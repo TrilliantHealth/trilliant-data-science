@@ -82,3 +82,13 @@ def test_generate_number_field_from_float_int_union():
 def test_union_types_are_hash_equal():
     assert ty.Union[float, int] == ty.Union[int, float]
     assert ty.Union[int, float] in {ty.Union[float, int]: "foo"}
+
+
+def test_raw_allows_none_by_default():
+    """This used to require raw: ty.Optional[ty.Any] because Raw does not accept None by default."""
+
+    @attrs.define
+    class Bar:
+        raw: ty.Any
+
+    neo(Bar)().load(dict(raw=None))
