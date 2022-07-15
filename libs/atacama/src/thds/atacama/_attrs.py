@@ -46,3 +46,10 @@ def yield_attributes(attrs_class: type) -> ty.Iterator[Attribute]:
             attribute.init,
             _get_attrs_field_default(attribute),
         )
+
+
+def is_attrs_class(cls: type) -> bool:
+    try:
+        return bool(attrs.fields(cls))
+    except TypeError:
+        return False

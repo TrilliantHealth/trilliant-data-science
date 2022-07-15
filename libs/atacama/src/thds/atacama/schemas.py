@@ -3,11 +3,11 @@ import typing as ty
 import marshmallow  # type: ignore
 from typing_extensions import Protocol
 
-from ._attrs import generate_attrs_post_load, yield_attributes
+from ._attrs import generate_attrs_post_load, is_attrs_class, yield_attributes
 from ._meta import SchemaMeta
 from .field_transforms import FieldTransform, apply_field_xfs
 from .fields import generate_field
-from .leaf import NATIVE_TO_MARSHMALLOW, LeafTypeMapping
+from .leaf import AtacamaBaseLeafTypeMapping, LeafTypeMapping
 
 
 def _set_default(default: object = marshmallow.missing) -> ty.Dict[str, ty.Any]:
@@ -71,7 +71,7 @@ class SchemaGenerator:
         meta: SchemaMeta,
         field_transforms: ty.Sequence[FieldTransform],
         *,
-        leaf_types: LeafTypeMapping = NATIVE_TO_MARSHMALLOW,
+        leaf_types: LeafTypeMapping = AtacamaBaseLeafTypeMapping,
     ):
         self._meta = meta
         self._field_transforms = field_transforms
@@ -95,6 +95,11 @@ class SchemaGenerator:
         schema_base_classes: ty.Tuple[ty.Type[marshmallow.Schema], ...] = (marshmallow.Schema,),
     ) -> ty.Type[marshmallow.Schema]:
         """Low-level API allowing for future keyword arguments that do not overlap with NamedFields."""
+        assert is_attrs_class(attrs_class), (
+            f"Object {attrs_class} (of type {type(attrs_class)}) is not an attrs class. "
+            "If this has been entered recursively, it's likely that you need a custom leaf type definition."
+        )
+
         return type(
             attrs_class.__name__ + "Schema",
             schema_base_classes,

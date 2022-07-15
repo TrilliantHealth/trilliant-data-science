@@ -4,6 +4,8 @@ from enum import Enum
 
 import attrs
 import marshmallow as ma
+import pytest
+from typing_extensions import Literal
 
 from core.atacama import neo
 
@@ -92,3 +94,40 @@ def test_raw_allows_none_by_default():
         raw: ty.Any
 
     neo(Bar)().load(dict(raw=None))
+
+
+def test_literals_are_supported_out_of_the_box():
+    @attrs.define
+    class Boo:
+        a: int
+        lit: Literal["s", "p"] = "s"
+
+    BooS = neo(Boo)
+    BooS().load(dict(a=3, lit="p"))
+    BooS().load(dict(a=3, lit="s"))
+    with pytest.raises(ma.exceptions.ValidationError) as e_info:
+        BooS().load(dict(a=4, lit="blah"))
+    assert str(e_info.value) == "{'lit': ['Must be one of: s, p.']}"
+
+    @attrs.define
+    class Goo:
+        lit: Literal["L", 2, True]
+
+    GooS = neo(Goo)
+    assert GooS().load(dict(lit=True)).lit is True
+    assert GooS().load(dict(lit=2)).lit == 2
+    assert GooS().load(dict(lit="L")).lit == "L"
+
+
+def test_new_types_are_unnested():
+    MyInt = ty.NewType("MyInt", int)
+
+    @attrs.define
+    class Moo:
+        my_int: MyInt
+
+    MooS = neo(Moo)
+
+    moo = MooS().load(dict(my_int=4))
+    assert moo.my_int == 4
+    assert type(moo.my_int) == int

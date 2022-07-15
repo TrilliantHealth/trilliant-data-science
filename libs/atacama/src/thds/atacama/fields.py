@@ -8,6 +8,7 @@ from functools import partial
 import marshmallow  # type: ignore
 import typing_inspect  # type: ignore
 
+from . import custom_fields
 from .leaf import LeafTypeMapping
 
 
@@ -78,6 +79,8 @@ def generate_field(
             collections.abc.MutableSequence,
         ):
             return marshmallow.fields.List(gen_field(arguments[0]), **field_kwargs)
+        if origin in (set, ty.Set, ty.MutableSet):
+            return custom_fields.Set(gen_field(arguments[0]), **field_kwargs)
         if origin in (tuple, ty.Tuple) and Ellipsis not in arguments:
             return marshmallow.fields.Tuple(  # type: ignore[no-untyped-call]
                 tuple(gen_field(arg) for arg in arguments),
