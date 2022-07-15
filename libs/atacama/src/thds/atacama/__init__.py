@@ -5,6 +5,7 @@ class MissingAtacamaImports(ImportError):
 try:
     from ._meta import meta  # noqa: F401
     from .generators import neo, ordered  # noqa: F401
+    from .leaf import AtacamaBaseLeafTypeMapping, DynamicLeafTypeMapping  # noqa: F401
     from .schemas import SchemaGenerator  # noqa: F401
 except ImportError as iex:
     raise MissingAtacamaImports(

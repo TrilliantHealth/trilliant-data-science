@@ -350,13 +350,38 @@ As a recursive generator, there must be known base cases where a
 concrete Marshmallow `Field` can be automatically generated based on
 the type of an attribute.
 
+#### Built-in mappings
+
 The default base cases are defined in `atacama/leaf.py`. They are
 relatively comprehensive as far as Python builtins go, covering
 various date/time concepts and UUID. We also specifically map
-`Union[int, float]` to the Marshmallow `Number` `Field`.
+`Union[int, float]` to the Marshmallow `Number` `Field`. Further, we
+support `typing_extensions.Literal` using the built-in Marshmallow
+validator `OneOf`, and we have introduced a simple `Set` `Field` that
+serializes `set`s to sorted `list`s.
+
+#### Custom static mappings
 
 Nevertheless, you may find that you wish to configure a more
 comprehensive (or different) set of leaf types for your
 `SchemaGenerator`. This may be configured by passing the keyword
 argument `leaf_types` to the `SchemaGenerator` constructor with a
-mapping of those leaf types.
+mapping of those leaf types. A `dict` is sufficient to provide a
+static `LeafTypeMapping`.
+
+#### Custom dynamic mappings
+
+You may also provide a more dynamic implementation of the `Protocol`
+defined in `atacama/leaf.py`. This would provide functionality similar
+to `cattrs.register_structure_hook`, except that a Marshmallow `Field`
+handles both serialization and deserialization. The included
+`DynamicLeafTypeMapping` class can help accomplish this, though you
+may provide your own custom implementation of the Protocol as
+well. `DynamicLeafTypeMapping` is recursively nestable, so you may
+overlay your own handlers on top of our base handlers via:
+
+```
+from atacama import DynamicLeafTypeMapping, AtacamaBaseLeafTypeMapping
+
+your_mapping = DynamicLeafTypeMapping(AtacamaBaseLeafTypeMapping, [handler_1, handler_2])
+```
