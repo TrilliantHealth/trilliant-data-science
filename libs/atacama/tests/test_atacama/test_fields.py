@@ -119,6 +119,26 @@ def test_literals_are_supported_out_of_the_box():
     assert GooS().load(dict(lit="L")).lit == "L"
 
 
+def test_unions_of_literals_inside_optionals_are_collapsed():
+    L1 = Literal["a", "b"]
+    L2 = Literal["c", "d"]
+
+    @attrs.define
+    class Roo:
+        lit: ty.Optional[ty.Union[L1, L2]] = None
+
+    RooS = neo(Roo)
+
+    roo = RooS().load(dict(lit="d"))
+    assert roo.lit == "d"
+
+    assert RooS().load(dict(lit=None)).lit is None
+    assert RooS().load(dict()).lit is None
+
+    with pytest.raises(ma.exceptions.ValidationError):
+        RooS().load(dict(lit="z"))
+
+
 def test_new_types_are_unnested():
     MyInt = ty.NewType("MyInt", int)
 

@@ -70,6 +70,12 @@ def generate_field(
     if origin:
         # each of these internal calls to field_for_schema for a Generic is recursive
         arguments = typing_inspect.get_args(typ, True)
+
+        def handle_union(types, **field_kwargs):
+            import marshmallow_union  # type: ignore
+
+            return marshmallow_union.Union([gen_field(subtyp) for subtyp in types], **field_kwargs)
+
         if origin in (
             list,
             ty.List,
@@ -86,12 +92,12 @@ def generate_field(
                 tuple(gen_field(arg) for arg in arguments),
                 **field_kwargs,
             )
-        elif origin in (tuple, ty.Tuple) and Ellipsis in arguments:
+        if origin in (tuple, ty.Tuple) and Ellipsis in arguments:
             return VariadicTuple(
                 gen_field(_only(arg for arg in arguments if arg != Ellipsis)),
                 **field_kwargs,
             )
-        elif origin in (
+        if origin in (
             dict,
             ty.Dict,
             ty.Mapping,
@@ -102,14 +108,17 @@ def generate_field(
             return marshmallow.fields.Dict(
                 **prefer_field_kwargs(keys=gen_field(arguments[0]), values=gen_field(arguments[1]))
             )
-        elif typing_inspect.is_optional_type(typ):
-            [subtyp] = (t for t in arguments if t is not NoneType)
-            # Treat optional types as types with a None default
-            return gen_field(subtyp, prefer_field_kwargs(allow_none=True))
-        elif typing_inspect.is_union_type(typ):
-            import marshmallow_union  # type: ignore
-
-            return marshmallow_union.Union([gen_field(subtyp) for subtyp in arguments], **field_kwargs)
+        if typing_inspect.is_optional_type(typ):
+            # Optionals are a special case of Union. _if_ the union is
+            # fully coalesced, we can treat it as a simple field.
+            non_none_subtypes = tuple(t for t in arguments if t is not NoneType)
+            if len(non_none_subtypes) == 1:
+                # Treat single-argument optional types as a field with a None default
+                return gen_field(non_none_subtypes[0], prefer_field_kwargs(allow_none=True))
+            # Otherwise, we must fall back to handling it as a Union.
+            return handle_union(non_none_subtypes, **prefer_field_kwargs(allow_none=True))
+        if typing_inspect.is_union_type(typ):
+            return handle_union(arguments)
 
     # ty.NewType returns a function with a __supertype__ attribute
     newtype_supertype = getattr(typ, "__supertype__", None)
