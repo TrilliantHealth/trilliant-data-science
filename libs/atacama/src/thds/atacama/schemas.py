@@ -1,10 +1,12 @@
 import typing as ty
 
 import marshmallow  # type: ignore
+import marshmallow.class_registry
 from typing_extensions import Protocol
 
 from ._attrs import generate_attrs_post_load, is_attrs_class, yield_attributes
 from ._meta import SchemaMeta
+from ._registry import only_identical_previously_generated_schema
 from .field_transforms import FieldTransform, apply_field_xfs
 from .fields import generate_field
 from .leaf import AtacamaBaseLeafTypeMapping, LeafTypeMapping
@@ -45,7 +47,7 @@ NamedField = ty.Union[
 
 class NamedFieldsSchemaGenerator(Protocol):
     def __call__(self, __attrs_class: type, **__named_fields: NamedField) -> ty.Type[marshmallow.Schema]:
-        ...
+        ...  # pragma: nocover
 
 
 class SchemaGenerator:
@@ -99,9 +101,15 @@ class SchemaGenerator:
             f"Object {attrs_class} (of type {type(attrs_class)}) is not an attrs class. "
             "If this has been entered recursively, it's likely that you need a custom leaf type definition."
         )
+        schema_name = ".".join((attrs_class.__module__, attrs_class.__name__)) + "Schema"
+        schema, register = only_identical_previously_generated_schema(
+            schema_name, self, attrs_class, schema_name, named_fields, schema_base_classes
+        )
+        if schema:
+            return schema
 
-        return type(
-            attrs_class.__name__ + "Schema",
+        schema = type(
+            schema_name,
             schema_base_classes,
             dict(
                 apply_field_xfs(
@@ -110,8 +118,11 @@ class SchemaGenerator:
                 ),
                 Meta=self._meta,
                 __atacama_post_load=generate_attrs_post_load(attrs_class),
+                __generated_by_atacama=True,  # not used for anything currently
             ),
         )
+        register(schema)
+        return schema
 
     def _named_field_discriminator(self, attribute, named_field: NamedField) -> marshmallow.fields.Field:
         """When we are given a field name with a provided value, there are 4 possibilities."""
