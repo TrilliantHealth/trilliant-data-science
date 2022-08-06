@@ -24,14 +24,24 @@ def _is_schema(a: ty.Any):
     )
 
 
+class NamedFieldsSchemaGenerator(Protocol):
+    def __call__(self, __attrs_class: type, **__fields: "NamedField") -> ty.Type[marshmallow.Schema]:
+        ...  # pragma: nocover
+
+
 class NestedSchemaGenerator:
-    def __init__(self, sg, field_kwargs, fields):
+    def __init__(
+        self,
+        sg: NamedFieldsSchemaGenerator,
+        field_kwargs: ty.Mapping[str, ty.Any],
+        fields: "ty.Mapping[str, NamedField]",
+    ):
         self._schema_generator = sg
         self.field_kwargs = field_kwargs
         self._fields = fields
         # to be used by the discriminator
 
-    def __call__(self, typ: type):
+    def __call__(self, typ: type) -> ty.Type[marshmallow.Schema]:
         return self._schema_generator(typ, **self._fields)
 
 
@@ -42,11 +52,6 @@ class PartialField(ty.NamedTuple):
 NamedField = ty.Union[
     marshmallow.fields.Field, NestedSchemaGenerator, PartialField, ty.Type[marshmallow.Schema]
 ]
-
-
-class NamedFieldsSchemaGenerator(Protocol):
-    def __call__(self, __attrs_class: type, **__named_fields: NamedField) -> ty.Type[marshmallow.Schema]:
-        ...  # pragma: nocover
 
 
 class SchemaGenerator:
