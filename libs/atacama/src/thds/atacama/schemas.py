@@ -1,12 +1,11 @@
 import typing as ty
 
 import marshmallow  # type: ignore
-import marshmallow.class_registry
 from typing_extensions import Protocol
 
 from ._attrs import generate_attrs_post_load, is_attrs_class, yield_attributes
+from ._cache import GenSchemaCachingDeco
 from ._meta import SchemaMeta
-from ._registry import only_identical_previously_generated_schema
 from .field_transforms import FieldTransform, apply_field_xfs
 from .fields import generate_field
 from .leaf import AtacamaBaseLeafTypeMapping, LeafTypeMapping
@@ -74,41 +73,38 @@ class SchemaGenerator:
         field_transforms: ty.Sequence[FieldTransform],
         *,
         leaf_types: LeafTypeMapping = AtacamaBaseLeafTypeMapping,
+        cache: ty.Optional[GenSchemaCachingDeco] = None,
     ):
         self._meta = meta
         self._field_transforms = field_transforms
         self._leaf_types = leaf_types
+        self.generate = cache(self._generate) if cache else self._generate
+        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields."""
 
     def __call__(
         self,
         __attrs_class: type,
         **named_fields: NamedField,
     ) -> ty.Type[marshmallow.Schema]:
-        """Generates a Schema class from an attrs class.
+        """Generate a Schema class from an attrs class.
 
         High-level convenience API that allows for using keyword arguments.
         """
         return self.generate(__attrs_class, named_fields=named_fields)
 
-    def generate(
+    def _generate(
         self,
         attrs_class: type,
         named_fields: ty.Mapping[str, NamedField] = dict(),  # noqa: B006
         schema_base_classes: ty.Tuple[ty.Type[marshmallow.Schema], ...] = (marshmallow.Schema,),
     ) -> ty.Type[marshmallow.Schema]:
-        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields."""
+        """Uncached low-level API."""
         assert is_attrs_class(attrs_class), (
             f"Object {attrs_class} (of type {type(attrs_class)}) is not an attrs class. "
             "If this has been entered recursively, it's likely that you need a custom leaf type definition."
         )
         schema_name = ".".join((attrs_class.__module__, attrs_class.__name__)) + "Schema"
-        schema, register = only_identical_previously_generated_schema(
-            schema_name, self, attrs_class, schema_name, named_fields, schema_base_classes
-        )
-        if schema:
-            return schema
-
-        schema = type(
+        return type(
             schema_name,
             schema_base_classes,
             dict(
@@ -121,8 +117,6 @@ class SchemaGenerator:
                 __generated_by_atacama=True,  # not used for anything currently
             ),
         )
-        register(schema)
-        return schema
 
     def _named_field_discriminator(self, attribute, named_field: NamedField) -> marshmallow.fields.Field:
         """When we are given a field name with a provided value, there are 4 possibilities."""
