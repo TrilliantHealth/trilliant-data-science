@@ -79,7 +79,10 @@ class SchemaGenerator:
         self._field_transforms = field_transforms
         self._leaf_types = leaf_types
         self.generate = cache(self._generate) if cache else self._generate
-        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields."""
+        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields.
+
+        May include caching if the SchemaGenerator is so-equipped.
+        """
 
     def __call__(
         self,
@@ -103,9 +106,8 @@ class SchemaGenerator:
             f"Object {attrs_class} (of type {type(attrs_class)}) is not an attrs class. "
             "If this has been entered recursively, it's likely that you need a custom leaf type definition."
         )
-        schema_name = ".".join((attrs_class.__module__, attrs_class.__name__)) + "Schema"
         return type(
-            schema_name,
+            ".".join((attrs_class.__module__, attrs_class.__name__)) + "Schema",
             schema_base_classes,
             dict(
                 apply_field_xfs(
