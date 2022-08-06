@@ -78,11 +78,8 @@ class SchemaGenerator:
         self._meta = meta
         self._field_transforms = field_transforms
         self._leaf_types = leaf_types
-        self.generate = cache(self._generate) if cache else self._generate
-        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields.
-
-        May include caching if the SchemaGenerator is so-equipped.
-        """
+        if cache:
+            self.generate = cache(self.generate)  # type: ignore
 
     def __call__(
         self,
@@ -95,13 +92,16 @@ class SchemaGenerator:
         """
         return self.generate(__attrs_class, named_fields=named_fields)
 
-    def _generate(
+    def generate(
         self,
         attrs_class: type,
         named_fields: ty.Mapping[str, NamedField] = dict(),  # noqa: B006
         schema_base_classes: ty.Tuple[ty.Type[marshmallow.Schema], ...] = (marshmallow.Schema,),
     ) -> ty.Type[marshmallow.Schema]:
-        """Uncached low-level API."""
+        """Low-level API allowing for future keyword arguments that do not overlap with NamedFields.
+
+        May include caching if the SchemaGenerator is so-equipped.
+        """
         assert is_attrs_class(attrs_class), (
             f"Object {attrs_class} (of type {type(attrs_class)}) is not an attrs class. "
             "If this has been entered recursively, it's likely that you need a custom leaf type definition."
