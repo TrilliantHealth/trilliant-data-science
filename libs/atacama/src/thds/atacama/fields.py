@@ -49,21 +49,14 @@ def generate_field(
     if typ in leaf_types:
         return leaf_types[typ](**field_kwargs)
 
-    gen_field = partial(
-        generate_field, leaf_types, schema_generator
-    )  # all recursive calls from here on out
+    gen_field = partial(generate_field, leaf_types, schema_generator)
+    # all recursive calls from here on out
 
     def prefer_field_kwargs(**kwargs):
         """In a couple of cases, we generate some Field kwargs, but we
         also want to prefer whatever may have been manually specified.
         """
         return {**kwargs, **field_kwargs}
-
-    def seq_handler(typ: ty.Type):
-        return marshmallow.fields.List(gen_field(typ), **field_kwargs)
-
-    def set_handler(typ: ty.Type):
-        return custom_fields.Set(gen_field(typ), **field_kwargs)
 
     def tuple_handler(types: ty.Type, variadic: bool):
         if not variadic:
@@ -72,11 +65,6 @@ def generate_field(
                 **field_kwargs,
             )
         return VariadicTuple(gen_field(types[0]), **field_kwargs)
-
-    def mapping_handler(keytype: ty.Type, valtype: ty.Type):
-        return marshmallow.fields.Dict(
-            **prefer_field_kwargs(keys=gen_field(keytype), values=gen_field(valtype))
-        )
 
     def union_handler(types, **field_kwargs):
         import marshmallow_union  # type: ignore
@@ -92,11 +80,7 @@ def generate_field(
         # Otherwise, we must fall back to handling it as a Union.
         return union_handler(non_none_subtypes, **prefer_field_kwargs(allow_none=True))
 
-    def newtype_handler(newtype_supertype):
-        return gen_field(newtype_supertype, field_kwargs)
-
     def fallthrough_handler(typ: ty.Type):
-
         if type(typ) is enum.EnumMeta:
             import marshmallow_enum  # type: ignore
 
@@ -122,12 +106,14 @@ def generate_field(
         return marshmallow.fields.Nested(nested_schema, **field_kwargs)
 
     return generic_types_dispatch(
-        seq_handler,
-        set_handler,
-        tuple_handler,
-        mapping_handler,
-        optional_handler,
-        union_handler,
-        newtype_handler,
-        fallthrough_handler,
+        sequence_handler=lambda typ: marshmallow.fields.List(gen_field(typ), **field_kwargs),
+        set_handler=lambda typ: custom_fields.Set(gen_field(typ), **field_kwargs),
+        tuple_handler=tuple_handler,
+        mapping_handler=lambda keytype, valtype: marshmallow.fields.Dict(
+            **prefer_field_kwargs(keys=gen_field(keytype), values=gen_field(valtype))
+        ),
+        optional_handler=optional_handler,
+        union_handler=union_handler,
+        newtype_handler=lambda newtype_supertype: gen_field(newtype_supertype, field_kwargs),
+        fallthrough_handler=fallthrough_handler,
     )(typ)
