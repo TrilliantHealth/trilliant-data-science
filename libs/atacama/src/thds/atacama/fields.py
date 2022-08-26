@@ -1,7 +1,4 @@
-# portions copyright Desert contributors - see LICENSE_desert.md
-import collections
 import enum
-import inspect
 import typing as ty
 from functools import partial
 
@@ -9,6 +6,7 @@ import marshmallow  # type: ignore
 import typing_inspect  # type: ignore
 
 from . import custom_fields
+from ._generic_dispatch import generic_types_dispatch
 from .leaf import LeafTypeMapping
 
 
@@ -21,12 +19,6 @@ class VariadicTuple(marshmallow.fields.List):
 
 T = ty.TypeVar("T")
 NoneType = type(None)
-
-
-def _only(items: ty.Iterable[T]) -> T:
-    """Return the only item in an iterable or raise ValueError."""
-    [x] = items
-    return x
 
 
 # most kwargs for a field belong to the surrounding context,
@@ -44,8 +36,10 @@ def generate_field(
     typ: type,
     field_kwargs: ty.Mapping[str, ty.Any] = dict(),  # noqa: [B006]
 ) -> marshmallow.fields.Field:
-    """Returns a Marshmallow Field if a leaf type can be resolved,
-    or if a leaf type can be 'unwrapped' from a Generic or other wrapper type.
+    """Return a Marshmallow Field or Schema.
+
+    Return a Field if a leaf type can be resolved.or if a leaf type
+    can be 'unwrapped' from a Generic or other wrapper type.
 
     If no leaf type can be resolved, attempts to construct a Nested Schema.
 
@@ -65,89 +59,75 @@ def generate_field(
         """
         return {**kwargs, **field_kwargs}
 
-    # Generic types
-    origin = typing_inspect.get_origin(typ)
-    if origin:
-        # each of these internal calls to field_for_schema for a Generic is recursive
-        arguments = typing_inspect.get_args(typ, True)
+    def seq_handler(typ: ty.Type):
+        return marshmallow.fields.List(gen_field(typ), **field_kwargs)
 
-        def handle_union(types, **field_kwargs):
-            import marshmallow_union  # type: ignore
+    def set_handler(typ: ty.Type):
+        return custom_fields.Set(gen_field(typ), **field_kwargs)
 
-            return marshmallow_union.Union([gen_field(subtyp) for subtyp in types], **field_kwargs)
-
-        if origin in (
-            list,
-            ty.List,
-            ty.Sequence,
-            ty.MutableSequence,
-            collections.abc.Sequence,
-            collections.abc.MutableSequence,
-        ):
-            return marshmallow.fields.List(gen_field(arguments[0]), **field_kwargs)
-        if origin in (set, ty.Set, ty.MutableSet):
-            return custom_fields.Set(gen_field(arguments[0]), **field_kwargs)
-        if origin in (tuple, ty.Tuple) and Ellipsis not in arguments:
+    def tuple_handler(types: ty.Type, variadic: bool):
+        if not variadic:
             return marshmallow.fields.Tuple(  # type: ignore[no-untyped-call]
-                tuple(gen_field(arg) for arg in arguments),
+                tuple(gen_field(typ) for typ in types),
                 **field_kwargs,
             )
-        if origin in (tuple, ty.Tuple) and Ellipsis in arguments:
-            return VariadicTuple(
-                gen_field(_only(arg for arg in arguments if arg != Ellipsis)),
-                **field_kwargs,
-            )
-        if origin in (
-            dict,
-            ty.Dict,
-            ty.Mapping,
-            ty.MutableMapping,
-            collections.abc.Mapping,
-            collections.abc.MutableMapping,
-        ):
-            return marshmallow.fields.Dict(
-                **prefer_field_kwargs(keys=gen_field(arguments[0]), values=gen_field(arguments[1]))
-            )
-        if typing_inspect.is_optional_type(typ):
-            # Optionals are a special case of Union. _if_ the union is
-            # fully coalesced, we can treat it as a simple field.
-            non_none_subtypes = tuple(t for t in arguments if t is not NoneType)
-            if len(non_none_subtypes) == 1:
-                # Treat single-argument optional types as a field with a None default
-                return gen_field(non_none_subtypes[0], prefer_field_kwargs(allow_none=True))
-            # Otherwise, we must fall back to handling it as a Union.
-            return handle_union(non_none_subtypes, **prefer_field_kwargs(allow_none=True))
-        if typing_inspect.is_union_type(typ):
-            return handle_union(arguments)
+        return VariadicTuple(gen_field(types[0]), **field_kwargs)
 
-    # ty.NewType returns a function with a __supertype__ attribute
-    newtype_supertype = getattr(typ, "__supertype__", None)
-    if newtype_supertype and inspect.isfunction(typ):
-        # this is just an unwrapping step.
-        # metadata.setdefault("description", typ.__name__)
+    def mapping_handler(keytype: ty.Type, valtype: ty.Type):
+        return marshmallow.fields.Dict(
+            **prefer_field_kwargs(keys=gen_field(keytype), values=gen_field(valtype))
+        )
+
+    def union_handler(types, **field_kwargs):
+        import marshmallow_union  # type: ignore
+
+        return marshmallow_union.Union([gen_field(subtyp) for subtyp in types], **field_kwargs)
+
+    def optional_handler(non_none_subtypes):
+        # Optionals are a special case of Union. _if_ the union is
+        # fully coalesced, we can treat it as a simple field.
+        if len(non_none_subtypes) == 1:
+            # Treat single-argument optional types as a field with a None default
+            return gen_field(non_none_subtypes[0], prefer_field_kwargs(allow_none=True))
+        # Otherwise, we must fall back to handling it as a Union.
+        return union_handler(non_none_subtypes, **prefer_field_kwargs(allow_none=True))
+
+    def newtype_handler(newtype_supertype):
         return gen_field(newtype_supertype, field_kwargs)
 
-    # enumerations
-    if type(typ) is enum.EnumMeta:
-        import marshmallow_enum  # type: ignore
+    def fallthrough_handler(typ: ty.Type):
 
-        return marshmallow_enum.EnumField(typ, **field_kwargs)
+        if type(typ) is enum.EnumMeta:
+            import marshmallow_enum  # type: ignore
 
-    # Nested dataclasses
-    forward_reference = typing_inspect.get_forward_arg(typ)
-    if forward_reference:
-        # TODO this is not getting hit - I think because typing_inspect.get_args
-        # resolves all ForwardRefs that live inside any kind of Generic type, including Unions,
-        # turning them into _not_ ForwardRefs anymore.a
-        return marshmallow.fields.Nested(forward_reference, **field_kwargs)
-    # by using a lambda here, we can provide full support for self-recursive schemas
-    # the same way Marshmallow itself does:
-    # https://marshmallow.readthedocs.io/en/stable/nesting.html#nesting-a-schema-within-itself
-    #
-    # One disadvantage is that we defer errors until runtime, so it may be worth considering
-    # whether we should find a different way of 'discovering' mutually-recursive types
-    try:
-        nested_schema = schema_generator(typ)
-    except RecursionError:
-        nested_schema = lambda: schema_generator(typ)  # type: ignore # noqa: E731
-    return marshmallow.fields.Nested(nested_schema, **field_kwargs)
+            return marshmallow_enum.EnumField(typ, **field_kwargs)
+
+        # Nested dataclasses
+        forward_reference = typing_inspect.get_forward_arg(typ)
+        if forward_reference:
+            # TODO this is not getting hit - I think because typing_inspect.get_args
+            # resolves all ForwardRefs that live inside any kind of Generic type, including Unions,
+            # turning them into _not_ ForwardRefs anymore.a
+            return marshmallow.fields.Nested(forward_reference, **field_kwargs)
+        # by using a lambda here, we can provide full support for self-recursive schemas
+        # the same way Marshmallow itself does:
+        # https://marshmallow.readthedocs.io/en/stable/nesting.html#nesting-a-schema-within-itself
+        #
+        # One disadvantage is that we defer errors until runtime, so it may be worth considering
+        # whether we should find a different way of 'discovering' mutually-recursive types
+        try:
+            nested_schema = schema_generator(typ)
+        except RecursionError:
+            nested_schema = lambda: schema_generator(typ)  # type: ignore # noqa: E731
+        return marshmallow.fields.Nested(nested_schema, **field_kwargs)
+
+    return generic_types_dispatch(
+        seq_handler,
+        set_handler,
+        tuple_handler,
+        mapping_handler,
+        optional_handler,
+        union_handler,
+        newtype_handler,
+        fallthrough_handler,
+    )(typ)

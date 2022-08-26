@@ -81,9 +81,20 @@ class DynamicLeafTypeMapping(LeafTypeMapping):
 
 def handle_literals(lt: LeafType) -> OptFieldType:
     if typing_inspect.is_literal_type(lt):
-        return _field_with_default_kwargs(
-            marshmallow.fields.Raw, validate=marshmallow.validate.OneOf(typing_inspect.get_args(lt))
-        )
+        values = typing_inspect.get_args(lt)
+        validator = marshmallow.validate.OneOf(values)
+        # the validator is the same no matter what - set membership/equality
+
+        types = [type(val) for val in values]
+        if all(typ == types[0] for typ in types):
+            # if we can narrow down to a single shared leaf type, use it:
+            underlying_type = types[0]
+            if underlying_type in NATIVE_TO_MARSHMALLOW:
+                return _field_with_default_kwargs(
+                    NATIVE_TO_MARSHMALLOW[underlying_type], validate=validator
+                )
+        # otherwise use the Raw type with the OneOf validator
+        return _field_with_default_kwargs(marshmallow.fields.Raw, validate=validator)
     return None
 
 
