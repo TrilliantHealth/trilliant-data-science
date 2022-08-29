@@ -1,3 +1,4 @@
+# portions copyright Desert contributors - see LICENSE_desert.md
 import enum
 import typing as ty
 from functools import partial

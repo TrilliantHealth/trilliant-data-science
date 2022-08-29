@@ -27,6 +27,11 @@ def test_handles_literals():
     with pytest.raises(ValidationError):
         s_or_p.deserialize("g")
 
+    assert isinstance(dm[Literal[1, 2]](), marshmallow.fields.Integer)
+    assert isinstance(dm[Literal[1.0, 2.0]](), marshmallow.fields.Float)
+    assert isinstance(dm[Literal[True, False]](), marshmallow.fields.Boolean)
+    assert isinstance(dm[Literal[1, False]](), marshmallow.fields.Raw)
+
 
 def test_dynamic_leaf_type_mapping():
     def fake_handle_literals(obj):
