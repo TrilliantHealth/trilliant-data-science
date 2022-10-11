@@ -1,0 +1,31 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+name = "ds-pypi-releases-local"
+url = "https://artifactory.trillianthealth.com/artifactory/api/pypi/ds-pypi-releases-local/simple"
+verify_ssl = true
+
+[dev-packages]
+# MONOREPO STANDARDS
+ipython = "*"
+mypy = "==0.982"
+mypy-extensions = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "*"
+types-setuptools = "*"
+# PROJECT-SPECIFIC
+"thds.core" = {path = ".", extras = ["dev"], editable = true}
+"types-toml" = "*"
+
+[packages]
+# DO NOT SPECIFY OTHER NON-LOCAL RUNTIME DEPENDENCIES HERE.
+"thds.core" = {path = ".", editable = true}
+# PUT THOSE IN pyproject.toml ONLY PLEASE.
+# packable SHOULD HAVE NO OTHER LOCAL RUNTIME DEPENDENCIES
+
+[requires]
+python_version = "3.8"
