@@ -10,9 +10,6 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package, open_text
 from types import MappingProxyType
 
-import attr
-from cattrs import Converter
-
 from .log import getLogger
 
 LayoutType = ty.Literal["flat", "src"]
@@ -163,7 +160,7 @@ def get_commit(pkg: Package = "") -> str:
     return ""
 
 
-def is_dirty() -> bool:
+def is_dirty(pkg: Package = "") -> bool:
     if GIT_IS_DIRTY in os.environ:
         LOGGER.debug("`is_dirty` reading from env var.")
         return bool(os.environ[GIT_IS_DIRTY])
@@ -179,6 +176,11 @@ def is_dirty() -> bool:
             pass
     except ImportError:  # pragma: no cover
         pass
+
+    if pkg:
+        LOGGER.debug("`is_dirty` reading from metadata.")
+        metadata = read_metadata(pkg)
+        return bool(metadata.git_is_dirty)
 
     LOGGER.debug("`is_dirty` found no dirtiness - assume dirty.")
     return True
@@ -248,6 +250,7 @@ MiscType = ty.Mapping[str, MetaPrimitiveType]
 class Metadata:
     git_commit: str = ""
     git_branch: str = ""
+    git_is_dirty: str = ""
     thds_user: str = ""
     misc: MiscType = dataclasses.field(default_factory=lambda: MappingProxyType(dict()))
 
@@ -268,7 +271,7 @@ class Metadata:
         return format_name(self.thds_user, "hive")
 
 
-def structure_metadata(payload: ty.Mapping[str, ty.Union[str, MiscType]]) -> Metadata:
+def structure_metadata(payload: ty.Mapping[str, ty.Union[MetaPrimitiveType, MiscType]]) -> Metadata:
     payload_fields = set(payload.keys())
     expected_fields = set((field.name for field in dataclasses.fields(Metadata)))
 
@@ -285,17 +288,16 @@ def structure_metadata(payload: ty.Mapping[str, ty.Union[str, MiscType]]) -> Met
     )
 
 
-def unstructure_metadata(metadata: Metadata) -> ty.Dict[str, ty.Union[str, ty.Dict[str, MetaPrimitiveType]]]:
-    payload = dataclasses.asdict(metadata)
-    payload["misc"] = dict(payload["misc"])
+def unstructure_metadata(
+    metadata: Metadata,
+) -> ty.Dict[str, ty.Union[str, ty.Dict[MetaPrimitiveType, MetaPrimitiveType]]]:
+    payload_fields = set((field.name for field in dataclasses.fields(Metadata)))
+    payload = {
+        field: getattr(metadata, field) if field != "misc" else dict(getattr(metadata, field))
+        for field in payload_fields
+    }
 
     return payload
-
-
-# meta_converter = Converter()
-# meta_converter.register_structure_hook(MiscType, lambda misc, _: MappingProxyType(misc))
-# # TODO - figure out typing issue for unstructure hook
-# meta_converter.register_unstructure_hook(MiscType, lambda misc: dict(misc))  # type: ignore
 
 
 class EmptyMetadataException(Exception):
@@ -307,9 +309,12 @@ class BadMetadataException(Exception):
 
 
 def init_metadata(misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None) -> Metadata:
+    dirty = is_dirty()
+
     return Metadata(
         git_commit=get_commit(),
         git_branch=get_branch(),
+        git_is_dirty="True" if dirty else "",
         thds_user=get_user(),
         misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
     )

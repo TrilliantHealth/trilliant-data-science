@@ -2,10 +2,10 @@
 # I have made some small modifications to the code
 import inspect
 
-import attrs
+from dataclasses import dataclass
 
 
-@attrs.frozen
+@dataclass(frozen=True)
 class CallerInfo:
     module: str = ""
     klass: str = ""

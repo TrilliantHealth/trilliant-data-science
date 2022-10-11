@@ -27,18 +27,13 @@ repository = "https://github.com/TrilliantHealth/similarity"
 
 # PROJECT ENTRY POINTS
 [project.scripts]
-release = "thds.core.distr.packaging:release"
+release = "thds.core.monotools.distr.packaging:release"
 
 # BUILD CONFIG
 [build-system]
 requires = [
     "setuptools>=61.0.0",
     "wheel",
-    "attrs",
-    "cattrs",
-    "build",
-    "gitpython",
-    "toml",
 ]
 build-backend = "setuptools.build_meta"
 

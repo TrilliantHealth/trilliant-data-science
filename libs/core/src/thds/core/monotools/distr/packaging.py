@@ -1,3 +1,7 @@
+# This is heavily inspired by Dan Hipschman of OpenDoor's gist here:
+# https://gist.github.com/dan-hipschman-od/070318806610727f17b2d6616ceaa4cc
+# The above is referenced in the Q&A from Hipschman's great article here:
+# https://medium.com/opendoor-labs/our-python-monorepo-d34028f2b6fa
 import argparse
 import functools
 import os
@@ -8,9 +12,10 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import __version__
-from ..log import getLogger
-from ..meta import DEPLOYING, META_FILE, init_metadata, meta_converter
+from ..util import load_pyproject, load_pipfile_dependencies
+from ... import __version__
+from ...log import getLogger
+from ...meta import DEPLOYING, META_FILE, init_metadata, unstructure_metadata
 
 try:
     import build  # noqa: F401
@@ -19,12 +24,6 @@ except ImportError:  # pragma: no cover
     raise RuntimeError("Install `build` and `toml` (`core[dev]`) to run the `release` CLI.")
 
 LOGGER = getLogger(__name__)
-
-
-# This is heavily inspired by Dan Hipschman of OpenDoor's gist here:
-# https://gist.github.com/dan-hipschman-od/070318806610727f17b2d6616ceaa4cc
-# The above is referenced in the Q&A from Hipschman's great article here:
-# https://medium.com/opendoor-labs/our-python-monorepo-d34028f2b6fa
 
 PYPROJECT_FILE = "pyproject.toml"
 STASHED_PYRPOJECT_FILE = "pyproject.toml.stashed"
@@ -77,57 +76,73 @@ def export_metadata(func):
     @functools.wraps(func)
     def wrapper_export_metadata(*args, **kwargs):
         os.environ[DEPLOYING] = "1"
-        metadata = meta_converter.unstructure(init_metadata())
+        metadata = unstructure_metadata(init_metadata())
+        del metadata["misc"]
         LOGGER.info("Exporting metadata:\n" "%s", metadata)
         for k, v in metadata.items():
             if k != "misc":
-                os.environ[k.upper()] = v
+                os.environ[k.upper()] = str(v)
         return func(*args, **kwargs)
 
     return wrapper_export_metadata
 
 
+def _determine_release_version(pyproject_data: ty.Dict, incl_patch: bool) -> str:
+    version_str = pyproject_data["project"]["version"]
+
+    if version_str.count(".") != 1:
+        raise ValueError("Version must be major.minor, patch will be added.")
+
+    patch_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") if incl_patch else ""
+
+    return f"{version_str}.{patch_version}" if patch_version else version_str
+
+
+def _resolve_local_deps(dependencies: ty.Dict, package_name: str) -> ty.List[str]:
+    dependencies_to_add = []
+
+    for dep_name, dep_value in dependencies.items():
+        if isinstance(dep_value, dict) and "path" in dep_value and dep_name != package_name:
+            # Found a non-self, local dependency. Load it's pyproject.toml to get its version
+            dep_pyproject_file = f"{dep_value['path']}/{PYPROJECT_FILE}"
+            dep_pyproject_data = toml.load(dep_pyproject_file)
+            dep_version = dep_pyproject_data["project"]["version"]
+            if dep_version.count(".") != 1:
+                raise ValueError(f"Version in {dep_pyproject_file} must be major.minor")
+
+            dep_version_parts = tuple(int(v) for v in dep_version.split("."))
+            next_minor_version = ".".join([str(dep_version_parts[0]), str(dep_version_parts[1] + 1)])
+
+            # The requirement should be to use the most recent published version, but
+            # add a max version constraint so we don't pull in future versions that might
+            # accidentally break things.
+            dep_version_requirement = f">={dep_version},<{next_minor_version}"
+            dependencies_to_add.append(f"{dep_name}{dep_version_requirement}")
+
+    return dependencies_to_add
+
+
 # TODO - refactor this into smaller functions for readability
 def resolve_deps(incl_patch: bool = True):
+    try:
+        import toml
+    except ImportError:  # pragma: no cover
+        raise RuntimeError("The `toml` package is needed, install `core[dev]`.")
+
     def decorator_resolve_deps(func):
         @functools.wraps(func)
         def wrapper_resolve_deps(*args, **kwargs):
             with stash_file(PYPROJECT_FILE, STASHED_PYRPOJECT_FILE):
-                pyproject_data = toml.load(STASHED_PYRPOJECT_FILE)
-                package_name = pyproject_data["project"]["name"]
+                package_name, pyproject_data = load_pyproject(STASHED_PYRPOJECT_FILE)
 
                 # Add a timestamp for the patch version
-                version_str = pyproject_data["project"]["version"]
-                if version_str.count(".") != 1:
-                    raise ValueError("Version must be major.minor, patch will be added.")
-
-                patch_version = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") if incl_patch else ""
-                release_version = f"{version_str}.{patch_version}" if patch_version else version_str
-                pyproject_data["project"]["version"] = release_version
+                pyproject_data["project"]["version"] = _determine_release_version(
+                    pyproject_data, incl_patch
+                )
 
                 # Replace local dependencies with published dependencies
-                pipfile_data = toml.load(PIPFILE)
-                dependencies = pipfile_data.get("packages", {})
-                dependencies_to_add = []
-                for dep_name, dep_value in dependencies.items():
-                    if isinstance(dep_value, dict) and "path" in dep_value and dep_name != package_name:
-                        # Found a non-self, local dependency. Load it's pyproject.toml to get its version
-                        dep_pyproject_file = f"{dep_value['path']}/{PYPROJECT_FILE}"
-                        dep_pyproject_data = toml.load(dep_pyproject_file)
-                        dep_version = dep_pyproject_data["project"]["version"]
-                        if dep_version.count(".") != 1:
-                            raise ValueError(f"Version in {dep_pyproject_file} must be major.minor")
-
-                        dep_version_parts = tuple(int(v) for v in dep_version.split("."))
-                        next_minor_version = ".".join(
-                            [str(dep_version_parts[0]), str(dep_version_parts[1] + 1)]
-                        )
-
-                        # The requirement should be to use the most recent published version, but
-                        # add a max version constraint so we don't pull in future versions that might
-                        # accidentally break things.
-                        dep_version_requirement = f">={dep_version},<{next_minor_version}"
-                        dependencies_to_add.append(f"{dep_name}{dep_version_requirement}")
+                dependencies = load_pipfile_dependencies(PIPFILE)
+                dependencies_to_add = _resolve_local_deps(dependencies, package_name)
 
                 # Append published verions of local dependencies to pyproject.toml's dependencies
                 try:
@@ -149,21 +164,21 @@ def resolve_deps(incl_patch: bool = True):
 @clean_metadata
 @export_metadata
 @resolve_deps()
-def _release() -> None:
-    # Build
+def _build() -> None:
     if os.path.isdir("dist"):
         LOGGER.info("'dist' folder already exists. Removing before rebuilding the distribution.")
         shutil.rmtree("dist")
-    build_cmd = ["python", "-m", "build", "-w", "."]
+    build_cmd = ["python", "-m", "build", "."]
     build_status = subprocess.run(build_cmd)
     if build_status.returncode != 0:
         raise subprocess.CalledProcessError(
             returncode=build_status.returncode,
             cmd=" ".join(build_cmd),
-            output="Could not build wheel, please see output above to debug.",
+            output="Could not build package, please see output above to debug.",
         )
 
-    # Release to Artifactory
+
+def _release() -> None:
     release_cmd = [
         "jfrog",
         "rt",
@@ -193,4 +208,4 @@ def release():
     parser.add_argument("-v", "--version", action="version", version=f"{__version__}")
     _ = parser.parse_args()
 
-    _release()
+    _build()
