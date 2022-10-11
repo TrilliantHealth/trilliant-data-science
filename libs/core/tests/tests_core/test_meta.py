@@ -91,14 +91,14 @@ def test_metadata_structure(
     metadata_unstructured: ty.Dict[str, ty.Union[meta.MetaPrimitiveType, meta.MiscType]],
     metadata: meta.Metadata,
 ) -> None:
-    assert meta.meta_converter.structure(metadata_unstructured, meta.Metadata) == metadata
+    assert meta.structure_metadata(metadata_unstructured) == metadata
 
 
 def test_metadata_unstructure(
     metadata: meta.Metadata,
     metadata_unstructured: ty.Dict[str, ty.Union[meta.MetaPrimitiveType, meta.MiscType]],
 ) -> None:
-    assert meta.meta_converter.unstructure(metadata) == metadata_unstructured
+    assert meta.unstructure_metadata(metadata) == metadata_unstructured
 
 
 def test_format_name_git() -> None:
