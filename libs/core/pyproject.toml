@@ -34,6 +34,8 @@ release = "thds.core.monotools.distr.packaging:release"
 requires = [
     "setuptools>=61.0.0",
     "wheel",
+    "attrs",
+    "cattrs",
 ]
 build-backend = "setuptools.build_meta"
 

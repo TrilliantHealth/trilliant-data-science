@@ -41,14 +41,26 @@ def misc() -> meta.MiscType:
 
 @pytest.fixture
 def metadata(misc: meta.MiscType) -> meta.Metadata:
-    return meta.Metadata(git_commit=COMMIT_HASH, git_branch=BRANCH_NAME, thds_user=USER_NAME, misc=misc)
+    return meta.Metadata(
+        git_commit=COMMIT_HASH,
+        git_branch=BRANCH_NAME,
+        git_is_clean="True",
+        thds_user=USER_NAME,
+        misc=misc,
+    )
 
 
 @pytest.fixture
 def metadata_unstructured(
     misc: meta.MiscType,
 ) -> ty.Dict[str, ty.Union[meta.MetaPrimitiveType, meta.MiscType]]:
-    return dict(git_commit=COMMIT_HASH, git_branch=BRANCH_NAME, thds_user=USER_NAME, misc=dict(misc))
+    return dict(
+        git_commit=COMMIT_HASH,
+        git_branch=BRANCH_NAME,
+        git_is_clean="True",
+        thds_user=USER_NAME,
+        misc=dict(misc),
+    )
 
 
 @pytest.fixture
@@ -82,23 +94,29 @@ def test_metadata(metadata: meta.Metadata) -> None:
     assert metadata.thds_user == USER_NAME
     assert metadata.docker_user == USER_NAME
     assert metadata.hive_user == HIVE_USER_NAME
+    assert not metadata.is_empty
     assert metadata.misc["bool"]
     with pytest.raises(TypeError):
         metadata.misc["new"] = "some_value"  # type: ignore
+
+
+def test_empty_metadata() -> None:
+    metadata = meta.Metadata()
+    assert metadata.is_empty
 
 
 def test_metadata_structure(
     metadata_unstructured: ty.Dict[str, ty.Union[meta.MetaPrimitiveType, meta.MiscType]],
     metadata: meta.Metadata,
 ) -> None:
-    assert meta.structure_metadata(metadata_unstructured) == metadata
+    assert meta.meta_converter.structure(metadata_unstructured, meta.Metadata) == metadata
 
 
 def test_metadata_unstructure(
     metadata: meta.Metadata,
     metadata_unstructured: ty.Dict[str, ty.Union[meta.MetaPrimitiveType, meta.MiscType]],
 ) -> None:
-    assert meta.unstructure_metadata(metadata) == metadata_unstructured
+    assert meta.meta_converter.unstructure(metadata) == metadata_unstructured
 
 
 def test_format_name_git() -> None:
@@ -260,26 +278,26 @@ def test_get_commit_no_commit(caplog, mock_git_repo: Mock) -> None:
     assert "`get_commit` found no commit." in caplog.text
 
 
-def test_is_dirty_from_envvar(caplog) -> None:
-    with envvars(GIT_IS_DIRTY="True"):
+def test_is_clean_from_envvar(caplog) -> None:
+    with envvars(GIT_IS_CLEAN="True"):
         with caplog.at_level(logging.DEBUG):
-            assert meta.is_dirty()
-        assert "`is_dirty` reading from env var." in caplog.text
+            assert meta.is_clean()
+        assert "`is_clean` reading from env var." in caplog.text
 
 
-def test_is_dirty_from_git_repo(caplog, mock_git_repo: Mock) -> None:
+def test_is_clean_from_git_repo(caplog, mock_git_repo: Mock) -> None:
     with caplog.at_level(logging.DEBUG):
-        assert meta.is_dirty()
+        assert not meta.is_clean()
     assert mock_git_repo.called
-    assert "`is_dirty` reading from Git repo." in caplog.text
+    assert "`is_clean` reading from Git repo." in caplog.text
 
 
-def test_is_dirty_no_dirtiness(caplog, mock_git_repo: Mock) -> None:
+def test_is_clean_no_dirtiness(caplog, mock_git_repo: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert meta.is_dirty()
+        assert meta.is_clean()
     assert mock_git_repo.called
-    assert "`is_dirty` found no dirtiness - assume dirty." in caplog.text
+    assert "`is_clean` found no cleanliness - assume dirty." in caplog.text
 
 
 def test_get_branch_from_envvar(caplog) -> None:
