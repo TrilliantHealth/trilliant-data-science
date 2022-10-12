@@ -12,10 +12,10 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..util import load_pyproject, load_pipfile_dependencies
+from ..common.util import load_pyproject, load_pipfile_dependencies
 from ... import __version__
 from ...log import getLogger
-from ...meta import DEPLOYING, META_FILE, init_metadata, unstructure_metadata
+from ...meta import DEPLOYING, META_FILE, init_metadata, meta_converter
 
 try:
     import build  # noqa: F401
@@ -76,7 +76,7 @@ def export_metadata(func):
     @functools.wraps(func)
     def wrapper_export_metadata(*args, **kwargs):
         os.environ[DEPLOYING] = "1"
-        metadata = unstructure_metadata(init_metadata())
+        metadata = meta_converter.unstructure(init_metadata())
         del metadata["misc"]
         LOGGER.info("Exporting metadata:\n" "%s", metadata)
         for k, v in metadata.items():
@@ -124,11 +124,6 @@ def _resolve_local_deps(dependencies: ty.Dict, package_name: str) -> ty.List[str
 
 # TODO - refactor this into smaller functions for readability
 def resolve_deps(incl_patch: bool = True):
-    try:
-        import toml
-    except ImportError:  # pragma: no cover
-        raise RuntimeError("The `toml` package is needed, install `core[dev]`.")
-
     def decorator_resolve_deps(func):
         @functools.wraps(func)
         def wrapper_resolve_deps(*args, **kwargs):

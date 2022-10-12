@@ -10,6 +10,9 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package, open_text
 from types import MappingProxyType
 
+import attr
+from cattrs import Converter
+
 from .log import getLogger
 
 LayoutType = ty.Literal["flat", "src"]
@@ -26,7 +29,7 @@ HIVE_SUB_CHARACTER = "_"
 
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
-GIT_IS_DIRTY = "GIT_IS_DIRTY"
+GIT_IS_CLEAN = "GIT_IS_CLEAN"
 GIT_BRANCH = "GIT_BRANCH"
 THDS_USER = "THDS_USER"
 
@@ -150,7 +153,7 @@ def get_commit(pkg: Package = "") -> str:
         if pkg:
             LOGGER.debug("`get_commit` reading from metadata.")
             metadata = read_metadata(pkg)
-            if not metadata.git_commit:
+            if metadata.is_empty:
                 raise EmptyMetadataException
             return metadata.git_commit
     except EmptyMetadataException:
@@ -160,29 +163,34 @@ def get_commit(pkg: Package = "") -> str:
     return ""
 
 
-def is_dirty(pkg: Package = "") -> bool:
-    if GIT_IS_DIRTY in os.environ:
-        LOGGER.debug("`is_dirty` reading from env var.")
-        return bool(os.environ[GIT_IS_DIRTY])
+def is_clean(pkg: Package = "") -> bool:
+    if GIT_IS_CLEAN in os.environ:
+        LOGGER.debug("`is_clean` reading from env var.")
+        return bool(os.environ[GIT_IS_CLEAN])
 
     try:
         import git
 
         try:
             repo = git.Repo(search_parent_directories=True)
-            LOGGER.debug("`is_dirty` reading from Git repo.")
-            return repo.is_dirty()
+            LOGGER.debug("`is_clean` reading from Git repo.")
+            return not repo.is_dirty()
         except git.InvalidGitRepositoryError:
             pass
     except ImportError:  # pragma: no cover
         pass
 
-    if pkg:
-        LOGGER.debug("`is_dirty` reading from metadata.")
-        metadata = read_metadata(pkg)
-        return bool(metadata.git_is_dirty)
+    try:
+        if pkg:
+            LOGGER.debug("`is_clean` reading from metadata.")
+            metadata = read_metadata(pkg)
+            if metadata.is_empty:
+                raise EmptyMetadataException
+            return bool(metadata.git_is_clean)
+    except EmptyMetadataException:
+        pass
 
-    LOGGER.debug("`is_dirty` found no dirtiness - assume dirty.")
+    LOGGER.debug("`is_clean` found no cleanliness - assume dirty.")
     return True
 
 
@@ -246,13 +254,13 @@ MetaPrimitiveType = ty.Union[str, int, float, bool]
 MiscType = ty.Mapping[str, MetaPrimitiveType]
 
 
-@dataclasses.dataclass(frozen=True)
+@attr.frozen
 class Metadata:
     git_commit: str = ""
     git_branch: str = ""
-    git_is_dirty: str = ""
+    git_is_clean: str = ""
     thds_user: str = ""
-    misc: MiscType = dataclasses.field(default_factory=lambda: MappingProxyType(dict()))
+    misc: MiscType = attr.field(factory=lambda: MappingProxyType(dict()))
 
     @property
     def docker_branch(self) -> str:
@@ -270,51 +278,28 @@ class Metadata:
     def hive_user(self) -> str:
         return format_name(self.thds_user, "hive")
 
-
-def structure_metadata(payload: ty.Mapping[str, ty.Union[MetaPrimitiveType, MiscType]]) -> Metadata:
-    payload_fields = set(payload.keys())
-    expected_fields = set((field.name for field in dataclasses.fields(Metadata)))
-
-    if payload_fields != expected_fields:
-        raise BadMetadataException(
-            f"Project metadata expects these exact fields: {expected_fields}, got : {payload_fields}"
-        )
-
-    return Metadata(
-        git_commit=payload["git_commit"],
-        git_branch=payload["git_branch"],
-        thds_user=payload["thds_user"],
-        misc=MappingProxyType(payload["misc"]),
-    )
+    @property
+    def is_empty(self) -> bool:
+        return all(not getattr(self, field.name) for field in attr.fields(Metadata))
 
 
-def unstructure_metadata(
-    metadata: Metadata,
-) -> ty.Dict[str, ty.Union[str, ty.Dict[MetaPrimitiveType, MetaPrimitiveType]]]:
-    payload_fields = set((field.name for field in dataclasses.fields(Metadata)))
-    payload = {
-        field: getattr(metadata, field) if field != "misc" else dict(getattr(metadata, field))
-        for field in payload_fields
-    }
-
-    return payload
+meta_converter = Converter(forbid_extra_keys=True)
+meta_converter.register_structure_hook(MiscType, lambda misc, _: MappingProxyType(misc))
+# TODO - figure out typing issue for unstructure hook
+meta_converter.register_unstructure_hook(MiscType, lambda misc: dict(misc))  # type: ignore
 
 
 class EmptyMetadataException(Exception):
     pass
 
 
-class BadMetadataException(Exception):
-    pass
-
-
 def init_metadata(misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None) -> Metadata:
-    dirty = is_dirty()
+    clean = is_clean()
 
     return Metadata(
         git_commit=get_commit(),
         git_branch=get_branch(),
-        git_is_dirty="True" if dirty else "",
+        git_is_clean="True" if clean else "",
         thds_user=get_user(),
         misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
     )
@@ -334,7 +319,7 @@ def write_metadata(
         metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
 
         with open(metadata_path, "w") as f:
-            json.dump(unstructure_metadata(metadata), f)
+            json.dump(meta_converter.unstructure(metadata), f)
             f.write("\n")  # Add newline because Py JSON does not
 
 
@@ -353,7 +338,7 @@ def read_metadata(pkg: Package) -> Metadata:
 
     try:
         with open_text(pkg, META_FILE) as f:
-            metadata = structure_metadata(json.load(f))
+            metadata = meta_converter.structure(json.load(f), Metadata)
     # pkg=__name__ will raise a TypeError unless it is called in an __init__.py
     except (FileNotFoundError, TypeError):
         pkg_ = pkg.split(".")
