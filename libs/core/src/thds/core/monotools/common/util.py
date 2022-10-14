@@ -1,10 +1,14 @@
 import os
+import subprocess
 import typing as ty
 from contextlib import contextmanager
 from pathlib import Path
 
+from ...log import getLogger
 from ...types import StrOrPath
 from .constants import REPO_ROOT
+
+LOGGER = getLogger(__name__)
 
 
 @contextmanager
@@ -26,8 +30,42 @@ def stash_file(filename: str, stash_name: str) -> ty.Iterator[None]:
         os.replace(stash_name, filename)
 
 
-def path_from_repo(path: StrOrPath) -> str:
-    path = Path(path) if not isinstance(path, Path) else path
-    _, repo_relative_path = str(path.resolve()).split(REPO_ROOT)
+def find_repo_root() -> Path:
+    path = Path.cwd()
 
-    return os.path.join(REPO_ROOT, repo_relative_path)
+    if path.name == REPO_ROOT:
+        return path
+
+    candidates = [parent for parent in path.parents if parent.name == REPO_ROOT]
+    if not candidates:
+        raise ValueError(f"Could not find '{REPO_ROOT}' on the path: '{path}'")
+    elif len(candidates) > 1:
+        raise ValueError(f"'{REPO_ROOT}' is ambiguous on the path: '{path}'")
+    else:
+        return candidates[0]
+
+
+@contextmanager
+def in_directory(dest: StrOrPath) -> ty.Iterator[None]:
+    origin = Path().resolve()
+
+    try:
+        LOGGER.debug("Changing directory from '%s' -> '%s'.", origin, dest)
+        os.chdir(dest)
+        yield
+    finally:
+        LOGGER.debug("Changing directory back to '%s'.", origin)
+        os.chdir(origin)
+
+
+def git_changes() -> ty.Set[str]:
+    cmd = ["git", "diff", "--name-only"]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+
+    if not proc.stdout:
+        raise subprocess.CalledProcessError(
+            returncode=1, cmd=" ".join(cmd), output="Could not get git changes from stdout."
+        )
+
+    changes = proc.stdout.readlines()
+    return {change.decode("utf-8").strip() for change in changes}

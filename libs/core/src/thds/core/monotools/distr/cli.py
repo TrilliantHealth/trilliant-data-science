@@ -3,13 +3,13 @@ from pathlib import Path
 
 from ... import __version__
 
-try:
-    from .packaging import build, release
-except ImportError:
-    raise RuntimeError("'thds.core[dev]' must be installed to use the 'distr' CLI.")
-
 
 def main():
+    try:
+        from .packaging import build, release
+    except ModuleNotFoundError:
+        raise RuntimeError("'thds.core[dev]' must be installed to use the 'distr' CLI.")
+
     parser = argparse.ArgumentParser(description="code distribution CLI", prog="distr")
     parser.add_argument("-v", "--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(help="available 'distr' commands")
@@ -21,7 +21,7 @@ def main():
 
     build_parser = package_subparsers.add_parser(
         "build",
-        description="builds a Python package ouputting the result to 'path/dist'",
+        description="builds a Python package ouputting the resulting sdist and wheel to 'path/dist'",
         help="build a Python package",
     )
     build_parser.add_argument("path", type=Path, help="path to the root of the package to build")
@@ -29,8 +29,11 @@ def main():
 
     release_parser = package_subparsers.add_parser(
         "release",
-        description="releases the Python package at 'path/dist' to Artifactory - will build before releasing by default",
-        help="release a Python package to Artifactory",
+        description=(
+            "builds a Python package and releases the resulting wheel at 'path/dist' to Artifactory - "
+            "assumes the jfrog CLI is available and configured"
+        ),
+        help="builds a Python package and releases the wheel to Artifactory",
     )
     release_parser.add_argument("path", type=Path, help="path to the root of the package to release")
     release_parser.add_argument(

@@ -19,6 +19,7 @@ dependencies = [
 dev = [
     "build",
     "gitpython",
+    "networkx",
     "toml",
 ]
 
@@ -67,6 +68,10 @@ exclude = '''(?x)(
     | \S+\.egg-info
 )'''
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["networkx"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

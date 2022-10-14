@@ -2,11 +2,16 @@ import os
 import shutil
 import subprocess
 
-from ..common.decorators import clean_metadata, export_metadata, resolve_pyproject
-from ..common.util import path_from_repo
+try:
+    import build as build_
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        f"'build' must be installed ('thds.core[dev]') to use code from '{__name__}'."
+    )
+
 from ...log import getLogger
 from ...types import StrOrPath
-
+from ..common.decorators import clean_metadata, export_metadata, resolve_pyproject
 
 LOGGER = getLogger(__name__)
 
@@ -15,21 +20,21 @@ VERSION_PATTERN = r"[0-9]+(?:\.[0-9]+){1,2}"
 
 
 def _build(path: StrOrPath) -> None:
-    LOGGER.info("Building package at %s", path_from_repo(path))
+    LOGGER.info("Building package at %s", path)
 
     dist_path = os.path.join(path, "dist")
     if os.path.isdir(dist_path):
         LOGGER.info(
             "'dist' folder already exists at: '%s'. Removing before rebuilding the distribution.",
-            path_from_repo(dist_path),
+            dist_path,
         )
         shutil.rmtree(dist_path)
-    build_cmd = ["python", "-m", "build", path]
-    build_status = subprocess.run(build_cmd)
-    if build_status.returncode != 0:
+    cmd = ["python", "-m", "build", path]
+    status = subprocess.run(cmd)
+    if status.returncode != 0:
         raise subprocess.CalledProcessError(
-            returncode=build_status.returncode,
-            cmd=" ".join(build_cmd),
+            returncode=status.returncode,
+            cmd=" ".join(cmd),
             output="Could not build package, please see output above to debug.",
         )
 
@@ -42,9 +47,9 @@ def release(path: StrOrPath, skip_build: bool = False) -> None:
     if not skip_build:
         build(path)
 
-    LOGGER.info("Releasing package at %s", path_from_repo(path))
+    LOGGER.info("Releasing package at %s", path)
 
-    release_cmd = [
+    cmd = [
         "jfrog",
         "rt",
         "u",
@@ -52,10 +57,10 @@ def release(path: StrOrPath, skip_build: bool = False) -> None:
         os.path.join(path, rf"dist/([a-zA-Z][\.\w]+)-({VERSION_PATTERN})-py3.*\.whl"),
         f"{ARTIFACTORY_REPOSITORY}" + "/{1}/{2}/",
     ]
-    release_status = subprocess.run(release_cmd)
-    if release_status.returncode != 0:
+    status = subprocess.run(cmd)
+    if status.returncode != 0:
         raise subprocess.CalledProcessError(
-            returncode=release_status.returncode,
-            cmd=" ".join(release_cmd),
+            returncode=status.returncode,
+            cmd=" ".join(cmd),
             output="Could not release to Artifactory, please see output above to debug.",
         )
