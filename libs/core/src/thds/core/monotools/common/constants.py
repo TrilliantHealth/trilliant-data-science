@@ -1,6 +1,7 @@
-from pathlib import Path
-
-REPO_ROOT = "ds-monorepo/"
-REPO_ROOT_PATH = str(Path(__file__).parents[7])
-PYPROJECT_FILE = "pyproject.toml"
+DAG_ROOT = "thds.core"
 PIPFILE = "Pipfile"
+PROJECT_CONFIG = ".projectconf"
+PYPROJECT_FILE = "pyproject.toml"
+REPO_CONFIG = ".repoconf"
+REPO_ROOT = "ds-monorepo"
+STASHED_PYPROJECT_FILE = "pyproject.toml.stashed"

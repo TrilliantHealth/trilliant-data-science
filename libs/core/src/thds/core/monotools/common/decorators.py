@@ -4,24 +4,24 @@ from pathlib import Path
 
 try:
     import toml
-except ImportError:
-    raise ModuleNotFoundError(f"'toml' must be installed ('thds.core[dev]') to use code from '{__name__}'.")
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        f"'toml' must be installed ('thds.core[dev]') to use code from '{__name__}'."
+    )
 
-from .constants import PYPROJECT_FILE
-from .datamodels import ProjectSpec
-from .util import stash_file, path_from_repo
 from ...log import getLogger
 from ...meta import DEPLOYING, META_FILE, init_metadata, meta_converter
 from ...types import StrOrPath
+from .constants import PYPROJECT_FILE, STASHED_PYPROJECT_FILE
+from .datamodels import ProjectSpec
+from .util import stash_file
 
 LOGGER = getLogger(__name__)
-
-STASHED_PYRPOJECT_FILE = "pyproject.toml.stashed"
 
 
 def clean_metadata(path: StrOrPath = "."):
     def _clean_metadata(path: StrOrPath) -> None:
-        LOGGER.info("Cleaning local metadata file(s) from '%s'.", path_from_repo(path))
+        LOGGER.info("Cleaning local metadata file(s) from '%s'.", path)
         meta_files = Path(path).rglob(META_FILE)
         for path in meta_files:
             if path.is_file():
@@ -67,11 +67,14 @@ def resolve_pyproject(path: StrOrPath = ".", incl_patch: bool = True):
         @functools.wraps(func)
         def wrapper_resolve_pyproject(*args, **kwargs):
             pyproject_file = os.path.join(path, PYPROJECT_FILE)
-            stashed_pyproject_file = os.path.join(path, STASHED_PYRPOJECT_FILE)
+            stashed_pyproject_file = os.path.join(path, STASHED_PYPROJECT_FILE)
 
             with stash_file(pyproject_file, stashed_pyproject_file):
-                project_spec = ProjectSpec.from_pyproject(stashed_pyproject_file)
-                resolved_pyproject = project_spec.resolve_pyproject(incl_patch=incl_patch)
+                pyproject_data = toml.load(stashed_pyproject_file)
+                project_spec = ProjectSpec.from_pyproject_data(pyproject_data, path)
+                resolved_pyproject = project_spec.resolve_pyproject(
+                    pyproject_data, incl_patch=incl_patch
+                )
 
                 with open(pyproject_file, "w") as output_file:
                     toml.dump(resolved_pyproject, output_file)
