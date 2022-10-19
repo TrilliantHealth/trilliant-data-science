@@ -3,7 +3,6 @@ import os
 import re
 import typing as ty
 from datetime import datetime, timezone
-import dataclasses
 from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version

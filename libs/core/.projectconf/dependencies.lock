@@ -1,0 +1,1 @@
+{"pipfile": "555ebbfa6a67152404783ae3bf2925a6", "pipfile_lock": "aed9838d6c840d33884ae2f7c9ac2787", "runtime_deps": ["attrs", "cattrs"], "dev_deps": ["build", "gitpython", "networkx", "toml"]}

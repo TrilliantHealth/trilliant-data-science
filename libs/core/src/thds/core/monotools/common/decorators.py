@@ -12,11 +12,13 @@ except ModuleNotFoundError:
 from ...log import getLogger
 from ...meta import DEPLOYING, META_FILE, init_metadata, meta_converter
 from ...types import StrOrPath
-from .constants import PYPROJECT_FILE, STASHED_PYPROJECT_FILE
+from .constants import PYPROJECT_FILE
 from .datamodels import ProjectSpec
 from .util import stash_file
 
 LOGGER = getLogger(__name__)
+
+STASHED_PYPROJECT_FILE = "pyproject.toml.stashed"
 
 
 def clean_metadata(path: StrOrPath = "."):
