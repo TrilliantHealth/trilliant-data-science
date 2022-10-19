@@ -1,7 +1,5 @@
-import hashlib
 import os
 import typing as ty
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +18,7 @@ except ModuleNotFoundError:
 
 from ...types import StrOrPath
 from .constants import PIPFILE, PYPROJECT_FILE
+from .util import md5_string
 
 PipfileDepType = ty.Literal["packages", "dev-packages"]
 
@@ -195,17 +194,16 @@ class RepoDAG:
             )
         )
 
-    def find_shortest_path(self, source: str, target: str) -> ty.List[str]:
+    def get_ancestors(self, project: str) -> ty.List[str]:
         try:
-            return nx.shortest_path(self._graph, source, target)
+            return nx.ancestors(self._graph, project)
         except nx.NodeNotFound:
             raise ValueError(
-                f"Either source '{source}' and/or target '{target}' is not a valid project - "
-                f"available projects: {list(self._projects.keys())}"
+                f"'{project}' is not a valid project - available projects: {list(self._projects.keys())}"
             )
 
-    def hash_build_order(self) -> str:
-        return hashlib.md5(str(self.determine_build_order(raw=True)).encode("utf-8")).hexdigest()
+    def md5_build_order(self) -> str:
+        return md5_string(str(self.determine_build_order(raw=True)))
 
     def has_changed(self, project: str) -> bool:
         return any(change.startswith(str(self._projects[project].path)) for change in self._changes)

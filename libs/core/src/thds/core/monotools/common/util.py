@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 import typing as ty
@@ -69,3 +70,15 @@ def git_changes() -> ty.Set[str]:
 
     changes = proc.stdout.readlines()
     return {change.decode("utf-8").strip() for change in changes}
+
+
+def md5_file(path: StrOrPath) -> str:
+    hash_md5 = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def md5_string(s: str) -> str:
+    return hashlib.md5(s.encode("utf-8")).hexdigest()
