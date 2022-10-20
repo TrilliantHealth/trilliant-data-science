@@ -19,7 +19,6 @@ pytest-mock = "*"
 types-setuptools = "*"
 # PROJECT-SPECIFIC
 "thds.core" = {path = ".", extras = ["dev"], editable = true}
-"types-toml" = "*"
 
 [packages]
 # DO NOT SPECIFY OTHER NON-LOCAL RUNTIME DEPENDENCIES HERE.

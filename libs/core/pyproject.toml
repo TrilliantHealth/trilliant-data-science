@@ -17,10 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "build",
     "gitpython",
-    "networkx",
-    "toml",
 ]
 
 [project.urls]
@@ -28,7 +25,6 @@ repository = "https://github.com/TrilliantHealth/similarity"
 
 # PROJECT ENTRY POINTS
 [project.scripts]
-distr = "thds.core.monotools.distr.cli:main"
 
 # BUILD CONFIG
 [build-system]
@@ -70,7 +66,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["networkx"]
+module = []
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
