@@ -1,0 +1,15 @@
+exclude: >
+      (?x)(
+          build
+          | dist
+          | \S+\.egg-info
+      )
+repos:
+  - repo: local
+    hooks:
+      - id: mypy-env
+        name: mypy-env
+        entry: ./scripts/env_runner.py mypy --show-traceback
+        language: system
+        files: libs/core/*
+        types: [python]
