@@ -1,1 +1,1 @@
-{"pipfile": "6f05259ca1d0e513301b79b76d7b3853", "pipfile_lock": "90ec8668782bb1347e5ccc57d129b4c1", "runtime_deps": ["attrs", "cattrs"], "dev_deps": ["gitpython"], "local_deps": {}, "scripts": {}}
+{"pipfile": "6f05259ca1d0e513301b79b76d7b3853", "pipfile_lock": "d9cf3d529330e43a31004777e367468d", "runtime_deps": ["attrs", "cattrs"], "dev_deps": ["gitpython"], "local_deps": {}, "scripts": {}}
