@@ -34,7 +34,7 @@ def test_all_fields_required_if_require_all():
         # count is required
         schema().load(dict(id="id", bars=[1.2, 2.3]))
 
-    schema().load(dict(id="id", count=4, bars=[0.0, 0.1]))
+    assert schema().load(dict(id="id", count=4, bars=[0.0, 0.1]))  # no error when all fields present
 
 
 def test_name_suffix():

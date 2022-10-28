@@ -16,8 +16,8 @@ class _GenConfig(ty.NamedTuple):
     schema_name_suffix: str
 
 
-def config(require_all: bool = False, schema_name: str = "", schema_name_suffix: str = "") -> _GenConfig:
-    """API for creating a Schema Generation Config.
+def config(require_all: bool = False, schema_name_suffix: str = "") -> _GenConfig:
+    """Create a Schema Generation Config.
 
     :param require_all: The Schema will enforce `required` for all
       attributes on load. This can also be used to generate a

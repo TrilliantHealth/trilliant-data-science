@@ -1,5 +1,5 @@
 """Meta is a Marshmallow-specific concept and is a way of
-configurating Schema load/dump behavior recursively.
+configuring Schema load/dump behavior recursively.
 
 We have an additional layer of configuration for Schema _generation_,
 and that lives in _config.py.

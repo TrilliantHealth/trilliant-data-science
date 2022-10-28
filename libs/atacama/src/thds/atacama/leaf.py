@@ -33,16 +33,42 @@ def _field_with_default_kwargs(field: FieldT, **default_kwargs) -> FieldT:
     return ty.cast(FieldT, fake_field)
 
 
+def allow_already_parsed(typ: ty.Type, mm_field: FieldT) -> FieldT:
+    """For certain types, it's quite common to want to be able to pass
+    an already-deserialized version of that item without error,
+    especially if you want to be able to use a Schema against both a
+    database abstraction (e.g. SQLAlchemy) and an API.
+
+    E.g., there's no need to throw an error if you're expecting a
+    datetime string so you can turn it into a datetime, but you get a
+    datetime itself.
+    """
+
+    def _deserialize(self, value, attr, data, **kwargs):
+        if isinstance(value, typ):
+            return value
+        return mm_field._deserialize(self, value, attr, data, **kwargs)
+
+    return ty.cast(
+        FieldT,
+        type(
+            mm_field.__name__ + "AllowsAlreadyDeserialized",
+            (mm_field,),  # inherits from this field type
+            dict(_deserialize=_deserialize),
+        ),
+    )
+
+
 NATIVE_TO_MARSHMALLOW: LeafTypeMapping = {
     int: marshmallow.fields.Integer,
     float: marshmallow.fields.Float,
     str: marshmallow.fields.String,
     bool: marshmallow.fields.Boolean,
-    datetime.datetime: marshmallow.fields.DateTime,
+    datetime.datetime: allow_already_parsed(datetime.datetime, marshmallow.fields.DateTime),
     datetime.time: marshmallow.fields.Time,
-    datetime.timedelta: marshmallow.fields.TimeDelta,
-    datetime.date: marshmallow.fields.Date,
-    decimal.Decimal: marshmallow.fields.Decimal,
+    datetime.timedelta: allow_already_parsed(datetime.timedelta, marshmallow.fields.TimeDelta),
+    datetime.date: allow_already_parsed(datetime.date, marshmallow.fields.Date),
+    decimal.Decimal: allow_already_parsed(decimal.Decimal, marshmallow.fields.Decimal),
     uuid.UUID: marshmallow.fields.UUID,
     ty.Union[int, float]: marshmallow.fields.Number,
     ty.Any: _field_with_default_kwargs(marshmallow.fields.Raw, allow_none=True),
