@@ -142,7 +142,7 @@ def get_commit(pkg: Package = "") -> str:
         try:
             repo = git.Repo(search_parent_directories=True)
             LOGGER.debug("`get_commit` reading from Git repo.")
-            return repo.head.object.hexsha[:7]
+            return repo.head.object.hexsha
         except git.InvalidGitRepositoryError:
             pass
     except ImportError:  # pragma: no cover
