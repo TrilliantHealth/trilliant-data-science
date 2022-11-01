@@ -10,6 +10,7 @@ verify_ssl = true
 
 [dev-packages]
 # MONOREPO STANDARDS
+ipykernel = "*"
 ipython = "*"
 mypy = "==0.982"
 mypy-extensions = "*"
