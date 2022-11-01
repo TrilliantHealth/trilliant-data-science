@@ -1,1 +1,1 @@
-The monorepo successor to `core`.
+The monorepo successor to `core`
