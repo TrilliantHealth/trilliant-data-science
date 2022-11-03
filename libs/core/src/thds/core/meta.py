@@ -15,7 +15,6 @@ from cattrs import Converter
 from .log import getLogger
 
 LayoutType = ty.Literal["flat", "src"]
-NamespaceType = ty.Literal["thds", "thds/features"]
 NameFormatType = ty.Literal["git", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
@@ -308,7 +307,7 @@ def write_metadata(
     pkg: str,
     *,
     misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None,
-    namespace: NamespaceType = "thds",
+    namespace: str = "thds",
     layout: LayoutType = "src",
 ) -> None:
     if os.getenv(DEPLOYING):
