@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: mypy-env
         name: mypy-env
-        entry: ./scripts/env_runner.py mypy --show-traceback
+        entry: bash -c 'cd libs/core && pipenv run mypy .'
         language: system
-        files: libs/core/*
-        types: [python]
+        pass_filenames: false
+        always_run: true
