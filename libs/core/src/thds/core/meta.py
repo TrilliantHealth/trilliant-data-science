@@ -317,7 +317,7 @@ def write_metadata(
         metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
 
         with open(metadata_path, "w") as f:
-            json.dump(meta_converter.unstructure(metadata), f)
+            json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
 
