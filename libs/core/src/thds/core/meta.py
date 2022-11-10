@@ -29,7 +29,6 @@ DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
 GIT_BRANCH = "GIT_BRANCH"
-MAIN = "main"
 THDS_USER = "THDS_USER"
 
 META_FILE = "meta.json"
@@ -318,7 +317,7 @@ def write_metadata(
         metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
 
         with open(metadata_path, "w") as f:
-            json.dump(meta_converter.unstructure(metadata), f, indent=2)
+            json.dump(meta_converter.unstructure(metadata), f)
             f.write("\n")  # Add newline because Py JSON does not
 
 
