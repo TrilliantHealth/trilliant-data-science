@@ -21,7 +21,7 @@ dev = [
 ]
 
 [project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
+repository = "https://github.com/TrilliantHealth/similarity"
 
 # PROJECT ENTRY POINTS
 [project.scripts]
