@@ -24,11 +24,16 @@ DOCKER_EXCLUSION_REGEX = r"[^\w\-\.]+"
 DOCKER_SUB_CHARACTER = "-"
 HIVE_EXCLUSION_REGEX = r"[\W]+"
 HIVE_SUB_CHARACTER = "_"
+VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
+VERSION_SUB_CHARACTER = ""
 
+CI = "CI"
+CI_TIMESTAMP = "CI_TIMESTAMP"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
 GIT_BRANCH = "GIT_BRANCH"
+MAIN = "main"
 THDS_USER = "THDS_USER"
 
 META_FILE = "meta.json"
@@ -90,6 +95,7 @@ def extract_timestamp(version: str, as_datetime: ty.Literal[False]) -> str:
 
 
 def extract_timestamp(version: str, as_datetime: bool = False):
+    version = re.sub(VERSION_EXCLUSION_REGEX, VERSION_SUB_CHARACTER, version)
     version_ = version.split(".")
 
     if len(version_) == 3:
@@ -317,7 +323,7 @@ def write_metadata(
         metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
 
         with open(metadata_path, "w") as f:
-            json.dump(meta_converter.unstructure(metadata), f)
+            json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
 
