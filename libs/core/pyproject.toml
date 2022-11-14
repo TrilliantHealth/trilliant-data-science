@@ -40,7 +40,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["py.typed", "meta.json"]
+"*" = [
+    "py.typed",
+    "meta.json",
+]
 
 # TOOLING CONFIG
 [tool.coverage.paths]
