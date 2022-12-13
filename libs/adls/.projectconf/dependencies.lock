@@ -1,0 +1,51 @@
+{
+  "pipfile": "e49c8d314aa1f0c5fbbd15b795ec3ff0",
+  "pipfile_lock": "ba821466741fdf5ff21304f3b5d471e8",
+  "spec": {
+    "name": "thds.adls",
+    "version": "1.0",
+    "path": "libs/adls",
+    "third_party": [
+      "aiostream>=0.4.5",
+      "azure-identity>=1.9",
+      "azure-storage-file-datalake>=12.6",
+      "lazy-object-proxy>=1.7.1"
+    ],
+    "extras": {
+      "dev": []
+    },
+    "scripts": {},
+    "deps": {
+      "prod": [
+        {
+          "name": "thds.core",
+          "version": "0.1",
+          "path": "libs/core",
+          "third_party": [
+            "attrs",
+            "cattrs"
+          ],
+          "extras": {},
+          "scripts": {}
+        }
+      ],
+      "dev": [
+        {
+          "name": "thds.core",
+          "version": "0.1",
+          "path": "libs/core",
+          "third_party": [
+            "attrs",
+            "cattrs"
+          ],
+          "extras": {
+            "dev": [
+              "gitpython"
+            ]
+          },
+          "scripts": {}
+        }
+      ]
+    }
+  }
+}
