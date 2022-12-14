@@ -251,7 +251,8 @@ def test_get_commit_from_git_repo(caplog, mock_git_repo: Mock) -> None:
 def test_get_commit_from_metadata(caplog, mock_git_repo: Mock, mock_read_metadata: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert meta.get_commit("test") == COMMIT_HASH
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert meta.get_commit("test") == COMMIT_HASH
     assert mock_git_repo.called
     assert mock_read_metadata.called
     assert "`get_commit` reading from metadata." in caplog.text
@@ -263,7 +264,8 @@ def test_get_commit_from_metadata_no_metadata(
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     mock_read_metadata.return_value = meta.Metadata()
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_commit("test")
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_commit("test")
     assert mock_git_repo.called
     assert mock_read_metadata.called
     assert "`get_commit` reading from metadata." in caplog.text
@@ -273,7 +275,8 @@ def test_get_commit_from_metadata_no_metadata(
 def test_get_commit_no_commit(caplog, mock_git_repo: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_commit()
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_commit()
     assert mock_git_repo.called
     assert "`get_commit` found no commit." in caplog.text
 
@@ -295,7 +298,8 @@ def test_is_clean_from_git_repo(caplog, mock_git_repo: Mock) -> None:
 def test_is_clean_no_dirtiness(caplog, mock_git_repo: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert meta.is_clean()
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert meta.is_clean()
     assert mock_git_repo.called
     assert "`is_clean` found no cleanliness - assume dirty." in caplog.text
 
@@ -324,7 +328,8 @@ def test_get_branch_from_git_repo(caplog, mock_git_repo: Mock) -> None:
 def test_get_branch_from_metadata(caplog, mock_git_repo: Mock, mock_read_metadata: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert meta.get_branch("test") == BRANCH_NAME
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert meta.get_branch("test") == BRANCH_NAME
     assert mock_git_repo.called
     assert "`get_branch` reading from metadata." in caplog.text
 
@@ -335,7 +340,8 @@ def test_get_branch_from_metadata_no_metadata(
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     mock_read_metadata.return_value = meta.Metadata()
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_branch("test")
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_branch("test")
     assert mock_git_repo.called
     assert mock_read_metadata.called
     assert "`get_branch` reading from metadata." in caplog.text
@@ -345,6 +351,7 @@ def test_get_branch_from_metadata_no_metadata(
 def test_get_branch_no_branch(caplog, mock_git_repo: Mock) -> None:
     mock_git_repo.side_effect = git.InvalidGitRepositoryError
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_branch()
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_branch()
     assert mock_git_repo.called
     assert "`get_branch` found no branch." in caplog.text

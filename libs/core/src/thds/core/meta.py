@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import subprocess as sp
 import typing as ty
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -19,6 +20,7 @@ NameFormatType = ty.Literal["git", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 CALVER_FORMAT = "%Y%m%d.%H%M%S"
+CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
 
 DOCKER_EXCLUSION_REGEX = r"[^\w\-\.]+"
 DOCKER_SUB_CHARACTER = "-"
@@ -26,6 +28,8 @@ HIVE_EXCLUSION_REGEX = r"[\W]+"
 HIVE_SUB_CHARACTER = "_"
 VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
 VERSION_SUB_CHARACTER = ""
+
+NO_GIT_FALLBACK = "NO_GIT_FALLBACK"
 
 CI = "CI"
 CI_TIMESTAMP = "CI_TIMESTAMP"
@@ -79,6 +83,25 @@ def get_calver() -> str:
     return timestamp.strftime(CALVER_FORMAT)
 
 
+def make_calgitver() -> str:
+    """Uses local git repo info to construct a more informative CalVer version string.
+
+    This time format was chosen to be CalVer-esque but to drop time
+    fractions smaller than minutes since they're exceeding rarely
+    semantically meaningful, and the git commit hash will in 99.999%
+    of cases be a great disambiguator for cases where multiple
+    versions happen to be generated within the same minute by
+    different users.
+    """
+    return "-".join(
+        [
+            datetime.now(tz=timezone.utc).strftime(CALGITVER_NO_SECONDS_FORMAT),
+            get_commit()[:7],
+            "" if is_clean() else "dirty",
+        ]
+    ).rstrip("-")
+
+
 @ty.overload
 def extract_timestamp(version: str) -> str:
     ...  # pragma: no cover
@@ -122,6 +145,11 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     raise ValueError(f"`version`: {version} is not a valid version string (SemVer or CalVer).")
 
 
+def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
+    cmd = s_or_l_cmd.split() if isinstance(s_or_l_cmd, str) else s_or_l_cmd
+    return sp.check_output(cmd, text=True).rstrip("\n")
+
+
 @lru_cache(None)
 def get_version(pkg: Package) -> str:
     try:
@@ -152,6 +180,14 @@ def get_commit(pkg: Package = "") -> str:
             pass
     except ImportError:  # pragma: no cover
         pass
+
+    if not os.getenv(NO_GIT_FALLBACK):
+        try:
+            # backup in case you don't have `git` installed as a dev-dependency
+            # but you still have the git repo available.
+            return _simple_run("git rev-parse HEAD")
+        except sp.CalledProcessError:
+            pass
 
     try:
         if pkg:
@@ -184,6 +220,13 @@ def is_clean(pkg: Package = "") -> bool:
     except ImportError:  # pragma: no cover
         pass
 
+    if not os.getenv(NO_GIT_FALLBACK):
+        try:
+            # command will print an empty string if the repo is clean
+            return "" == _simple_run("git diff --name-status")
+        except sp.CalledProcessError:
+            pass
+
     try:
         if pkg:
             LOGGER.debug("`is_clean` reading from metadata.")
@@ -215,6 +258,12 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
                 pass
         except ImportError:  # pragma: no cover
             pass
+
+        if not os.getenv(NO_GIT_FALLBACK):
+            try:
+                return _simple_run("git branch --show-current")
+            except sp.CalledProcessError:
+                pass
 
         try:
             if pkg:

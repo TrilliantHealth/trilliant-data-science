@@ -15,7 +15,6 @@
       ]
     },
     "scripts": {},
-    "entry_points": {},
     "deps": {
       "prod": [],
       "dev": []
