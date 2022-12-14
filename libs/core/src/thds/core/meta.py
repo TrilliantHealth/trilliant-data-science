@@ -185,7 +185,7 @@ def get_commit(pkg: Package = "") -> str:
         try:
             # backup in case you don't have `git` installed as a dev-dependency
             # but you still have the git repo available.
-            return _simple_run("git rev-parse HEAD")
+            return _simple_run("git rev-parse --verify HEAD")
         except sp.CalledProcessError:
             pass
 
