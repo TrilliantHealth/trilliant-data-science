@@ -11,10 +11,11 @@ description = "Short description of the library."
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-  "azure-storage-file-datalake>=12.6",
-  "azure-identity>=1.9",
-  "aiostream>=0.4.5",
-  "lazy-object-proxy>=1.7.1",
+    "aiohttp>=3.8.1",
+    "aiostream>=0.4.5",
+    "azure-identity>=1.9",
+    "azure-storage-file-datalake>=12.6",
+    "lazy-object-proxy>=1.7.1",
 ]
 
 [project.optional-dependencies]

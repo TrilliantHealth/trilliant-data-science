@@ -1,11 +1,12 @@
 {
   "pipfile": "e49c8d314aa1f0c5fbbd15b795ec3ff0",
-  "pipfile_lock": "ba821466741fdf5ff21304f3b5d471e8",
+  "pipfile_lock": "b154aff22590c0f2568ac6e28f1810af",
   "spec": {
     "name": "thds.adls",
     "version": "1.0",
     "path": "libs/adls",
     "third_party": [
+      "aiohttp>=3.8.1",
       "aiostream>=0.4.5",
       "azure-identity>=1.9",
       "azure-storage-file-datalake>=12.6",

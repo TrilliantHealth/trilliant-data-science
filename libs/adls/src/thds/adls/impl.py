@@ -38,9 +38,8 @@ LOGGER = getLogger(__name__)
 getLogger("azure.core").setLevel(logging.WARNING)
 getLogger("azure.identity").setLevel(logging.WARNING)
 
-DEFAULT_HIVE_PREFIX = os.getenv(
-    "CORE_HIVE_PREFIX", "hive/warehouse"
-)  # For West SAs - maybe change to most common East SA in future
+DEFAULT_HIVE_PREFIX = os.getenv("CORE_HIVE_PREFIX", "")
+WEST_HIVE_PREFIX = "hive/warehouse"  # For easy access while we may need backwards compatibility
 
 T = TypeVar("T")
 
@@ -312,7 +311,7 @@ class ADLSFileSystem:
         recursive: bool = True,
         path_filter: Optional[Callable[[PathProperties], bool]] = None,
     ) -> List[Path]:
-        """Async function that downloads all of the files within a given directory,
+        """Async function that downloads all the files within a given directory,
         including the files in the subdirectories when recursive = True
 
         :return: a list of the paths of the files downloaded
@@ -787,7 +786,7 @@ class ADLSFileSystem:
 
         :param remote_path: the remote directory to download from
         :param local_path: path for the local directory; if not given, use the name from the
-          remote path when there is no cache, otherwiase use the path under the cache dir
+          remote path when there is no cache, otherwise use the path under the cache dir
           corresponding to remote_path
         :param batch_size: the size of each batch
         :param recursive: recurse into subdirectories when downloading?
@@ -816,10 +815,14 @@ class ADLSFileSystem:
         :param table: e.g. database.tablename
         :param local_path: if not given, the files will be saved to ./database/tablename/
         :param batch_size: the size of each batch
-        :param hive_prefix: the path prefix from the SA root to the Hive warehouse
+        :param hive_prefix: the path prefix from the container root to the Hive warehouse
         """
         database, tablename = table.split(".")
-        remote_path = f"{hive_prefix.rstrip('/')}/{database}.db/{tablename}"
+        remote_path = (
+            f"{hive_prefix.strip('/')}/{database}.db/{tablename}"
+            if hive_prefix
+            else f"{database}.db/{tablename}"
+        )
         local_path_resolved = local_path if local_path is not None else Path(f"{database}/{tablename}")
 
         return self.fetch_directory(remote_path, local_path_resolved, batch_size)
@@ -915,26 +918,26 @@ class ADLSFileSystem:
         path_filter: Optional[Callable[[PathProperties], bool]] = None,
     ) -> List[DeleteProperties]:
         """Async function that deletes all files in a remote directory, with the option to also delete
-        sub-directories left empty afterwards.
+        subdirectories left empty afterwards.
 
         Note #1: Cleanup step is blocking due to the need to maintain the order in which empty
-        sub-directories must be deleted. Inner empty directories have to be deleted before
+        subdirectories must be deleted. Inner empty directories have to be deleted before
         outer empty directories so the outer directories can be empty.
 
-        Note #2: if cleanup is true, the function will attempt to delete all sub-directories,
-        however non-empty sub-directories will produce an exception that gets passed and written to their
+        Note #2: if cleanup is true, the function will attempt to delete all subdirectories,
+        however non-empty subdirectories will produce an exception that gets passed and written to their
         respective response details dicts.
 
         :param remote_path: Path to remote directory location.
-        :param if_modified_since: Only delete files if it they have been modified since given datetime.
+        :param if_modified_since: Only delete files if they have been modified since given datetime.
           Default is `None`.
         :param if_unmodified_since: Only delete files if they have been unmodified since given datetime.
           Default is `None`.
-        :param cleanup: Whether to delete sub-directories left empty after file deletion.
+        :param cleanup: Whether to delete subdirectories left empty after file deletion.
           Default is `False`.
         :param batch_size: Number of files to delete in each batch.
           Default is `None`.
-        :param recursive: Whether to recurse into sub-directories when deleting.
+        :param recursive: Whether to recurse into subdirectories when deleting.
           Default is `True`.
         :param path_filter: Optional callable taking a `PathProperties` and returning a bool
           indicating whether to delete the corresponding file.
@@ -1025,11 +1028,11 @@ class ADLSFileSystem:
         """Async function that gets `FileProperties` for all files in a remote directory.
 
         :param remote_path: Path to a remote directory location.
-        :param incl_subdirs: Whether to include `FileProperties` for the sub-directories themselves.
+        :param incl_subdirs: Whether to include `FileProperties` for the subdirectories themselves.
           Default is `False`.
         :param batch_size: Number of `FileProperties` to get in each batch.
           Default is `None`.
-        :param recursive: Whether to recurse into sub-directories when getting `FileProperties`.
+        :param recursive: Whether to recurse into subdirectories when getting `FileProperties`.
         :param path_filter: Optional callable taking a `PathProperties` and returning a bool
           indicating whether to delete the corresponding file.
         :return: List of `FileProperties`.
@@ -1090,7 +1093,7 @@ class ADLSFileSystemCache:
             os.remove(cache_path)
 
     def cache_path(self, path: str):
-        """Return the local path in the cache corresponding the the relative ADLS path `path`"""
+        """Return the local path in the cache corresponding to the relative ADLS path `path`"""
         # ADLS paths are always forward-slash separated, hence we don't use os.path.split here
         parts = path.split("/")
         return self.cache_dir.joinpath(*parts)
