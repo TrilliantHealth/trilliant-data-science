@@ -11,7 +11,7 @@ from thds.core.meta import write_metadata  # noqa: E402
 write_metadata("core")
 
 # ALL DECLARATIVE SETUP GOES IN THE pyproject.toml
-build_name = os.getenv("BUILD_NAME", "")
+build_name = os.getenv("THDS_SETUPPY_BUILD_NAME", "")
 build_base = f"build/{build_name}" if build_name else "build"
 # SOLVES PARALLEL PIPENV OPERATIONS RACE CONDITION
 setup(options={"build": {"build_base": build_base}})
