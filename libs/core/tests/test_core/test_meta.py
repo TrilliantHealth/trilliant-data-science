@@ -86,13 +86,6 @@ def mock_read_metadata(mocker: MockFixture, metadata: meta.Metadata) -> Mock:
     return mock
 
 
-@pytest.fixture
-def mock_read_empty_metadata(mocker: MockFixture) -> Mock:
-    mock = mocker.patch("thds.core.meta.read_metadata")
-    mock.return_value = meta.Metadata()
-    return mock
-
-
 def test_metadata(metadata: meta.Metadata) -> None:
     assert metadata.git_commit == COMMIT_HASH
     assert metadata.git_branch == BRANCH_NAME
@@ -355,11 +348,3 @@ def test_get_branch_no_branch(caplog, mock_git_repo: Mock) -> None:
         assert not meta.get_branch()
     assert mock_git_repo.called
     assert "`get_branch` found no branch." in caplog.text
-
-
-def test_is_deployed_with_metadata(mock_read_metadata: Mock) -> None:
-    assert meta.is_deployed("test")
-
-
-def test_is_deployed_with_empty_metadata(mock_read_empty_metadata: Mock) -> None:
-    assert not meta.is_deployed("test")
