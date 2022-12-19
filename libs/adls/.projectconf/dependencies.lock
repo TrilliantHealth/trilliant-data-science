@@ -16,6 +16,7 @@
       "dev": []
     },
     "scripts": {},
+    "entry_points": {},
     "deps": {
       "prod": [
         {
@@ -27,7 +28,8 @@
             "cattrs"
           ],
           "extras": {},
-          "scripts": {}
+          "scripts": {},
+          "entry_points": {}
         }
       ],
       "dev": [
@@ -44,7 +46,8 @@
               "gitpython"
             ]
           },
-          "scripts": {}
+          "scripts": {},
+          "entry_points": {}
         }
       ]
     }
