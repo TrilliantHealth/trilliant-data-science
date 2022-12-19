@@ -94,7 +94,7 @@ def extract_timestamp(version: str, as_datetime: ty.Literal[False]) -> str:
     ...  # pragma: no cover
 
 
-def extract_timestamp(version: str, as_datetime: bool = False):
+def extract_timestamp(version: str, as_datetime=False):
     version = re.sub(VERSION_EXCLUSION_REGEX, VERSION_SUB_CHARACTER, version)
     version_ = version.split(".")
 
@@ -252,6 +252,13 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
         return getuser()
 
     return format_name(_get_user(pkg), format)
+
+
+def is_deployed(pkg: Package) -> bool:
+    meta = read_metadata(pkg)
+    if meta.is_empty:
+        return False
+    return True
 
 
 MetaPrimitiveType = ty.Union[str, int, float, bool]
