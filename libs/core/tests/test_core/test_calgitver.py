@@ -1,4 +1,4 @@
-from thds.core.meta import make_calgitver
+from thds.core.meta import make_calgitver, parse_calgitver
 
 
 def test_calgitver():
@@ -18,3 +18,19 @@ def test_calgitver():
     assert len(hhmm) == 4
     yyyymmdd.startswith("20")  # this is gonna break someday :(
     assert hhmm[0] in ("0", "1", "2")
+
+
+def test_parse_calgitver():
+    gd = parse_calgitver("20021130.0804-34afb29-dirty").groupdict()
+    assert gd == dict(
+        year="2002",
+        month="11",
+        day="30",
+        hour="08",
+        minute="04",
+        git_commit="34afb29",
+        dirty="-dirty",
+    )
+
+    n = parse_calgitver("20021130.0804-34afb29")
+    assert n.group("dirty") == ""
