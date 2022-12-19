@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import subprocess as sp
 import typing as ty
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -19,7 +18,7 @@ LayoutType = ty.Literal["flat", "src"]
 NameFormatType = ty.Literal["git", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
-CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
+CALVER_FORMAT = "%Y%m%d.%H%M%S"
 
 DOCKER_EXCLUSION_REGEX = r"[^\w\-\.]+"
 DOCKER_SUB_CHARACTER = "-"
@@ -75,55 +74,18 @@ def get_timestamp(as_datetime=False):
     return timestamp.strftime(TIMESTAMP_FORMAT) if not as_datetime else timestamp
 
 
-def make_calgitver() -> str:
-    """Uses local git repo info to construct a more informative CalVer version string.
-
-    This time format was chosen to be CalVer-esque but to drop time
-    fractions smaller than minutes since they're exceeding rarely
-    semantically meaningful, and the git commit hash will in 99.999%
-    of cases be a great disambiguator for cases where multiple
-    versions happen to be generated within the same minute by
-    different users.
-
-    We use only dots as separators to be compatible with both Container Registry
-    formats and PEP440.
-    """
-    return "-".join(
-        [
-            datetime.now(tz=timezone.utc).strftime(CALGITVER_NO_SECONDS_FORMAT),
-            get_commit()[:7],
-            "" if is_clean() else "dirty",
-        ]
-    ).rstrip("-")
-
-
-CALGITVER_EXTRACT_RE = re.compile(
-    r"""
-    (?P<year>\d{4})
-    (?P<month>\d{2})
-    (?P<day>\d{2})
-    \.
-    (?P<hour>\d{2})
-    (?P<minute>\d{2})
-    -
-    (?P<git_commit>[a-f0-9]{7})
-    (?P<dirty>(-dirty$)|$)
-    """,
-    re.X,
-)
-
-
-def parse_calgitver(maybe_calgitver: str):
-    return CALGITVER_EXTRACT_RE.match(maybe_calgitver)
+def get_calver() -> str:
+    timestamp = datetime.now(timezone.utc)
+    return timestamp.strftime(CALVER_FORMAT)
 
 
 @ty.overload
 def extract_timestamp(version: str) -> str:
-    """Returns timestamp in full YYYYMMDDHHMMSS format even if the input was a CalGitVer string with no seconds."""
+    ...  # pragma: no cover
 
 
 @ty.overload
-def extract_timestamp(version: str, as_datetime: ty.Literal[True]) -> datetime:
+def extract_timestamp(version: str, as_datetime: ty.Literal[True]) -> ty.Optional[datetime]:
     ...  # pragma: no cover
 
 
@@ -133,34 +95,31 @@ def extract_timestamp(version: str, as_datetime: ty.Literal[False]) -> str:
 
 
 def extract_timestamp(version: str, as_datetime: bool = False):
-    def to_result(dt: datetime):
-        return dt.replace(tzinfo=timezone.utc) if as_datetime else dt.strftime(TIMESTAMP_FORMAT)
-
-    # This is intended to be general-purpose and therefore a bit heuristic.
-    # We attempt to parse the version as CalGitVer first, since it is a
-    # narrow format. Failing that, we'll try SemCalVer.
-    if parse_calgitver(version):
-        try:
-            return to_result(datetime.strptime(version[:13], CALGITVER_NO_SECONDS_FORMAT))
-        except ValueError:
-            pass
-
     version = re.sub(VERSION_EXCLUSION_REGEX, VERSION_SUB_CHARACTER, version)
     version_ = version.split(".")
-    if len(version_) >= 3:
+
+    if len(version_) == 3:
         try:
-            return to_result(datetime.strptime(version_[2], TIMESTAMP_FORMAT))
+            timestamp = datetime.strptime(version_[2], TIMESTAMP_FORMAT)
+            return (
+                timestamp.strftime(TIMESTAMP_FORMAT)
+                if not as_datetime
+                else timestamp.replace(tzinfo=timezone.utc)
+            )
         except ValueError:
-            pass
+            return "" if not as_datetime else None
+    elif len(version_) == 2:
+        try:
+            timestamp = datetime.strptime(version, CALVER_FORMAT)
+            return (
+                timestamp.strftime(TIMESTAMP_FORMAT)
+                if not as_datetime
+                else timestamp.replace(tzinfo=timezone.utc)
+            )
+        except ValueError:
+            return "" if not as_datetime else None
 
-    raise ValueError(
-        f"`version`: {version} is not a timestamp-containing version string (SemCalVer or CalGitVer)."
-    )
-
-
-def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
-    cmd = s_or_l_cmd.split() if isinstance(s_or_l_cmd, str) else s_or_l_cmd
-    return sp.check_output(cmd, text=True).rstrip("\n")
+    raise ValueError(f"`version`: {version} is not a valid version string (SemVer or CalVer).")
 
 
 @lru_cache(None)
@@ -183,11 +142,15 @@ def get_commit(pkg: Package = "") -> str:
         return os.environ[GIT_COMMIT]
 
     try:
-        LOGGER.debug("`get_commit` reading from Git repo.")
-        # backup in case you don't have `git` installed as a dev-dependency
-        # but you still have the git repo available.
-        return _simple_run("git rev-parse --verify HEAD")
-    except sp.CalledProcessError:
+        import git
+
+        try:
+            repo = git.Repo(search_parent_directories=True)
+            LOGGER.debug("`get_commit` reading from Git repo.")
+            return repo.head.object.hexsha
+        except git.InvalidGitRepositoryError:
+            pass
+    except ImportError:  # pragma: no cover
         pass
 
     try:
@@ -210,10 +173,15 @@ def is_clean(pkg: Package = "") -> bool:
         return bool(os.environ[GIT_IS_CLEAN])
 
     try:
-        LOGGER.debug("`is_clean` reading from Git repo.")
-        # command will print an empty string if the repo is clean
-        return "" == _simple_run("git diff --name-status")
-    except sp.CalledProcessError:
+        import git
+
+        try:
+            repo = git.Repo(search_parent_directories=True)
+            LOGGER.debug("`is_clean` reading from Git repo.")
+            return not repo.is_dirty()
+        except git.InvalidGitRepositoryError:
+            pass
+    except ImportError:  # pragma: no cover
         pass
 
     try:
@@ -237,9 +205,15 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
             return os.environ[GIT_BRANCH]
 
         try:
-            LOGGER.debug("`get_branch` reading from Git repo.")
-            return _simple_run("git branch --show-current")
-        except sp.CalledProcessError:
+            import git
+
+            try:
+                repo = git.Repo(search_parent_directories=True)
+                LOGGER.debug("`get_branch` reading from Git repo.")
+                return repo.active_branch.name
+            except git.InvalidGitRepositoryError:
+                pass
+        except ImportError:  # pragma: no cover
             pass
 
         try:
