@@ -21,7 +21,7 @@
       "prod": [
         {
           "name": "thds.core",
-          "version": "0.1",
+          "version": "0.2",
           "path": "libs/core",
           "third_party": [
             "attrs",
@@ -35,7 +35,7 @@
       "dev": [
         {
           "name": "thds.core",
-          "version": "0.1",
+          "version": "0.2",
           "path": "libs/core",
           "third_party": [
             "attrs",
