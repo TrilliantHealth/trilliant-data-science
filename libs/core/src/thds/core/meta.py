@@ -280,6 +280,13 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
     return format_name(_get_user(pkg), format)
 
 
+def is_deployed(pkg: Package) -> bool:
+    meta = read_metadata(pkg)
+    if meta.is_empty:
+        return False
+    return True
+
+
 MetaPrimitiveType = ty.Union[str, int, float, bool]
 MiscType = ty.Mapping[str, MetaPrimitiveType]
 
