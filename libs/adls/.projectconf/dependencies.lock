@@ -1,6 +1,6 @@
 {
-  "pipfile": "e49c8d314aa1f0c5fbbd15b795ec3ff0",
-  "pipfile_lock": "28742fdda25fee5f0619ee6c2a44fcc0",
+  "pipfile": "ac4e7ca6ffee1a1317785e3a67ced5c8",
+  "pipfile_lock": "26e00bb3ce732b22b614d32a48da3c4e",
   "spec": {
     "name": "thds.adls",
     "version": "1.0",
@@ -32,24 +32,7 @@
           "entry_points": {}
         }
       ],
-      "dev": [
-        {
-          "name": "thds.core",
-          "version": "0.2",
-          "path": "libs/core",
-          "third_party": [
-            "attrs",
-            "cattrs"
-          ],
-          "extras": {
-            "dev": [
-              "gitpython"
-            ]
-          },
-          "scripts": {},
-          "entry_points": {}
-        }
-      ]
+      "dev": []
     }
   }
 }

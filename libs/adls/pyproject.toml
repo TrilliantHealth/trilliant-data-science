@@ -63,8 +63,9 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    build
-    | dist
+    \.venv
+    | build/
+    | dist/
     | \S+\.egg-info
 )'''
 check_untyped_defs = true

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "e79422641b62b03bc2efa9e919dfb2da0dfb2181fecc6c39ef06e5e8ed8cf84a"
+            "sha256": "7dad08ff11ebdef0af0dfe62dfd7190d9823f814dfd1af3a3f1073affde37560"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -139,11 +139,11 @@
         },
         "attrs": {
             "hashes": [
-                "sha256:29adc2665447e5191d0e7c568fde78b21f9672d344281d0c6e1ab085429b22b6",
-                "sha256:86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c"
+                "sha256:29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836",
+                "sha256:c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99"
             ],
-            "markers": "python_version >= '3.5'",
-            "version": "==22.1.0"
+            "markers": "python_version >= '3.6'",
+            "version": "==22.2.0"
         },
         "azure-core": {
             "hashes": [
@@ -706,18 +706,10 @@
     "develop": {
         "attrs": {
             "hashes": [
-                "sha256:29adc2665447e5191d0e7c568fde78b21f9672d344281d0c6e1ab085429b22b6",
-                "sha256:86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c"
+                "sha256:29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836",
+                "sha256:c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99"
             ],
-            "markers": "python_version >= '3.5'",
-            "version": "==22.1.0"
-        },
-        "cattrs": {
-            "hashes": [
-                "sha256:bc12b1f0d000b9f9bee83335887d532a1d3e99a833d1bf0882151c97d3e68c21",
-                "sha256:f0eed5642399423cf656e7b66ce92cdc5b963ecafd041d1b24d136fdde7acf6d"
-            ],
-            "markers": "python_version >= '3.7'",
+            "markers": "python_version >= '3.6'",
             "version": "==22.2.0"
         },
         "coverage": {
@@ -787,22 +779,6 @@
             ],
             "markers": "python_version < '3.11'",
             "version": "==1.0.4"
-        },
-        "gitdb": {
-            "hashes": [
-                "sha256:6eb990b69df4e15bad899ea868dc46572c3f75339735663b81de79b06f17eb9a",
-                "sha256:c286cf298426064079ed96a9e4a9d39e7f3e9bf15ba60701e95f5492f28415c7"
-            ],
-            "markers": "python_version >= '3.7'",
-            "version": "==4.0.10"
-        },
-        "gitpython": {
-            "hashes": [
-                "sha256:41eea0deec2deea139b459ac03656f0dd28fc4a3387240ec1d3c259a2c47850f",
-                "sha256:cc36bfc4a3f913e66805a28e84703e419d9c264c1077e537b54f0e1af85dbefd"
-            ],
-            "markers": "python_version >= '3.7'",
-            "version": "==3.1.29"
         },
         "iniconfig": {
             "hashes": [
@@ -888,22 +864,6 @@
             ],
             "index": "pypi",
             "version": "==3.10.0"
-        },
-        "smmap": {
-            "hashes": [
-                "sha256:2aba19d6a040e78d8b09de5c57e96207b09ed71d8e55ce0959eeee6c8e190d94",
-                "sha256:c840e62059cd3be204b0c9c9f74be2c09d5648eddd4580d9314c3ecde0b30936"
-            ],
-            "markers": "python_version >= '3.6'",
-            "version": "==5.0.0"
-        },
-        "thds-core": {
-            "editable": true,
-            "path": "./../core"
-        },
-        "thds.core": {
-            "editable": true,
-            "path": "../core"
         },
         "tomli": {
             "hashes": [
