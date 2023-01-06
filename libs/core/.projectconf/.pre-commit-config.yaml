@@ -1,12 +1,9 @@
 exclude: >
       (?x)(
-          \.mypy_cache
-          | \.venv
-          | build/
-          | dist/
-          | \S+\.egg-info/
+          build
+          | dist
+          | \S+\.egg-info
       )
-
 repos:
   - repo: local
     hooks:

@@ -2,7 +2,7 @@
 [project]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "0.2"
+version = "0.1"
 authors = [
     {name = "Trilliant Health"},
     {email = "inquire@trillianthealth.com"}
@@ -16,7 +16,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = []
+dev = [
+    "gitpython",
+]
 
 [project.urls]
 repository = "https://github.com/TrilliantHealth/ds-monorepo"
@@ -60,9 +62,8 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    \.venv
-    | build/
-    | dist/
+    build
+    | dist
     | \S+\.egg-info
 )'''
 check_untyped_defs = true

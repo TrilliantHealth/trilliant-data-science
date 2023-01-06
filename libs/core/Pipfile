@@ -8,37 +8,24 @@ name = "ds-pypi-releases-local"
 url = "https://artifactory.trillianthealth.com/artifactory/api/pypi/ds-pypi-releases-local/simple"
 verify_ssl = true
 
-#################
-# HELLO!
-#
-# If you don't mind, please specify fairly strong bounds
-# for _development_ dependencies in the Pipfile for a library.
-# The reasoning is that we never want our stuff to break because
-# of a backward-incompatible change to something like mypy or pytest.
-#################
-
 [dev-packages]
 # MONOREPO STANDARDS
+ipykernel = "*"
+ipython = "*"
 mypy = "==0.982"
-mypy-extensions = "~=0.4"
-pytest = "~=7.2"
-pytest-cov = "~=4.0"
-pytest-mock = "~=3.10"
+mypy-extensions = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "*"
 types-setuptools = "*"
 # PROJECT-SPECIFIC
-
-#################
-# By contrast, runtime dependencies (defined in pyproject.toml) should
-# be as loose as semantically correct, because this is a library and
-# we want to give applications maximum latitude to choose their own
-# versions of libraries.
-#################
+"thds.core" = {path = ".", extras = ["dev"], editable = true}
 
 [packages]
 # DO NOT SPECIFY OTHER NON-LOCAL RUNTIME DEPENDENCIES HERE.
 "thds.core" = {path = ".", editable = true}
 # PUT THOSE IN pyproject.toml ONLY PLEASE.
-# thds.core SHOULD HAVE NO OTHER LOCAL RUNTIME DEPENDENCIES
+# packable SHOULD HAVE NO OTHER LOCAL RUNTIME DEPENDENCIES
 
 [requires]
 python_version = "3.8"
