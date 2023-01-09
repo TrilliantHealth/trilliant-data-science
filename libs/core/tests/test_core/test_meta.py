@@ -1,12 +1,12 @@
 import datetime
 import logging
 import os
+import subprocess
 import typing as ty
 from contextlib import contextmanager
 from types import MappingProxyType
 from unittest.mock import Mock
 
-import git
 import pytest
 from pytest_mock import MockFixture
 
@@ -18,8 +18,8 @@ HIVE_BRANCH_NAME = "feature_test_branch_3750"
 COMMIT_HASH = "hash123"
 USER_NAME = "test.user"
 HIVE_USER_NAME = "test_user"
-SEMVER_STRING = "2.1.20220919184229"
-CALVER_STRING = "20220919.184229"
+SEMVER_STRING = "2.1.20220919184213"
+CALGITVER_STRING = "20220919.1842-abcdef1"
 
 
 @contextmanager
@@ -71,18 +71,42 @@ def mock_getuser(mocker: MockFixture) -> Mock:
 
 
 @pytest.fixture
-def mock_git_repo(mocker: MockFixture) -> Mock:
-    mock = mocker.patch("git.Repo")
-    mock.return_value.head.object.hexsha = COMMIT_HASH
-    mock.is_dirty = True
-    mock.return_value.active_branch.name = BRANCH_NAME
+def mock_git_commit(mocker: MockFixture) -> Mock:
+    mock = mocker.patch("thds.core.meta._simple_run")
+    mock.return_value = COMMIT_HASH
     return mock
+
+
+@pytest.fixture
+def mock_git_is_clean(mocker: MockFixture) -> Mock:
+    mock = mocker.patch("thds.core.meta._simple_run")
+    mock.return_value = True
+    return mock
+
+
+@pytest.fixture
+def mock_git_branch(mocker: MockFixture) -> Mock:
+    mock = mocker.patch("thds.core.meta._simple_run")
+    mock.return_value = BRANCH_NAME
+    return mock
+
+
+@pytest.fixture
+def mock_simple_run(mocker: MockFixture) -> Mock:
+    pass
 
 
 @pytest.fixture
 def mock_read_metadata(mocker: MockFixture, metadata: meta.Metadata) -> Mock:
     mock = mocker.patch("thds.core.meta.read_metadata")
     mock.return_value = metadata
+    return mock
+
+
+@pytest.fixture
+def mock_read_empty_metadata(mocker: MockFixture) -> Mock:
+    mock = mocker.patch("thds.core.meta.read_metadata")
+    mock.return_value = meta.Metadata()
     return mock
 
 
@@ -187,14 +211,8 @@ def test_get_timestamp_datetime() -> None:
     assert timestamp.tzinfo == datetime.timezone.utc
 
 
-def test_get_calver() -> None:
-    timestamp = meta.get_calver()
-    assert len(timestamp) == 15
-    assert len(timestamp.split(".")) == 2
-
-
 def test_extract_timestamp_semver_str() -> None:
-    assert meta.extract_timestamp(SEMVER_STRING, as_datetime=False) == SEMVER_STRING.split(".")[2]
+    assert meta.extract_timestamp(SEMVER_STRING, as_datetime=False) == "20220919184213"
 
 
 def test_extract_timestamp_semver_datetime() -> None:
@@ -204,29 +222,33 @@ def test_extract_timestamp_semver_datetime() -> None:
 
 
 def test_extract_timestamp_semver_no_date_str() -> None:
-    assert meta.extract_timestamp(".".join(SEMVER_STRING.split(".")[:2]), as_datetime=False) == ""
+    with pytest.raises(ValueError):
+        meta.extract_timestamp(".".join(SEMVER_STRING.split(".")[:2]), as_datetime=False)
 
 
 def test_extract_timestamp_semver_no_date_str2() -> None:
-    assert meta.extract_timestamp("1.1.1", as_datetime=False) == ""
+    with pytest.raises(ValueError):
+        meta.extract_timestamp("1.1.1", as_datetime=False)
 
 
 def test_extract_timestamp_semver_no_date_datetime() -> None:
-    assert meta.extract_timestamp(".".join(SEMVER_STRING.split(".")[:2]), as_datetime=True) is None
+    with pytest.raises(ValueError):
+        meta.extract_timestamp(".".join(SEMVER_STRING.split(".")[:2]), as_datetime=True)
 
 
 def test_extract_timestamp_semver_no_date_datetime2() -> None:
-    assert meta.extract_timestamp("1.1.1", as_datetime=True) is None
+    with pytest.raises(ValueError):
+        meta.extract_timestamp("1.1.1", as_datetime=True)
 
 
 def test_extract_timestamp_calver_str() -> None:
-    assert meta.extract_timestamp(CALVER_STRING, as_datetime=False) == "".join(CALVER_STRING.split("."))
+    assert meta.extract_timestamp(CALGITVER_STRING, as_datetime=False) == "20220919184200"
 
 
 def test_extract_timestamp_calver_datetime() -> None:
-    assert meta.extract_timestamp(CALVER_STRING, as_datetime=True) == datetime.datetime.strptime(
-        CALVER_STRING, meta.CALVER_FORMAT
-    ).replace(tzinfo=datetime.timezone.utc)
+    assert meta.extract_timestamp(CALGITVER_STRING, as_datetime=True) == datetime.datetime(
+        2022, 9, 19, 18, 42, 0, tzinfo=datetime.timezone.utc
+    )
 
 
 def test_extract_timestamp_unsupported_version_format() -> None:
@@ -241,40 +263,42 @@ def test_get_commit_from_envvar(caplog) -> None:
         assert "`get_commit` reading from env var." in caplog.text
 
 
-def test_get_commit_from_git_repo(caplog, mock_git_repo: Mock) -> None:
+def test_get_commit_from_git_repo(caplog, mock_git_commit: Mock) -> None:
     with caplog.at_level(logging.DEBUG):
         assert meta.get_commit() == COMMIT_HASH
-    assert mock_git_repo.called
+    assert mock_git_commit.called
     assert "`get_commit` reading from Git repo." in caplog.text
 
 
-def test_get_commit_from_metadata(caplog, mock_git_repo: Mock, mock_read_metadata: Mock) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+def test_get_commit_from_metadata(caplog, mock_git_commit: Mock, mock_read_metadata: Mock) -> None:
+    mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.DEBUG):
         assert meta.get_commit("test") == COMMIT_HASH
-    assert mock_git_repo.called
+    assert mock_git_commit.called
     assert mock_read_metadata.called
     assert "`get_commit` reading from metadata." in caplog.text
 
 
 def test_get_commit_from_metadata_no_metadata(
-    caplog, mock_git_repo: Mock, mock_read_metadata: Mock
+    caplog, mock_git_commit: Mock, mock_read_metadata: Mock
 ) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+    mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
     mock_read_metadata.return_value = meta.Metadata()
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_commit("test")
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_commit("test")
+    assert mock_git_commit.called
     assert mock_read_metadata.called
     assert "`get_commit` reading from metadata." in caplog.text
     assert "`get_commit` found no commit." in caplog.text
 
 
-def test_get_commit_no_commit(caplog, mock_git_repo: Mock) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+def test_get_commit_no_commit(caplog, mock_git_commit: Mock) -> None:
+    mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_commit()
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_commit()
+    assert mock_git_commit.called
     assert "`get_commit` found no commit." in caplog.text
 
 
@@ -285,18 +309,19 @@ def test_is_clean_from_envvar(caplog) -> None:
         assert "`is_clean` reading from env var." in caplog.text
 
 
-def test_is_clean_from_git_repo(caplog, mock_git_repo: Mock) -> None:
+def test_is_clean_from_git_repo(caplog, mock_git_is_clean: Mock) -> None:
     with caplog.at_level(logging.DEBUG):
         assert not meta.is_clean()
-    assert mock_git_repo.called
+    assert mock_git_is_clean.called
     assert "`is_clean` reading from Git repo." in caplog.text
 
 
-def test_is_clean_no_dirtiness(caplog, mock_git_repo: Mock) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+def test_is_clean_no_dirtiness(caplog, mock_git_is_clean: Mock) -> None:
+    mock_git_is_clean.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.DEBUG):
-        assert meta.is_clean()
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert meta.is_clean()
+    assert mock_git_is_clean.called
     assert "`is_clean` found no cleanliness - assume dirty." in caplog.text
 
 
@@ -314,37 +339,48 @@ def test_get_hive_branch_from_envvar(caplog) -> None:
         assert "`get_branch` reading from env var." in caplog.text
 
 
-def test_get_branch_from_git_repo(caplog, mock_git_repo: Mock) -> None:
+def test_get_branch_from_git_repo(caplog, mock_git_branch: Mock) -> None:
     with caplog.at_level(logging.DEBUG):
         assert meta.get_branch() == BRANCH_NAME
-    assert mock_git_repo.called
+    assert mock_git_branch.called
     assert "`get_branch` reading from Git repo." in caplog.text
 
 
-def test_get_branch_from_metadata(caplog, mock_git_repo: Mock, mock_read_metadata: Mock) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+def test_get_branch_from_metadata(caplog, mock_git_branch: Mock, mock_read_metadata: Mock) -> None:
+    mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.DEBUG):
-        assert meta.get_branch("test") == BRANCH_NAME
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert meta.get_branch("test") == BRANCH_NAME
+    assert mock_git_branch.called
     assert "`get_branch` reading from metadata." in caplog.text
 
 
 def test_get_branch_from_metadata_no_metadata(
-    caplog, mock_git_repo: Mock, mock_read_metadata: Mock
+    caplog, mock_git_branch: Mock, mock_read_metadata: Mock
 ) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+    mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
     mock_read_metadata.return_value = meta.Metadata()
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_branch("test")
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_branch("test")
+    assert mock_git_branch.called
     assert mock_read_metadata.called
     assert "`get_branch` reading from metadata." in caplog.text
     assert "`get_branch` found no branch." in caplog.text
 
 
-def test_get_branch_no_branch(caplog, mock_git_repo: Mock) -> None:
-    mock_git_repo.side_effect = git.InvalidGitRepositoryError
+def test_get_branch_no_branch(caplog, mock_git_branch: Mock) -> None:
+    mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.DEBUG):
-        assert not meta.get_branch()
-    assert mock_git_repo.called
+        with envvars(NO_GIT_FALLBACK="true"):
+            assert not meta.get_branch()
+    assert mock_git_branch.called
     assert "`get_branch` found no branch." in caplog.text
+
+
+def test_is_deployed_with_metadata(mock_read_metadata: Mock) -> None:
+    assert meta.is_deployed("test")
+
+
+def test_is_deployed_with_empty_metadata(mock_read_empty_metadata: Mock) -> None:
+    assert not meta.is_deployed("test")
