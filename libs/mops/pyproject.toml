@@ -1,0 +1,95 @@
+# PROJECT METADATA
+[project]
+name = "thds.mops"
+# Patch version is a datetime determined upon release
+version = "1.0"
+authors = [
+    {name = "Trilliant Health"},
+    {email = "inquire@trillianthealth.com"}
+]
+description = "ML Ops tools for Trilliant Health"
+readme = "README.md"
+requires-python = ">=3.8"
+
+dependencies = [
+    "requests",
+    "azure-core",
+    "azure-containerregistry",
+    "azure-mgmt-resource",
+    "azure-mgmt-containerservice",
+    "azure-identity",
+    "azure-storage-blob",
+    "adal",  # this is necessary for K8S Azure authentication refresh.
+    "pyyaml",
+    "retry",
+    "kubernetes>=18.20,<23.0",  # 22.6 is the best match for current clusters
+    "ansicolors",
+    "cachetools",
+    "tomli",
+    "lazy_object_proxy",
+]
+# The above should contain loosely-specified,
+# *THIRD-PARTY ONLY*, _runtime_ dependencies.
+#
+# Local (monorepo) dependencies
+# (both runtime and development) go in the `Pipfile`.
+
+[project.optional-dependencies]
+# the names in here correspond to the names inside `extras` sent to `pip`.
+dev = []
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# PROJECT ENTRY POINTS
+[project.scripts]
+
+# BUILD CONFIG
+[build-system]
+requires = [
+    "setuptools>=61.0.0",
+    "wheel",
+    "thds.core",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = [
+    "py.typed",
+    "meta.json",
+    "*_config.toml",
+]
+
+# TOOLING CONFIG
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.mops"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+python_version = 3.8
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    \.venv
+    | build/
+    | dist/
+    | \S+\.egg-info
+)'''
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["azure.*", "kubernetes.*", 'colors', 'lazy_object_proxy', "setuptools"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,63 @@
+{
+  "pipfile": "123da19f1a0e7d4d106129588317b075",
+  "pipfile_lock": "f07b42a2c65b8b63a6bce81e8ecd0a53",
+  "spec": {
+    "name": "thds.mops",
+    "version": "1.0",
+    "path": "libs/mops",
+    "third_party": [
+      "adal",
+      "ansicolors",
+      "azure-containerregistry",
+      "azure-core",
+      "azure-identity",
+      "azure-mgmt-containerservice",
+      "azure-mgmt-resource",
+      "azure-storage-blob",
+      "cachetools",
+      "kubernetes>=18.20,<23.0",
+      "lazy_object_proxy",
+      "pyyaml",
+      "requests",
+      "retry",
+      "tomli"
+    ],
+    "extras": {
+      "dev": []
+    },
+    "scripts": {},
+    "entry_points": {},
+    "deps": {
+      "prod": [
+        {
+          "name": "thds.adls",
+          "version": "1.0",
+          "path": "libs/adls",
+          "third_party": [
+            "aiohttp>=3.8.1",
+            "aiostream>=0.4.5",
+            "azure-identity>=1.9",
+            "azure-storage-file-datalake>=12.6",
+            "lazy-object-proxy>=1.7.1"
+          ],
+          "extras": {},
+          "scripts": {},
+          "entry_points": {}
+        },
+        {
+          "name": "thds.core",
+          "version": "0.2",
+          "path": "libs/core",
+          "third_party": [
+            "attrs",
+            "cattrs"
+          ],
+          "extras": {},
+          "scripts": {},
+          "entry_points": {}
+        }
+      ],
+      "dev": []
+    }
+  }
+}
