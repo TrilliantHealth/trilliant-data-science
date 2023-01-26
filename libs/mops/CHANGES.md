@@ -1,3 +1,15 @@
+## 1.1
+
+- New `ImagePullBackOff` watcher utility available for integration with applications.
+- Tiny file-based image-name-sharing abstraction intended for use in local development.
+- Fix some odd bugs in `remote.remote_file` where `DestFiles` weren't correctly getting uploaded before exit.
+
+# 1.0
+
+Initial re-release as `mops`.
+
+# Ancient History (`trilliant-ml-ops`) versions below:
+
 ## 30000003.7.0
 
 - Optimistically fetch result or error from ADLS tmp path for each

@@ -20,6 +20,10 @@ from thds.mops.remote.adls_remote_files import (
 from ._util import adls_shell
 
 TEST_TIME = datetime.utcnow().isoformat()
+# at least two of these times will be seen each time the tests are
+# run.  one for the local-running process, and then others for the
+# remote-running processes that directly access TEST_PREFIX instead of
+# it being provided to them.
 TOP_DIR = "test-adls-src-dest-files/"
 TEST_PREFIX = TOP_DIR + TEST_TIME
 
@@ -82,7 +86,7 @@ def test_via_remote():
 
 def test_first_time_upload_of_src_file():
     sd_context = _context()
-    with tempfile.NamedTemporaryFile(mode="w") as f:
+    with tempfile.NamedTemporaryFile(mode="w", prefix="created-on-orchestrator") as f:
         f.write("some random data")
         f.flush()
         f.seek(0)
@@ -141,6 +145,9 @@ def test_src_file_is_reentrant():
 
 
 def remote_dest_file_creator() -> DestFile:
+    """Proves that even if the orchestrator doesn't provide you a DestFile,
+    you can create one yourself and hand it back, if you use remote_dest.
+    """
     sd_context = _context()
     dest = sd_context.remote_dest("just/somewhere.txt")
     with dest as path:

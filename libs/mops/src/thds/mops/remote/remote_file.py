@@ -79,32 +79,46 @@ class DestFile:
     def __init__(self, uploader: Uploader, str_or_path: StrOrPath):
         self._uploader = uploader
         self._local_filename = os.fspath(str_or_path)
+        # we are careful throughout this class (and SrcFile) to
+        # refrain from storing things as Paths, because it is likely
+        # that these objects will pass through a `pure_remote`
+        # function boundary at some point (this is what they're
+        # designed for!)  and when that happens, if something is out
+        # of whack, we do not want to see the internal Path object
+        # pickled and uploaded/downloaded.
         self._serialized_remote_pointer = Serialized("")
 
     def __enter__(self) -> Path:
-        """Return a temporary local filen Path that may be used for opening or moving to.
+        """Return a temporary local file Path that may be used for opening or moving to.
 
         When the context exits, this temporary file will be uploaded if remote,
         or moved to the local destination if not remote.
         """
-        _fh, temp_filename = tempfile.mkstemp(suffix=os.path.basename(self._local_filename))
-        os.close(_fh)  # we don't want this open ourselves
-        self._temp_filepath = Path(temp_filename)
-        # we use mkstemp instead of TemporaryFile because we don't want it to auto-delete on close.
-        return self._temp_filepath
+        _fh, self._temp_dest_filepath = tempfile.mkstemp(suffix=os.path.basename(self._local_filename))
+        # we use mkstemp instead of TemporaryFile because we don't want it to auto-delete on close,
+        os.close(_fh)  # and we specifically don't want this open ourselves.
+        return Path(self._temp_dest_filepath)
 
     def __exit__(self, *_args, **_kwargs):
-        """Upload locally-created file if remote - otherwise move to local destination directly."""
+        """Upload locally-created file if remote - otherwise move to local destination directly.
+
+        It's critical that this get run within the is_remote scope if
+        running remotely.  To ensure this, you should enter the
+        context when you write to the file and then close it as soon
+        as you are done writing it for the last time.
+        """
         if is_remote():
             try:
-                self._serialized_remote_pointer = self._uploader(self._temp_filepath)
+                self._serialized_remote_pointer = self._uploader(self._temp_dest_filepath)
+                logger.info(f"Uploaded DestFile to {self._serialized_remote_pointer}")
             finally:
-                os.remove(self._temp_filepath)
+                os.remove(self._temp_dest_filepath)
         else:
-            shutil.move(os.fspath(self._temp_filepath), self._local_filename)
+            logger.info(f"Moving temp file to dest file on local system: {self._local_filename}")
+            shutil.move(os.fspath(self._temp_dest_filepath), self._local_filename)
             # we use shutil.move instead of os.rename because it will transparently handle
             # moving across different filesystems if for some reason the temporary file is created on a different FS.
-        del self._temp_filepath  # we don't want this meaningless Path to exist later
+        del self._temp_dest_filepath  # we don't want this meaningless file path to exist later
 
     def _write_serialized_remote_to_placeholder(self):
         """For use by framework code in the local orchestrator process.
@@ -172,7 +186,7 @@ class SrcFile:
         if self._local_filename:
             assert self._uploader, "If local file is present, uploader must be provided as well"
         self._downloader = downloader
-        self._temp_filepath: ty.Optional[Path] = None
+        self._temp_src_filepath: str = ""
         self._entrance_count = 0
 
     def _upload_if_not_already_remote(self):
@@ -198,15 +212,18 @@ class SrcFile:
         Writes to this path are undefined behavior.
         """
         self._entrance_count += 1
-        if self._temp_filepath:
-            return self._temp_filepath  # pragma: nocover  # cannot 'see' test b/c it runs remotely
+        if self._temp_src_filepath:
+            return Path(
+                self._temp_src_filepath
+            )  # pragma: nocover  # cannot 'see' test b/c it runs remotely
 
         if is_remote() or self._serialized_remote_pointer:
-            _fh, tmp_fname = tempfile.mkstemp(suffix=os.path.basename(self._local_filename))
+            _fh, self._temp_src_filepath = tempfile.mkstemp(
+                suffix=os.path.basename(self._local_filename)
+            )
             os.close(_fh)  # we don't want the file to be open
-            self._temp_filepath = Path(tmp_fname)
-            self._downloader(self._serialized_remote_pointer, self._temp_filepath)
-            return self._temp_filepath
+            self._downloader(self._serialized_remote_pointer, self._temp_src_filepath)
+            return Path(self._temp_src_filepath)
 
         assert os.path.exists(
             self._local_filename
@@ -216,12 +233,12 @@ class SrcFile:
     def __exit__(self, *_args, **_kwargs):
         """Clean up temporary file if one exists."""
         self._entrance_count -= 1
-        if self._temp_filepath and not self._entrance_count:
+        if self._temp_src_filepath and not self._entrance_count:
             assert (
                 is_remote() or self._serialized_remote_pointer
             ), "No temp file should have been created in this context."
-            os.remove(self._temp_filepath)
-            self._temp_filepath = None
+            os.remove(self._temp_src_filepath)
+            self._temp_src_filepath = ""
 
 
 def _recursive_visit(visitor: ty.Callable[[ty.Any], bool], obj: ty.Any):

@@ -2,7 +2,7 @@
 [project]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "1.0"
+version = "1.1"
 authors = [
     {name = "Trilliant Health"},
     {email = "inquire@trillianthealth.com"}

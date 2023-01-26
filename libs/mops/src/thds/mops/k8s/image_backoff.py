@@ -1,0 +1,58 @@
+import typing as ty
+from datetime import datetime, timezone
+
+from kubernetes import client
+
+from thds.core.log import getLogger
+
+from .. import config
+from ..colorize import colorized
+from .watch import DaemonLimiter, K8sList, yield_events
+
+logger = getLogger(__name__)
+
+OnCoreEvent = ty.Callable[[client.CoreV1Event], ty.Any]
+
+YIKES = colorized(fg="black", bg="yellow")
+
+
+def _emit_basic(event: client.CoreV1Event):
+    logger.error(YIKES(event.message))
+
+
+def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_basic):
+    """Log scary errors when ImagePullBackoff is observed."""
+    start_dt = datetime.now(tz=timezone.utc)
+    for _ns, event in yield_events(
+        namespace,
+        lambda _, __: ty.cast(
+            # do NOT use client.EventsV1Api here - for some reason
+            # it does not return the right 'types' of events.
+            # why? who the heck knows? How much time did I spend
+            # trying to figure this out? Also who knows.
+            K8sList[client.CoreV1Event],
+            client.CoreV1Api().list_namespaced_event,
+        ),
+        field_selector="reason=BackOff",
+    ):
+        obj = event["object"]
+        if obj.last_timestamp > start_dt:
+            on_backoff(obj)
+
+
+_WARN_IMAGE_PULL_BACKOFF = DaemonLimiter()
+
+
+def start_warn_image_pull_backoff_thread(
+    namespace: str = "", on_backoff: ty.Optional[OnCoreEvent] = None
+):
+    """Limit 1 thread per namespace per application.
+
+    You can pass an additional message context
+    """
+    namespace = namespace or config.k8s_namespace()
+    _WARN_IMAGE_PULL_BACKOFF(
+        namespace,
+        target=_warn_image_pull_backoff,
+        args=(namespace, on_backoff or _emit_basic),
+    )

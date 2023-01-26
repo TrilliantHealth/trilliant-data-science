@@ -1,3 +1,12 @@
+"""This entire module is/could be a generic stack-configuration layer
+built over top of static application config that allows it to be
+selectively overridden on a per-stack/thread basis. It would get moved
+to `thds.core` without the `tomli` dependency or the `mops`-specific
+config.
+
+I just need to finish abstracting it and give it a nicer API.
+
+"""
 import os
 import typing as ty
 from datetime import timedelta
@@ -33,10 +42,11 @@ def _get_config():
 def set_config(dict_like_config):
     """Call this to replace the default config with a pre-parsed
     dict-like such as a Dynaconf settings object that your application
-    already manages.
+    already manages. It will only override the specific keys that you
+    provide.
     """
     global _CONFIG
-    _CONFIG = dict_like_config
+    _CONFIG = {**_CONFIG, **dict_like_config}
 
 
 def _nested_lazy_get(dotted_path: str, default=None):

@@ -4,7 +4,7 @@ from thds.core import meta
 
 __basepackage__ = __name__
 try:
-    __version__ = version(__name__)
+    __version__ = version("thds.mops")
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "1.x"
 __commit__ = meta.read_metadata(__name__).git_commit

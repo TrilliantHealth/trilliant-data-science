@@ -3,7 +3,12 @@ from threading import Lock, RLock
 from typing import Optional, Union
 
 from cachetools import keys
-from cachetools.func import _CacheInfo  # type: ignore
+
+try:
+    from cachetools.func import _CacheInfo  # type: ignore
+except ImportError:
+    # this moved between 5.2.1 and 5.3.
+    from cachetools import _CacheInfo  # type: ignore
 
 
 def locked_cached(cache, typed: bool = False, lock: Optional[Union[RLock, Lock]] = None):

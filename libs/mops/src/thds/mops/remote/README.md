@@ -370,6 +370,11 @@ def remote_processor(dest: DestFile, src: SrcFile, *args, **kwargs) -> DestFile:
 The Context Managers are a bit ugly, so you may wish to use
 `core.scope.enter` to avoid all of the nesting.
 
+⚠️ However, it is critical that your `DestFile` context be closed
+_before_ exiting the `pure_remote`-decorated function, or else your
+data will remain in the temp location and will not get delivered to
+its final destination.
+
 `SrcFile` actually supports three different methods of creation,
 depending on your situation.
 
