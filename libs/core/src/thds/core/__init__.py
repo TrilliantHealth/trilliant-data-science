@@ -1,3 +1,5 @@
+"""Trilliant Health data science team core utils"""
+
 from importlib.metadata import PackageNotFoundError, version
 
 from .meta import read_metadata
