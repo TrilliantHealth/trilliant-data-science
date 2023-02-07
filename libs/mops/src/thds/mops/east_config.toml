@@ -6,7 +6,39 @@ url = "https://datascience-c5f20f9b.privatelink.eastus2.azmk8s.io:443"
 
 [mops.k8s.azure]
 aad_pod_managed_identity = "ds-standard"
-# https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf
+# https://learn.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity
+# This is not the oldest form of identity supported by AKS, but it is
+# now somewhat deprecated because of performance and scaling
+# limitations.
+
+# https://azure.github.io/azure-workload-identity/docs/introduction.html
+# Yes, this list looks weird. please see the longer comment below
+# before you touch it.
+namespaces_supporting_workload_identity = [
+  "default",
+  "demand-forecast",
+  "dimitrios-boursinos",
+  "grant-andersen",
+  "person-api",
+  "peter-gaultney",
+  "rueben-banalagay",
+  "sandeep-kothiwale",
+  "tim-dobbins",
+  "yelena-goryunova",
+  "zane-dennis",
+]
+# the above list should follow
+# https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf#L4
+#
+# If new users come on board and they want to use the more reliable
+# auth, it should suffice to add their k8s namespace to these two
+# lists. The infra list is the prerequisite list and needs to be
+# merged and applied to the cluster, however, whereas this list should
+# simply mirror the infra/Terraform list.
+#
+# If a Terraform change has been made, it is not necessary for an
+# application to wait for `mops` to be rebuilt - the application may
+# simply set this config value to include its desired namespace(s).
 
 [mops.k8s.monitor]
 delay_seconds = 5

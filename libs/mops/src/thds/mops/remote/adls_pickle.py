@@ -2,6 +2,7 @@
 implementation for the pure_remote Channel/Runner system.
 """
 import hashlib
+import threading
 import typing as ty
 
 from cachetools import LRUCache
@@ -12,9 +13,10 @@ from thds.core import scope
 from thds.core.log import getLogger
 
 from ..__about__ import backward_compatible_with
-from ..config import adls_remote_tmp_container, adls_remote_tmp_sa
+from ..colorize import colorized
+from ..config import adls_max_clients, adls_remote_tmp_container, adls_remote_tmp_sa
 from ..locked_cache import locked_cached
-from ._adls import AdlsFileSystem, AdlsFileSystemClient, join, yield_filenames
+from ._adls import AdlsFileSystem, join
 from ._adls_serde import (
     ADLS_CONTEXT,
     AdlsContext,
@@ -28,8 +30,11 @@ from ._once import Once
 from ._pickle import gimme_bytes, wrap_f
 from ._registry import MAIN_HANDLER_BASE_ARGS, register_main_handler
 from .core import SerializableThunk, forwarding_call, get_pipeline_id
-from .remote_file import trigger_dest_files_download, trigger_src_files_upload
+from .remote_file import trigger_dest_files_placeholder_write, trigger_src_files_upload
 from .types import T
+
+_OUT_SEMAPHORE = threading.BoundedSemaphore(int(adls_max_clients()))
+_IN_SEMAPHORE = threading.BoundedSemaphore(int(adls_max_clients()))
 
 logger = getLogger(__name__)
 
@@ -91,32 +96,6 @@ def _make_byos(_pipeline_id: str) -> BYOS:
     return BYOS()
 
 
-def _make_pipeline_init_file_exists_cache(
-    sa: str, container: str, adls_prefix: str
-) -> ty.Callable[[str], bool]:
-    """At the beginning of a function run, we don't expect most of
-    these files to exist - they will be the results of our upcoming
-    run. Therefore we err on the side of using a cache to tell us that they do not exist.
-    """
-    adls_prefix = adls_prefix.lstrip("/")
-    logger.info(f"Searching {adls_prefix} for previous runs")
-    known_filenames = set(yield_filenames(AdlsFileSystemClient(sa, container), adls_prefix))
-    if len(known_filenames):
-        logger.info(
-            f"Found {len(known_filenames)} at the pipeline prefix {adls_prefix} "
-            "- these may save some time."
-        )
-
-    def file_exists(full_filename: str) -> bool:
-        full_filename = full_filename.lstrip("/")  # ADLS returns paths with no forward slash
-        if full_filename.startswith(adls_prefix):
-            return full_filename in known_filenames
-        logger.warning(f"Having to search elsewhere for {full_filename}")
-        return AdlsFileSystem(sa, container).file_exists(full_filename)
-
-    return file_exists
-
-
 def _make_name(f):
     try:
         return f"{f.__module__}:{f.__name__}"
@@ -132,6 +111,10 @@ def _default_adls_root() -> AdlsFqn:
     )
 
 
+_DarkBlue = colorized(fg="white", bg="#00008b")
+_LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
+
+
 class AdlsPickleRunner:
     """Runs functions in a remote process as specified by the Shell."""
 
@@ -139,6 +122,7 @@ class AdlsPickleRunner:
         self,
         shell: ty.Union[Shell, ShellBuilder],
         adls_path: ty.Optional[AdlsFqn] = None,
+        rerun_exceptions: bool = False,
     ):
         """Construct a repeatable shell runner with a shared pipeline_id.
 
@@ -155,6 +139,13 @@ class AdlsPickleRunner:
         implementation to return for the given function call. The
         Shell must still support pulling the function and arguments
         from ADLS as usual.
+
+        `rerun_exceptions` will cause a pre-existing `exception`
+        result to be ignored, as though Exceptions in your function
+        are the result of transient errors and not part of a truly
+        pure function. This may be the default behavior in the future
+        but is a backwards-incompatible change so it will remain off
+        by default for now.
         """
         if isinstance(shell, ShellBuilder):
             # this is for backward compatibility. arguably we should simplify this interface.
@@ -162,11 +153,12 @@ class AdlsPickleRunner:
         else:
             self.shell_builder = lambda *_args, **_kws: shell
 
+        self._rerun_exceptions = rerun_exceptions
         self._adls_loc = adls_path or _default_adls_root()
         # synchronization per pipeline id:
         self._pipeline_once = locked_cached(LRUCache(1))(_make_once)
         self._pipeline_byos = locked_cached(LRUCache(1))(_make_byos)
-        self._pre_run_file_exists = locked_cached(LRUCache(20))(_make_pipeline_init_file_exists_cache)
+        self._fs = AdlsFileSystem(self._adls_loc[0], self._adls_loc[1])
 
     def named(self, **objs: ty.Any):
         """Set up shared pickle serialization for these objects.
@@ -186,14 +178,14 @@ class AdlsPickleRunner:
         deterministic hashed bytes of all of the arguments, _plus_ the
         pipeline ID.
         """
-        trigger_src_files_upload(args, kwargs)
-
         pipeline_id = get_pipeline_id()
         sa, container, path = self._adls_loc
+        trigger_src_files_upload(args, kwargs)
+
         pipeline_dir = join(path, pipeline_id)
         logger.debug("Preparing to run function via remote shell")
 
-        fs = AdlsFileSystem(sa, container)
+        fs = self._fs
         scope.enter(ADLS_CONTEXT.set(AdlsContext(fs, pipeline_dir)))
         dumper = make_dumper(
             fs,
@@ -218,24 +210,49 @@ class AdlsPickleRunner:
         )
         read_object = make_read_object(fs)
 
-        def check_result(file_exists: ty.Callable[[str], bool]) -> ty.Optional[ty.Callable[[], T]]:
+        def check_result(
+            file_exists: ty.Callable[[str], bool], rerun_excs: bool = False
+        ) -> ty.Optional[ty.Callable[[], T]]:
             result_path = _result_path(call_id)
             if file_exists(result_path):
-                return lambda: trigger_dest_files_download(ty.cast(T, read_object(result_path)))
-            exc_path = _exception_path(call_id)
-            if file_exists(exc_path):
-                return _mk_raiser(lambda: ty.cast(Exception, read_object(exc_path)))
+                return lambda: trigger_dest_files_placeholder_write(
+                    ty.cast(T, read_object(result_path, type_hint="result"))
+                )
+            if rerun_excs:
+                return None
+            exception_path = _exception_path(call_id)
+            if file_exists(exception_path):
+                return _mk_raiser(
+                    lambda: ty.cast(
+                        Exception,
+                        read_object(exception_path, type_hint="exception"),
+                    )
+                )
             return None
 
-        # it's possible that our result may already exist from a previous run of this pipeline id.
-        # we can short-circuit the entire process by looking for that result and returning it immediately.
-        give_result = check_result(self._pre_run_file_exists(sa, container, function_dir))
-        if give_result:
-            logger.info(f"Result for {call_id} already exists and is being returned without invocation!")
-            return give_result()
-        # but if it does not exist, we need to run.
+        # the use of this semaphore allows a given thread to have a
+        # high likelihood of getting the underlying client to
+        # prioritize its file-exists and follow-up put_bytes requests,
+        # such that the remote shells don't get starved for work
+        # (i.e. jobs get launched on average earlier). This has been
+        # tested to increase performance by 2x on small (5 second)
+        # remote tasks.
 
-        fs.put_bytes(_invocation_path(call_id), invoc_bytes, type_hint="invocation")
+        with _OUT_SEMAPHORE:
+            # it's possible that our result may already exist from a previous run of this pipeline id.
+            # we can short-circuit the entire process by looking for that result and returning it immediately.
+            give_result = check_result(
+                fs.file_exists,
+                rerun_excs=self._rerun_exceptions,
+            )
+            if give_result:
+                _LogKnownResult(
+                    f"Result for {call_id} already exists and is being returned without invocation!"
+                )
+                return give_result()
+            # but if it does not exist, we need to run.
+
+            fs.put_bytes(_invocation_path(call_id), invoc_bytes, type_hint="invocation")
         try:
             shell_ex = None
             self.shell_builder(f, *args, **kwargs)(
@@ -258,12 +275,17 @@ class AdlsPickleRunner:
             )
             shell_ex = ex
 
-        give_result = check_result(fs.file_exists)
-        if not give_result:
-            if shell_ex:
-                raise shell_ex  # re-raise the underlying exception rather than making up our own.
-            raise NoResultAfterInvocationError(call_id)
-        return give_result()
+        # this semaphore serves a similar purpose, prioritizing the
+        # pair/trio of ADLS operations as a group such that we
+        # prioritize getting an entire task finished vs finding out
+        # bits of information about many tasks.
+        with _IN_SEMAPHORE:
+            give_result = check_result(fs.file_exists)
+            if not give_result:
+                if shell_ex:
+                    raise shell_ex  # re-raise the underlying exception rather than making up our own.
+                raise NoResultAfterInvocationError(call_id)
+            return give_result()
 
 
 class _ResultChannel:

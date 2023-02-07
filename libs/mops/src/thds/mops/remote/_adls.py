@@ -1,23 +1,23 @@
 """Mostly generic ADLS utilities for non-async operation."""
-import contextlib
 import io
 import json
 import logging
 import os
-import threading
 import typing as ty
-from timeit import default_timer
 
 import azure.core.exceptions
 from azure.storage.blob import ContentSettings
-from azure.storage.filedatalake import DataLakeFileClient, DataLakeServiceClient, FileSystemClient
+from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 from retry import retry
 
-from thds.core.log import getLogger
+from thds.core import scope
+from thds.core.log import getLogger, logger_context
 
-from ..config import adls_max_clients, adls_skip_already_uploaded_check_if_smaller_than_bytes
-from ._azure import SharedCredential
+from ..colorize import colorized
+from ..config import adls_skip_already_uploaded_check_if_smaller_than_bytes
+from ._adls_shared import adls_fs_client
 from ._md5 import md5_something
+from ._on_slow import on_slow
 from .remote_file import Serialized
 
 T = ty.TypeVar("T")
@@ -31,24 +31,8 @@ getLogger("azure.core").setLevel(logging.WARNING)
 
 logger = getLogger(__name__)
 
-_SimultaneousDownloadsSemaphore = threading.BoundedSemaphore(int(adls_max_clients()))
-_SimultaneousUploadsSemaphore = threading.BoundedSemaphore(int(adls_max_clients()))
 
-
-@contextlib.contextmanager
-def AdlsFileSystemClient(storage_account: str, container: str) -> ty.Iterator[FileSystemClient]:
-    # exclude_shared_token_cache_credential=True avoids MacOS keychain prompts
-    with SharedCredential as credential:
-        service_client = DataLakeServiceClient(
-            account_url=f"https://{storage_account}.dfs.core.windows.net",
-            credential=credential,
-        )
-        with service_client:
-            with service_client.get_file_system_client(file_system=container) as file_system_client:
-                yield file_system_client
-
-
-def yield_files(fsc: ty.ContextManager[FileSystemClient], adls_root: str) -> ty.Iterable[ty.Any]:
+def yield_files(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[ty.Any]:
     """Yield files (including directories) from the root."""
     with fsc as client:
         try:
@@ -59,20 +43,11 @@ def yield_files(fsc: ty.ContextManager[FileSystemClient], adls_root: str) -> ty.
             raise
 
 
-def yield_filenames(fsc: ty.ContextManager[FileSystemClient], adls_root: str) -> ty.Iterable[str]:
+def yield_filenames(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[str]:
     """Yield only real file (not directory) names recursively from the root."""
     for azure_file in yield_files(fsc, adls_root):
         if not azure_file.get("is_directory"):
             yield azure_file["name"]
-
-
-@contextlib.contextmanager
-def _AdlsFileClient(
-    storage_account: str, container: str, remote_path: str
-) -> ty.Iterator[DataLakeFileClient]:
-    with AdlsFileSystemClient(storage_account, container) as fs:
-        with fs.get_file_client(remote_path) as file_client:
-            yield file_client
 
 
 AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr]]
@@ -120,62 +95,72 @@ _azure_creds_retry = retry(
     logger=logger,  # type: ignore
 )
 # sometimes Azure Cli credentials expire but would succeed if retried
-# and the azure library does not retry these on its own.
+# and the azure library does not seem to retry these on its own.
 
-LOG_SLOW_TRANSFER_S = 10  # seconds
+LOG_SLOW_TRANSFER_S = 3  # seconds
+_SLOW = colorized(fg="yellow", bg="black")
+LogSlow = lambda s: logger.warning(_SLOW(s))  # noqa: E731
 
 
 class AdlsFileSystem:
     def __init__(self, storage_account: str, container: str):
         self.storage_account = storage_account
         self.container = container
+        self._client = adls_fs_client(storage_account, container)
+
+    @property
+    def client(self) -> FileSystemClient:
+        return self._client
+
+    def __getstate__(self):
+        """AdlsFileSystem needs to be picklable because it gets
+        transmitted to the remote for use passing things back.  But
+        the _client cannot be pickled since it contains a lock, so we
+        need to remove that before pickling.
+        """
+        return {k: v for k, v in self.__dict__.items() if k != "_client"}
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+        self._client = adls_fs_client(self.storage_account, self.container)
 
     @_azure_creds_retry
+    @scope.bound
     def readinto(self, remote_path: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
-        with _SimultaneousDownloadsSemaphore:
-            with _AdlsFileClient(self.storage_account, self.container, remote_path) as file_client:
-                logger.info(
-                    f"<----- downloading {type_hint} from {self.storage_account} {self.container} {remote_path}"
-                )
-                start_time = default_timer()
-                file_client.download_file().readinto(stream)
-                elapsed_s = default_timer() - start_time
-                if elapsed_s > LOG_SLOW_TRANSFER_S:
-                    logger.info(
-                        f"Took {int(elapsed_s)} seconds to download {type_hint} from {remote_path}"
-                    )
+        scope.enter(logger_context(download=remote_path))
+        logger.info(f"<----- downloading {type_hint} from {self.storage_account} {self.container}")
+        on_slow(
+            LOG_SLOW_TRANSFER_S,
+            lambda elapsed_s: LogSlow(f"Took {int(elapsed_s)}s to download {type_hint}"),
+        )(lambda: self.client.get_file_client(remote_path).download_file().readinto(stream))()
 
     @_azure_creds_retry
+    @scope.bound
     def put_bytes(self, remote_path: str, data: AnyStrSrc, type_hint: str = "bytes"):
-        with _AdlsFileClient(self.storage_account, self.container, remote_path) as file_client:
-            content_settings_if_upload_needed = _content_settings_unless_checksum_already_present(
-                file_client, data
+        scope.enter(logger_context(upload=remote_path))
+        file_client = self.client.get_file_client(remote_path)
+        content_settings_if_upload_needed = _content_settings_unless_checksum_already_present(
+            file_client, data
+        )
+        if not content_settings_if_upload_needed:
+            return
+        logger.info(f"======> uploading {type_hint} to {self.storage_account} {self.container}")
+        on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"),)(
+            lambda: file_client.upload_data(
+                data,
+                overwrite=True,
+                content_settings=content_settings_if_upload_needed,
             )
-            if content_settings_if_upload_needed:
-                # we allow unlimited 'small' operations to proceed in
-                # parallel, but we gate actual uploads behind the
-                # semaphore to concentrate our bandwidth on fewer
-                # active uploads, reducing median and mean wait time.
-                with _SimultaneousUploadsSemaphore:
-                    logger.info(
-                        f"======> uploading {type_hint} to {self.storage_account} {self.container} {remote_path}"
-                    )
-                    start_time = default_timer()
-                    file_client.upload_data(
-                        data,
-                        overwrite=True,
-                        content_settings=content_settings_if_upload_needed,
-                    )
-                    elapsed_s = default_timer() - start_time
-                    if elapsed_s > LOG_SLOW_TRANSFER_S:
-                        logger.info(
-                            f"Took {int(elapsed_s)} seconds to upload {type_hint} to {remote_path}"
-                        )
+        )()
 
     @_azure_creds_retry
+    @scope.bound
     def file_exists(self, remote_path: str) -> bool:
-        with _AdlsFileClient(self.storage_account, self.container, remote_path) as file_client:
-            return file_client.exists()
+        scope.enter(logger_context(exists=remote_path))
+        return on_slow(
+            1.2,
+            lambda secs: LogSlow(f"Took {int(secs)}s to check if file exists."),
+        )(lambda: self.client.get_file_client(remote_path).exists())()
 
     def get_bytes(self, remote_path: str, type_hint: str = "bytes") -> bytes:
         with io.BytesIO() as tb:

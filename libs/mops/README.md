@@ -15,24 +15,41 @@ Prerequisites:
 
 ### Required Kubernetes Setup
 
-This _should_ be one-time setup, since we're down to a single cluster.
+This is now documented in the [Guidebook](https://guidebook.trillianthealth.com/data-science/kubernetes-access/).
 
-```bash
-brew install kubectl Azure/kubelogin/kubelogin
+### Additional Cluster setup [optional but recommended as of Q1 2023]
 
-az login  # since the East migration, you likely only have one choice here. If you have multiple, choose the one that gives you access to the East2 region.
-az aks get-credentials --resource-group datascience --name datascience --subscription engineering-stable
-kubelogin convert-kubeconfig
-kubectl get nodes  # this will likely prompt you to open a web page to authenticate.
-```
+These steps are not required, and will also not benefit anyone who is
+not using the `mops` library as part of their application (e.g. who is
+just deploying applications via Helm).
 
-You will be prompted to open your browser, possibly multiple times;
-If all goes well you'll have a `~/.kube/config`
-file filled in nicely, and you won't have to run this command again.
+Background: A K8s namespace using a sanitized version your local
+computer's user account name will eventually be created if you use
+this library. If that generated namespace does not appear in the list
+of `common_azure_access_identity.namespaces`
+[here](https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf#L4),
+and the corresponding default config value for
+`namespaces_supporting_workload_identity`
+[in this library](src/thds/mops/east_config.toml), then you are more
+likely to run into non-deterministic Azure authentication failures
+because of the
+[older](https://learn.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity)
+authn/authz method that must be used to support your unknown
+namespace.
+
+It's recommended that you make a small PR to `engineering-infra` and a
+corresponding PR to this library to add your namespace. This will
+automatically enable the use of
+[more reliable and performant auth](https://azure.github.io/azure-workload-identity/docs/introduction.html)
+from your K8s pods against Azure resources such as ADLS.
+
+Unfortunately this manual step appears to be unavoidable at this time,
+because the configuration must live in a part of Azure that we do not
+have permission to directly edit.
 
 ## Running Your Code on K8s
 
-See [the nested readme here](src/thds/k8s/README.md) for basics on how
+See [the nested readme here](src/thds/mops/k8s/README.md) for basics on how
 to launch a known Docker image in Kubernetes directly, and optionally
 wait for it to complete.
 

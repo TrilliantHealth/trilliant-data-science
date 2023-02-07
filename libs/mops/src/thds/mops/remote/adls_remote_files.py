@@ -6,7 +6,7 @@ from pathlib import Path
 from ..config import adls_remote_datasets_container, adls_remote_datasets_sa
 from ._adls import (
     AdlsFileSystem,
-    AdlsFileSystemClient,
+    adls_fs_client,
     download_to,
     join,
     represent_adls_path,
@@ -115,7 +115,11 @@ class AdlsDirectory:
 
     def upload(self, local_src: StrOrPath, remote_relative_path: str) -> Serialized:
         remote_serialization = upload_and_represent(
-            self.sa, self.container, self.directory, remote_relative_path, Path(os.fspath(local_src))
+            self.sa,
+            self.container,
+            self.directory,
+            remote_relative_path,
+            Path(os.fspath(local_src)),
         )
         serialization_len = len(remote_serialization.encode())
         assert (
@@ -145,6 +149,16 @@ class AdlsDatasetContext:
     def src(self, local_src: ty.Union[DestFile, StrOrPath]) -> SrcFile:
         """Return SrcFile for locally-existing path, or raise FileNotFoundError.
 
+        If the local file is a remote file pointer, it will get
+        recognized as such and will be downloaded upon entry to the
+        SrcFile context in a local orchestrator.
+
+        If the local file is not a remote file pointer (it is the file
+        itself), no download will occur for local usage.
+
+        In all cases, remote functions will download the file to a
+        temporary Path upon first context entry.
+
         May be absolute or relative to current working directory.
         """
         local_filepath = str(local_src)
@@ -159,6 +173,10 @@ class AdlsDatasetContext:
 
     def dest(self, local_dest: StrOrPath) -> DestFile:
         """Return DestFile representing the given local path.
+
+        If a file already exists at this local path, it will be
+        overwritten without warning upon return from a remote
+        function.
 
         May be absolute or relative to current working directory.
         """
@@ -223,7 +241,7 @@ def sync_remote_to_local_as_pointers(
     # normalize to start with no slash and end with a slash.
     directory = directory if directory.endswith("/") else (directory + "/")
     directory = directory[1:] if directory.startswith("/") else directory
-    for azure_filename in yield_filenames(AdlsFileSystemClient(sa, container), directory):
+    for azure_filename in yield_filenames(adls_fs_client(sa, container), directory):
         assert azure_filename.startswith(directory)
         path = local_root_path / azure_filename[len(directory) :]
         path.parent.mkdir(exist_ok=True, parents=True)

@@ -1,14 +1,14 @@
 """Find out how long a run took by looking at outputs to ADLS."""
 from datetime import timezone
 
-from .._adls import AdlsFileSystemClient, yield_files
+from .._adls import adls_fs_client, yield_files
 
 
 def summarize(sa: str, container: str, pipeline_root_dir: str):
     times = list()
     durations = list()
     total_functions = 0
-    for azure_file in yield_files(AdlsFileSystemClient(sa, container), pipeline_root_dir):
+    for azure_file in yield_files(adls_fs_client(sa, container), pipeline_root_dir):
         if azure_file.name.endswith("invocation"):
             total_functions += 1
         times.append(azure_file.creation_time)

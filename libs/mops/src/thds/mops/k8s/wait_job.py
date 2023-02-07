@@ -34,9 +34,10 @@ def wait_for_job(job_name: str, short_name: str = "") -> bool:
     start_time = default_timer()
 
     def _wait_for_job() -> bool:
+        nonlocal start_time
         found = False
         while True:
-            time.sleep(0.1 if found else 5.0)
+            time.sleep(0.5 if found else 10.0)
             job = get_job(job_name)
             if not job:
                 if found:
@@ -50,6 +51,7 @@ def wait_for_job(job_name: str, short_name: str = "") -> bool:
                 continue
 
             found = True
+            start_time = default_timer()  # restart timer since the job has been found.
             status = job.status  # type: ignore
             if not status:
                 continue

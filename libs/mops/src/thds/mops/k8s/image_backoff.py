@@ -1,3 +1,4 @@
+import threading
 import typing as ty
 from datetime import datetime, timezone
 
@@ -7,7 +8,7 @@ from thds.core.log import getLogger
 
 from .. import config
 from ..colorize import colorized
-from .watch import DaemonLimiter, K8sList, yield_events
+from .watch import K8sList, OneShotLimiter, yield_objects_from_list
 
 logger = getLogger(__name__)
 
@@ -23,7 +24,7 @@ def _emit_basic(event: client.CoreV1Event):
 def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_basic):
     """Log scary errors when ImagePullBackoff is observed."""
     start_dt = datetime.now(tz=timezone.utc)
-    for _ns, event in yield_events(
+    for _ns, obj in yield_objects_from_list(
         namespace,
         lambda _, __: ty.cast(
             # do NOT use client.EventsV1Api here - for some reason
@@ -35,12 +36,11 @@ def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_bas
         ),
         field_selector="reason=BackOff",
     ):
-        obj = event["object"]
         if obj.last_timestamp > start_dt:
             on_backoff(obj)
 
 
-_WARN_IMAGE_PULL_BACKOFF = DaemonLimiter()
+_WARN_IMAGE_PULL_BACKOFF = OneShotLimiter()
 
 
 def start_warn_image_pull_backoff_thread(
@@ -51,8 +51,12 @@ def start_warn_image_pull_backoff_thread(
     You can pass an additional message context
     """
     namespace = namespace or config.k8s_namespace()
+
     _WARN_IMAGE_PULL_BACKOFF(
         namespace,
-        target=_warn_image_pull_backoff,
-        args=(namespace, on_backoff or _emit_basic),
+        lambda ns: threading.Thread(
+            target=_warn_image_pull_backoff,
+            args=(namespace, on_backoff or _emit_basic),
+            daemon=True,
+        ).start(),
     )

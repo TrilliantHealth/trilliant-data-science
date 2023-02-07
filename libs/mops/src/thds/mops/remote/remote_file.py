@@ -157,9 +157,9 @@ class SrcFile:
     Must always be constructed on a local orchestrator process, but
     should not be accessed after 'return' from a remote process.
 
-    Either `serialized_remote_pointer` or `str_or_path_or_destfile`
-    must be provided and be non-empty. If the latter is provided, the local file
-    MUST exist on the local filesystem.
+    `serialized_remote_pointer` AND/OR `local_path` must be provided
+    and be non-empty. If the latter is provided, the local file MUST
+    already exist on the local filesystem.
     """
 
     def __init__(
@@ -262,7 +262,7 @@ def _recursive_visit(visitor: ty.Callable[[ty.Any], bool], obj: ty.Any):
     PickleVisit(io.BytesIO()).dump(obj)
 
 
-def trigger_dest_files_download(rval: T) -> T:
+def trigger_dest_files_placeholder_write(rval: T) -> T:
     """Runner implementations making use of remote filesystems should
     call this after remote function execution.
     """

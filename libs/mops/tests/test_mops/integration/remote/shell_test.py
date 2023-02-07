@@ -63,14 +63,11 @@ def test_repeated_pipeline_id_reuses_results(caplog):
     caplog.set_level(logging.INFO)
     clear_cache()
     test_func_with_paths()
-    found = False
     exists = False
     for record in caplog.records:
-        if "Found " in record.msg and "at the pipeline prefix" in record.msg:
-            found = True
         if "already exists" in record.msg:
             exists = True
-    assert found and exists, [r.msg for r in caplog.records]
+    assert exists, [r.msg for r in caplog.records]
 
 
 @adls_shell

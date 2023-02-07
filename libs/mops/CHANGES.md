@@ -1,3 +1,23 @@
+## 1.2
+
+- Support Azure Workload Identity in known namespaces as provisioned
+  by
+  [Trilliant Health infrastructure](https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf#L4).
+- `AdlsPickleRunner` now shares an underlying `FileSystemClient`
+   across all parallel threads, leading to significant (5-7x) speedup
+   when dealing with large (100+) numbers of parallel threads all
+   trying to talk to the same storage account.
+- `AdlsPickleRunner` can automatically re-run exceptions, assuming
+  that intentional re-runs on the same pipeline id indicate that
+  errors experienced by remote functions were transient. This behavior
+  is configurable at the time of constructing the pickle runner, and
+  is turned off by default.
+- fix incorrect environment variable name `TRILLML_NO_K8S_LOGS` - is
+  now `MOPS_NO_K8S_LOGS` as documented in the
+  [README](src/thds/mops/k8s/README.md).
+- Improvements to our handling of K8s API errors when attempting to
+  watch lists of things (e.g. Jobs) that may change very rapidly.
+
 ## 1.1
 
 - New `ImagePullBackOff` watcher utility available for integration with applications.

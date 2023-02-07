@@ -106,15 +106,31 @@ k8s_job_timeout_seconds = _make_stack_config(
 k8s_monitor_delay = _make_stack_config("k8s.monitor.delay_seconds", 5)
 k8s_monitor_max_attempts = _make_stack_config("k8s.monitor.max_attempts", 100)
 
-# In the East, we use the newer-style pod managed identity, which provides access to a metadata endpoint
-# that Azure clients know how to access automatically.
+# In the East, we use the newer pod managed identity by default,
+# which provides access to a metadata endpoint that Azure clients know
+# how to access automatically.
 # https://docs.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity
 aad_pod_managed_identity = _make_stack_config("k8s.azure.aad_pod_managed_identity", "")
 
+# but there's an even newer, better type of auth called Workload
+# Identity, which unfortunately requires specific infrastructure
+# configuration that lives outside this library.
+# https://azure.github.io/azure-workload-identity/docs/introduction.html
+namespaces_supporting_workload_identity = _make_stack_config(
+    "k8s.azure.namespaces_supporting_workload_identity", ["default"]
+)
 
 adls_remote_tmp_sa = _make_stack_config("adls.remote.tmp_sa", "")
 adls_remote_tmp_container = _make_stack_config("adls.remote.tmp_container", "")
+
 adls_max_clients = _make_stack_config("adls.max_clients", 8)
+# 8 clients has been obtained experimentally via the `stress_test`
+# application running on a Mac M1 laptop running 200 parallel 5 second
+# tasks, though no significant difference was obtained between 5 and
+# 20 clients. Running a similar stress test from your orchestrator may
+# be a good idea if you are dealing with hundreds of micro (<20
+# second) remote tasks.
+
 adls_skip_already_uploaded_check_if_smaller_than_bytes = _make_stack_config(
     "adls.skip_already_uploaded_check_if_smaller_than_bytes", 2 * 2**20
 )  # 2 MB is about right for how slow ADLS is to respond to individual requests.

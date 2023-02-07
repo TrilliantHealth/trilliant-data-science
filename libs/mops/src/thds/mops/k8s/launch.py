@@ -53,13 +53,16 @@ def launch(
     container_image: str,
     args: ty.Sequence[str],
     *,
-    name_prefix: str = "",
     node_narrowing: ty.Optional[NodeNarrowing] = None,
+    container_name: str = "jobcontainer",
+    env_vars: ty.Optional[ty.Mapping[str, str]] = None,
+    # arguments below are for launching; arguments above are for
+    # building.  these should get separated in a future change.
+    name_prefix: str = "",
     dry_run: bool = False,
     fire_and_forget: bool = False,
     suppress_logs: bool = False,
-    container_name: str = "jobcontainer",
-    env_vars: ty.Optional[ty.Mapping[str, str]] = None,
+    transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = lambda x: x,
 ) -> None:
     """Launch a Kubernetes job.
 
@@ -75,10 +78,11 @@ def launch(
 
     """
     job_num = f"{_LAUNCH_COUNT.inc():0>3}"
-    name = "-".join([name_prefix, str(os.getpid()), job_num, str(uuid.uuid4())[:8]])
+    name = "-".join([name_prefix, str(os.getpid()), job_num, str(uuid.uuid4())[:8]]).lstrip("-")
     scope.enter(logger_context(job=name))
     node_narrowing = node_narrowing or dict()
 
+    # TODO move this entire function out to be separately callable
     @k8s_sdk_retry()
     def assemble_job() -> client.models.V1Job:
         logger.debug(f"Assembling job named `{name}` on image `{container_image}`")
@@ -94,10 +98,25 @@ def launch(
         logger.debug("Creating pod template ...")
         template = client.V1PodTemplate()
 
-        labels = dict()
-        if config.aad_pod_managed_identity():
+        use_azure_workload_identity = (
+            config.k8s_namespace() in config.namespaces_supporting_workload_identity()
+        )
+        if use_azure_workload_identity:
+            logger.debug(
+                "Using Azure Workload Identity," " which is the most reliable form of auth as of Q1 2023"
+            )
+            labels = {"azure.workload.identity/use": "true"}
+            # this is in fact supposed to be string 'true', not value True.
+            # https://azure.github.io/azure-workload-identity/docs/quick-start.html#7-deploy-workload
+        elif config.aad_pod_managed_identity():
             logger.debug("Adding AAD pod managed identity")
-            labels["aadpodidbinding"] = config.aad_pod_managed_identity()
+            labels = {"aadpodidbinding": config.aad_pod_managed_identity()}
+        else:
+            logger.warning(
+                "No automatic Azure identity being assigned. This might cause authorization issues"
+            )
+            labels = dict()
+
         template.template = client.V1PodTemplateSpec(metadata=client.V1ObjectMeta(labels=labels))
 
         logger.debug("Applying environment variables ...")
@@ -137,6 +156,9 @@ def launch(
             node_selector=node_narrowing.get("node_selector", dict()),
             tolerations=node_narrowing.get("tolerations", list()),
         )
+        if use_azure_workload_identity:
+            template.template.spec.service_account_name = "ds-standard"
+
         logger.debug("Creating job definition ...")
         body.spec = client.V1JobSpec(
             backoff_limit=config.k8s_job_retry_count(),
@@ -147,7 +169,7 @@ def launch(
         logger.debug("Finished creating job definition ...")
         return body
 
-    body = assemble_job()
+    body = transform_job(assemble_job())
 
     if dry_run:
         logger.info("Dry run assembly successful; not launching...")
@@ -160,7 +182,7 @@ def launch(
             return client.BatchV1Api().create_namespaced_job(namespace=config.k8s_namespace(), body=body)
 
     job = launch_job()
-    logger.info(LAUNCHED(f"Job {job_num} launched!") + f" - {name} on {container_image}")
+    logger.info(LAUNCHED(f"Job {job_num} launched!") + f" on {container_image}")
     if not suppress_logs:
         threading.Thread(  # fire and forget a log watching thread
             target=JobLogWatcher(job.metadata.name, len(job.spec.template.spec.containers)).start,

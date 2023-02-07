@@ -16,7 +16,7 @@ runner = AdlsPickleRunner(_subprocess_remote)
 
 
 def clear_cache():
-    runner._pre_run_file_exists.cache_clear()  # type: ignore
+    pass
 
 
 adls_shell = pure_remote(runner)

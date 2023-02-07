@@ -20,9 +20,7 @@ from ._shared import logger
 from .jobs import get_job
 from .retry import k8s_sdk_retry
 
-_NO_K8S_LOGS = os.getenv(
-    "TRILLML_NO_K8S_LOGS"
-)  # non-empty if you want to completely disable k8s pod logs.
+_NO_K8S_LOGS = os.getenv("MOPS_NO_K8S_LOGS")  # non-empty if you want to completely disable k8s pod logs.
 
 BOINK = colorized(fg="white", bg="magenta")
 # this module has tons of logs. occasionally you want to find a needle
