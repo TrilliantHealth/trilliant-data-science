@@ -1,9 +1,11 @@
 """Joins pickle functionality and ADLS functionality into a full
 implementation for the pure_remote Channel/Runner system.
 """
+import contextlib
 import hashlib
 import threading
 import typing as ty
+from dataclasses import dataclass
 
 from cachetools import LRUCache
 from typing_extensions import Protocol
@@ -16,7 +18,7 @@ from ..__about__ import backward_compatible_with
 from ..colorize import colorized
 from ..config import adls_max_clients, adls_remote_tmp_container, adls_remote_tmp_sa
 from ..locked_cache import locked_cached
-from ._adls import AdlsFileSystem, join
+from ._adls import AdlsFileSystem, is_blob_not_found, join
 from ._adls_serde import (
     ADLS_CONTEXT,
     AdlsContext,
@@ -69,13 +71,6 @@ class NoResultAfterInvocationError(Exception):
     """Raised if the remotely-invoked function does not provide any result."""
 
 
-def _mk_raiser(callable: ty.Callable[[], Exception]):
-    def _raiser_():
-        raise callable()
-
-    return _raiser_
-
-
 def _invocation_path(call_id: str) -> str:
     return call_id + "/invocation"
 
@@ -113,6 +108,30 @@ def _default_adls_root() -> AdlsFqn:
 
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
+
+
+@dataclass
+class GoodResult(ty.Generic[T]):
+    result: T
+    exception: ty.Literal[None] = None
+
+
+@dataclass
+class BadResult:
+    exception: Exception
+    result: ty.Literal[None] = None
+
+
+Result = ty.Union[GoodResult, BadResult]
+
+
+@contextlib.contextmanager
+def catch(allow: ty.Callable[[Exception], bool]) -> ty.Iterator:
+    try:
+        yield
+    except Exception as e:
+        if not allow(e):
+            raise
 
 
 class AdlsPickleRunner:
@@ -211,23 +230,19 @@ class AdlsPickleRunner:
         read_object = make_read_object(fs)
 
         def check_result(
-            file_exists: ty.Callable[[str], bool], rerun_excs: bool = False
-        ) -> ty.Optional[ty.Callable[[], T]]:
-            result_path = _result_path(call_id)
-            if file_exists(result_path):
-                return lambda: trigger_dest_files_placeholder_write(
-                    ty.cast(T, read_object(result_path, type_hint="result"))
+            rerun_excs: bool = False,
+        ) -> ty.Optional[ty.Union[GoodResult[T], BadResult]]:
+            with catch(is_blob_not_found):
+                return GoodResult(
+                    trigger_dest_files_placeholder_write(
+                        ty.cast(T, read_object(_result_path(call_id), type_hint="result"))
+                    )
                 )
             if rerun_excs:
                 return None
             exception_path = _exception_path(call_id)
-            if file_exists(exception_path):
-                return _mk_raiser(
-                    lambda: ty.cast(
-                        Exception,
-                        read_object(exception_path, type_hint="exception"),
-                    )
-                )
+            with catch(is_blob_not_found):
+                return BadResult(ty.cast(Exception, read_object(exception_path, type_hint="exception")))
             return None
 
         # the use of this semaphore allows a given thread to have a
@@ -238,20 +253,23 @@ class AdlsPickleRunner:
         # tested to increase performance by 2x on small (5 second)
         # remote tasks.
 
+        def give_result(result: ty.Union[GoodResult[T], BadResult]) -> T:
+            if result.result:
+                return result.result
+            assert result.exception
+            raise result.exception
+
         with _OUT_SEMAPHORE:
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            give_result = check_result(
-                fs.file_exists,
-                rerun_excs=self._rerun_exceptions,
-            )
-            if give_result:
+            result = check_result(rerun_excs=self._rerun_exceptions)
+            if result:
                 _LogKnownResult(
                     f"Result for {call_id} already exists and is being returned without invocation!"
                 )
-                return give_result()
-            # but if it does not exist, we need to run.
+                return give_result(result)
 
+            # but if it does not exist, we need to run.
             fs.put_bytes(_invocation_path(call_id), invoc_bytes, type_hint="invocation")
         try:
             shell_ex = None
@@ -280,12 +298,12 @@ class AdlsPickleRunner:
         # prioritize getting an entire task finished vs finding out
         # bits of information about many tasks.
         with _IN_SEMAPHORE:
-            give_result = check_result(fs.file_exists)
-            if not give_result:
+            result = check_result()
+            if not result:
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
                 raise NoResultAfterInvocationError(call_id)
-            return give_result()
+            return give_result(result)
 
 
 class _ResultChannel:

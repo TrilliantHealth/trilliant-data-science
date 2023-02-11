@@ -18,6 +18,12 @@ class PicklableFunction:
     """
 
     def __init__(self, f):
+        if f.__module__ == "__main__":
+            raise ValueError(
+                f"Cannot pickle function {f.__name__} that is in the __main__ module"
+                " because it will not be able to be found in a different process with a different __main__."
+                " Please move it to a different module."
+            )
         self.fmod = f.__module__
         self.fname = f.__name__
         self.f = None

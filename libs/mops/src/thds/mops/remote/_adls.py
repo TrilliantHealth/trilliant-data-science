@@ -8,13 +8,13 @@ import typing as ty
 import azure.core.exceptions
 from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
-from retry import retry
 
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
 from ..colorize import colorized
 from ..config import adls_skip_already_uploaded_check_if_smaller_than_bytes
+from ..fretry import expo, retry_regular, sleep
 from ._adls_shared import adls_fs_client
 from ._md5 import md5_something
 from ._on_slow import on_slow
@@ -87,13 +87,15 @@ def _content_settings_unless_checksum_already_present(
     return local_content_settings
 
 
-_azure_creds_retry = retry(
-    exceptions=azure.core.exceptions.HttpResponseError,
-    tries=10,
-    backoff=2,
-    delay=1.0,
-    logger=logger,  # type: ignore
-)
+def is_blob_not_found(exc: Exception) -> bool:
+    return isinstance(exc, azure.core.exceptions.HttpResponseError) and exc.status_code == 404
+
+
+def is_creds_failure(exc: Exception) -> bool:
+    return isinstance(exc, azure.core.exceptions.HttpResponseError) and not is_blob_not_found(exc)
+
+
+_azure_creds_retry = retry_regular(is_creds_failure, sleep(expo(tries=10, delay=1.0)))
 # sometimes Azure Cli credentials expire but would succeed if retried
 # and the azure library does not seem to retry these on its own.
 
