@@ -1,9 +1,9 @@
 {
   "pipfile": "123da19f1a0e7d4d106129588317b075",
-  "pipfile_lock": "e76cb4454fefae734a4ec91fb21506d7",
+  "pipfile_lock": "63779d9d1ce3ed11292385ce3dd1ff2a",
   "spec": {
     "name": "thds.mops",
-    "version": "1.1",
+    "version": "1.2",
     "path": "libs/mops",
     "third_party": [
       "adal",
@@ -50,7 +50,7 @@
           "path": "libs/core",
           "third_party": [
             "attrs",
-            "cattrs"
+            "cattrs>=22.2"
           ],
           "extras": {},
           "scripts": {},
