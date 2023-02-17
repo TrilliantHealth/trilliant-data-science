@@ -25,6 +25,15 @@ repository = "https://github.com/TrilliantHealth/ds-monorepo"
 [project.scripts]
 
 # BUILD CONFIG
+[build-system]
+requires = [
+    "setuptools>=61.0.0",
+    "wheel",
+    "attrs",
+    "cattrs>=22.2",
+]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -64,29 +73,3 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[tool.poetry]
-name = "thds.core"
-version = "0.2"
-authors = ["Trilliant Health"]
-description = ""
-readme = "README.md"
-packages = [{include = "thds/core", from="src"}]
-
-[tool.poetry.dependencies]
-python = "^3.8"
-attrs = "^22.2.0"
-cattrs = "^22.2.0"
-
-[tool.poetry.group.dev.dependencies]
-black = "^22.10"
-mypy = "^0.982"
-mypy-extensions = "*"
-pytest = "*"
-pytest-cov = "*"
-pytest-mock = "*"
-types-setuptools = "*"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
