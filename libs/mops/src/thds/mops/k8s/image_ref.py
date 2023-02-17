@@ -3,8 +3,16 @@ script and an image-consuming script, e.g. docker-tools/build_push.py
 and your application which used to read from an environment variable
 that you keep forgetting to set.
 """
+import os
 from pathlib import Path
 from typing import Optional
+
+from thds.core.log import getLogger
+
+from .image_backoff import YIKES
+from .launch import autocr
+
+logger = getLogger(__name__)
 
 
 class ImageFileRef:
@@ -26,3 +34,44 @@ class ImageFileRef:
         assert fully_qualified_image_name, "Cannot be empty"
         with open(self._path, "w") as f:
             f.write(fully_qualified_image_name + "\n")
+
+
+MOPS_IMAGE_FULL_TAG = "MOPS_IMAGE_FULL_TAG"
+STD_MOPS_IMAGE_FILE_REF = ImageFileRef(Path(".mops-image-name"))
+
+
+def std_find_image_full_tag(
+    project_name: str = "",
+    image_basename: str = "",
+    file_ref: ImageFileRef = STD_MOPS_IMAGE_FILE_REF,
+):
+    """Looks in the 'standard' places in a standard order to try to
+    come up with a fully-qualified image tag.
+
+    Enivronment variables are preferred over the ImageFileRef, although
+    ImageFileRef is the recommended solution for most applications.
+    """
+    image_fullref_from_env = os.getenv(MOPS_IMAGE_FULL_TAG)
+    if image_fullref_from_env:
+        return image_fullref_from_env
+
+    # this type of reference is somewhat deprecated because of a confusing name,
+    # but we still will look for it.
+    image_tag_from_env = os.getenv(f"{project_name.upper()}_VERSION" if project_name else "VERSION")
+    if image_tag_from_env:
+        logger.info(
+            YIKES(f"Using image name '{image_tag_from_env}' from old-style environment variable.")
+        )
+        if image_basename and image_tag_from_env.startswith(image_basename):
+            return autocr(image_tag_from_env)
+        if project_name:
+            if not image_basename:
+                image_basename = f"ds/{project_name}"
+            return autocr(f"{image_basename}:{image_tag_from_env}")
+        return autocr(image_tag_from_env)
+
+    image_tag_from_file = ImageFileRef(Path(".mops-image-name"))()
+    if image_tag_from_file:
+        return image_tag_from_file
+
+    return ""

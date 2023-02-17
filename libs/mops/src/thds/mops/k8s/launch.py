@@ -27,9 +27,16 @@ class K8sJobFailedError(Exception):
     """Raised by `launch` when a Job is seen to terminate in a Failed state."""
 
 
-def autocr(container_image_name: str) -> str:
-    """Prefix the container with the configured container registry URL."""
-    return config.acr_url() + "/" + container_image_name
+def autocr(container_image_name: str, cr_url: str = "") -> str:
+    """Prefix the container with the configured container registry URL.
+
+    Idempotent, so it will not apply if called a second time.
+    """
+    cr_url = cr_url or config.acr_url()
+    prefix = cr_url + "/" if not cr_url.endswith("/") else cr_url
+    if not container_image_name.startswith(prefix):
+        return prefix + container_image_name
+    return container_image_name
 
 
 class Counter:

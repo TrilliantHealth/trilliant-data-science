@@ -65,6 +65,10 @@ Used together, these utilities will allow you to parallelize parts
 (pickleable functions) of your Python application across the cluster,
 similar to how `multiprocessing.Pool` and friends work.
 
+### Orchestrator pods
+
+See [here](src/thds/mops/k8s/orchestrator/README.md).
+
 # Development
 
 If making changes to the library, please bump the version in `pyproject.toml` accordingly.

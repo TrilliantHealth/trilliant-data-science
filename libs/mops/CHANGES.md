@@ -1,3 +1,8 @@
+## 1.3
+
+- Add tooling and CLI for launching arbitrary temporary/orchestrator pods from partial YAML.
+- Add `krsync` wrapper to same CLI.
+
 ## 1.2
 
 - Support Azure Workload Identity in known namespaces as provisioned

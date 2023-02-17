@@ -1,9 +1,9 @@
 {
   "pipfile": "123da19f1a0e7d4d106129588317b075",
-  "pipfile_lock": "63779d9d1ce3ed11292385ce3dd1ff2a",
+  "pipfile_lock": "8a7aa9d2241641c87b0841885a1b7a74",
   "spec": {
     "name": "thds.mops",
-    "version": "1.2",
+    "version": "1.3",
     "path": "libs/mops",
     "third_party": [
       "adal",
@@ -25,7 +25,10 @@
     "extras": {
       "dev": []
     },
-    "scripts": {},
+    "scripts": {
+      "mops-exit-after": "thds.mops.k8s.orchestrator.exit_after:main",
+      "krsync": "thds.mops.k8s.orchestrator.krsync:main"
+    },
     "entry_points": {},
     "deps": {
       "prod": [

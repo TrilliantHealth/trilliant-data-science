@@ -2,7 +2,7 @@
 [project]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "1.2"
+version = "1.3"
 authors = [
     {name = "Trilliant Health"},
     {email = "inquire@trillianthealth.com"}
@@ -43,6 +43,8 @@ repository = "https://github.com/TrilliantHealth/ds-monorepo"
 
 # PROJECT ENTRY POINTS
 [project.scripts]
+mops-exit-after = "thds.mops.k8s.orchestrator.exit_after:main"
+krsync = "thds.mops.k8s.orchestrator.krsync:main"
 
 # BUILD CONFIG
 [build-system]
@@ -61,6 +63,8 @@ where = ["src"]
     "py.typed",
     "meta.json",
     "*_config.toml",
+    "*.yml.template",
+    "*.sh",
 ]
 
 # TOOLING CONFIG
