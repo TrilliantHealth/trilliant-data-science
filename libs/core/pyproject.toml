@@ -19,7 +19,6 @@ mypy-extensions = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-mock = "*"
-types-setuptools = "*"
 
 [tool.poetry.build]
 generate-setup-file = false
