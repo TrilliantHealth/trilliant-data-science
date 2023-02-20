@@ -1,22 +1,22 @@
 {
+  "pipfile": "df9ba9cdbb35caebd4d62f6e32ea25aa",
+  "pipfile_lock": "d9c35ce9ccfa64e6c87cabd006e96ebb",
   "spec": {
     "name": "thds.core",
     "version": "0.2",
     "path": "libs/core",
     "third_party": [
       "attrs",
-      "cattrs",
-      "python"
+      "cattrs>=22.2"
     ],
-    "extras": {},
+    "extras": {
+      "dev": []
+    },
     "scripts": {},
     "entry_points": {},
     "deps": {
       "prod": [],
       "dev": []
     }
-  },
-  "pipfile": "",
-  "pipfile_lock": "",
-  "poetry_lock": "d0feb6de6a9eaedd7e17962c2c1ccf1a"
+  }
 }
