@@ -57,18 +57,17 @@ def std_find_image_full_tag(
 
     # this type of reference is somewhat deprecated because of a confusing name,
     # but we still will look for it.
-    image_tag_from_env = os.getenv(f"{project_name.upper()}_VERSION" if project_name else "VERSION")
-    if image_tag_from_env:
+    image_tag_from_env = os.getenv(f"{project_name.upper()}_VERSION")
+    if image_tag_from_env and project_name:
+        # I don't want to use the plain 'VERSION' env var.
         logger.info(
             YIKES(f"Using image name '{image_tag_from_env}' from old-style environment variable.")
         )
-        if image_basename and image_tag_from_env.startswith(image_basename):
+        if not image_basename:
+            image_basename = f"ds/{project_name}"
+        if image_basename in image_tag_from_env:
             return autocr(image_tag_from_env)
-        if project_name:
-            if not image_basename:
-                image_basename = f"ds/{project_name}"
-            return autocr(f"{image_basename}:{image_tag_from_env}")
-        return autocr(image_tag_from_env)
+        return autocr(f"{image_basename}:{image_tag_from_env}")
 
     image_tag_from_file = ImageFileRef(Path(".mops-image-name"))()
     if image_tag_from_file:

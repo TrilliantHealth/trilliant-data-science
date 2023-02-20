@@ -1,3 +1,7 @@
+### 1.3.1
+
+- Fix image name inference for `std_find_image_full_tag` and add unit tests.
+
 ## 1.3
 
 - Add tooling and CLI for launching arbitrary temporary/orchestrator pods from partial YAML.
