@@ -1,5 +1,5 @@
 """Trilliant Health data science team core utils"""
-
+import sys
 from importlib.metadata import PackageNotFoundError, version
 
 from .meta import read_metadata
@@ -8,7 +8,7 @@ try:
     __version__ = version(__name__)
     assert __version__, f"if package {__name__} is found, version should exist."
 except PackageNotFoundError:  # pragma: no cover
-    print(f"no version found for {__name__}")
+    sys.stderr.write(f"no version found for {__name__}")
     __version__ = ""
 
 metadata = read_metadata(__name__)
