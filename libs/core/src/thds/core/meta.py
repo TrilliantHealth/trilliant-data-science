@@ -163,10 +163,17 @@ def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
     return sp.check_output(cmd, text=True).rstrip("\n")
 
 
+def norm_name(pkg: str) -> str:
+    """Apparently poetry creates slightly different dist-info
+    directories and METADATA files than p-i-p-e-n-v did.
+    """
+    return pkg.replace(".", "_")
+
+
 @lru_cache(None)
 def get_version(pkg: Package) -> str:
     try:
-        version_ = version(str(pkg))
+        version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         pkg_ = pkg.split(".")
         if len(pkg_) <= 1:
