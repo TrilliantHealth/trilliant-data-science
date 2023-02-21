@@ -1,5 +1,7 @@
 """Trilliant Health data science team core utils"""
 
+# TODO: remove this comment - intended to kick off CI for full monorepo DAG
+
 from importlib.metadata import PackageNotFoundError, version
 
 from .meta import read_metadata
