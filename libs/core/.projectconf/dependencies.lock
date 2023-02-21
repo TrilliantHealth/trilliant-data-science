@@ -3,16 +3,16 @@
     "name": "thds.core",
     "version": "0.2",
     "path": "libs/core",
-    "third_party": [
-      "attrs",
-      "cattrs",
-      "python"
-    ],
+    "third_party": {
+      "attrs": "^22.2.0",
+      "cattrs": "^22.2.0",
+      "python": "^3.8"
+    },
     "extras": {},
     "scripts": {},
     "entry_points": {},
     "deps": {
-      "prod": [],
+      "runtime": [],
       "dev": []
     }
   },
