@@ -1,6 +1,6 @@
 {
   "spec": {
-    "name": "thds.core",
+    "name": "thds-core",
     "version": "0.2",
     "path": "libs/core",
     "external": {
