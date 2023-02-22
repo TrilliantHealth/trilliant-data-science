@@ -1,47 +1,36 @@
-# PROJECT METADATA
-[project]
-name = "thds.core"
+[tool.poetry]
+name = "thds-core"
 # Patch version is a datetime determined upon release
 version = "0.2"
-authors = [
-    {name = "Trilliant Health"},
-    {email = "inquire@trillianthealth.com"}
-]
+authors = ["Trilliant Health"]
 description = "Core utilities."
 readme = "README.md"
-requires-python = ">=3.8"
-dependencies = [
-    "attrs",
-    "cattrs>=22.2",
-]
+packages = [{include = "thds", from="src"}]
+include = ['py.typed', 'meta.json']
 
-[project.optional-dependencies]
-dev = []
+[tool.poetry.dependencies]
+python = "^3.8"
+attrs = "^22.2.0"
+cattrs = "^22.2.0"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^0.982"
+mypy-extensions = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "*"
+
+# [tool.poetry.build]
+# generate-setup-file = false
+# script = "build.py"
+
+[build-system]
+requires = ["poetry-core", 'attrs', 'cattrs>=22.2'] # core is the one package that cannot
+# depend on itself at build time.
+build-backend = "poetry.core.masonry.api"
 
 [project.urls]
 repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# PROJECT ENTRY POINTS
-[project.scripts]
-
-# BUILD CONFIG
-[build-system]
-requires = [
-    "setuptools>=61.0.0",
-    "wheel",
-    "attrs",
-    "cattrs>=22.2",
-]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"*" = [
-    "py.typed",
-    "meta.json",
-]
 
 # TOOLING CONFIG
 [tool.coverage.paths]
@@ -68,7 +57,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = []
+module = ["setuptools",]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
