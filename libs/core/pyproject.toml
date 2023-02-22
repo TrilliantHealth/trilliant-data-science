@@ -20,9 +20,9 @@ pytest = "*"
 pytest-cov = "*"
 pytest-mock = "*"
 
-[tool.poetry.build]
-generate-setup-file = false
-script = "build.py"
+# [tool.poetry.build]
+# generate-setup-file = false
+# script = "build.py"
 
 [build-system]
 requires = ["poetry-core", 'attrs', 'cattrs>=22.2'] # core is the one package that cannot

@@ -8,6 +8,7 @@ from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package, open_text
+from pathlib import Path
 from types import MappingProxyType
 
 import attr
@@ -355,14 +356,23 @@ def write_metadata(
     misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None,
     namespace: str = "thds",
     layout: LayoutType = "src",
+    wdir: ty.Optional[Path] = None,
+    deploying: bool = False,
 ) -> None:
-    if os.getenv(DEPLOYING):
+    wdir = wdir or Path(".")
+    assert wdir
+    if os.getenv(DEPLOYING) or deploying:
         LOGGER.debug("Writing metadata.")
         metadata = init_metadata(misc=misc)
+        metadata_path = os.path.join(
+            "src" if layout == "src" else "",
+            namespace,
+            pkg.replace("-", "_").replace(".", "/"),
+            META_FILE,
+        )
 
-        metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
-
-        with open(metadata_path, "w") as f:
+        with open(wdir / metadata_path, "w") as f:
+            LOGGER.info(f"Writing metadata for {pkg} to {wdir / metadata_path}")
             json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
