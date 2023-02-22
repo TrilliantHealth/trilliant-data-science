@@ -1,4 +1,8 @@
-### 1.3.1
+### >1.3.20230220012057
+
+- K8s Image Pull Backoff warnings will not die because of nil `last_timestamp` on event object.
+
+### 1.3.20230220012057
 
 - Fix image name inference for `std_find_image_full_tag` and add unit tests.
 
