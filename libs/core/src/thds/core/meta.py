@@ -8,7 +8,6 @@ from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package, open_text
-from pathlib import Path
 from types import MappingProxyType
 
 import attr
@@ -164,17 +163,10 @@ def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
     return sp.check_output(cmd, text=True).rstrip("\n")
 
 
-def norm_name(pkg: str) -> str:
-    """Apparently poetry creates slightly different dist-info
-    directories and METADATA files than p-i-p-e-n-v did.
-    """
-    return pkg.replace(".", "_")
-
-
 @lru_cache(None)
 def get_version(pkg: Package) -> str:
     try:
-        version_ = version(norm_name(str(pkg)))
+        version_ = version(str(pkg))
     except PackageNotFoundError:
         pkg_ = pkg.split(".")
         if len(pkg_) <= 1:
@@ -356,23 +348,14 @@ def write_metadata(
     misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None,
     namespace: str = "thds",
     layout: LayoutType = "src",
-    wdir: ty.Optional[Path] = None,
-    deploying: bool = False,
 ) -> None:
-    wdir = wdir or Path(".")
-    assert wdir
-    if os.getenv(DEPLOYING) or deploying:
+    if os.getenv(DEPLOYING):
         LOGGER.debug("Writing metadata.")
         metadata = init_metadata(misc=misc)
-        metadata_path = os.path.join(
-            "src" if layout == "src" else "",
-            namespace,
-            pkg.replace("-", "_").replace(".", "/"),
-            META_FILE,
-        )
 
-        with open(wdir / metadata_path, "w") as f:
-            LOGGER.info(f"Writing metadata for {pkg} to {wdir / metadata_path}")
+        metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
+
+        with open(metadata_path, "w") as f:
             json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
