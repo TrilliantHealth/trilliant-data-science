@@ -10,7 +10,6 @@
     },
     "extras": {},
     "scripts": {},
-    "entry_points": {},
     "monodeps": {
       "runtime": [],
       "dev": []
