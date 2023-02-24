@@ -12,7 +12,7 @@ repos:
     hooks:
       - id: mypy-env
         name: mypy-env
-        entry: bash -c 'cd libs/mops && pipenv run mypy .'
+        entry: bash -c 'cd libs/mops && poetry run mypy .'
         language: system
         pass_filenames: false
         always_run: true

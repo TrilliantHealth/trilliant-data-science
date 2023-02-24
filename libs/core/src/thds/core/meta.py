@@ -8,6 +8,7 @@ from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package, open_text
+from pathlib import Path
 from types import MappingProxyType
 
 import attr
@@ -33,6 +34,7 @@ CI_TIMESTAMP = "CI_TIMESTAMP"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
+GIT_IS_DIRTY = "GIT_IS_DIRTY"
 GIT_BRANCH = "GIT_BRANCH"
 MAIN = "main"
 THDS_USER = "THDS_USER"
@@ -163,10 +165,17 @@ def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
     return sp.check_output(cmd, text=True).rstrip("\n")
 
 
+def norm_name(pkg: str) -> str:
+    """Apparently poetry creates slightly different dist-info
+    directories and METADATA files than p-i-p-e-n-v did.
+    """
+    return pkg.replace(".", "_")
+
+
 @lru_cache(None)
 def get_version(pkg: Package) -> str:
     try:
-        version_ = version(str(pkg))
+        version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         pkg_ = pkg.split(".")
         if len(pkg_) <= 1:
@@ -208,6 +217,10 @@ def is_clean(pkg: Package = "") -> bool:
     if GIT_IS_CLEAN in os.environ:
         LOGGER.debug("`is_clean` reading from env var.")
         return bool(os.environ[GIT_IS_CLEAN])
+
+    if os.getenv(GIT_IS_DIRTY):
+        # compatibility with docker-tools/build_push
+        return False
 
     try:
         LOGGER.debug("`is_clean` reading from Git repo.")
@@ -348,14 +361,23 @@ def write_metadata(
     misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None,
     namespace: str = "thds",
     layout: LayoutType = "src",
+    wdir: ty.Optional[Path] = None,
+    deploying: bool = False,
 ) -> None:
-    if os.getenv(DEPLOYING):
+    wdir = wdir or Path(".")
+    assert wdir
+    if os.getenv(DEPLOYING) or deploying:
         LOGGER.debug("Writing metadata.")
         metadata = init_metadata(misc=misc)
+        metadata_path = os.path.join(
+            "src" if layout == "src" else "",
+            namespace,
+            pkg.replace("-", "_").replace(".", "/"),
+            META_FILE,
+        )
 
-        metadata_path = os.path.join("src" if layout == "src" else "", namespace, pkg, META_FILE)
-
-        with open(metadata_path, "w") as f:
+        with open(wdir / metadata_path, "w") as f:
+            LOGGER.info(f"Writing metadata for {pkg} to {wdir / metadata_path}")
             json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 

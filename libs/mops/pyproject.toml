@@ -1,71 +1,61 @@
-# PROJECT METADATA
-[project]
+[tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
 version = "1.3"
-authors = [
-    {name = "Trilliant Health"},
-    {email = "inquire@trillianthealth.com"}
-]
 description = "ML Ops tools for Trilliant Health"
+authors = ['Trilliant Health']
 readme = "README.md"
-requires-python = ">=3.8"
-
-dependencies = [
-    "requests",
-    "azure-core",
-    "azure-containerregistry",
-    "azure-mgmt-resource",
-    "azure-mgmt-containerservice",
-    "azure-identity",
-    "azure-storage-blob",
-    "adal",  # this is necessary for K8S Azure authentication refresh.
-    "pyyaml",
-    "retry",
-    "kubernetes>=18.20,<23.0",  # 22.6 is the best match for current clusters
-    "ansicolors",
-    "cachetools",
-    "tomli",
-    "lazy_object_proxy",
-]
-# The above should contain loosely-specified,
-# *THIRD-PARTY ONLY*, _runtime_ dependencies.
-#
-# Local (monorepo) dependencies
-# (both runtime and development) go in the `Pipfile`.
-
-[project.optional-dependencies]
-# the names in here correspond to the names inside `extras` sent to `pip`.
-dev = []
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# PROJECT ENTRY POINTS
-[project.scripts]
-mops-exit-after = "thds.mops.k8s.orchestrator.exit_after:main"
-krsync = "thds.mops.k8s.orchestrator.krsync:main"
-
-# BUILD CONFIG
-[build-system]
-requires = [
-    "setuptools>=61.0.0",
-    "wheel",
-    "thds.core",
-]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"*" = [
+packages = [{include = "thds", from="src"}]
+include = [
     "py.typed",
     "meta.json",
     "*_config.toml",
     "*.yml.template",
     "*.sh",
 ]
+
+# PROJECT ENTRY POINTS
+[tool.poetry.scripts]
+mops-exit-after = "thds.mops.k8s.orchestrator.exit_after:main"
+krsync = "thds.mops.k8s.orchestrator.krsync:main"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "*"
+azure-core = "*"
+azure-containerregistry = "*"
+azure-mgmt-resource = "*"  # not sure we require this anymore...
+azure-mgmt-containerservice = "*" # same for this one
+azure-identity = "*"
+azure-storage-blob = "*"
+adal = "*"  # this is necessary for K8S Azure authentication refresh.
+pyyaml = "*"
+retry = "*"  # i can probably get rid of this one soon
+kubernetes = ">=18.20"  # 22.6 is the best match for current clusters
+ansicolors = "*"
+cachetools = "*"
+tomli = "*"
+lazy_object_proxy = "*"
+thds-adls = { path="../../libs/adls", develop=true }
+thds-core = { path="../../libs/core", develop=true }
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^0.982"
+mypy-extensions = "*"
+pytest = "^7.2"
+pytest-cov = "^4.0"
+pytest-mock = "^3.10"
+types-cachetools = "*"
+types-retry = "*"
+types-urllib3 = "*"
+
+# BUILD CONFIG
+[build-system]
+requires = ["poetry-core", "thds.core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
 
 # TOOLING CONFIG
 [tool.coverage.paths]
@@ -92,7 +82,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["azure.*", "kubernetes.*", 'colors', 'lazy_object_proxy', "setuptools"]
+module = ["setuptools","azure.*", "kubernetes.*", 'colors', 'lazy_object_proxy']
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

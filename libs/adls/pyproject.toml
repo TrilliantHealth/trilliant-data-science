@@ -1,50 +1,35 @@
-# PROJECT METADATA
-[project]
+[tool.poetry]
 name = "thds.adls"
-# Patch version is a datetime determined upon release
 version = "1.0"
-authors = [
-    {name = "Trilliant Health"},
-    {email = "inquire@trillianthealth.com"}
-]
-description = "Short description of the library."
+# Patch version is a datetime determined upon release
+description = "ADLS tools"
+authors = ["Trilliant Health"]
 readme = "README.md"
-requires-python = ">=3.8"
-dependencies = [
-    "aiohttp>=3.8.1",
-    "aiostream>=0.4.5",
-    "azure-identity>=1.9",
-    "azure-storage-file-datalake>=12.6",
-    "lazy-object-proxy>=1.7.1",
-]
+packages = [{include = "thds", from="src"}]
+include = ['py.typed', 'meta.json']
 
-[project.optional-dependencies]
-# the names in here correspond to the names inside `extras` sent to `pip`.
-dev = []
+[tool.poetry.dependencies]
+python = "^3.8"
+aiohttp = ">=3.8.1"
+aiostream = ">=0.4.5"
+azure-identity = ">=1.9"
+azure-storage-file-datalake = ">=12.6"
+lazy-object-proxy = ">=1.7.1"
+thds-core = {path = "../../libs/core", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^0.982"
+mypy-extensions = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "*"
+
+[build-system]
+requires = ["poetry-core", 'thds.core']
+build-backend = "poetry.core.masonry.api"
 
 [project.urls]
 repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# PROJECT ENTRY POINTS
-[project.scripts]
-
-# BUILD CONFIG
-[build-system]
-requires = [
-    "setuptools>=61.0.0",
-    "wheel",
-    "thds.core",
-]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"*" = [
-    "py.typed",
-    "meta.json",
-]
 
 # TOOLING CONFIG
 [tool.coverage.paths]
@@ -71,7 +56,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["setuptools", 'aiostream', 'lazy_object_proxy']
+module = ["setuptools", 'lazy_object_proxy','aiostream']
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
