@@ -34,6 +34,7 @@ CI_TIMESTAMP = "CI_TIMESTAMP"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
+GIT_IS_DIRTY = "GIT_IS_DIRTY"
 GIT_BRANCH = "GIT_BRANCH"
 MAIN = "main"
 THDS_USER = "THDS_USER"
@@ -216,6 +217,10 @@ def is_clean(pkg: Package = "") -> bool:
     if GIT_IS_CLEAN in os.environ:
         LOGGER.debug("`is_clean` reading from env var.")
         return bool(os.environ[GIT_IS_CLEAN])
+
+    if os.getenv(GIT_IS_DIRTY):
+        # compatibility with docker-tools/build_push
+        return False
 
     try:
         LOGGER.debug("`is_clean` reading from Git repo.")
