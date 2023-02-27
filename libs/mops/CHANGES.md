@@ -1,3 +1,8 @@
+### 1.3.x
+
+- `ImageFileRef` makes sure to resolve Path on creation so that the
+  semantics do not change after a later `os.chdir`.
+
 ### >1.3.20230220012057
 
 - K8s Image Pull Backoff warnings will not die because of nil `last_timestamp` on event object.

@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 class ImageFileRef:
     def __init__(self, path: Path):
-        self._path = path
+        self._path = path.resolve()
         self._cached_image_ref: Optional[str] = None
 
     def __call__(self) -> str:
@@ -32,6 +32,7 @@ class ImageFileRef:
 
     def create(self, fully_qualified_image_name: str):
         assert fully_qualified_image_name, "Cannot be empty"
+        logger.info(f"Writing {fully_qualified_image_name} to {self._path}")
         with open(self._path, "w") as f:
             f.write(fully_qualified_image_name + "\n")
 
