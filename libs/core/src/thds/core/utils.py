@@ -1,13 +1,25 @@
 import os
 from collections.abc import MutableMapping
+from typing import Any, Dict, List, Tuple
 
 
-def flatten(d, parent_key="", sep="."):
-    items = []
+def flatten(d, parent_key="", sep=".") -> Dict[str, Any]:
+    """
+    flattens a dictionary using a seperator.
+
+    Example
+    ---------
+
+    d = {"a": {"b": {"c": 1}}}
+    fd = flatten(d, sep=".")
+    print(fd)
+    > {"a.b.c": 1}
+    """
+    items: List[Tuple[str, Any]] = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
         if isinstance(v, MutableMapping):
-            items.extend(flatten(v, new_key, sep=sep).items())
+            items.extend(flatten(v, new_key, sep=sep).items())  # type: ignore
         else:
             items.append((new_key, v))
     return dict(items)
