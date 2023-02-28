@@ -20,10 +20,6 @@ pytest = "*"
 pytest-cov = "*"
 pytest-mock = "*"
 
-# [tool.poetry.build]
-# generate-setup-file = false
-# script = "build.py"
-
 [build-system]
 requires = ["poetry-core", 'attrs', 'cattrs>=22.2'] # core is the one package that cannot
 # depend on itself at build time.
@@ -57,7 +53,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["setuptools",]
+module = ["setuptools"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
