@@ -49,6 +49,9 @@ Uploader = ty.Callable[[StrOrPath], Serialized]
 Downloader = ty.Callable[[Serialized, StrOrPath], None]
 # interprets the serialized string as a remote file location and downloads it to the provided local path
 
+MAX_FILENAME_LEN = 150
+# conservative cap on the max temp filename length
+
 
 class DestFile:
     """A write-only file that provides local open semantics but may be uploaded after write.
@@ -94,7 +97,9 @@ class DestFile:
         When the context exits, this temporary file will be uploaded if remote,
         or moved to the local destination if not remote.
         """
-        _fh, self._temp_dest_filepath = tempfile.mkstemp(suffix=os.path.basename(self._local_filename))
+        _fh, self._temp_dest_filepath = tempfile.mkstemp(
+            suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
+        )
         # we use mkstemp instead of TemporaryFile because we don't want it to auto-delete on close,
         os.close(_fh)  # and we specifically don't want this open ourselves.
         return Path(self._temp_dest_filepath)
@@ -219,7 +224,7 @@ class SrcFile:
 
         if is_remote() or self._serialized_remote_pointer:
             _fh, self._temp_src_filepath = tempfile.mkstemp(
-                suffix=os.path.basename(self._local_filename)
+                suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
             )
             os.close(_fh)  # we don't want the file to be open
             self._downloader(self._serialized_remote_pointer, self._temp_src_filepath)

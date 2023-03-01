@@ -1,4 +1,8 @@
-### 1.3.x
+### >1.3.20230227170917
+
+- Made a limit of `tempfile` name length in `remote.remote_file` of 150 characters.
+
+### >=1.3.20230227170917
 
 - `ImageFileRef` makes sure to resolve Path on creation so that the
   semantics do not change after a later `os.chdir`.
