@@ -196,8 +196,8 @@ def get_commit(pkg: Package = "") -> str:
         # backup in case you don't have `git` installed as a dev-dependency
         # but you still have the git repo available.
         return _simple_run("git rev-parse --verify HEAD")
-    except (sp.CalledProcessError, FileNotFoundError):
-        pass  # FileNotFoundError can happen if git is not installed at all.
+    except sp.CalledProcessError:
+        pass
 
     try:
         if pkg:
@@ -218,16 +218,16 @@ def is_clean(pkg: Package = "") -> bool:
         LOGGER.debug("`is_clean` reading from env var.")
         return bool(os.environ[GIT_IS_CLEAN])
 
-    if GIT_IS_DIRTY in os.environ:
+    if os.getenv(GIT_IS_DIRTY):
         # compatibility with docker-tools/build_push
-        return bool(os.getenv(GIT_IS_DIRTY))
+        return False
 
     try:
         LOGGER.debug("`is_clean` reading from Git repo.")
         # command will print an empty string if the repo is clean
         return "" == _simple_run("git diff --name-status")
-    except (sp.CalledProcessError, FileNotFoundError):
-        pass  # FileNotFoundError can happen if git is not installed at all.
+    except sp.CalledProcessError:
+        pass
 
     try:
         if pkg:
@@ -252,8 +252,8 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
         try:
             LOGGER.debug("`get_branch` reading from Git repo.")
             return _simple_run("git branch --show-current")
-        except (sp.CalledProcessError, FileNotFoundError):
-            pass  # FileNotFoundError can happen if git is not installed at all.
+        except sp.CalledProcessError:
+            pass
 
         try:
             if pkg:
