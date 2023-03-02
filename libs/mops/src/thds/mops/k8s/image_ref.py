@@ -32,7 +32,7 @@ class ImageFileRef:
 
     def create(self, fully_qualified_image_name: str):
         assert fully_qualified_image_name, "Cannot be empty"
-        logger.info(f"Writing {fully_qualified_image_name} to {self._path}")
+        logger.info(f"In {self._path.parent}:\necho '{fully_qualified_image_name}' > {self._path.name}")
         with open(self._path, "w") as f:
             f.write(fully_qualified_image_name + "\n")
 
