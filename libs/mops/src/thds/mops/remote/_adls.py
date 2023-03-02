@@ -9,6 +9,7 @@ import azure.core.exceptions
 from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
+from thds.adls import AdlsFqn
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
@@ -87,8 +88,15 @@ def _content_settings_unless_checksum_already_present(
     return local_content_settings
 
 
+class BlobNotFoundError(Exception):
+    def __init__(self, sa: str, container: str, path: str, type_hint: str = "Blob"):
+        super().__init__(f"{type_hint} not found: {AdlsFqn(sa, container, path)}")
+
+
 def is_blob_not_found(exc: Exception) -> bool:
-    return isinstance(exc, azure.core.exceptions.HttpResponseError) and exc.status_code == 404
+    return (
+        isinstance(exc, azure.core.exceptions.HttpResponseError) and exc.status_code == 404
+    ) or isinstance(exc, BlobNotFoundError)
 
 
 def is_creds_failure(exc: Exception) -> bool:
@@ -131,10 +139,17 @@ class AdlsFileSystem:
     def readinto(self, remote_path: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
         scope.enter(logger_context(download=remote_path))
         logger.info(f"<----- downloading {type_hint} from {self.storage_account} {self.container}")
-        on_slow(
-            LOG_SLOW_TRANSFER_S,
-            lambda elapsed_s: LogSlow(f"Took {int(elapsed_s)}s to download {type_hint}"),
-        )(lambda: self.client.get_file_client(remote_path).download_file().readinto(stream))()
+        try:
+            on_slow(
+                LOG_SLOW_TRANSFER_S,
+                lambda elapsed_s: LogSlow(f"Took {int(elapsed_s)}s to download {type_hint}"),
+            )(lambda: self.client.get_file_client(remote_path).download_file().readinto(stream))()
+        except azure.core.exceptions.HttpResponseError as e:
+            if is_blob_not_found(e):
+                raise BlobNotFoundError(
+                    type_hint, self.storage_account, self.container, remote_path
+                ) from e
+            raise
 
     @_azure_creds_retry
     @scope.bound

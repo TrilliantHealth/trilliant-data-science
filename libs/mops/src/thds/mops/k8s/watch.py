@@ -45,6 +45,7 @@ def yield_objects_from_list(
     namespace: str,
     get_list_method: GetListMethod[T],
     server_timeout: int = 10,
+    object_type_hint: str = "items",
     **kwargs,
 ) -> ty.Iterator[ty.Tuple[str, T]]:
     ex = None
@@ -53,14 +54,16 @@ def yield_objects_from_list(
             load_config()
             list_method = get_list_method(namespace, ex)
             if not list_method:
-                logger.info("No longer yielding events")
+                logger.info(f"No longer watching {object_type_hint} events in namespace: {namespace}")
                 break
             initial_list = list_method(namespace=namespace)
-            logger.info(f"Fetched {len(initial_list.items)} items from {namespace}")
+            logger.info(f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}")
             for item in initial_list.items:
                 yield namespace, item
             if initial_list.metadata._continue:
-                logger.warning("We did not fetch the whole list the first time...")
+                logger.warning(
+                    f"We did not fetch the whole list of {object_type_hint} the first time..."
+                )
             for evt in k8s_watch.Watch().stream(
                 list_method,
                 namespace=namespace,
@@ -82,7 +85,7 @@ def yield_objects_from_list(
             if too_old:
                 logger.info(f"Immediately retrying {too_old}")
             else:
-                logger.exception("Unexpected exception while listing objects")
+                logger.exception(f"Unexpected exception while listing {object_type_hint}")
             ex = e
 
 
@@ -142,7 +145,7 @@ class WatchingObjectSource(ty.Generic[T]):
             ty.Callable[[T], str], _default_get_name
         ),
         backup_fetch: ty.Optional[ty.Callable[[str, str], T]] = None,
-        typename: str = "obj",
+        typename: str = "object",
         starting: ty.Callable[[str], str] = STARTING,
     ):
         self.get_list_method = get_list_method
@@ -163,14 +166,18 @@ class WatchingObjectSource(ty.Generic[T]):
             target=callback_events,
             args=(
                 self._add_object,
-                yield_objects_from_list(namespace, self._get_list_method_on_restart),
+                yield_objects_from_list(
+                    namespace,
+                    self._get_list_method_on_restart,
+                    object_type_hint=self.typename + "s",
+                ),
             ),
             daemon=True,
         ).start()
 
     def _add_object(self, namespace: str, obj: T):
         if not obj:
-            logger.warning("Received null/empty object")
+            logger.warning(f"Received null/empty {self.typename}")
             return
         name = _make_name(namespace, self.get_name(obj))
         logger.debug(f"{self.typename} {name} updated")

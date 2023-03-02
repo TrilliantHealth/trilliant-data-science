@@ -1,13 +1,22 @@
-### >1.3.20230227170917
+### >1.3.2023030100240
+
+- Added custom Exception `BlobNotFoundError` to capture type hint, SA,
+  container, and path when we are unable to fetch a blob from ADLS. We
+  observed errors in Demand Forecast where blobs were missing, but it
+  was difficult to understand what was going on since the only context
+  we had were the native Azure SDK errors, which contain none of this
+  information.
+
+### 1.3.20230301002409
 
 - Made a limit of `tempfile` name length in `remote.remote_file` of 150 characters.
 
-### >=1.3.20230227170917
+### 1.3.20230227170917
 
 - `ImageFileRef` makes sure to resolve Path on creation so that the
   semantics do not change after a later `os.chdir`.
 
-### >1.3.20230220012057
+### 1.3.20230222215430
 
 - K8s Image Pull Backoff warnings will not die because of nil `last_timestamp` on event object.
 

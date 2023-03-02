@@ -198,34 +198,6 @@ tests = ["attrs[tests-no-zope]", "zope.interface"]
 tests-no-zope = ["cloudpickle", "cloudpickle", "hypothesis", "hypothesis", "mypy (>=0.971,<0.990)", "mypy (>=0.971,<0.990)", "pympler", "pympler", "pytest (>=4.3.0)", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-mypy-plugins", "pytest-xdist[psutil]", "pytest-xdist[psutil]"]
 
 [[package]]
-name = "azure-common"
-version = "1.1.28"
-description = "Microsoft Azure Client Library for Python (Common)"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "azure-common-1.1.28.zip", hash = "sha256:4ac0cd3214e36b6a1b6a442686722a5d8cc449603aa833f3f0f40bda836704a3"},
-    {file = "azure_common-1.1.28-py2.py3-none-any.whl", hash = "sha256:5c12d3dcf4ec20599ca6b0d3e09e86e146353d443e7fcc050c9a19c1f9df20ad"},
-]
-
-[[package]]
-name = "azure-containerregistry"
-version = "1.0.0"
-description = "Microsoft Azure Azure Container Registry Client Library for Python"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "azure-containerregistry-1.0.0.zip", hash = "sha256:0c86421d933969e2ad989ae0c00939276ea5b5ac4dc4a527deb47e15b9aec997"},
-    {file = "azure_containerregistry-1.0.0-py3-none-any.whl", hash = "sha256:780c08f604036b93c22db47811b205ae1a229c4aa63d481b1eedf6c2e041cd73"},
-]
-
-[package.dependencies]
-azure-core = ">=1.20.0,<2.0.0"
-msrest = ">=0.6.21"
-
-[[package]]
 name = "azure-core"
 version = "1.26.3"
 description = "Microsoft Azure Core Library for Python"
@@ -263,55 +235,6 @@ cryptography = ">=2.5"
 msal = ">=1.12.0,<2.0.0"
 msal-extensions = ">=0.3.0,<2.0.0"
 six = ">=1.12.0"
-
-[[package]]
-name = "azure-mgmt-containerservice"
-version = "21.2.0"
-description = "Microsoft Azure Container Service Management Client Library for Python"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "azure-mgmt-containerservice-21.2.0.zip", hash = "sha256:a492e74ae49b5db6ab3a25f07e78d20cd9b253b64e97621451568403c990ae24"},
-    {file = "azure_mgmt_containerservice-21.2.0-py3-none-any.whl", hash = "sha256:7de292559fdfdd523247323c3bbc3ee73cf519ffb860f0c49290c66f44319407"},
-]
-
-[package.dependencies]
-azure-common = ">=1.1,<2.0"
-azure-mgmt-core = ">=1.3.2,<2.0.0"
-msrest = ">=0.7.1"
-
-[[package]]
-name = "azure-mgmt-core"
-version = "1.3.2"
-description = "Microsoft Azure Management Core Library for Python"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "azure-mgmt-core-1.3.2.zip", hash = "sha256:07f4afe823a55d704b048d61edfdc1318c051ed59f244032126350be95e9d501"},
-    {file = "azure_mgmt_core-1.3.2-py3-none-any.whl", hash = "sha256:fd829f67086e5cf6f7eb016c9e80bb0fb293cbbbd4d8738dc90af9aa1055fb7b"},
-]
-
-[package.dependencies]
-azure-core = ">=1.24.0,<2.0.0"
-
-[[package]]
-name = "azure-mgmt-resource"
-version = "22.0.0"
-description = "Microsoft Azure Resource Management Client Library for Python"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "azure-mgmt-resource-22.0.0.zip", hash = "sha256:feb5d979e18b52f2cfd023b4a0a33e54a6f76cc6a252dc8cd75ece2c63298e94"},
-    {file = "azure_mgmt_resource-22.0.0-py3-none-any.whl", hash = "sha256:5c9712aacb230c7dde59cd7b43a734ed88a326140042ae02746d095fe779ae20"},
-]
-
-[package.dependencies]
-azure-common = ">=1.1,<2.0"
-azure-mgmt-core = ">=1.3.2,<2.0.0"
-msrest = ">=0.7.1"
 
 [[package]]
 name = "azure-storage-blob"
@@ -1749,4 +1672,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "859356041fa135341cdbb202fb079d41d1f883678b93911dd6374bfe0073d95e"
+content-hash = "078dbfea9e40fb49763acbba45dd37debb84d6a395d3a48cdd14d00eb988542c"

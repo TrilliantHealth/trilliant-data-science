@@ -6,11 +6,8 @@
     "external": {
       "adal": "*",
       "ansicolors": "*",
-      "azure-containerregistry": "*",
       "azure-core": "*",
       "azure-identity": "*",
-      "azure-mgmt-containerservice": "*",
-      "azure-mgmt-resource": "*",
       "azure-storage-blob": "*",
       "cachetools": "*",
       "kubernetes": ">=18.20",
@@ -59,5 +56,5 @@
       "dev": []
     }
   },
-  "lockfile_hash": "6602c59f2dcf13ed73c64382206efadc"
+  "lockfile_hash": "dce1e5a5137f44ab498725979c045eac"
 }

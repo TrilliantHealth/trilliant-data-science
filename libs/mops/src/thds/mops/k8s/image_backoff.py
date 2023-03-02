@@ -34,6 +34,7 @@ def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_bas
             K8sList[client.CoreV1Event],
             client.CoreV1Api().list_namespaced_event,
         ),
+        object_type_hint="backoff-warnings",
         field_selector="reason=BackOff",
     ):
         if None is obj.last_timestamp or obj.last_timestamp > start_dt:
