@@ -6,7 +6,7 @@ Marshmallow itself and can consequently be configured via _meta.py.
 """
 import typing as ty
 
-from core.stack_context import StackContext  # this is our only 'dependency' on core.
+from thds.core.stack_context import StackContext  # this is our only 'dependency' on core.
 
 
 class _GenConfig(ty.NamedTuple):

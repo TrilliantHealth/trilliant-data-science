@@ -4,7 +4,7 @@ import pytest
 from attrs import Factory, define
 from marshmallow.exceptions import ValidationError
 
-from core.atacama import config, neo
+from thds.atacama import config, neo
 
 
 @define

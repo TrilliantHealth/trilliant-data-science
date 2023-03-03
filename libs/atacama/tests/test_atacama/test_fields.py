@@ -7,7 +7,7 @@ import marshmallow as ma
 import pytest
 from typing_extensions import Literal
 
-from core.atacama import neo
+from thds.atacama import neo
 
 
 class MyEnum(Enum):

@@ -6,7 +6,7 @@ import marshmallow as ma
 import pytest
 from marshmallow_enum import EnumField
 
-import core.atacama as atacama
+import thds.atacama as atacama
 
 """The following is taken more-or-less directly from the README"""
 

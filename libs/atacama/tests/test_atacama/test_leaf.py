@@ -4,7 +4,7 @@ import typing_inspect
 from marshmallow import ValidationError
 from typing_extensions import Literal
 
-from core.atacama.leaf import NATIVE_TO_MARSHMALLOW, DynamicLeafTypeMapping, handle_literals
+from thds.atacama.leaf import NATIVE_TO_MARSHMALLOW, DynamicLeafTypeMapping, handle_literals
 
 
 def _assert_core_native_types(mapping):
@@ -28,9 +28,9 @@ def test_handles_literals():
         s_or_p.deserialize("g")
 
     assert isinstance(dm[Literal[1, 2]](), marshmallow.fields.Integer)
-    assert isinstance(dm[Literal[1.0, 2.0]](), marshmallow.fields.Float)
+    assert isinstance(dm[Literal[1.1, 2.0]](), marshmallow.fields.Float)
     assert isinstance(dm[Literal[True, False]](), marshmallow.fields.Boolean)
-    assert isinstance(dm[Literal[1, False]](), marshmallow.fields.Raw)
+    assert isinstance(dm[Literal[-1, False]](), marshmallow.fields.Raw)
 
 
 def test_dynamic_leaf_type_mapping():

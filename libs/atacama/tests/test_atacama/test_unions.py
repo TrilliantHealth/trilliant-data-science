@@ -5,7 +5,7 @@ import pytest
 from attrs import define
 from typing_extensions import Literal
 
-from core.atacama import ordered
+from thds.atacama import ordered
 
 LitA = Literal["1", "2"]
 LitB = Literal["3", "4"]

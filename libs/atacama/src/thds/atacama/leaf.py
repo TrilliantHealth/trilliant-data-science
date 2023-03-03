@@ -60,8 +60,8 @@ def allow_already_parsed(typ: ty.Type, mm_field: FieldT) -> FieldT:
 
 
 NATIVE_TO_MARSHMALLOW: LeafTypeMapping = {
-    int: marshmallow.fields.Integer,
     float: marshmallow.fields.Float,
+    int: marshmallow.fields.Integer,
     str: marshmallow.fields.String,
     bool: marshmallow.fields.Boolean,
     datetime.datetime: allow_already_parsed(datetime.datetime, marshmallow.fields.DateTime),

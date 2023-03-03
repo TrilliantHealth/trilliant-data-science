@@ -2,7 +2,7 @@
 from attrs import define
 from marshmallow import Schema, fields
 
-from core.atacama import neo, ordered
+from thds.atacama import neo, ordered
 
 
 @define

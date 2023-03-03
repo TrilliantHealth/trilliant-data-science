@@ -2,7 +2,7 @@ import typing as ty
 
 from attrs import define
 
-from core.atacama import neo
+from thds.atacama import neo
 
 
 def test_set_field():
