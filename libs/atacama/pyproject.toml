@@ -74,7 +74,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["setuptools"]
+module = ["setuptools", 'typing_inspect', 'marshmallow_enum']
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
