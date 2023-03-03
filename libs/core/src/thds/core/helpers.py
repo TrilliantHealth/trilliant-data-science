@@ -69,12 +69,11 @@ class Map(dict):
                 d[k] = v
         return d
 
-
     def set_value(self, dot_path: str, val):
         ref = self
         path = dot_path.split(".")
         for k in path[:-1]:
-            ref = ref.get(k)
+            ref = ref.__getattr__(k)
         ref.__setattr__(path[-1], val)
 
 
