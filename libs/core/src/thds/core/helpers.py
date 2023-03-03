@@ -60,11 +60,21 @@ class Map(dict):
         super(Map, self).__delitem__(key)
         del self.__dict__[key]
 
+    def to_dict(self):
+        d = dict()
+        for k, v in self.items():
+            if isinstance(v, Map):
+                d[k] = v.to_dict()
+            else:
+                d[k] = v
+        return d
+
+
     def set_value(self, dot_path: str, val):
         ref = self
         path = dot_path.split(".")
         for k in path[:-1]:
-            ref = ref.__getattr__(k)
+            ref = ref.get(k)
         ref.__setattr__(path[-1], val)
 
 
