@@ -5,8 +5,8 @@
     "path": "libs/atacama",
     "external": {
       "marshmallow": ">=3.1",
-      "marshmallow-enum": "^1.5.1",
-      "marshmallow-union": "^0.1.15.post1",
+      "marshmallow-enum": "*",
+      "marshmallow-union": "*",
       "python": "^3.8",
       "typing-inspect": ">=0.7.0"
     },
@@ -30,5 +30,5 @@
       "dev": []
     }
   },
-  "lockfile_hash": "3c3f1948350083a5486e74fe7ac14c67"
+  "lockfile_hash": "84e50bef9476c454a7e2a8231dfaed64"
 }
