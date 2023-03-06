@@ -151,3 +151,18 @@ def test_new_types_are_unnested():
     moo = MooS().load(dict(my_int=4))
     assert moo.my_int == 4
     assert type(moo.my_int) == int
+
+
+def test_new_types_are_recursively_handled():
+    MyFloat = ty.NewType("MyFloat", float)
+    MyFancyFloat = ty.NewType("MyFancyFloat", MyFloat)
+
+    @attrs.define
+    class Goo:
+        my_fancy_float: MyFancyFloat
+
+    GooS = neo(Goo)
+
+    goo = GooS().load(dict(my_fancy_float=42.42))
+    assert goo.my_fancy_float == 42.42
+    assert type(goo.my_fancy_float) == float

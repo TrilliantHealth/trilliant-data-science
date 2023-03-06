@@ -1,6 +1,5 @@
 # portions copyright Desert contributors - see LICENSE_desert.md
 import collections
-import inspect
 import typing as ty
 
 import typing_inspect
@@ -19,7 +18,6 @@ def generic_types_dispatch(
     fallthrough_handler,
 ):
     def type_discriminator(typ: ty.Type):
-
         origin = typing_inspect.get_origin(typ)
         if origin:
             # each of these internal calls to field_for_schema for a Generic is recursive
@@ -56,7 +54,7 @@ def generic_types_dispatch(
                 return union_handler(arguments)
 
         newtype_supertype = getattr(typ, "__supertype__", None)
-        if newtype_supertype and inspect.isfunction(typ):
+        if newtype_supertype and typing_inspect.is_new_type(typ):
             # this is just an unwrapping step.
             return newtype_handler(newtype_supertype)
 
