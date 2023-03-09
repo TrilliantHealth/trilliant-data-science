@@ -1,0 +1,18 @@
+exclude: >
+      (?x)(
+          \.mypy_cache
+          | \.venv
+          | build/
+          | dist/
+          | \S+\.egg-info/
+      )
+
+repos:
+  - repo: local
+    hooks:
+      - id: mypy-env
+        name: mypy-env
+        entry: bash -c 'cd libs/atacama && poetry run mypy .'
+        language: system
+        pass_filenames: false
+        always_run: true
