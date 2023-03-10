@@ -1,0 +1,42 @@
+import numpy as np
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+
+dates_schema = pa.DataFrameSchema(
+    columns=dict(
+        date2=pa.Column(np.dtype("datetime64[ns]"), checks=None, nullable=True, unique=False,),
+        datetime1=pa.Column(np.dtype("datetime64[ns]"), checks=None, nullable=False, unique=False,),
+    ),
+    index=pa.MultiIndex(
+        [
+            pa.Index(
+                np.dtype("datetime64[ns]"), checks=None, nullable=False, unique=True, name="date1",
+            ),
+            pa.Index(
+                np.dtype("datetime64[ns]"), checks=None, nullable=True, unique=False, name="datetime2",
+            ),
+        ],
+        strict=True,
+        ordered=True,
+    ),
+    checks=[
+        thds.tabularasa.loaders.util.CheckUnique(["datetime1", "datetime2"]),
+        thds.tabularasa.loaders.util.CheckUnique(["date1", "datetime2"]),
+    ],
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+
+load_dates = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="dates",
+    schema=dates_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

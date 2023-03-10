@@ -1,0 +1,73 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  mappings:
+    # mapping types
+    columns:
+      - name: pk
+        type: int16
+        nullable: false
+        doc: primary key
+      - name: string_to_int_mapping
+        type:
+          keys: str
+          values: int32
+        nullable: true
+        doc: mapping of string to int
+      - name: int_to_string_mapping
+        type:
+          keys:
+            custom: small_int
+          values:
+            custom: short_upper
+        nullable: true
+        doc: mapping of int to string
+    primary_key: ['pk']
+    doc: table with mapping columns
+    dependencies:
+      filename: tests/data/mappings.csv
+      delimiter: '|'
+  nested_mappings:
+    columns:
+      - name: string_to_int_array
+        type:
+          keys: str
+          values:
+            values: uint8
+        nullable: false
+        doc: mapping of string to array of int
+      - name: date_to_datetime_array
+        type:
+          keys: date
+          values:
+            values: datetime
+        nullable: true
+        doc: mapping of date to array of datetime
+    doc: table with nested mapping columns
+    dependencies:
+      filename: tests/data/mappings_nested.csv
+      delimiter: '|'
+types:
+  small_int:
+    type: uint8
+    constraints:
+      - le: 255
+  short_upper:
+    type: str
+    constraints:
+      - case: upper
+      - len_le: 5

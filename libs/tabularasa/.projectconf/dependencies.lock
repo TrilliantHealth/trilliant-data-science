@@ -1,0 +1,93 @@
+{
+  "spec": {
+    "name": "thds.tabularasa",
+    "version": "0.0",
+    "path": "libs/tabularasa",
+    "external": {
+      "attrs": ">=22.2.0",
+      "black": {
+        "version": "*",
+        "optional": true
+      },
+      "bourbaki.application": {
+        "version": ">=0.10",
+        "optional": true
+      },
+      "cattrs": ">=22.2.0",
+      "isort": {
+        "version": "*",
+        "optional": true
+      },
+      "networkx": ">=3.0",
+      "numpy": "*",
+      "pandas": "^1.4",
+      "pandera": "~0.7.1",
+      "pyarrow": ">=10.0.0",
+      "pydantic": ">=1.10.0",
+      "pygraphviz": {
+        "version": "*",
+        "optional": true
+      },
+      "python": "^3.8",
+      "pyyaml": "*",
+      "ruamel.yaml": {
+        "version": "*",
+        "optional": true
+      },
+      "setuptools": ">=66.1.1",
+      "tabulate": {
+        "version": "*",
+        "optional": true
+      },
+      "typing-extensions": "*"
+    },
+    "extras": {
+      "cli": [
+        "black",
+        "bourbaki.application",
+        "isort",
+        "ruamel.yaml",
+        "tabulate"
+      ],
+      "viz": [
+        "pygraphviz"
+      ]
+    },
+    "scripts": {
+      "tabularasa": "thds.tabularasa.__main__:main"
+    },
+    "monodeps": {
+      "runtime": [
+        {
+          "name": "thds.adls",
+          "version": "1.0",
+          "path": "libs/adls",
+          "external": {
+            "aiohttp": ">=3.8.1",
+            "aiostream": ">=0.4.5",
+            "azure-identity": ">=1.9",
+            "azure-storage-file-datalake": ">=12.6",
+            "lazy-object-proxy": ">=1.7.1",
+            "python": "^3.8"
+          },
+          "extras": {},
+          "scripts": {}
+        },
+        {
+          "name": "thds.core",
+          "version": "0.2",
+          "path": "libs/core",
+          "external": {
+            "attrs": "^22.2.0",
+            "cattrs": "^22.2.0",
+            "python": "^3.8"
+          },
+          "extras": {},
+          "scripts": {}
+        }
+      ],
+      "dev": []
+    }
+  },
+  "lockfile_hash": "7b146eeec52c2094a87da42cb2b04afc"
+}

@@ -1,0 +1,55 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  ints:
+    # int types; nullable, non-nullable, index and non-index
+    columns:
+      - name: col1
+        type: int64
+        doc: plain int
+      - name: col2
+        type: int32
+        nullable: true
+        doc: nullable int
+      - name: col3
+        type: uint16
+        doc: small int
+      - name: col4
+        type:
+          custom: small_int
+        doc: even smaller int
+    primary_key: ['col3']
+    constraints:
+      - unique: ['col1', 'col3']
+    indexes:
+      - ['col4']
+    doc: table with int columns
+    dependencies:
+      filename: tests/data/ints.csv
+types:
+  small_int:
+    type: uint8
+    constraints:
+      - gt: 0
+      - le: 10
+  string_enum:
+    type: str
+    constraints:
+      - case: lower
+      - enum: [foo, bar, baz]
+      - len_ge: 3
+      - len_lt: 4  # only length 3 allowed

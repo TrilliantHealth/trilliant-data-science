@@ -1,0 +1,6 @@
+pk|int_to_string_mapping|string_to_int_mapping
+1|null|{"1": 1}
+0|{"1":"one"}
+3||{"2": 2}
+2|{"2": "two"}|null
+4|{"3": "three"}

@@ -1,0 +1,28 @@
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Bools:
+    """table with bool columns
+
+    :param boolean: just true or false
+    :param trinary: just true, false, or null
+    """
+
+    boolean: bool
+    trinary: typing.Optional[bool]
+
+
+load_bools = thds.tabularasa.loaders.util.AttrsParquetLoader(
+    table_name="bools",
+    type_=Bools,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

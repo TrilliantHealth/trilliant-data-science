@@ -1,0 +1,30 @@
+import numpy as np
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+
+sequences_schema = pa.DataFrameSchema(
+    columns=dict(
+        fibonacci=pa.Column(np.dtype("int16"), checks=None, nullable=False, unique=True,),
+        square=pa.Column(np.dtype("int16"), checks=None, nullable=False, unique=True,),
+        triangular=pa.Column(np.dtype("int16"), checks=None, nullable=False, unique=True,),
+        is_fibonacci=pa.Column(np.dtype("bool"), checks=None, nullable=False, unique=False,),
+    ),
+    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="n",),
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+
+load_sequences = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="sequences",
+    schema=sequences_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

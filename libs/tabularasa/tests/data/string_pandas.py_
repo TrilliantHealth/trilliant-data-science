@@ -1,0 +1,59 @@
+import re
+
+import pandas as pd
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+# This code is auto-generated; do not edit!
+
+strings_schema = pa.DataFrameSchema(
+    columns=dict(
+        uppercase=pa.Column(
+            pd.StringDtype(),
+            checks=[
+                pa.Check(lambda s: s.str.isupper().fillna(True), name="case=upper"),
+                pa.Check.str_length(max_value=5),
+            ],
+            nullable=True,
+            unique=True,
+        ),
+        enum=pa.Column(
+            pd.CategoricalDtype(["foo", "bar", "baz"], ordered=False),
+            checks=[
+                pa.Check(lambda s: s.str.islower().fillna(True), name="case=lower"),
+                pa.Check.isin(["foo", "bar", "baz"]),
+                pa.Check.str_length(min_value=3),
+                pa.Check.str_length(max_value=3),
+            ],
+            nullable=True,
+            unique=False,
+        ),
+    ),
+    index=pa.Index(
+        pd.StringDtype(),
+        checks=[
+            pa.Check(
+                lambda s: s.str.fullmatch(re.compile("[\\w\\s]*"), case=True, na=True),
+                name="MatchesRegex(fullmatch=True, case_sensitive=True)",
+            )
+        ],
+        nullable=False,
+        unique=True,
+        name="lowercase",
+    ),
+    checks=[thds.tabularasa.loaders.util.CheckUnique(["uppercase", "lowercase"])],
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+load_strings = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="strings",
+    schema=strings_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

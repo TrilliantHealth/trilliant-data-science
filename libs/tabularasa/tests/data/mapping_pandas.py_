@@ -1,0 +1,49 @@
+import numpy as np
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+mappings_schema = pa.DataFrameSchema(
+    columns=dict(
+        string_to_int_mapping=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
+        int_to_string_mapping=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
+    ),
+    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="pk",),
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+nested_mappings_schema = pa.DataFrameSchema(
+    columns=dict(
+        string_to_int_array=pa.Column(np.dtype("object"), checks=None, nullable=False, unique=False,),
+        date_to_datetime_array=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
+    ),
+    index=None,
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+
+load_mappings = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="mappings",
+    schema=mappings_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)
+
+load_nested_mappings = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="nested_mappings",
+    schema=nested_mappings_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

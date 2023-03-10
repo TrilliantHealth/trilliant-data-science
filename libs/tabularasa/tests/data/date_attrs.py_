@@ -1,0 +1,33 @@
+import datetime
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Dates:
+    """table with date and datetime columns
+
+    :param date1: just year month and day
+    :param date2: also just year month and day
+    :param datetime1: timestamp to the second
+    :param datetime2: also timestamp to the second
+    """
+
+    date1: datetime.date
+    date2: typing.Optional[datetime.date]
+    datetime1: datetime.datetime
+    datetime2: typing.Optional[datetime.datetime]
+
+
+load_dates = thds.tabularasa.loaders.util.AttrsParquetLoader(
+    table_name="dates",
+    type_=Dates,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

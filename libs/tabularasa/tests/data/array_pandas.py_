@@ -1,0 +1,27 @@
+import numpy as np
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+arrays_schema = pa.DataFrameSchema(
+    columns=dict(
+        int_array=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
+        nested_string_array=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
+        nested_date_array=pa.Column(np.dtype("object"), checks=None, nullable=False, unique=False,),
+    ),
+    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="pk",),
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+load_arrays = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="arrays",
+    schema=arrays_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

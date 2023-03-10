@@ -1,0 +1,53 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  arrays:
+    # array types
+    columns:
+      - name: pk
+        type: int64
+        nullable: false
+        doc: primary key
+      - name: int_array
+        type:
+          values: int32
+        nullable: true
+        doc: array of ints
+      - name: nested_string_array
+        type:
+          values:
+            values:
+              custom: short_upper
+        nullable: true
+        doc: array of array of strings
+      - name: nested_date_array
+        type:
+          values:
+            values: date
+        doc: array of array of dates
+        nullable: false
+    primary_key: ['pk']
+    doc: table with array columns
+    dependencies:
+      filename: tests/data/arrays.csv
+      delimiter: ' '
+types:
+  short_upper:
+    type: str
+    constraints:
+      - case: upper
+      - len_le: 5

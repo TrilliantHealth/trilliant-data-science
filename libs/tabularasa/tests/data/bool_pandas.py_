@@ -1,0 +1,29 @@
+import numpy as np
+import pandas as pd
+import pandera as pa
+
+import thds.tabularasa.loaders.util
+
+
+bools_schema = pa.DataFrameSchema(
+    columns=dict(
+        boolean=pa.Column(np.dtype("bool"), checks=None, nullable=False, unique=False,),
+        trinary=pa.Column(pd.BooleanDtype(), checks=None, nullable=True, unique=False,),
+    ),
+    index=None,
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+
+load_bools = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="bools",
+    schema=bools_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)
