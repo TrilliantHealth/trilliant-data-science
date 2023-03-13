@@ -84,6 +84,7 @@ def test_keys_for_scopes_must_be_unique():
 
 
 def test_there_is_a_default_scope_that_doesnt_exit_until_program_ends():
+
     vals = list()
 
     @cl.contextmanager
