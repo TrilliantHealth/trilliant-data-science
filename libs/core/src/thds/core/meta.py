@@ -29,7 +29,7 @@ HIVE_SUB_CHARACTER = "_"
 VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
 VERSION_SUB_CHARACTER = ""
 
-CI = "CI"
+CI = "runner"
 CI_TIMESTAMP = "CI_TIMESTAMP"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
@@ -177,11 +177,14 @@ def get_version(pkg: Package) -> str:
     try:
         version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
-        pkg_ = pkg.split(".")
-        if len(pkg_) <= 1:
-            return ""
-        else:
-            return get_version(".".join(pkg_[:-1]))
+        try:
+            version_ = version(str(pkg))
+        except PackageNotFoundError:
+            pkg_ = pkg.split(".")
+            if len(pkg_) <= 1:
+                return ""
+            else:
+                return get_version(".".join(pkg_[:-1]))
 
     return version_
 
@@ -295,9 +298,7 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
 
 def is_deployed(pkg: Package) -> bool:
     meta = read_metadata(pkg)
-    if meta.is_empty:
-        return False
-    return True
+    return not meta.is_empty
 
 
 MetaPrimitiveType = ty.Union[str, int, float, bool]
@@ -331,6 +332,10 @@ class Metadata:
     @property
     def is_empty(self) -> bool:
         return all(not getattr(self, field.name) for field in attr.fields(Metadata))
+
+    @property
+    def git_is_dirty(self) -> bool:
+        return not self.git_is_clean
 
 
 meta_converter = Converter(forbid_extra_keys=True)
