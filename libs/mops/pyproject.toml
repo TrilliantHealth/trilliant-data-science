@@ -78,9 +78,16 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
+
 [[tool.mypy.overrides]]
 module = ["setuptools","azure.*", "kubernetes.*", 'colors', 'lazy_object_proxy']
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# temporary fix for mypy error: Function has duplicate type signatures
+# related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
+module = ["setuptools","azure.storage.filedatalake.*"]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
