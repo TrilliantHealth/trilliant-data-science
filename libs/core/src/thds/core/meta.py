@@ -29,7 +29,7 @@ HIVE_SUB_CHARACTER = "_"
 VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
 VERSION_SUB_CHARACTER = ""
 
-CI = "runner"
+CI = "CI"
 CI_TIMESTAMP = "CI_TIMESTAMP"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
@@ -177,14 +177,11 @@ def get_version(pkg: Package) -> str:
     try:
         version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
-        try:
-            version_ = version(str(pkg))
-        except PackageNotFoundError:
-            pkg_ = pkg.split(".")
-            if len(pkg_) <= 1:
-                return ""
-            else:
-                return get_version(".".join(pkg_[:-1]))
+        pkg_ = pkg.split(".")
+        if len(pkg_) <= 1:
+            return ""
+        else:
+            return get_version(".".join(pkg_[:-1]))
 
     return version_
 
