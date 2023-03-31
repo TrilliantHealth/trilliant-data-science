@@ -24,7 +24,7 @@ class Strings:
     lowercase: LowerNoPunct
 
 
-load_strings = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_strings = thds.tabularasa.loaders.util.AttrsParquetLoader[Strings](
     table_name="strings",
     type_=Strings,
     package="tests",

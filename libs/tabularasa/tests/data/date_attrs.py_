@@ -22,7 +22,7 @@ class Dates:
     datetime2: typing.Optional[datetime.datetime]
 
 
-load_dates = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_dates = thds.tabularasa.loaders.util.AttrsParquetLoader[Dates](
     table_name="dates",
     type_=Dates,
     package="tests",

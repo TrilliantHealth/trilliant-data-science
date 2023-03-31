@@ -35,7 +35,7 @@ class NestedMappings:
     date_to_datetime_array: typing.Optional[typing.Dict[datetime.date, typing.List[datetime.datetime]]]
 
 
-load_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader[Mappings](
     table_name="mappings",
     type_=Mappings,
     package="tests",
@@ -45,7 +45,7 @@ load_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader(
     blob_store=None,
 )
 
-load_nested_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_nested_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader[NestedMappings](
     table_name="nested_mappings",
     type_=NestedMappings,
     package="tests",

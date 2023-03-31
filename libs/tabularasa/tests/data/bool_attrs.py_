@@ -17,7 +17,7 @@ class Bools:
     trinary: typing.Optional[bool]
 
 
-load_bools = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_bools = thds.tabularasa.loaders.util.AttrsParquetLoader[Bools](
     table_name="bools",
     type_=Bools,
     package="tests",

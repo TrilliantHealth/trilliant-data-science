@@ -21,7 +21,7 @@ class Sequences:
     is_fibonacci: bool
 
 
-load_sequences = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_sequences = thds.tabularasa.loaders.util.AttrsParquetLoader[Sequences](
     table_name="sequences",
     type_=Sequences,
     package="tests",

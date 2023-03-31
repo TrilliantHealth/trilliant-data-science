@@ -111,6 +111,7 @@ def constructor_template(
     module_name: Optional[str] = None,
     sig: Optional[Signature] = None,
     exclude: Optional[List[str]] = None,
+    type_params: Optional[List[str]] = None,
 ) -> str:
     module = module_name or type_.__module__
     name = type_.__name__
@@ -127,7 +128,8 @@ def constructor_template(
         params = list(sig.parameters)
     exclude_ = exclude or []
     args = ",\n    ".join(f"{name}={{{name}}}" for name in params if name not in exclude_)
-    template = f"{module}.{name}(\n    {args},\n)"
+    type_params_ = f"[{', '.join(type_params)}]" if type_params else ""
+    template = f"{module}.{name}{type_params_}(\n    {args},\n)"
     return template
 
 

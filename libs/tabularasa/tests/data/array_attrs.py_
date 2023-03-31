@@ -24,7 +24,7 @@ class Arrays:
     nested_date_array: typing.List[typing.List[datetime.date]]
 
 
-load_arrays = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_arrays = thds.tabularasa.loaders.util.AttrsParquetLoader[Arrays](
     table_name="arrays",
     type_=Arrays,
     package="tests",

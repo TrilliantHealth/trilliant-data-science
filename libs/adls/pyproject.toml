@@ -25,7 +25,7 @@ pytest-cov = "*"
 pytest-mock = "*"
 
 [build-system]
-requires = ["poetry-core", 'thds.core']
+requires = ["poetry-core", "thds.core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]

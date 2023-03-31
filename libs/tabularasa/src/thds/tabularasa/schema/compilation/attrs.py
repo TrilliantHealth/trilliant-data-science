@@ -40,7 +40,9 @@ class {class_name}:
 ATTRS_FIELD_DEF_TEMPLATE_BASIC = "{name}: {type}"
 
 ATTRS_LOADER_TEMPLATE = constructor_template(
-    thds.tabularasa.loaders.util.AttrsParquetLoader, exclude=["filename"]
+    thds.tabularasa.loaders.util.AttrsParquetLoader,
+    exclude=["filename"],
+    type_params=["{record_type}"],
 )
 
 
@@ -176,6 +178,7 @@ def render_attrs_schema(
         render_constructor(
             ATTRS_LOADER_TEMPLATE,
             kwargs=dict(
+                record_type=VarName(table.class_name),
                 table_name=table.snake_case_name,
                 type_=VarName(table.class_name),
                 package=package,

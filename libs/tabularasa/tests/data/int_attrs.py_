@@ -23,7 +23,7 @@ class Ints:
     col4: SmallInt
 
 
-load_ints = thds.tabularasa.loaders.util.AttrsParquetLoader(
+load_ints = thds.tabularasa.loaders.util.AttrsParquetLoader[Ints](
     table_name="ints",
     type_=Ints,
     package="tests",
