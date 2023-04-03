@@ -6,7 +6,7 @@ description = "ADLS tools"
 authors = ["Trilliant Health"]
 readme = "README.md"
 packages = [{include = "thds", from="src"}]
-include = ['py.typed', 'meta.json']
+include = ["py.typed", "meta.json"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -48,16 +48,15 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    \.venv
-    | build/
+    build/
     | dist/
-    | \S+\.egg-info
+    | \S+\.egg-info/
 )'''
 check_untyped_defs = true
 
 
 [[tool.mypy.overrides]]
-module = ["setuptools", 'lazy_object_proxy','aiostream']
+module = ["aiostream", "lazy_object_proxy", "setuptools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -3,7 +3,7 @@ name = "thds.mops"
 # Patch version is a datetime determined upon release
 version = "1.3"
 description = "ML Ops tools for Trilliant Health"
-authors = ['Trilliant Health']
+authors = ["Trilliant Health"]
 readme = "README.md"
 packages = [{include = "thds", from="src"}]
 include = [
@@ -71,8 +71,7 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    \.venv
-    | build/
+    build/
     | dist/
     | \S+\.egg-info
 )'''
@@ -80,13 +79,13 @@ check_untyped_defs = true
 
 
 [[tool.mypy.overrides]]
-module = ["setuptools","azure.*", "kubernetes.*", 'colors', 'lazy_object_proxy']
+module = ["azure.*", "colors", "kubernetes.*", "lazy_object_proxy", "setuptools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # temporary fix for mypy error: Function has duplicate type signatures
 # related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
-module = ["setuptools","azure.storage.filedatalake.*"]
+module = ["azure.storage.filedatalake.*"]
 follow_imports = "skip"
 
 [tool.pytest.ini_options]
