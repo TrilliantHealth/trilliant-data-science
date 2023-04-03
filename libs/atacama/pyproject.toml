@@ -3,10 +3,13 @@ name = "thds.atacama"
 # Patch version is a datetime determined upon release
 version = "1.0"
 description = "A Marshmallow schema generator for `attrs` classes. Inspired by `desert`."
-authors = ["Trilliant Health"]
+authors = ['Trilliant Health']
 readme = "README.md"
 packages = [{include = "thds", from="src"}]
-include = ["py.typed", "meta.json"]
+include = [
+  'py.typed',
+  'meta.json',
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -40,7 +43,7 @@ pytest-mock = "^3.10"
 
 
 [build-system]
-requires = ["poetry-core", "thds.core"]
+requires = ["poetry-core", 'thds.core']
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
@@ -63,14 +66,15 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    build/
+    \.venv
+    | build/
     | dist/
-    | \S+\.egg-info/
+    | \S+\.egg-info
 )'''
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["marshmallow_enum", "setuptools", "typing_inspect"]
+module = ["setuptools", 'typing_inspect', 'marshmallow_enum']
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

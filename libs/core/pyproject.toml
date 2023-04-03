@@ -6,7 +6,7 @@ authors = ["Trilliant Health"]
 description = "Core utilities."
 readme = "README.md"
 packages = [{include = "thds", from="src"}]
-include = ["py.typed", "meta.json"]
+include = ['py.typed', 'meta.json']
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -21,7 +21,7 @@ pytest-cov = "*"
 pytest-mock = "*"
 
 [build-system]
-requires = ["poetry-core", "attrs", "cattrs>=22.2"] # core is the one package that cannot
+requires = ["poetry-core", 'attrs', 'cattrs>=22.2'] # core is the one package that cannot
 # depend on itself at build time.
 build-backend = "poetry.core.masonry.api"
 
@@ -45,9 +45,10 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 exclude = '''(?x)(
-    build/
+    \.venv
+    | build/
     | dist/
-    | \S+\.egg-info/
+    | \S+\.egg-info
 )'''
 check_untyped_defs = true
 
