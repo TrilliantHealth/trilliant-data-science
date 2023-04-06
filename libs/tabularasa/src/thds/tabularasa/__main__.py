@@ -318,9 +318,9 @@ class ReferenceDataManager:
         )()
         self.logger = logging.getLogger(__name__)
         if repo_root is None:
-            self.repo_root = Path.cwd().absolute()
+            self.repo_root = Path.cwd().resolve()
         else:
-            self.repo_root = repo_root.absolute()
+            self.repo_root = repo_root.resolve()
 
         if require_editable_install:
             self.check_editable_install()

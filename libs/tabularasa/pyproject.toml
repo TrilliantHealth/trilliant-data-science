@@ -70,6 +70,9 @@ viz = ["pygraphviz"]
 [tool.poetry.scripts]
 "tabularasa" = "thds.tabularasa.__main__:main"
 
+[tool.mono]
+omit_extras = ["viz"]
+
 [build-system]
 requires = ["poetry-core", "thds.core"]
 build-backend = "poetry.core.masonry.api"
