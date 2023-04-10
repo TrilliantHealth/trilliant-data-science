@@ -21,8 +21,7 @@ pytest-cov = "*"
 pytest-mock = "*"
 
 [build-system]
-requires = ["poetry-core", "attrs", "cattrs>=22.2"] # core is the one package that cannot
-# depend on itself at build time.
+requires = ["poetry-core", "attrs", "cattrs>=22.2"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]

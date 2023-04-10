@@ -74,7 +74,7 @@ viz = ["pygraphviz"]
 omit_extras = ["viz"]
 
 [build-system]
-requires = ["poetry-core", "thds.core"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]

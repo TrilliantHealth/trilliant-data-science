@@ -48,7 +48,7 @@ types-urllib3 = "*"
 
 # BUILD CONFIG
 [build-system]
-requires = ["poetry-core", "thds.core"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
