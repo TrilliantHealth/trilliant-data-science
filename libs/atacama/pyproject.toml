@@ -40,7 +40,7 @@ pytest-mock = "^3.10"
 
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core", "thds.core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
