@@ -198,7 +198,7 @@ class ADLSFileSystem:
 
     @staticmethod
     async def _exists(file_system_client: FileSystemClient) -> Awaitable[bool]:
-        return file_system_client.exists()
+        return await file_system_client.exists()
 
     def file_exists(self, path: str) -> bool:
         return self._run(self._path_exists, path, False)
@@ -469,7 +469,6 @@ class ADLSFileSystem:
         remote_path: str,
         batch_size: Optional[int] = None,
     ) -> List[str]:
-
         remote_path = remote_path.rstrip("/") + "/"
 
         paths: List[PathPair] = []
@@ -1100,7 +1099,8 @@ class ADLSFileSystemCache:
 
     def file_handle(self, path: str, mode: str) -> IO:
         """Return a file handle to the local path in the cache corresponding to the relative ADLS
-        path, `path`, opened in mode `mode`. Closing the handle is the responsibility of the caller."""
+        path, `path`, opened in mode `mode`. Closing the handle is the responsibility of the caller.
+        """
         file_path = self.cache_path(path)
         dir_path = Path(file_path).parent
         dir_path.mkdir(parents=True, exist_ok=True)
