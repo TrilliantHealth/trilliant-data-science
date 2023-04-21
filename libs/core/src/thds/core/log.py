@@ -111,6 +111,13 @@ def make_th_formatters_safe(logger: logging.Logger):
             setattr(formatter, "formatMessage", wrapper_formatMessage)  # noqa: B010
 
 
+class NoJavaFilter(logging.Filter):
+    # Filters out noisy py4j logs when logging on a Spark cluster.
+    def filter(self, record):
+        return not record.name.startswith("py4j.java_gateway")
+
+
 if not logging.getLogger().hasHandlers():
     logging.basicConfig(level=_LOGLEVEL, format=TH_DEFAULT_LOG_FORMAT)
     make_th_formatters_safe(logging.getLogger())
+    logging.getLogger("py4j.java_gateway").addFilter(NoJavaFilter())
