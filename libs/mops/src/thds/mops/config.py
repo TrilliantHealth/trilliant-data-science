@@ -7,6 +7,8 @@ config.
 I just need to finish abstracting it and give it a nicer API.
 
 """
+import contextlib
+import copy
 import os
 import typing as ty
 from datetime import timedelta
@@ -16,67 +18,94 @@ from pathlib import Path
 
 import tomli
 
+from thds.adls import AdlsFqn
+from thds.core import scope
 from thds.core.stack_context import StackContext
 
 _WDIR_TOML = Path(".mops.toml").resolve()
-_TOML_TOP_LEVEL_TABLE = "mops."
+_TOML_TOP_LEVEL_TABLE = "mops"
 
 
-def _reload_current_config():
-    global _CONFIG
-    env_toml_config_path = Path(os.environ.get("MOPS_CONFIG", f"{Path.home()}/.mops.toml"))
-    if _WDIR_TOML.exists():
-        return tomli.load(open(_WDIR_TOML, "rb"))
-    elif env_toml_config_path.exists():
-        return tomli.load(open(env_toml_config_path, "rb"))
+def _load_config() -> ty.Dict[str, ty.Any]:
+    paths = [
+        Path(os.environ.get("MOPS_CONFIG", "")),
+        _WDIR_TOML,
+        Path(f"{Path.home()}/.mops.toml"),
+    ]
+    for path in paths:
+        if path and path.exists() and path.is_file():
+            return tomli.load(open(path, "rb"))
     return tomli.loads(read_text("thds.mops", "east_config.toml"))
 
 
-_CONFIG = _reload_current_config()
+_CONFIG = StackContext("MOPS_CONFIG", _load_config())
 
 
-def _get_config():
-    return _CONFIG
-
-
-def set_config(dict_like_config):
+def set_global_config(dict_like_config: ty.Mapping):
     """Call this to replace the default config with a pre-parsed
     dict-like such as a Dynaconf settings object that your application
     already manages. It will only override the specific keys that you
     provide.
     """
     global _CONFIG
-    _CONFIG = {**_CONFIG, **dict_like_config}
+    scope.enter(_CONFIG.set({**_CONFIG(), **dict_like_config}))
 
 
-def _nested_lazy_get(dotted_path: str, default=None):
-    convert_val = type(default) if default is not None else lambda x: x
-    assert callable(convert_val)
-    convert_val(default)
+def set_config(
+    *path: str,
+) -> ty.Callable[[ty.Any], contextlib._GeneratorContextManager]:
+    @contextlib.contextmanager
+    def set_config_(value: ty.Any) -> ty.Generator[None, None, None]:
+        nonlocal path
+        if path[0] != _TOML_TOP_LEVEL_TABLE:
+            path = (_TOML_TOP_LEVEL_TABLE, *path)
 
-    def _nested_get_(d: ty.Union[ty.Callable[[], dict], dict]):
-        assert callable(convert_val)
-        dd = d() if callable(d) else d
-        for path_part in dotted_path.split("."):
-            if path_part in dd:
-                dd = dd[path_part]
-            else:
-                if callable(default):
-                    return convert_val(default())
-                return convert_val(default)
-        return dd
+        config = copy.deepcopy(_CONFIG())
+        loc = config
+        for path_part in path[:-1]:
+            if path_part not in loc:
+                loc[path_part] = dict()
+            loc = loc[path_part]
+        loc[path[-1]] = value
+        with _CONFIG.set(config):
+            yield
 
-    return _nested_get_
+    return set_config_
 
 
 T = ty.TypeVar("T")
 
 
-def _make_stack_config(dotted_path: str, default: T) -> StackContext[T]:
-    return StackContext(
-        dotted_path,
-        _nested_lazy_get(_TOML_TOP_LEVEL_TABLE + dotted_path, default=default)(_get_config),
-    )
+def config_at_path(default: T, *path) -> T:
+    """Dynamic lookup of mops config."""
+    convert_val = type(default) if default is not None else lambda x: x
+    assert callable(convert_val)
+    convert_val(default)  # type: ignore
+
+    config = _CONFIG()
+    for path_part in path:
+        if path_part not in config:
+            return default
+        config = config[path_part]
+    return convert_val(config)  # type: ignore
+
+
+class _StackConfig(ty.Generic[T]):
+    def __init__(self, default: T, *path: str):
+        self.default = default
+        self.path = path
+
+    def __call__(self) -> T:  # get current config value
+        return config_at_path(self.default, *self.path)
+
+    @contextlib.contextmanager
+    def set(self, value) -> ty.Iterator[None]:
+        with set_config(*self.path)(value):
+            yield
+
+
+def _make_stack_config(dotted_path: str, default: T) -> _StackConfig[T]:
+    return _StackConfig(default, _TOML_TOP_LEVEL_TABLE, *dotted_path.split("."))
 
 
 # k8s namespace will default to your OS username
@@ -120,8 +149,20 @@ namespaces_supporting_workload_identity = _make_stack_config(
     "k8s.azure.namespaces_supporting_workload_identity", ["default"]
 )
 
+# TODO eliminate these for 2.0 in favor of `memo_storage_root`. `tmp`
+# is an implementation detail; what it is is 'memoization storage'.
 adls_remote_tmp_sa = _make_stack_config("adls.remote.tmp_sa", "")
 adls_remote_tmp_container = _make_stack_config("adls.remote.tmp_container", "")
+
+memo_storage_root = _make_stack_config("memo.storage_root", "")
+# use this instead of the remote_tmp config objects.
+
+
+def get_memo_storage_root() -> str:
+    return memo_storage_root() or str(AdlsFqn.of(adls_remote_tmp_sa(), adls_remote_tmp_container()))
+
+
+memo_pipeline_id = _make_stack_config("memo.pipeline_id", "")
 
 adls_max_clients = _make_stack_config("adls.max_clients", 8)
 # 8 clients has been obtained experimentally via the `stress_test`
@@ -134,8 +175,19 @@ adls_max_clients = _make_stack_config("adls.max_clients", 8)
 adls_skip_already_uploaded_check_if_smaller_than_bytes = _make_stack_config(
     "adls.skip_already_uploaded_check_if_smaller_than_bytes", 2 * 2**20
 )  # 2 MB is about right for how slow ADLS is to respond to individual requests.
+
+# TODO eliminate these for 2.0 in favor of `datasets_storage_root`
 adls_remote_datasets_sa = _make_stack_config("adls.remote.datasets_sa", "")
 adls_remote_datasets_container = _make_stack_config("adls.remote.datasets_container", "")
+
+datasets_storage_root = _make_stack_config("datasets.storage_root", "")
+
+
+def get_datasets_storage_root() -> str:
+    return datasets_storage_root() or str(
+        AdlsFqn.of(adls_remote_datasets_sa(), adls_remote_datasets_container())
+    )
+
 
 # Container registry stuff
 acr_url = _make_stack_config("acr.url", "")

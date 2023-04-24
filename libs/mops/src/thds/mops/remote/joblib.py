@@ -13,7 +13,7 @@ from thds.core.log import getLogger
 
 from ._file_limits import bump_limits
 from ._joblib_batching import patch_joblib_parallel_batching  # noqa
-from .adls_pickle import AdlsPickleRunner
+from .types import Runner
 
 logger = getLogger(__name__)
 
@@ -47,7 +47,7 @@ class TrillMlParallelJoblibBackend(ThreadingBackend):
 
     def __init__(
         self,
-        runner: AdlsPickleRunner,
+        runner: Runner,
         parallelism: int,
         n_cores: int,
         oversubscribe: int = 10,

@@ -1,10 +1,13 @@
 """Utilities built around pickle for the purpose of transferring large amounts of on-disk data and also functions."""
 import importlib
+import inspect
 import io
 import pickle
 import typing as ty
 
 from thds.core.log import getLogger
+
+from .types import Args, Kwargs
 
 logger = getLogger(__name__)
 
@@ -20,7 +23,7 @@ class PicklableFunction:
     def __init__(self, f):
         if f.__module__ == "__main__":
             raise ValueError(
-                f"Cannot pickle function {f.__name__} that is in the __main__ module"
+                f"Cannot pickle function {f} that is in the __main__ module"
                 " because it will not be able to be found in a different process with a different __main__."
                 " Please move it to a different module."
             )
@@ -28,8 +31,11 @@ class PicklableFunction:
         self.fname = f.__name__
         self.f = None
 
+    def __str__(self) -> str:
+        return f"{self.fmod}.{self.fname}"
+
     def __call__(self, *args, **kwargs):
-        logger.info(f"Dynamically importing function {self.fname} from module {self.fmod}")
+        logger.debug(f"Dynamically importing function {str(self)}")
         mod = importlib.import_module(self.fmod)
         self.f = getattr(mod, self.fname)
         return self.f(*args, **kwargs)
@@ -68,14 +74,16 @@ class CallableUnpickler(pickle.Unpickler):
     def persistent_load(self, pid):
         try:
             return pid()
-        except TypeError:
-            pass
-        # this line should never get hit as long as nobody asks us to unpickle PIDs we don't know about
-        raise pickle.UnpicklingError("unsupported persistent object")  # pragma: no cover
+        except TypeError as te:
+            # logger.exception("TypeError hit while debugging")
+            # this line should never get hit as long as nobody asks us to unpickle PIDs we don't know about
+            raise pickle.UnpicklingError(f"unsupported persistent object - {te}")  # pragma: no cover
 
 
 class Dumper:
-    """Presents the same interface as pickle.dump but supports pickling paths."""
+    """Presents the same interface as pickle.dump but supports
+    arbitrary callback-based unpickling.
+    """
 
     def __init__(self, handlers: ty.Sequence[PickleHandler]):
         self.handlers = handlers
@@ -89,3 +97,20 @@ def gimme_bytes(pickle_dump: ty.Callable[[object, ty.IO], None], obj: object) ->
         pickle_dump(obj, bio)
         bio.seek(0)
         return bio.read()
+
+
+def freeze_args_kwargs(dumper: Dumper, f, args: Args, kwargs: Kwargs) -> bytes:
+    """Returns a pickled (args, kwargs) tuple, with pre-bound
+    arguments to normalize different call structures into a
+    canonical/determinstic binding.
+
+    Also binds default arguments, for maximum determinism/explicitness.
+    """
+    bound_arguments = inspect.signature(f).bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
+    return gimme_bytes(dumper, (bound_arguments.args, bound_arguments.kwargs))
+
+
+def unfreeze_args_kwargs(args_kwargs_pickle: bytes) -> ty.Tuple[Args, Kwargs]:
+    """Undoes a freeze_args_kwargs call."""
+    return CallableUnpickler(io.BytesIO(args_kwargs_pickle)).load()

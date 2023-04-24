@@ -146,8 +146,9 @@ def test_cache_valid(
 
 
 def test_adls_fqn():
-    name = "thdsdatasets prod-datasets /lib-datamodel/v22/backerd compat.jsonl"
-    fqn = parse_fqn(name)
+    old_name = "thdsdatasets prod-datasets /lib-datamodel/v22/backerd compat.jsonl"
+    name = "adls://thdsdatasets/prod-datasets/lib-datamodel/v22/backerd compat.jsonl"
+    fqn = parse_fqn(old_name)
 
     assert fqn.sa == "thdsdatasets"
     assert fqn.container == "prod-datasets"
@@ -161,6 +162,7 @@ def test_adls_fqn():
     assert str(fqn) == name
 
     assert AdlsFqn.parse(name) == parse_fqn(name)
+    assert AdlsFqn.parse(old_name) == parse_fqn(name)
 
     joined = parse_fqn("sa1 cont /path/to/dir/").join("/somedir").path
     assert "path/to/dir/somedir" in joined, joined  # no double slash

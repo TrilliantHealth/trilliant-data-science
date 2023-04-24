@@ -45,6 +45,66 @@ class Runner(Protocol):
     """
 
     def __call__(
-        self, __f: ty.Callable[..., T], __args: ty.Sequence, __kwargs: ty.Mapping[str, ty.Any]
+        self,
+        __f: ty.Callable[..., T],
+        __args: ty.Sequence,
+        __kwargs: ty.Mapping[str, ty.Any],
     ) -> T:
         ...  # pragma: no cover
+
+
+Shell = ty.Callable[[ty.Sequence[str]], ty.Any]
+"""A Shell is a way of getting back into a Python process with enough
+context to download the uploaded function and its arguments from the
+location where a runner placed it, and then invoke the function. All
+arguments are strings because it is assumed that this represents some
+kind of command line invocation.
+
+The Shell must be a blocking call, and its result(s) must be available
+immediately after its return.
+"""
+
+
+# TODO: for version 2.0, ShellBuilder should be the default, and
+# args,kwargs should not be expanded because that doesn't make it
+# easier to process them
+class _ShellBuilder(Protocol):
+    def __call__(self, __f, *__args, **__kwargs) -> Shell:
+        ...
+
+
+class ShellBuilder(ty.NamedTuple):
+    """You can also dynamically build your Shell based on the function and arguments passed.
+
+    This allows sharing the core AdlsPickleRunner state/context between subtly different calls.
+    """
+
+    shell_builder: _ShellBuilder
+
+
+class NoResultAfterInvocationError(Exception):
+    """Raised if the remotely-invoked function does not provide any result."""
+
+
+AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr]]
+
+
+class BlobStore(Protocol):
+    def read(self, __remote_uri: str, __stream: ty.IO[bytes], *, type_hint: str = "bytes") -> None:
+        """Allows reading into any stream, including a stream-to-disk."""
+
+    def put(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> str:
+        """Upload bytes from any stream, and return fully-qualified, unambiguous URI."""
+
+    def exists(self, __remote_uri: str) -> bool:
+        ...
+
+    def join(self, *parts) -> str:
+        ...
+
+    def is_blob_not_found(self, __exc: Exception) -> bool:
+        ...
+
+
+Args = ty.Sequence
+Kwargs = ty.Mapping[str, ty.Any]

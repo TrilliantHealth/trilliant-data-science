@@ -1,4 +1,34 @@
-### >1.3.2023030100240
+## 1.4
+
+- Note that this release makes changes to AdlsPickleRunner internals
+  as well as standard ADLS locations for function invocations and
+  other blobs, so runs using previous versions of `mops` will not be
+  able to take advantage of memoization across the upgrade, and Docker
+  images for the remote workers executing `mops`-powered functions
+  must be rebuilt. It remains backward-compatible with existing code.
+
+- Upload shared blobs (Paths and Named objects) to
+  content-hash-addressed locations in ADLS, in order to simplify data
+  sharing and move toward greater possibility for trivial memoization.
+
+- Calls to a PickleRunner-wrapped function can be configured as using
+  memoized results from a previous run, such that identical arguments
+  will result in retrieving those results even if the function has
+  been moved or renamed, or a different pipeline id is being used for
+  the rest of the run. This is configurable per-function as documented
+  in the README.
+
+- Embed base64-encoded `md5` checksum in serialized Src and DestFiles
+  wherever we have access to that information. This will help us move
+  toward more universal memoization, and would also uncover subtle
+  bugs caused by files on ADLS being modified by some external
+  process. MD5 is used because this is what Azure natively supports,
+  and is acceptable because we are not using this for security
+  purposes, but instead to avoid edge cases and improve user
+  experience.
+
+
+### 1.3.20230302160033
 
 - Added custom Exception `BlobNotFoundError` to capture type hint, SA,
   container, and path when we are unable to fetch a blob from ADLS. We

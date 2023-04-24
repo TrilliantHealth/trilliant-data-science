@@ -33,6 +33,7 @@ import shutil
 import tempfile
 import typing as ty
 from pathlib import Path
+from threading import RLock
 
 from thds.core.log import getLogger
 
@@ -165,6 +166,9 @@ class SrcFile:
     `serialized_remote_pointer` AND/OR `local_path` must be provided
     and be non-empty. If the latter is provided, the local file MUST
     already exist on the local filesystem.
+
+    Uploader should likely contain its own process-wide lock, to avoid
+    re-upload in cases of intra-process concurrency.
     """
 
     def __init__(
@@ -188,8 +192,10 @@ class SrcFile:
                 self._serialized_remote_pointer
             ), "Must provide either local file or remote file pointer"
         self._uploader = uploader
-        if self._local_filename:
-            assert self._uploader, "If local file is present, uploader must be provided as well"
+        if not self._serialized_remote_pointer:
+            assert (
+                self._uploader
+            ), "If file is not a remote file pointer, uploader must be provided as well"
         self._downloader = downloader
         self._temp_src_filepath: str = ""
         self._entrance_count = 0
@@ -280,6 +286,16 @@ def trigger_dest_files_placeholder_write(rval: T) -> T:
     return rval
 
 
+_GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
+# SrcFiles are generally created on the orchestrator in order to fan
+# out across multiple workers. If multiple threads launch workers
+# concurrently, you don't want to cause multiple re-uploads of the same
+# file.
+#
+# This is a simplistic approach to avoiding that, by forcing all SrcFiles
+# to upload one after the other.
+
+
 def trigger_src_files_upload(args, kwargs):
     """Runner implementations making use of remote filesystems should
     call this before remote function execution.
@@ -287,7 +303,8 @@ def trigger_src_files_upload(args, kwargs):
 
     def visitor(obj: ty.Any):
         if isinstance(obj, SrcFile):
-            obj._upload_if_not_already_remote()
+            with _GLOBAL_SRC_FILE_UPLOAD_LOCK:
+                obj._upload_if_not_already_remote()
 
     _recursive_visit(visitor, args)
     _recursive_visit(visitor, kwargs)

@@ -20,7 +20,7 @@ class List(list):
 def test_multiple_threads_share_large_array():
     big_arr = List(range(100000))
 
-    _our_runner.named(bigarray=big_arr)
+    _our_runner.shared(bigarray=big_arr)
 
     ts = [
         Thunk(adls_remote(multiply_arraysum), big_arr, 1),

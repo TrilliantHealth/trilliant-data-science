@@ -32,13 +32,14 @@ namespaces_supporting_workload_identity = [
 #
 # If new users come on board and they want to use the more reliable
 # auth, it should suffice to add their k8s namespace to these two
-# lists. The infra list is the prerequisite list and needs to be
-# merged and applied to the cluster, however, whereas this list should
-# simply mirror the infra/Terraform list.
+# lists. Their default namespace is their username with DNS
+# sanitization applied. HOWEVER, the infra list is the prerequisite
+# list and needs to be merged and applied to the cluster, whereas this
+# list should simply mirror the infra/Terraform list.
 #
 # If a Terraform change has been made, it is not necessary for an
 # application to wait for `mops` to be rebuilt - the application may
-# simply set this config value to include its desired namespace(s).
+# simply set this config value to include the desired namespace(s).
 
 [mops.k8s.monitor]
 delay_seconds = 5
@@ -49,10 +50,16 @@ url = "thdatascience.azurecr.io"
 name = "thdatascience"
 subscription = "engineering-stable"
 
-[mops.adls.remote]
-tmp_sa = "thdsscratch"
-tmp_container = "tmp"
-local_cache_dir = ".cache/adls"
+[mops.memo]
+storage_root = ""
+# prefer configuring this over the deprecated 'tmp' SA/container in the following block
 
+[mops.adls.remote]
+local_cache_dir = ".cache/adls"
 datasets_sa = "thdsscratch"
 datasets_container = "tmp"
+tmp_sa = "thdsscratch"
+tmp_container = "tmp"
+
+[mops.datasets]
+storage_root = ""  # prefer this over the deprecated 'datasets' SA/container in the preceding block

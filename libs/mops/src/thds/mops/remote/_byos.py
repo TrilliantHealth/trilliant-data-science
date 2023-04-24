@@ -7,6 +7,8 @@ from thds.core.log import getLogger
 from ._once import Once
 from ._pickle import Deserializer, Serializer, T
 
+V = ty.TypeVar("V")
+
 logger = getLogger(__name__)
 
 
@@ -14,35 +16,57 @@ class NeedsToBeWeakReferenceable(TypeError):
     pass
 
 
-class BYOS:
-    """Provides one-time, cached serialization for large in-memory objects.
-
-    Thread-safe by necessity.
-
-    The Deserializer returned by the Serialized should ideally not occupy much memory.
+class ByIdRegistry(ty.Generic[T, V]):
+    """When you want to use something as the key for a runtime-only
+    dictionary, but the thing doesn't support being hashed.
     """
 
     def __init__(self):
-        self._registry: ty.Dict[int, ty.Any] = WeakValueDictionary()  # type: ignore
-        self.sers: ty.Dict[int, Serializer] = dict()
-        self.desers: ty.Dict[int, Deserializer] = dict()
-        self.once = Once()
+        self._objects: ty.Dict[int, T] = WeakValueDictionary()  # type: ignore
+        self._values: ty.Dict[int, V] = dict()
 
-    def byos(self, obj: T, serializer: Serializer):
-        logger.info(f"Registering obj {type(obj)} {id(obj)} for one-time serialization")
+    def __setitem__(self, obj: T, value: V):
         try:
-            self._registry[id(obj)] = obj
-            self.sers[id(obj)] = serializer
+            self._objects[id(obj)] = obj
+            self._values[id(obj)] = value
         except TypeError as te:
             raise NeedsToBeWeakReferenceable(f"{obj} needs to be weak-referenceable") from te
 
+    def __contains__(self, obj: T) -> bool:
+        return id(obj) in self._objects and self._objects[id(obj)] is obj
+
+    def __getitem__(self, obj: T) -> V:
+        if obj not in self:
+            raise KeyError(str(obj))
+        return self._values[id(obj)]
+
+
+class MemoizingSerializer:
+    """Proxies id()-based memoizing serialization for large in-memory objects.
+
+    For use with something like CallablePickler, which will allow this
+    object to recognize registered objects and provide their
+    serialization.
+
+    Thread-safe at the time of (deferred) serialization, but all calls
+    to `register` should be done prior to beginning concurrent serialization.
+
+    The Deserializer returned by the Serializer should ideally not
+    occupy much memory, as it will be cached.
+    """
+
+    def __init__(self, registry: ByIdRegistry[ty.Any, Serializer]):
+        self._registry = registry
+        self._desers: ty.Dict[int, Deserializer] = dict()
+        self._once = Once()
+
     def __call__(self, obj: ty.Any) -> ty.Union[None, Deserializer]:
-        if id(obj) in self._registry and self._registry[id(obj)] is obj:
+        if obj in self._registry:
 
             def serialize_and_cache():
                 logger.info(f"Serializing object {type(obj)} {id(obj)}")
-                self.desers[id(obj)] = self.sers[id(obj)](obj)
+                self._desers[id(obj)] = self._registry[obj](obj)
 
-            self.once.run_once(id(obj), serialize_and_cache)
-            return self.desers[id(obj)]
+            self._once.run_once(id(obj), serialize_and_cache)
+            return self._desers[id(obj)]
         return None

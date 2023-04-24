@@ -80,6 +80,7 @@ def parallel_yield_results(
     exceptions and raise a final exception at the end if any are
     encountered.
     """
+    _ = get_pipeline_id()  # force existence of lazily-generated pipeline id.
     bump_limits()
     num_tasks = len(thunks)
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(max_workers=num_tasks)

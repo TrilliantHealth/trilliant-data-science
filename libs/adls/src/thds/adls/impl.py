@@ -3,7 +3,6 @@ import datetime
 import itertools
 import logging
 import os
-import re
 import shutil
 from collections.abc import Mapping as MappingABC
 from functools import cmp_to_key, wraps
@@ -19,7 +18,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    NamedTuple,
     Optional,
     TypeVar,
     Union,
@@ -42,74 +40,6 @@ DEFAULT_HIVE_PREFIX = os.getenv("CORE_HIVE_PREFIX", "")
 WEST_HIVE_PREFIX = "hive/warehouse"  # For easy access while we may need backwards compatibility
 
 T = TypeVar("T")
-
-
-def join(prefix: str, suffix: str) -> str:
-    """For joining ADLS paths together."""
-    prefix = prefix.rstrip("/")
-    suffix = suffix.lstrip("/")
-    return f"{prefix}/{suffix}"
-
-
-class AdlsFqn(NamedTuple):
-    sa: str
-    container: str
-    path: str
-
-    def __str__(self) -> str:
-        return format_fqn(*self)
-
-    @classmethod
-    def parse(cls, fully_qualified_name: str) -> "AdlsFqn":
-        return parse_fqn(fully_qualified_name)
-
-    def join(self, path_suffix: str) -> "AdlsFqn":
-        return AdlsFqn(self.sa, self.container, join(self.path, path_suffix))
-
-
-SA_REGEX = re.compile(r"^[\w]{3,24}$")
-# https://github.com/MicrosoftDocs/azure-docs/issues/64497#issuecomment-714380739
-CONT_REGEX = re.compile(r"^\w[\w\-]{2,63}$")
-# https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
-
-
-def parse_fqn(fully_qualified_name: str) -> AdlsFqn:
-    """There are many ways to represent a fully qualified ADLS path, and most of them are cumbersome.
-
-    This is an attempt to provide a standard way across our codebases
-    that keeps all parts together, but allows separating them for
-    passing into libraries.
-
-    Because Storage Account names can only include alphanumeric
-    characters, and Container names may only include alphanumerics
-    plus the dash character, this simple format turns out to be
-    unambiguous and easy for humans to read.
-
-    We accept formatted strings with or without the leading forward
-    slash in front of the path even though the formatter below
-    guarantees the leading forward slash, but we do require there to
-    be two spaces. If you wish to represent a Storage Account and
-    Container with no path, simply append a forward slash to the end
-    of your string, which represents the root of that SA and
-    container, because a single forward slash is not valid as a path
-    name for a blob in ADLS.
-    """
-    sa, container, path = fully_qualified_name.split(None, 2)
-    assert SA_REGEX.match(sa)
-    assert CONT_REGEX.match(container)
-    return AdlsFqn(sa, container, path.lstrip("/"))
-
-
-def format_fqn(storage_account: str, container: str, path: str = "") -> str:
-    """When formatting, we will prefix your path with a forward-slash (/)
-
-    if it does not already have one, in order to allow empty paths to
-    be formatted and parsed simply.
-    """
-
-    assert SA_REGEX.match(storage_account)
-    assert CONT_REGEX.match(container)
-    return f"{storage_account} {container} /{path.lstrip('/')}"
 
 
 def async_run(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:

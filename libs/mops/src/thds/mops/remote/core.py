@@ -2,11 +2,13 @@
 
 Full implementations require a ser/de approach as well as an accessible storage location.
 """
+import os
 import typing as ty
 from functools import wraps
 
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
+from thds.core.stack_context import StackContext
 
 from ._root import get_pipeline_id, is_remote, set_pipeline_id
 from .types import ResultChannel, Runner
@@ -73,7 +75,6 @@ class SerializableThunk(ty.Generic[FT]):
     change, it will likely become incompatible with all previously
     serialized instances, particularly if the serialization process is
     `pickle`.
-
     """
 
     def __init__(
@@ -87,9 +88,12 @@ class SerializableThunk(ty.Generic[FT]):
         self.args = args
         self.kwargs = kwargs
 
+    def __str__(self) -> str:
+        return str(self.f)
+
     def __call__(self):
         """Run the function on the callee side."""
-        logger.info(f"Running remote function for {get_pipeline_id()}")
+        logger.info(f"Running remote function {self.f} for {get_pipeline_id()}")
         # args and kwargs may be beefy, so we allow them to be
         # garbage-collected as soon as the underlying function
         # does by removing our own reference.
@@ -100,16 +104,32 @@ class SerializableThunk(ty.Generic[FT]):
         return self.f(*args, **kwargs)
 
 
+InvocationUniqueKey = StackContext("InvocationUniqueKey", default="")
+
+
+def invocation_unique_key() -> ty.Optional[str]:
+    """A runner may provide a value for this, and if it does, it's
+    required to be unique across all invocations of all mops
+    functions. If your code is _not_ running inside a mops runner, or
+    the mops runner does not provide a value for this, you will
+    instead get None.
+    """
+    return InvocationUniqueKey() or None
+
+
 @scope.bound
 def forwarding_call(
     channel: ResultChannel[T_contra],
-    serializable_thunk: SerializableThunk[FT],
-    pipeline_id: str = "",  # for debugging
+    get_serializable_thunk: ty.Callable[[], SerializableThunk[FT]],
+    pipeline_id: str = "",
+    invocation_unique_key: str = "",
 ):
     """Your shell implementation doesn't have to use this, but it's a reasonable approach."""
     set_pipeline_id(pipeline_id)
-    scope.enter(logger_context(remote=pipeline_id))
+    scope.enter(logger_context(remote=pipeline_id, pid=os.getpid()))
+    serializable_thunk = get_serializable_thunk()  # defer until debug info set up
     try:
+        scope.enter(InvocationUniqueKey.set(invocation_unique_key))
         channel.result(serializable_thunk())
     except Exception as ex:
         logger.exception(f"Serializable thunk {serializable_thunk} invocation failed")

@@ -1,5 +1,6 @@
 from thds.core import meta
 
+from .fqn import *  # noqa: F401,F403
 from .impl import *  # noqa: F401,F403
 
 __version__ = meta.get_version(__name__)

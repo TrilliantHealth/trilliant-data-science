@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from thds.mops.config import adls_remote_tmp_container, adls_remote_tmp_sa
+from thds.adls import AdlsFqn
+from thds.mops.config import get_datasets_storage_root
 from thds.mops.remote import AdlsDatasetContext, DestFile, SrcFile
 from thds.mops.remote.adls_remote_files import (
     AdlsDirectory,
@@ -29,8 +30,9 @@ TEST_PREFIX = TOP_DIR + TEST_TIME
 
 
 def _context():
+    fqn = AdlsFqn.parse(get_datasets_storage_root())
     return AdlsDatasetContext(
-        AdlsDirectory(adls_remote_tmp_sa(), adls_remote_tmp_container(), TEST_PREFIX),
+        AdlsDirectory(fqn.sa, fqn.container, TEST_PREFIX),
         "tests/test_mops/integration",  # ignore this part of the local file path
     )
 

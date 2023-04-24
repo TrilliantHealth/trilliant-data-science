@@ -10,6 +10,7 @@ registered in sys.modules because it's still running `main`.
 Ask me how long it took to figure out what was going on there...
 """
 import argparse
+import os
 
 from thds.core.log import getLogger
 
@@ -23,8 +24,8 @@ logger = getLogger(__name__)
 
 def main():
     """Routes remote function calls in a remote process."""
-    logger.info(f"Entering remote process with installed mops version {__version__}")
-    parser = argparse.ArgumentParser()
+    logger.info(f"Entering remote process {os.getpid()} with installed mops version {__version__}")
+    parser = argparse.ArgumentParser(description="Unknown arguments will be passed to the named runner.")
     parser.add_argument(
         "remote_runner",
         help="Name of a known remote runner that can handle the rest of the arguments",

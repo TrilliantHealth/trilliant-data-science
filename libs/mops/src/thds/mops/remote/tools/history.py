@@ -1,7 +1,8 @@
 """Find out how long a run took by looking at outputs to ADLS."""
 from datetime import timezone
 
-from .._adls import adls_fs_client, yield_files
+from .._adls import yield_files
+from .._adls_shared import adls_fs_client
 
 
 def summarize(sa: str, container: str, pipeline_root_dir: str):

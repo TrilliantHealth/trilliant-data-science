@@ -1,25 +1,23 @@
 """Mostly generic ADLS utilities for non-async operation."""
-import io
-import json
+import base64
 import logging
-import os
 import typing as ty
 
 import azure.core.exceptions
 from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
-from thds.adls import AdlsFqn
+from thds.adls import AdlsFqn, join
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
 from ..colorize import colorized
 from ..config import adls_skip_already_uploaded_check_if_smaller_than_bytes
 from ..fretry import expo, retry_regular, sleep
-from ._adls_shared import adls_fs_client
-from ._md5 import md5_something
+from ._adls_shared import get_global_client
+from ._md5 import try_md5
 from ._on_slow import on_slow
-from .remote_file import Serialized
+from .types import AnyStrSrc, BlobStore
 
 T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
@@ -51,16 +49,13 @@ def yield_filenames(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[str]:
             yield azure_file["name"]
 
 
-AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr]]
-
-
 def _get_checksum_content_settings(data) -> ty.Optional[ContentSettings]:
     """Ideally, we calculate an MD5 sum for all data that we upload.
 
     The only circumstances under which we cannot do this are if the
     stream does not exist in its entirety before the upload begins.
     """
-    md5 = md5_something(data)
+    md5 = try_md5(data)
     if md5:
         return ContentSettings(content_md5=md5)
     return None
@@ -89,8 +84,8 @@ def _content_settings_unless_checksum_already_present(
 
 
 class BlobNotFoundError(Exception):
-    def __init__(self, sa: str, container: str, path: str, type_hint: str = "Blob"):
-        super().__init__(f"{type_hint} not found: {AdlsFqn(sa, container, path)}")
+    def __init__(self, fqn: AdlsFqn, type_hint: str = "Blob"):
+        super().__init__(f"{type_hint} not found: {fqn}")
 
 
 def is_blob_not_found(exc: Exception) -> bool:
@@ -112,56 +107,39 @@ _SLOW = colorized(fg="yellow", bg="black")
 LogSlow = lambda s: logger.warning(_SLOW(s))  # noqa: E731
 
 
-class AdlsFileSystem:
-    def __init__(self, storage_account: str, container: str):
-        self.storage_account = storage_account
-        self.container = container
-        self._client = adls_fs_client(storage_account, container)
-
-    @property
-    def client(self) -> FileSystemClient:
-        return self._client
-
-    def __getstate__(self):
-        """AdlsFileSystem needs to be picklable because it gets
-        transmitted to the remote for use passing things back.  But
-        the _client cannot be pickled since it contains a lock, so we
-        need to remove that before pickling.
-        """
-        return {k: v for k, v in self.__dict__.items() if k != "_client"}
-
-    def __setstate__(self, d):
-        self.__dict__.update(d)
-        self._client = adls_fs_client(self.storage_account, self.container)
+class AdlsFileSystem(BlobStore):
+    def _client(self, fqn: AdlsFqn) -> DataLakeFileClient:
+        return get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path)
 
     @_azure_creds_retry
     @scope.bound
-    def readinto(self, remote_path: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
-        scope.enter(logger_context(download=remote_path))
-        logger.info(f"<----- downloading {type_hint} from {self.storage_account} {self.container}")
+    def read(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+        fqn = AdlsFqn.parse(remote_uri)
+        scope.enter(logger_context(download=fqn))
+        logger.info(f"<----- downloading {type_hint}")
         try:
             on_slow(
                 LOG_SLOW_TRANSFER_S,
                 lambda elapsed_s: LogSlow(f"Took {int(elapsed_s)}s to download {type_hint}"),
-            )(lambda: self.client.get_file_client(remote_path).download_file().readinto(stream))()
+            )(lambda: self._client(fqn).download_file().readinto(stream))()
         except azure.core.exceptions.HttpResponseError as e:
             if is_blob_not_found(e):
-                raise BlobNotFoundError(
-                    type_hint, self.storage_account, self.container, remote_path
-                ) from e
+                raise BlobNotFoundError(fqn, type_hint) from e
             raise
 
     @_azure_creds_retry
     @scope.bound
-    def put_bytes(self, remote_path: str, data: AnyStrSrc, type_hint: str = "bytes"):
-        scope.enter(logger_context(upload=remote_path))
-        file_client = self.client.get_file_client(remote_path)
+    def put(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> str:
+        """Upload data to a remote path and return the fully-qualified URI."""
+        fqn = AdlsFqn.parse(remote_uri)
+        scope.enter(logger_context(upload=fqn))
+        file_client = self._client(fqn)
         content_settings_if_upload_needed = _content_settings_unless_checksum_already_present(
             file_client, data
         )
         if not content_settings_if_upload_needed:
-            return
-        logger.info(f"======> uploading {type_hint} to {self.storage_account} {self.container}")
+            return remote_uri
+        logger.info(f"======> uploading {type_hint}")
         on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"),)(
             lambda: file_client.upload_data(
                 data,
@@ -169,48 +147,29 @@ class AdlsFileSystem:
                 content_settings=content_settings_if_upload_needed,
             )
         )()
+        return remote_uri
 
     @_azure_creds_retry
     @scope.bound
-    def file_exists(self, remote_path: str) -> bool:
-        scope.enter(logger_context(exists=remote_path))
+    def exists(self, remote_uri: str) -> bool:
+        fqn = AdlsFqn.parse(remote_uri)
+        scope.enter(logger_context(exists=fqn))
         return on_slow(
             1.2,
             lambda secs: LogSlow(f"Took {int(secs)}s to check if file exists."),
-        )(lambda: self.client.get_file_client(remote_path).exists())()
+        )(lambda: self._client(fqn).exists())()
 
-    def get_bytes(self, remote_path: str, type_hint: str = "bytes") -> bytes:
-        with io.BytesIO() as tb:
-            self.readinto(remote_path, tb, type_hint=type_hint)
-            tb.seek(0)
-            return tb.read()
+    def join(self, *parts: str) -> str:
+        return join(*parts)
 
-
-def represent_adls_path(storage_account: str, container: str, key: str) -> Serialized:
-    """Canonical fully-qualified representation for a given ADLS file."""
-    assert '{"type": "ADLS"' not in key, key
-    return Serialized(json.dumps(dict(type="ADLS", sa=storage_account, container=container, key=key)))
+    def is_blob_not_found(self, exc: Exception) -> bool:
+        return is_blob_not_found(exc)
 
 
-def join(prefix: str, suffix: str) -> str:
-    prefix = prefix.rstrip("/")
-    suffix = suffix.lstrip("/")
-    return f"{prefix}/{suffix}"
+def b64(digest: bytes) -> str:
+    """This is the string representation used by ADLS.
 
-
-def download_to(fs: AdlsFileSystem, key: str, local_dest: os.PathLike):
-    with open(local_dest, "wb") as file_:
-        fs.readinto(key, file_)
-
-
-def upload_to(fs: AdlsFileSystem, key: str, local_src: os.PathLike):
-    with open(local_src, "rb") as f:
-        fs.put_bytes(key, f)
-
-
-def upload_and_represent(
-    sa: str, container: str, directory: str, relative_path: str, local_src: os.PathLike
-) -> Serialized:
-    key = join(directory, relative_path)
-    upload_to(AdlsFileSystem(sa, container), key, local_src)
-    return represent_adls_path(sa, container, key)
+    We use it in cases where we want to represent the same hash that
+    ADLS will have in UTF-8 string (instead of bytes) format.
+    """
+    return base64.b64encode(digest).decode()
