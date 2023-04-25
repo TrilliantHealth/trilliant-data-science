@@ -32,7 +32,7 @@ _RUNNER_SUFFIX = f"mops/pipeline-pickled-functions-v{backward_compatible_with()}
 
 
 def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
-    return f"{storage_root}/{_RUNNER_SUFFIX}"
+    return lookup_blob_store(storage_root).join(storage_root, _RUNNER_SUFFIX)
 
 
 def _extract_invocation_unique_key(memo_uri: str) -> str:
@@ -49,7 +49,7 @@ class MemoizingPickledFunctionRunner:
     def __init__(
         self,
         shell_builder: _ShellBuilder,
-        runner_prefix: str,
+        storage_root: str,
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
@@ -80,7 +80,7 @@ class MemoizingPickledFunctionRunner:
 
         """
         self._shell_builder = shell_builder
-        self._runner_prefix = runner_prefix
+        self._runner_prefix = _runner_prefix_for_pickled_functions(storage_root)
         self._rerun_exceptions = rerun_exceptions
         self._by_id_registry = serialization_registry
 
