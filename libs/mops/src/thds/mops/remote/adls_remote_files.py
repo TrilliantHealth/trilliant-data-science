@@ -2,6 +2,7 @@
 import json
 import os
 import typing as ty
+from functools import lru_cache
 from pathlib import Path
 
 from thds.adls import AdlsFqn, AdlsRoot
@@ -18,28 +19,47 @@ _AZURE_PLACEHOLDER_SIZE_LIMIT = 4096
 # it is assumed that no placeholder will ever need to be larger than 4 KB.
 
 
+class _SerializedDict(ty.TypedDict):
+    sa: str
+    container: str
+    key: str
+
+
+class SerializedDict(_SerializedDict, total=False):
+    md5b64: str
+
+
+def _fqn(sd: _SerializedDict) -> AdlsFqn:
+    return AdlsFqn(sd["sa"], sd["container"], sd["key"])
+
+
+@lru_cache(maxsize=256)
 def _try_parse_adls_path_repr(
     possible_json_adls_repr: str,
-) -> str:
+) -> ty.Optional[SerializedDict]:
     """Tightly coupled to _represent_adls_path."""
     try:
         adls_dict = json.loads(possible_json_adls_repr)
-        assert adls_dict["type"] == "ADLS"
+        if adls_dict["type"] != "ADLS":
+            raise ValueError(f"Not an ADLS remote pointer: <{adls_dict}>")
         assert '{"type": "ADLS"' not in adls_dict["key"], adls_dict
-        return str(AdlsFqn(adls_dict["sa"], adls_dict["container"], adls_dict["key"]))
+        return SerializedDict(  # type: ignore
+            sa=adls_dict["sa"],
+            container=adls_dict["container"],
+            key=adls_dict["key"],
+            **{k: v for k, v in adls_dict.items() if k not in {"sa", "container", "key"}},
+        )
     except (json.JSONDecodeError, TypeError, KeyError):
-        return ""
+        return None
 
 
-def _represent_adls_path(storage_account: str, container: str, key: str, **kwargs) -> Serialized:
+def _represent_adls_path(sa: str, container: str, key: str, **kwargs) -> Serialized:
     """Historical fully-qualified representation for a given ADLS file.
 
     At the time, our AdlsFqn approach did not exist.
     """
     assert '"type": "ADLS"' not in key, key
-    return Serialized(
-        json.dumps(dict(type="ADLS", sa=storage_account, container=container, key=key, **kwargs))
-    )
+    return Serialized(json.dumps(dict(type="ADLS", sa=sa, container=container, key=key, **kwargs)))
 
 
 def _upload_and_represent(
@@ -63,13 +83,14 @@ def _upload_and_represent(
 
 def _download_serialized(serialized: Serialized, local_dest: StrOrPath):
     local_filename = os.fspath(local_dest)
-    uri = _try_parse_adls_path_repr(serialized)
-    if not uri:
+    sd = _try_parse_adls_path_repr(serialized)
+    if not sd:
         raise ValueError(f"{serialized} does not represent a remote ADLS file")
 
+    uri = str(_fqn(sd))
     with open(local_filename, "wb") as file:
         lookup_blob_store(uri).read(uri, file)
-    ser_md5 = json.loads(serialized).get("md5b64")
+    ser_md5 = sd.get("md5b64")
     if ser_md5:
         # do additional validation. This is not required but it's
         # worth doing if the checksum is present in the
@@ -81,20 +102,20 @@ def _download_serialized(serialized: Serialized, local_dest: StrOrPath):
         file_md5 = b64(md5_readable(local_filename))
         assert file_md5 == ser_md5, (
             f"MD5 in Serialized remote file pointer ({ser_md5}) does not match"
-            f" md5 of downloaded file from ADLS ({file_md5})"
+            f" MD5 of downloaded file from ADLS ({file_md5})"
         )
 
 
-def _get_remote_serialized(local_src: StrOrPath) -> Serialized:
+def _read_possible_serialized(local_src: StrOrPath) -> ty.Optional[SerializedDict]:
+    """Open a file and see if it is a Serialized remote pointer."""
     with open(local_src) as maybe_json_file:
         try:
             json_str = maybe_json_file.read(_AZURE_PLACEHOLDER_SIZE_LIMIT)
-            if _try_parse_adls_path_repr(json_str):
-                return Serialized(json_str)
+            return _try_parse_adls_path_repr(json_str)
         except UnicodeDecodeError:
             # TODO determine proper exception types to catch here
             pass
-    return Serialized("")
+    return None
 
 
 def _split_on_working_dir_or_basename(
@@ -131,34 +152,81 @@ class _UploadDirectoryAdjuster:
         return self.upload_file_to_remote_key(local_src, self.remote_key)
 
 
-def adls_remote_src(storage_account: str, container: str, key: str, validate: bool = True) -> SrcFile:
-    """Create a SrcFile from a fully-qualified set of ADLS info.
-
-    You should really only disable validation for performance
-    reasons. If your file does not in fact exist, you will just be
-    deferring a very unpleasant error.
-    """
+def _validate_remote_srcfile(
+    sa: str, container: str, key: str, md5b64: ty.Optional[str] = ""
+) -> _SerializedDict:
+    sd = _SerializedDict(sa=sa, container=container, key=key)
 
     def _nicer_blob_not_found_error(exc: Exception) -> bool:
         if is_blob_not_found(exc):
-            raise ValueError(
-                f"File {key} does not exist on ADLS in {storage_account} {container}"
-            ) from exc
+            raise ValueError(f"File {key} does not exist on ADLS in {sa} {container}") from exc
         return False
 
-    adls_client = get_global_client(storage_account, container)
     assert "{" not in key, key
-    serialized_meta = dict()
-    if validate:
-        with catch(_nicer_blob_not_found_error):
-            props = adls_client.get_file_client(key).get_file_properties()
-            if props.content_settings.content_md5:
-                serialized_meta["md5b64"] = b64(props.content_settings.content_md5)
 
+    with catch(_nicer_blob_not_found_error):  # just translates the exception
+        adls_md5 = (
+            get_global_client(sa, container)
+            .get_file_client(key)
+            .get_file_properties()
+            .content_settings.content_md5
+        )
+        if adls_md5:
+            adls_md5 = b64(adls_md5)  # don't b64 an empty string - you'll get something weird
+        if md5b64 and md5b64 != adls_md5:
+            # don't tolerate a mismatch between someone's explicit
+            # expectation and what ADLS says.  in some cases,
+            # people won't know the md5 and they'll want to just
+            # trust what's on ADLS, but in the ideal caseswe'll
+            # have recorded what we expect and this will help us
+            # identify mutated blobs.
+            raise ValueError(f"Mismatched MD5 for ADLS blob - expected {md5b64} but ADLS has {adls_md5}")
+        if adls_md5:
+            # finally - make sure we embed this in the serialization
+            # if we can get it - this will prevent errors stemming
+            # from incorrectly mutated data.
+            return dict(sd, md5b64=adls_md5)  # type: ignore
+    return sd
+
+
+def adls_remote_src(
+    storage_account: str, container: str, key: str, known_md5b64: ty.Optional[str] = ""
+) -> SrcFile:
+    """Create a SrcFile from a fully-qualified set of ADLS info.
+
+    Ensures that the file actually exists on ADLS, and captures its
+    md5b64 if the file was uploaded with one, to maximize our chances
+    of deterministic computing.
+    """
     return SrcFile(
         _download_serialized,
-        _represent_adls_path(storage_account, container, key, **serialized_meta),
+        _represent_adls_path(
+            **_validate_remote_srcfile(storage_account, container, key, known_md5b64),
+        ),
     )
+
+
+def _from_serialized_dict(sd: SerializedDict) -> SrcFile:
+    fqn = _fqn(sd)
+    return adls_remote_src(fqn.sa, fqn.container, fqn.path, known_md5b64=sd.get("md5b64"))
+
+
+def srcfile_from_serialized(serialized: Serialized) -> SrcFile:
+    """Make a SrcFile directly from a known Serialized remote pointer.
+
+    Because this is statically type-checked, a TypeError will be
+    raised if the Serialized object cannot be parsed.
+    """
+    sd = _try_parse_adls_path_repr(serialized)
+    if not sd:
+        raise TypeError(f"Not an instance of ADLS Serialized: <{serialized}>")
+    return _from_serialized_dict(sd)
+
+
+def load_srcfile(local_path: StrOrPath) -> ty.Optional[SrcFile]:
+    """Return a remote-only SrcFile from a locally-serialized remote pointer on the filesystem."""
+    sd = _read_possible_serialized(local_path)
+    return _from_serialized_dict(sd) if sd else None
 
 
 class AdlsDirectory:
@@ -192,7 +260,8 @@ class AdlsDatasetContext:
     """Provides ADLS implementations of the DestFile/SrcFile abstraction.
 
     All Src/DestFiles are placed within the given ADLS Storage
-    Account, Container, and directory prefix.
+    Account, Container, and directory prefix, with the exception of SrcFiles
+    loaded using `src` _if and only if_ they are
 
     Public methods are only to be called within a local orchestrator process.
     """
@@ -209,25 +278,28 @@ class AdlsDatasetContext:
     def src(self, local_src: ty.Union[DestFile, StrOrPath]) -> SrcFile:
         """Return SrcFile for locally-existing path, or raise FileNotFoundError.
 
+        The path may be absolute or relative to current working directory.
+
         If the local file is a remote file pointer, it will get
         recognized as such and will be downloaded upon entry to the
-        SrcFile context in a local orchestrator.
+        SrcFile context in a local orchestrator. This will bypass the
+        SA/container/root directory of this context, since remote file
+        pointers are always fully-qualified.
 
         If the local file is not a remote file pointer (it is the file
         itself), no download will occur for local usage.
 
         In all cases, remote functions will download the file to a
         temporary Path upon first context entry.
-
-        May be absolute or relative to current working directory.
         """
+        already_remote_srcfile = load_srcfile(str(local_src))
+        if already_remote_srcfile:
+            return already_remote_srcfile
         local_filepath = str(local_src)
         return SrcFile(
             _download_serialized,
-            _get_remote_serialized(local_filepath),
-            local_filepath,
-            # TODO insert lazy-hashing (sha256 to match Paths!) uploader here.
-            _UploadDirectoryAdjuster(
+            local_path=local_filepath,
+            uploader=_UploadDirectoryAdjuster(
                 self.adls_dir.upload, self.current_working_dir, os.fspath(local_src)
             ),
         )

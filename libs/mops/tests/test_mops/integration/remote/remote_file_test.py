@@ -10,15 +10,19 @@ import pytest
 from thds.adls import AdlsFqn
 from thds.mops.config import get_datasets_storage_root
 from thds.mops.remote import AdlsDatasetContext, DestFile, SrcFile
+from thds.mops.remote._pickle import gimme_bytes
 from thds.mops.remote.adls_remote_files import (
     AdlsDirectory,
+    Serialized,
     _download_serialized,
-    _get_remote_serialized,
+    _read_possible_serialized,
+    _try_parse_adls_path_repr,
     adls_dataset_context,
     adls_remote_src,
+    srcfile_from_serialized,
 )
 
-from ._util import adls_shell
+from ._util import adls_shell, runner
 
 TEST_TIME = datetime.utcnow().isoformat()
 # at least two of these times will be seen each time the tests are
@@ -118,7 +122,7 @@ def test_no_get_remote_if_not_unicode():
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(b"\xff\x00\x00\x00\x00\x00\x00\x00\x01\x01\x01\x01\x01\x01")
         tmp.seek(0)
-        assert "" == _get_remote_serialized(tmp.name)  # type: ignore
+        assert None is _read_possible_serialized(tmp.name)  # type: ignore
 
 
 def test_serialized_path_not_dict():
@@ -164,3 +168,70 @@ def test_dest_file_created_remotely():
         assert os.path.exists(str(dest))
     finally:
         shutil.rmtree(TOP_DIR)
+
+
+def test_src_file_serialization_includes_deterministic_md5b64():
+    sd_context = _context()
+    src = sd_context.src(Path(__file__).parent / "a_path.txt")
+    src._upload_if_not_already_remote()
+    assert json.loads(src._serialized_remote_pointer)["md5b64"] == "QQgXnnVU6fpk9lmLJxqqnA=="
+    assert src._uploader is None
+    assert src._local_filename == ""
+
+
+def test_remote_src_file_is_identical_on_serialization_to_local_src_file():
+    """This test 'proves' that, whether this is a first-time upload of
+    your SrcFile or a later re-use of the remote-only bytes, you will
+    get an identical SrcFile payload during pickle serialization,
+    which is critical for providing maximum memoization over time when
+    using SrcFiles the way they're intended to be used.
+
+    We accomplish this essentially by reducing the SrcFile internal
+    attributes to nothing but those required to successfully download
+    the file on the worker, as soon as the upload has been completed.
+    """
+    dumper = runner._get_dumper(os.environ.get("PYTEST_CURRENT_TEST"))
+
+    sd_context = _context()
+    src = sd_context.src(Path(__file__).parent / "a_path.txt")
+    src._upload_if_not_already_remote()
+
+    rem_src = srcfile_from_serialized(src._serialized_remote_pointer)
+    assert rem_src._serialized_remote_pointer == src._serialized_remote_pointer
+    assert gimme_bytes(dumper, src) == gimme_bytes(dumper, rem_src)
+
+
+def test_from_serialized_sad_paths():
+    with pytest.raises(TypeError):
+        srcfile_from_serialized("")  # type: ignore
+    with pytest.raises(ValueError):
+        srcfile_from_serialized('{"type": "S3", "bucket": "foo", "key": "bar"}')  # type: ignore
+    with pytest.raises(AssertionError):
+        srcfile_from_serialized(
+            Serialized(r'{"type": "ADLS", "bucket": "foo", "key": "{\"type\": \"ADLS\""}')
+        )
+    with pytest.raises(TypeError):
+        # is missing 'key'
+        srcfile_from_serialized(Serialized('{"type": "ADLS", "sa": "thdsscratch", "container": "tmp"}'))
+
+    with pytest.raises(ValueError):
+        # valueerror here means blob does not exist
+        srcfile_from_serialized(
+            Serialized(
+                '{"type": "ADLS", "sa": "thdsscratch", "container": "tmp", '
+                '"key": "this-path-should-never-exist.txt"}'
+            )
+        )
+
+    sd_context = _context()
+    src = sd_context.src(Path(__file__).parent / "a_path.txt")
+    src._upload_if_not_already_remote()
+
+    sd = _try_parse_adls_path_repr(src._serialized_remote_pointer)
+    assert sd
+    assert sd["md5b64"] != "broken"
+    sd["md5b64"] = "broken"
+
+    with pytest.raises(ValueError):
+        # valueError here means we failed md5 validation
+        srcfile_from_serialized(Serialized(json.dumps(sd)))

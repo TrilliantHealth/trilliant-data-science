@@ -211,6 +211,8 @@ class SrcFile:
         assert self._uploader, "No serialized remote pointer is present and no uploader is available"
         logger.info(f"Local file {self._local_filename} requires upload")
         self._serialized_remote_pointer = self._uploader(self._local_filename)
+        self._local_filename = ""
+        self._uploader = None
 
     def __enter__(self) -> Path:
         """Return a local path suitable for opening and reading.

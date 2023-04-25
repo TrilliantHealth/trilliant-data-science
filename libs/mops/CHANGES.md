@@ -1,3 +1,10 @@
+### 1.4.1
+
+- Makes SrcFiles deterministically serializable in most cases, and
+  always validates ADLS SrcFiles upon creation, even if they're
+  remote. This is done in the service of greater reuse of memoized
+  results.
+
 ## 1.4
 
 - Note that this release makes changes to AdlsPickleRunner internals
