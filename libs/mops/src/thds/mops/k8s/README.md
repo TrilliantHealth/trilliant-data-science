@@ -1,15 +1,23 @@
 # Run Jobs on DS Kubernetes cluster
 
-Launches K8s Jobs on existing Docker images using Python for
+Launch a K8s Job on an existing Docker image, using Python for
 configuration.
 
-Optionally:
+Optionally (but by default):
 
-1. Wait for the Job to exit
-2. Scrape logs of all launched pods reliably
+1. Scrape logs of the launched pod(s) reliably.
+2. Wait for the Job to exit.
 
+> NOT intended for deployment of a long-running service! For that, use
+> Helm.
 
 ## Launch
+
+> This is the low level, imperative API. It is most suitable for
+> launching a K8s image where the program being run is not Python.
+>
+> If you are running Python, you should look into using the declarative
+> approach supported by `mops.remote.PickleRunner`.
 
 ```python
 from thds.mops.k8s import launch, autocr
