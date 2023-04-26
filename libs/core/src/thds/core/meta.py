@@ -189,23 +189,6 @@ def get_version(pkg: Package) -> str:
     return version_
 
 
-@lru_cache(None)
-def get_base_package(pkg: Package) -> str:
-    try:
-        _ = version(norm_name(str(pkg)))
-    except PackageNotFoundError:
-        try:
-            _ = version(str(pkg))
-        except PackageNotFoundError:
-            pkg_ = pkg.split(".")
-            if len(pkg_) <= 1:
-                return ""
-            else:
-                return get_base_package(".".join(pkg_[:-1]))
-
-    return str(pkg)
-
-
 def get_commit(pkg: Package = "") -> str:
     if GIT_COMMIT in os.environ:
         LOGGER.debug("`get_commit` reading from env var.")
