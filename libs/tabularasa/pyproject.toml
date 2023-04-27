@@ -89,7 +89,7 @@ explicit_package_bases = true
 exclude = '''(?x)(
     build/
     | dist/
-    | \S+\.egg-info
+    | \S+\.egg-info/
 )'''
 check_untyped_defs = true
 

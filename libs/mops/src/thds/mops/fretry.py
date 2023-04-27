@@ -11,12 +11,13 @@ RetryStrategy = ty.Iterable[IsRetryable]
 RetryStrategyFactory = ty.Callable[[], RetryStrategy]
 
 
-def expo(*, tries: int, delay: float = 1.0, backoff: int = 2) -> ty.Iterator[float]:
-    """End iteration after 'tries'.
-    If you want infinite exponential values, pass a negative number for 'tries'.
+def expo(*, retries: int, delay: float = 1.0, backoff: int = 2) -> ty.Iterator[float]:
+    """End iteration after yielding 'retries' times.
+
+    If you want infinite exponential values, pass a negative number for 'retries'.
     """
     count = 0
-    while tries < 0 or count < tries:
+    while retries < 0 or count < retries:
         yield backoff**count * delay
         count += 1
 
@@ -27,10 +28,9 @@ def sleep(
     """A common base strategy for separating retries by sleeps."""
 
     def sleep_() -> ty.Iterator:
-        yield
         for secs in seconds_iter:
-            sleeper(secs)
             yield
+            sleeper(secs)
 
     return sleep_
 
@@ -40,6 +40,9 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
     Your iterable can therefore provide different handling for each
     incrementing error, as well as configurable delays between errors,
     etc.
+
+    If the retry_strategy iterator itself ends (or is empty to begin
+    with), the function will be called one final time.
     """
 
     def _retry_decorator(func: F) -> F:
@@ -48,9 +51,10 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
             for is_retryable in retry_strategy_factory():
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
-                    if not is_retryable(e):
-                        raise
+                except Exception as ex:
+                    if not is_retryable(ex):
+                        raise ex
+            return func(*args, **kwargs)
 
         return ty.cast(F, retry_wrapper)
 

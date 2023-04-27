@@ -28,7 +28,7 @@ class AdlsRoot(NamedTuple):
     @classmethod
     def parse(cls, root_uri: str) -> "AdlsRoot":
         fqn = AdlsFqn.parse(root_uri)
-        assert not fqn.path, f"URI {root_uri} does not represent an ADLS root!"
+        assert not fqn.path, f"URI '{root_uri}' does not represent an ADLS root!"
         return AdlsRoot(fqn.sa, fqn.container)
 
     def join(self, path: str) -> "AdlsFqn":
@@ -48,6 +48,9 @@ class AdlsFqn(NamedTuple):
     container: str
     path: str
 
+    def __str__(self) -> str:
+        return format_fqn(*self)
+
     @classmethod
     def of(cls, storage_account: str, container: str, path: str = "") -> "AdlsFqn":
         """Expensive but includes validation."""
@@ -57,12 +60,10 @@ class AdlsFqn(NamedTuple):
     def parse(cls, fully_qualified_name: str) -> "AdlsFqn":
         return parse_fqn(fully_qualified_name)
 
-    def __str__(self) -> str:
-        return format_fqn(*self)
-
     def join(self, path_suffix: str) -> "AdlsFqn":
         return AdlsFqn(self.sa, self.container, join(self.path, path_suffix))
 
+    # Should be a property?
     def root(self) -> AdlsRoot:
         return AdlsRoot(self.sa, self.container)
 

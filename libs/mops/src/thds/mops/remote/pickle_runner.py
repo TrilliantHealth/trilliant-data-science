@@ -232,7 +232,7 @@ def _pickle_func_and_run_via_shell(
             shell(
                 [
                     *MAIN_HANDLER_BASE_ARGS,
-                    MemoizingPickledFunctionRunner.__class__.__name__,
+                    MemoizingPickledFunctionRunner.__name__,
                     memo_uri,
                     get_pipeline_id(),  # for debugging only
                 ]
@@ -306,4 +306,4 @@ def run_pickled_invocation(*shell_args: str):
     )
 
 
-register_main_handler(MemoizingPickledFunctionRunner.__class__.__name__, run_pickled_invocation)
+register_main_handler(MemoizingPickledFunctionRunner.__name__, run_pickled_invocation)

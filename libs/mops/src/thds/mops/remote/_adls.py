@@ -98,7 +98,7 @@ def is_creds_failure(exc: Exception) -> bool:
     return isinstance(exc, azure.core.exceptions.HttpResponseError) and not is_blob_not_found(exc)
 
 
-_azure_creds_retry = retry_regular(is_creds_failure, sleep(expo(tries=10, delay=1.0)))
+_azure_creds_retry = retry_regular(is_creds_failure, sleep(expo(retries=9, delay=1.0)))
 # sometimes Azure Cli credentials expire but would succeed if retried
 # and the azure library does not seem to retry these on its own.
 
