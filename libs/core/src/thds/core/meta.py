@@ -11,8 +11,8 @@ from importlib.resources import Package, open_text
 from pathlib import Path
 from types import MappingProxyType
 
-import attr
-from cattr import Converter
+import attrs
+from cattrs import Converter
 
 from .log import getLogger
 from .types import StrOrPath
@@ -323,13 +323,13 @@ def is_deployed(pkg: Package) -> bool:
 MiscType = ty.Mapping[str, ty.Union[str, int, float, bool]]
 
 
-@attr.frozen
+@attrs.frozen
 class Metadata:
     git_commit: str = ""
     git_branch: str = ""
     git_is_clean: bool = False
     thds_user: str = ""
-    misc: MiscType = attr.field(factory=lambda: MappingProxyType(dict()))
+    misc: MiscType = attrs.field(factory=lambda: MappingProxyType(dict()))
 
     @property
     def docker_branch(self) -> str:
@@ -349,7 +349,7 @@ class Metadata:
 
     @property
     def is_empty(self) -> bool:
-        return all(not getattr(self, field.name) for field in attr.fields(Metadata))
+        return all(not getattr(self, field.name) for field in attrs.fields(Metadata))
 
     @property
     def git_is_dirty(self) -> bool:

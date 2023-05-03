@@ -2,10 +2,10 @@
 # I have made some small modifications to the code
 import inspect
 
-import attr
+import attrs
 
 
-@attr.frozen
+@attrs.frozen
 class CallerInfo:
     module: str = ""
     klass: str = ""
