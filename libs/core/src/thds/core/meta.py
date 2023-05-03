@@ -176,10 +176,10 @@ def norm_name(pkg: str) -> str:
 @lru_cache(None)
 def get_version(pkg: Package) -> str:
     try:
-        version_ = version(str(pkg))
+        version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         try:
-            version_ = version(norm_name(str(pkg)))
+            version_ = version(str(pkg))
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
@@ -194,10 +194,10 @@ def get_version(pkg: Package) -> str:
 @lru_cache(None)
 def get_base_package(pkg: Package) -> str:
     try:
-        _ = version(str(pkg))
+        _ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         try:
-            _ = version(norm_name(str(pkg)))
+            _ = version(str(pkg))
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
