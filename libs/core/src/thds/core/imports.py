@@ -9,7 +9,7 @@ def try_imports(*modules: str, module: Package = "", extra: str = "") -> None:
         for m in modules:
             import_module(m)
     except ImportError:
-        if extra:
+        if extra and module:
             raise ImportError(
                 f"Install the '{extra}' extra for `{get_base_package(module)}` to use `{module}`."
             )
