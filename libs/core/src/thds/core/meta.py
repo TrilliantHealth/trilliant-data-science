@@ -11,10 +11,11 @@ from importlib.resources import Package, open_text
 from pathlib import Path
 from types import MappingProxyType
 
-import attr
+import attrs
 from cattrs import Converter
 
 from .log import getLogger
+from .types import StrOrPath
 
 LayoutType = ty.Literal["flat", "src"]
 NameFormatType = ty.Literal["git", "docker", "hive"]
@@ -72,7 +73,7 @@ def get_timestamp(as_datetime: ty.Literal[False]) -> str:
     ...  # pragma: no cover
 
 
-def get_timestamp(as_datetime=False):
+def get_timestamp(as_datetime: bool = False):
     timestamp = datetime.now(timezone.utc)
     return timestamp.strftime(TIMESTAMP_FORMAT) if not as_datetime else timestamp
 
@@ -182,6 +183,7 @@ def get_version(pkg: Package) -> str:
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
+                LOGGER.warning("Could not find a version for `%s`. Package not found.", pkg)
                 return ""
             else:
                 return get_version(".".join(pkg_[:-1]))
@@ -199,6 +201,7 @@ def get_base_package(pkg: Package) -> str:
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
+                LOGGER.warning("Could not find the base package for `%s`. Package not found.", pkg)
                 return ""
             else:
                 return get_base_package(".".join(pkg_[:-1]))
@@ -213,8 +216,6 @@ def get_commit(pkg: Package = "") -> str:
 
     try:
         LOGGER.debug("`get_commit` reading from Git repo.")
-        # backup in case you don't have `git` installed as a dev-dependency
-        # but you still have the git repo available.
         return _simple_run("git rev-parse --verify HEAD")
     except (sp.CalledProcessError, FileNotFoundError):
         pass  # FileNotFoundError can happen if git is not installed at all.
@@ -229,7 +230,7 @@ def get_commit(pkg: Package = "") -> str:
     except EmptyMetadataException:
         pass
 
-    LOGGER.debug("`get_commit` found no commit.")
+    LOGGER.warning("`get_commit` found no commit.")
     return ""
 
 
@@ -240,7 +241,8 @@ def is_clean(pkg: Package = "") -> bool:
 
     if GIT_IS_DIRTY in os.environ:
         # compatibility with docker-tools/build_push
-        return bool(os.getenv(GIT_IS_DIRTY))
+        LOGGER.debug("`is_clean` reading from env var.")
+        return not bool(os.getenv(GIT_IS_DIRTY))
 
     try:
         LOGGER.debug("`is_clean` reading from Git repo.")
@@ -255,12 +257,12 @@ def is_clean(pkg: Package = "") -> bool:
             metadata = read_metadata(pkg)
             if metadata.is_empty:
                 raise EmptyMetadataException
-            return bool(metadata.git_is_clean)
+            return metadata.git_is_clean
     except EmptyMetadataException:
         pass
 
-    LOGGER.debug("`is_clean` found no cleanliness - assume dirty.")
-    return True
+    LOGGER.warning("`is_clean` found no cleanliness - assume dirty.")
+    return False
 
 
 def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
@@ -285,7 +287,7 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
         except EmptyMetadataException:
             pass
 
-        LOGGER.debug("`get_branch` found no branch.")
+        LOGGER.warning("`get_branch` found no branch.")
         return ""
 
     return format_name(_get_branch(pkg), format)
@@ -307,7 +309,7 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
         except EmptyMetadataException:
             pass
 
-        LOGGER.debug("`get_user` found no user data - getting system user.")
+        LOGGER.warning("`get_user` found no user data - getting system user.")
         return getuser()
 
     return format_name(_get_user(pkg), format)
@@ -318,17 +320,16 @@ def is_deployed(pkg: Package) -> bool:
     return not meta.is_empty
 
 
-MetaPrimitiveType = ty.Union[str, int, float, bool]
-MiscType = ty.Mapping[str, MetaPrimitiveType]
+MiscType = ty.Mapping[str, ty.Union[str, int, float, bool]]
 
 
-@attr.frozen
+@attrs.frozen
 class Metadata:
     git_commit: str = ""
     git_branch: str = ""
-    git_is_clean: str = ""
+    git_is_clean: bool = False
     thds_user: str = ""
-    misc: MiscType = attr.field(factory=lambda: MappingProxyType(dict()))
+    misc: MiscType = attrs.field(factory=lambda: MappingProxyType(dict()))
 
     @property
     def docker_branch(self) -> str:
@@ -348,7 +349,7 @@ class Metadata:
 
     @property
     def is_empty(self) -> bool:
-        return all(not getattr(self, field.name) for field in attr.fields(Metadata))
+        return all(not getattr(self, field.name) for field in attrs.fields(Metadata))
 
     @property
     def git_is_dirty(self) -> bool:
@@ -356,23 +357,21 @@ class Metadata:
 
 
 meta_converter = Converter(forbid_extra_keys=True)
-meta_converter.register_structure_hook(MiscType, lambda misc, _: MappingProxyType(misc))
-# TODO - figure out typing issue for unstructure hook
-meta_converter.register_unstructure_hook(MiscType, lambda misc: dict(misc))  # type: ignore
+meta_converter.register_structure_hook(
+    Metadata, lambda v, _: Metadata(misc=MappingProxyType(v.pop("misc", {})), **v)
+)
 
 
 class EmptyMetadataException(Exception):
     pass
 
 
-def init_metadata(misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None) -> Metadata:
-    clean = is_clean()
-
+def init_metadata(misc: ty.Optional[MiscType] = None) -> Metadata:
     return Metadata(
         git_commit=get_commit(),
         git_branch=get_branch(),
-        git_is_clean="True" if clean else "",
-        thds_user=get_user(),
+        git_is_clean=is_clean(),
+        thds_user=os.getenv(THDS_USER, getuser()),
         misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
     )
 
@@ -380,26 +379,26 @@ def init_metadata(misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None) 
 def write_metadata(
     pkg: str,
     *,
-    misc: ty.Optional[ty.Mapping[str, MetaPrimitiveType]] = None,
+    misc: ty.Optional[MiscType] = None,
     namespace: str = "thds",
     layout: LayoutType = "src",
-    wdir: ty.Optional[Path] = None,
+    wdir: ty.Optional[StrOrPath] = None,
     deploying: bool = False,
 ) -> None:
-    wdir = wdir or Path(".")
-    assert wdir
+    wdir_ = Path(wdir) if wdir else Path(".")
+    assert wdir_
     if os.getenv(DEPLOYING) or deploying:
         LOGGER.debug("Writing metadata.")
         metadata = init_metadata(misc=misc)
         metadata_path = os.path.join(
             "src" if layout == "src" else "",
-            namespace,
+            namespace.replace(".", "/"),
             pkg.replace("-", "_").replace(".", "/"),
             META_FILE,
         )
 
-        with open(wdir / metadata_path, "w") as f:
-            LOGGER.info(f"Writing metadata for {pkg} to {wdir / metadata_path}")
+        with open(wdir_ / metadata_path, "w") as f:
+            LOGGER.info(f"Writing metadata for {pkg} to {wdir_ / metadata_path}")
             json.dump(meta_converter.unstructure(metadata), f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
@@ -409,11 +408,11 @@ def read_metadata(pkg: Package) -> Metadata:
     LOGGER.debug("Reading metadata.")
 
     if pkg == "__main__":
-        raise ValueError("`read_meta` expects a package or module name, not '__main__'")
+        raise ValueError("`read_meta` expects a package or module name, not '__main__'.")
 
-    if pkg is None:
+    if not pkg:
         raise ValueError(
-            "`read_meta` expects a package or module name, not `None`. "
+            "`read_meta` is missing a package or module name. "
             "If using `__package__` make sure an __init__.py is present."
         )
 
