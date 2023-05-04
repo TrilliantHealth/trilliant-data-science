@@ -11,7 +11,7 @@ from thds.mops.remote import AdlsPickleRunner, Shell, ShellBuilder, pure_remote,
 from ._util import _subprocess_remote, adls_shell, clear_cache
 
 # this hopefully keeps the tmp bucket easier to navigate/understand
-set_pipeline_id("test-shell/" + datetime.utcnow().isoformat())
+set_pipeline_id("test/shell/" + datetime.utcnow().isoformat())
 
 
 @adls_shell

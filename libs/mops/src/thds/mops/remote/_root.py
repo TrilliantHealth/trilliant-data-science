@@ -38,12 +38,22 @@ def __set_or_generate_pipeline_id_if_empty():
 
 
 def get_pipeline_id() -> str:
+    """This will return the stack-local pipeline id, if set, or, if
+    that is not set, will generate a global pipeline id and return
+    that.
+
+    Once a global pipeline id is generated, it will not be
+    regenerated, although it can be overridden as a global with
+    set_pipeline_id, and overridden for the stack with
+    """
     if not _PIPELINE_ID:
         __set_or_generate_pipeline_id_if_empty()
-    return _PIPELINE_ID
+    assert _PIPELINE_ID
+    return memo_pipeline_id() or _PIPELINE_ID
 
 
 def set_pipeline_id(name: str):
+    """Override the current global pipeline id."""
     global _PIPELINE_ID
     _PIPELINE_ID = name
 

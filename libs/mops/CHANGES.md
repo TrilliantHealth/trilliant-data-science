@@ -1,3 +1,21 @@
+## 1.5
+
+Minor features providing bootstrapping defaults for general use across
+the monorepo.
+
+- Add `pipeline_id_mask` decorator, such that libraries can set a
+  default `pipeline_id` for an exported function that provides a known
+  result, and so that applications can choose to override a library's
+  `pipeline_id_mask` using the same decorator.
+- `k8s_shell` will now accept a callable that returns the container
+  name, so that this can be lazily deferred to the time of use.
+- Add `std_docker_build_push_develop` helper to create a
+  lazy-docker-image-building default approach to go along with the
+  `k8s_shell` interface. This can be plugged in by applications to
+  prevent accidentally running without rebuilding. See
+  [`mldemo`](../../apps/mldemo/src/mldemo/k8s_choose_image.py#L13) for
+  an example of this usage.
+
 ### 1.4.1
 
 - Makes SrcFiles deterministically serializable in most cases, and
@@ -6,6 +24,8 @@
   results.
 
 ## 1.4
+
+Big changes to consistency and usability of memoization.
 
 - Note that this release makes changes to AdlsPickleRunner internals
   as well as standard ADLS locations for function invocations and

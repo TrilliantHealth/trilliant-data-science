@@ -16,7 +16,7 @@ def broken_mul(a: int, b: float) -> float:
 
 def test_reuse_memoized_via_config():
     func_uri = (
-        "adls://thdsscratch/tmp/mops/pipeline-pickled-functions-v1/some-pipeline-id"
+        "adls://thdsscratch/tmp/mops/pipeline-pickled-functions-v1/test/some-pipeline-id"
         f"/{make_unique_name_including_docstring_key(mul)}"
     )
 

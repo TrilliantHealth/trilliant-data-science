@@ -141,11 +141,16 @@ from ._hash import nest
 from ._memoize_function_code import make_unique_name_including_docstring_key
 from ._root import get_pipeline_id
 from ._uris import lookup_blob_store
+from .memoize import get_pipeline_id_mask
 
 
 def _lookup_memospace(callable_name: str) -> ty.Optional[str]:
     """The base URI is everything up until but not including the hash of the (args, kwargs) tuple."""
     return config_at_path(None, "mops", "memo", callable_name, "memospace")
+
+
+def get_mask_or_pipeline_id() -> str:
+    return get_pipeline_id_mask() or get_pipeline_id()
 
 
 def make_function_memospace(default_storage_root: str, f: ty.Callable) -> str:
@@ -154,7 +159,7 @@ def make_function_memospace(default_storage_root: str, f: ty.Callable) -> str:
         lookup_blob_store(default_storage_root).join,
         (
             default_storage_root,
-            get_pipeline_id(),
+            get_mask_or_pipeline_id(),
             callable_name,
         ),
     )

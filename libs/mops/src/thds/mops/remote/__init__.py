@@ -9,6 +9,7 @@ from .adls_remote_files import (  # noqa
     sync_remote_to_local_as_pointers,
 )
 from .core import get_pipeline_id, invocation_unique_key, pure_remote, set_pipeline_id  # noqa
+from .memoize import pipeline_id_mask, pipeline_id_mask_from_docstr  # noqa
 from .parallel import Thunk, YieldingMapWithLen, parallel_yield_results  # noqa
 from .pickle_runner import MemoizingPickledFunctionRunner  # noqa
 from .remote_file import DestFile, SrcFile  # noqa

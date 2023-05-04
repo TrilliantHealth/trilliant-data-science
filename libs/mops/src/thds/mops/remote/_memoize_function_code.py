@@ -24,10 +24,12 @@ function-logic-key: try-uint8-math
 """
 import inspect
 import re
+from functools import lru_cache
 
 _DOCSTRING_VERSION_RE = re.compile(r".*function-logic-key:\s+(?P<version>[^\s]+)\b", re.DOTALL)
 
 
+@lru_cache(maxsize=None)
 def make_unique_name_including_docstring_key(f) -> str:
     module = ""
     name = ""

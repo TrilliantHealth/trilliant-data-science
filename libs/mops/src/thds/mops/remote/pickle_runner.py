@@ -15,13 +15,13 @@ from ..config import adls_max_clients
 from ..exception import catch
 from ._byos import ByIdRegistry, MemoizingSerializer
 from ._content_aware_uri_serde import STORAGE_ROOT, SharedPickler, make_dumper, make_read_object
-from ._memoize import args_kwargs_content_address, make_function_memospace
+from ._memoize import args_kwargs_content_address, get_mask_or_pipeline_id, make_function_memospace
 from ._once import Once
 from ._paths import PathContentAddresser
 from ._pickle import Dumper, Serializer, freeze_args_kwargs, gimme_bytes, unfreeze_args_kwargs, wrap_f
 from ._registry import MAIN_HANDLER_BASE_ARGS, register_main_handler
 from ._uris import get_root, lookup_blob_store
-from .core import SerializableThunk, forwarding_call, get_pipeline_id
+from .core import SerializableThunk, forwarding_call
 from .remote_file import trigger_dest_files_placeholder_write, trigger_src_files_upload
 from .types import Args, BlobStore, Kwargs, NoResultAfterInvocationError, Shell, T, _ShellBuilder
 
@@ -234,7 +234,7 @@ def _pickle_func_and_run_via_shell(
                     *MAIN_HANDLER_BASE_ARGS,
                     MemoizingPickledFunctionRunner.__name__,
                     memo_uri,
-                    get_pipeline_id(),  # for debugging only
+                    get_mask_or_pipeline_id(),  # for debugging only
                 ]
             )
         except Exception as ex:

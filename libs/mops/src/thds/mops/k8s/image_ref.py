@@ -4,21 +4,28 @@ and your application which used to read from an environment variable
 that you keep forgetting to set.
 """
 import os
+import subprocess
+import sys
+import typing as ty
 from pathlib import Path
-from typing import Optional
 
 from thds.core.log import getLogger
 
+from .._lazy import Lazy
+from ..colorize import colorized
 from .image_backoff import YIKES
 from .launch import autocr
 
 logger = getLogger(__name__)
 
 
+PINK = colorized(fg="black", bg="pink")
+
+
 class ImageFileRef:
     def __init__(self, path: Path):
         self._path = path.resolve()
-        self._cached_image_ref: Optional[str] = None
+        self._cached_image_ref: ty.Optional[str] = None
 
     def __call__(self) -> str:
         if self._cached_image_ref is not None:
@@ -41,16 +48,86 @@ MOPS_IMAGE_FULL_TAG = "MOPS_IMAGE_FULL_TAG"
 STD_MOPS_IMAGE_FILE_REF = ImageFileRef(Path(".mops-image-name"))
 
 
+def std_docker_build_push_develop_cmd(root: Path) -> ty.List[str]:
+    """This is currently a monorepo standard, but it's also a hack.
+
+    The only reason this does not exist in docker-tools is because I
+    don't want users having to resort to ImportError hacks when they
+    use it, and mops is a runtime dependency whereas docker-tools is
+    dev-only and therefore should never be imported inside the
+    application.
+    """
+    script = root / "docker/build_push.py"
+    assert script.is_file(), f"We were unable to find {script}"
+    return [
+        "poetry",
+        "run",
+        str(script),
+        "--develop",
+    ]
+
+
+def build_push_image(cmd: ty.List[str]) -> ty.Callable[[], str]:
+    """This is kind of a hack, but it should work for everything
+    currently in the monorepo, as well as demandforecast.
+
+    cmd must be runnable by subprocess.run and must return parseable
+    stderr lines prefixed with `full_tag: `, of which the last will be
+    used.
+    """
+
+    def docker_build_push_develop() -> str:
+        try:
+            logger.info(PINK(f"Attempting to build and push docker image with `{' '.join(cmd)}`"))
+            proc = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            full_tags = list()
+            for line in proc.stderr.split("\n"):
+                FULL_TAG = "full_tag: "  # see docker-tools/build_push.py
+                if line.startswith(FULL_TAG):
+                    full_tags.append(line[len(FULL_TAG) :])
+            if full_tags:
+                logger.info(PINK(f"Built and pushed images; selecting tag '{full_tags[-1]}'"))
+                return full_tags[-1]
+            logger.warning(YIKES("Build/push command succeeded but no tags were found."))
+            return ""
+        except subprocess.CalledProcessError:
+            sys.stdout.write(proc.stdout)
+            sys.stderr.write(proc.stderr)
+            return ""
+
+    return Lazy(docker_build_push_develop)
+
+
+def std_docker_build_push_develop(root: Path) -> ty.Callable[[], str]:
+    """Easiest possible approach to getting yourself a docker image built and pushed."""
+    return build_push_image(std_docker_build_push_develop_cmd(root))
+
+
+# TODO for a 2.0, make this return a Callable[[], str] instead of str,
+# because almost all use cases paired with k8s_shell should be lazily-called.
 def std_find_image_full_tag(
     project_name: str = "",
     image_basename: str = "",
     file_ref: ImageFileRef = STD_MOPS_IMAGE_FILE_REF,
+    build_push_image: ty.Optional[ty.Callable[[], str]] = None,
 ):
     """Looks in the 'standard' places in a standard order to try to
     come up with a fully-qualified image tag.
 
-    Enivronment variables are preferred over the ImageFileRef, although
-    ImageFileRef is the recommended solution for most applications.
+    The priority order is:
+
+    1. environ['MOPS_IMAGE_FULL_TAG']
+    2. environ['<PROJECT_NAME.upper()>_VERSION']
+    3. non-empty string result of build_push_image, if available.
+    4. ImageFileRef
+
+    build_push_image is the current recommended solution for most applications,
+    and the recommended implementation is std_docker_build_push_develop.
     """
     image_fullref_from_env = os.getenv(MOPS_IMAGE_FULL_TAG)
     if image_fullref_from_env:
@@ -70,8 +147,14 @@ def std_find_image_full_tag(
             return autocr(image_tag_from_env)
         return autocr(f"{image_basename}:{image_tag_from_env}")
 
+    if build_push_image:
+        image_tag_from_func = build_push_image()
+        if image_tag_from_func:
+            return image_tag_from_func
+
     image_tag_from_file = ImageFileRef(Path(".mops-image-name"))()
     if image_tag_from_file:
         return image_tag_from_file
 
+    logger.warning(YIKES(f"Found no image tag for '{project_name}' '{image_basename}'"))
     return ""

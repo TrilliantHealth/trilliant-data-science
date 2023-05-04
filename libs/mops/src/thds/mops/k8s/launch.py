@@ -211,14 +211,28 @@ def launch(
 
 
 def k8s_shell(
-    container_image: str,
+    container_image: ty.Union[str, ty.Callable[[], str]],
     **outer_kwargs,
 ) -> ty.Callable[[ty.Sequence[str]], None]:
-    """Return a closure that can launch the given configuration with specific arguments."""
-    assert "args" not in outer_kwargs
+    """Return a closure that can launch the given configuration with specific arguments.
+
+    Now supports callables that return a container image name; the
+    goal being to allow applications to perform this lazily on the
+    first actual use of the k8s shell. The passed callable will be
+    called each time, so if you want it to be called only once, you'll
+    need to wrap it yourself.
+    """
+    assert (
+        "args" not in outer_kwargs
+    ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
+
+    if isinstance(container_image, str):
+        get_container_image = lambda: container_image  # noqa: E731
+    else:
+        get_container_image = container_image
 
     def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
         assert "args" not in inner_kwargs
-        launch(container_image, args, **{**outer_kwargs, **inner_kwargs})
+        launch(get_container_image(), args, **{**outer_kwargs, **inner_kwargs})
 
     return launch_container_on_k8s_with_args
