@@ -15,10 +15,15 @@ aad_pod_managed_identity = "ds-standard"
 # Yes, this list looks weird. please see the longer comment below
 # before you touch it.
 namespaces_supporting_workload_identity = [
+  "cailey-kerley",
   "default",
   "demand-forecast",
   "dimitrios-boursinos",
   "grant-andersen",
+  "joseph-doiron",
+  "justin-fincher",
+  "matt-eby",
+  "matt-hawthorn",
   "person-api",
   "peter-gaultney",
   "rueben-banalagay",
