@@ -43,7 +43,6 @@ source = ["thds.adls"]
 show_missing = true
 
 [tool.mypy]
-python_version = 3.8
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
