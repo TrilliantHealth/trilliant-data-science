@@ -14,11 +14,11 @@ attrs = "^22.2.0"
 cattrs = "^22.2.0"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^0.982"
-mypy-extensions = "*"
-pytest = "*"
-pytest-cov = "*"
-pytest-mock = "*"
+mypy = "^1.0"
+mypy-extensions = "^1.0"
+pytest = "^7.2"
+pytest-cov = "^4.0"
+pytest-mock = "^3.10"
 
 [build-system]
 requires = ["poetry-core", "attrs", "cattrs>=22.2"]
