@@ -13,7 +13,11 @@ from pathlib import Path
 # allowing for more than a few of these per process is a recipe for
 # getting nothing done.
 _SEMAPHORE = threading.BoundedSemaphore(int(os.getenv("THDS_CORE_HASHING_PARALLELISM", 4)))
-_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 4096))
+_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 65536))
+# https://stackoverflow.com/questions/17731660/hashlib-optimal-size-of-chunks-to-be-used-in-md5-update
+# this may not apply to us as the architecture is 32 bit, but it's at
+# least a halfway decent guess and benchmarking this ourselves would
+# be a massive waste of time.
 
 T = ty.TypeVar("T")
 SomehowReadable = ty.Union[ty.AnyStr, ty.IO[ty.AnyStr], Path]
@@ -38,10 +42,12 @@ def attempt_readable(thing: SomehowReadable) -> ty.Iterator[ty.IO[bytes]]:
     if hasattr(thing, "read") and hasattr(thing, "seek"):
         try:
             yield thing  # type: ignore
+            return
         finally:
             thing.seek(0)  # type: ignore
     elif isinstance(thing, bytes):
         yield io.BytesIO(thing)
+        return
     with open(thing, "rb") as readable:  # type: ignore
         yield readable
 
