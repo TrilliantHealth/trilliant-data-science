@@ -7,7 +7,9 @@ from pathlib import Path
 from thds.core.hashing import hash_using
 
 HW = Path(__file__).parent.parent / "data/hello_world.txt"
-HW_SHA256 = "3ad08644ab5aa81626a4c41c253a82da9a7cd9843f74486b8b492dff8e8ab690"
+HW_SHA256 = (
+    "a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447"  # includes trailing newline
+)
 
 
 def test_file_hashes():
