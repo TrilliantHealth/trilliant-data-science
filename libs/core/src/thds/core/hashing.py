@@ -1,6 +1,7 @@
 import io
 import threading
 import typing as ty
+from pathlib import Path
 
 # https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
 # I have written this code too many times to write it again. Why isn't this in the stdlib?
@@ -11,7 +12,7 @@ import typing as ty
 _SEMAPHORE = threading.BoundedSemaphore(4)
 
 T = ty.TypeVar("T")
-AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr]]
+SomehowReadable = ty.Union[ty.AnyStr, ty.IO[ty.AnyStr], Path]
 
 
 def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: T) -> T:
@@ -27,7 +28,15 @@ def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: T) -> T:
         return hasher
 
 
-def hash_using(data: AnyStrSrc, hasher: T) -> T:
+def hash_using(data: SomehowReadable, hasher: T) -> T:
+    """This is quite dynamic - but if your data object is not readable
+    bytes and is not openable as bytes, you'll get a
+    FileNotFoundError, or possibly a TypeError or other gremlin.
+
+    Therefore, you may pass whatever you want unless it's an actual
+    string - if you want your actual string hashed, you should encode
+    it as actual bytes first.
+    """
     if hasattr(data, "read") and hasattr(data, "seek"):
         try:
             return hash_readable_chunks(data, hasher)  # type: ignore
@@ -39,7 +48,7 @@ def hash_using(data: AnyStrSrc, hasher: T) -> T:
         return hash_readable_chunks(readable, hasher)
 
 
-def hash_anything(data: AnyStrSrc, hasher: T) -> ty.Optional[T]:
+def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
     try:
         return hash_using(data, hasher)
     except FileNotFoundError:
