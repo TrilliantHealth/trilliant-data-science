@@ -6,12 +6,12 @@ from functools import lru_cache
 from pathlib import Path
 
 from thds.adls import AdlsFqn, AdlsRoot
+from thds.adls.md5 import md5_readable
 
 from ..config import get_datasets_storage_root
 from ..exception import catch
 from ._adls import b64, is_blob_not_found, join, yield_filenames
 from ._adls_shared import get_global_client
-from ._md5 import md5_readable
 from ._uris import lookup_blob_store
 from .remote_file import DestFile, Serialized, SrcFile, StrOrPath
 

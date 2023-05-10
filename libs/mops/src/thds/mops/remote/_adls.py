@@ -8,6 +8,7 @@ from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
 from thds.adls import AdlsFqn, join
+from thds.adls._upload import _get_checksum_content_settings
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
@@ -15,7 +16,6 @@ from ..colorize import colorized
 from ..config import adls_skip_already_uploaded_check_if_smaller_than_bytes
 from ..fretry import expo, retry_regular, sleep
 from ._adls_shared import get_global_client
-from ._md5 import try_md5
 from ._on_slow import on_slow
 from .types import AnyStrSrc, BlobStore
 
@@ -47,18 +47,6 @@ def yield_filenames(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[str]:
     for azure_file in yield_files(fsc, adls_root):
         if not azure_file.get("is_directory"):
             yield azure_file["name"]
-
-
-def _get_checksum_content_settings(data) -> ty.Optional[ContentSettings]:
-    """Ideally, we calculate an MD5 sum for all data that we upload.
-
-    The only circumstances under which we cannot do this are if the
-    stream does not exist in its entirety before the upload begins.
-    """
-    md5 = try_md5(data)
-    if md5:
-        return ContentSettings(content_md5=md5)
-    return None
 
 
 def _content_settings_unless_checksum_already_present(

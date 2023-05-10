@@ -6,9 +6,10 @@ from pathlib import Path
 
 from typing_extensions import Protocol
 
+from thds.core.hashing import hash_using
 from thds.core.log import getLogger
 
-from ._hash import hash_using, nest
+from ._hash import nest
 from ._once import Once
 from .temp import tempdir
 

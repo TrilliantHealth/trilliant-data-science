@@ -1,5 +1,6 @@
 """Core abstractions for the remote runner system."""
 import typing as ty
+from pathlib import Path
 
 from typing_extensions import Protocol
 
@@ -86,7 +87,7 @@ class NoResultAfterInvocationError(Exception):
     """Raised if the remotely-invoked function does not provide any result."""
 
 
-AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr]]
+AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
 
 
 class BlobStore(Protocol):

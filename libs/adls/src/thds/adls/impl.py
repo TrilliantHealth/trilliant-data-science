@@ -32,6 +32,8 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 
 from thds.core.log import getLogger
 
+from ._upload import content_settings_for_upload_unless_file_present_with_matching_checksum
+
 LOGGER = getLogger(__name__)
 getLogger("azure.core").setLevel(logging.WARNING)
 getLogger("azure.identity").setLevel(logging.WARNING)
@@ -329,9 +331,14 @@ class ADLSFileSystem:
         """
 
         async with file_system_client.get_file_client(remote_path) as file_client:
-            local_file = open(local_path, "rb")
-            file_contents = local_file.read()
-            await file_client.upload_data(file_contents, None, True)
+            with open(local_path, "rb") as fp:
+                content_settings = (
+                    await content_settings_for_upload_unless_file_present_with_matching_checksum(
+                        file_client, fp
+                    )
+                )
+                if content_settings:
+                    await file_client.upload_data(fp, overwrite=True, content_settings=content_settings)
 
         return remote_path
 

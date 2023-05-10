@@ -9,12 +9,13 @@ import io
 import pickle
 import typing as ty
 
+from thds.core.hashing import hash_using
 from thds.core.log import getLogger
 from thds.core.stack_context import StackContext
 
 from ..config import get_memo_storage_root
 from ._byos import MemoizingSerializer
-from ._hash import hash_using, nest
+from ._hash import nest
 from ._once import Once
 from ._paths import Downloader, PathContentAddresser, PathPickler
 from ._pickle import CallableUnpickler, Dumper
