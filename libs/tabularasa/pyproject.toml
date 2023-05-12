@@ -26,6 +26,7 @@ thds-core = {path = "../../libs/core", develop = true}
 
 # optional/extras dependencies
 "bourbaki.application" = {version=">=0.10",optional=true}
+typing-inspect = {git = "https://github.com/ilevkivskyi/typing_inspect.git", rev = "beaa4a4", optional = true}
 "ruamel.yaml" = {version="*",optional=true}
 tabulate = {version="*",optional=true}
 isort = {version="*",optional=true}
@@ -34,8 +35,8 @@ pygraphviz = {version="*",optional=true}
 
 [tool.poetry.group.dev.dependencies]
 # type checks
-mypy = "^0.982"
-mypy-extensions = "*"
+mypy = "^1.0"
+mypy-extensions = "^1.0"
 pandas-stubs = "*"
 types-pkg-resources = "*"
 types-pyyaml = "*"
@@ -43,8 +44,8 @@ types-setuptools = "*"
 types-tabulate = "*"
 typing-inspect = "*"
 # tests
-pytest = "*"
-pytest-cov = "*"
+pytest = "^7.2"
+pytest-cov = "^4.0"
 # ipython
 ipykernel = "*"
 ipython = "*"
@@ -63,7 +64,7 @@ black = "*"
 
 [tool.poetry.extras]
 # support for CLI operations - code and data generation
-cli = ["bourbaki.application", "ruamel.yaml", "tabulate", "isort", "black"]
+cli = ["bourbaki.application", "ruamel.yaml", "tabulate", "isort", "black", "typing-inspect"]
 # support for visualizing computational/dependency DAGs
 viz = ["pygraphviz"]
 
@@ -82,7 +83,6 @@ repository = "https://github.com/TrilliantHealth/ds-monorepo"
 
 # TOOLING CONFIG
 [tool.mypy]
-python_version = 3.8
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
@@ -92,6 +92,7 @@ exclude = '''(?x)(
     | \S+\.egg-info/
 )'''
 check_untyped_defs = true
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [

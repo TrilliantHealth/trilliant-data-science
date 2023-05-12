@@ -1,8 +1,10 @@
-from typing import List
+import re
+from typing import List, cast
 
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import AnyUrl
 
 import thds.tabularasa.schema as schema
 from thds.tabularasa.schema import metaschema
@@ -52,13 +54,14 @@ def test_dtype_nullable_numpy_type(dtype: schema.dtypes.DType, np_type: np.dtype
     assert dtype.pandas(nullable=True) == np_type
 
 
-match_constraint = schema.constraints.MatchesRegex(matches="foobar")
+match_constraint = schema.constraints.MatchesRegex(matches=re.compile("foobar"))
 
-len_constraint = schema.constraints.LenLessThan(len_lt=5)
+len_constraint = schema.constraints.LenLessThan(len_lt=5)  # type: ignore[call-arg]
+# I can't figure out this type issue - the pydantic plugin is enabled.
 
 int_enum_constraint = schema.constraints.EnumConstraint(enum=[1, 2])
 
-build_options = dict(
+build_options = metaschema.BuildOptions(
     attrs=True,
     sqlite_data=False,
     sqlite_interface=True,
@@ -70,7 +73,7 @@ build_options = dict(
     sqlite_db_path="reference_data.db",
     table_docs_dir="docs/source/tables/",
     type_docs_path="docs/source/types.md",
-    repo_url="https://github.com/TrilliantHealth/ds-monorepo/tree/main/",
+    repo_url=cast(AnyUrl, "https://github.com/TrilliantHealth/ds-monorepo/tree/main/"),
     use_newtypes=True,
     type_constraint_comments=True,
     validate_transient_tables=True,
@@ -273,7 +276,7 @@ expected_validation_errors = [
 
 @pytest.fixture()
 def schema_validation_errors() -> List[schema.validation.ErrorMessage]:
-    raw_schema = metaschema._RawSchema(**bad_schema)
+    raw_schema = metaschema._RawSchema(**bad_schema)  # type: ignore[arg-type]
     errors, external_schemas = schema.validation.validation_errors(
         raw_schema,
         require_data_resources=True,
@@ -301,7 +304,7 @@ def inheritance_schema() -> metaschema._RawSchema:
             bar=metaschema._RawTable(
                 inherit_schema=metaschema.InheritanceSpec(
                     tables=["foo"],
-                    exclude_columns=["col1"],
+                    exclude_columns={"col1"},
                     update_docs=dict(col2="col2 in bar"),
                 ),
                 columns=[

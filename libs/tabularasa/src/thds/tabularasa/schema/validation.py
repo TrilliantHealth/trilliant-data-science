@@ -2,7 +2,7 @@ import itertools
 import os
 from collections import Counter
 from functools import lru_cache
-from typing import Any, Collection, Dict, List, Mapping, Optional, Set, Tuple, Type, Union
+from typing import Any, Collection, Dict, List, Mapping, Optional, Set, Tuple, Type, Union, cast
 
 import networkx as nx
 import pkg_resources
@@ -600,7 +600,9 @@ def _resolve_typeref(
         if isinstance(dtype.values, (AnonCustomType, _CustomTypeRef)):
             warn(f"Mapping values with custom type {dtype.values} cannot currently be validated")
         return MappingType(
-            keys=_resolve_typeref(dtype.keys, custom_types),
+            keys=cast(
+                Union[DType, CustomType, AnonCustomType], _resolve_typeref(dtype.keys, custom_types)
+            ),
             values=_resolve_typeref(dtype.values, custom_types),
         )
     else:
