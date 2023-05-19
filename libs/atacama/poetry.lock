@@ -342,7 +342,7 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "thds-core"
-version = "1.2"
+version = "1.1"
 description = "Core utilities."
 category = "main"
 optional = false
