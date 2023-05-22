@@ -28,7 +28,7 @@ def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: T) -> T:
 
     E.g.:
 
-    hash_readable_chunks(hashlib.sha256(), open(Path('foo/bar'), 'rb')).hexdigest()
+    hash_readable_chunks(open(Path('foo/bar'), 'rb'), hashlib.sha256()).hexdigest()
     """
     with _SEMAPHORE:
         for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
