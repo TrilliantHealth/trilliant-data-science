@@ -1,3 +1,7 @@
+## 1.3
+
+Added a `dict_utils` module, providing useful functions and classes for dictionaries.
+
 ## 1.2
 
 - Add `hashing` utility.
