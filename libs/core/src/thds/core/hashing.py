@@ -2,7 +2,6 @@
 https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
 I have written this code too many times to write it again. Why isn't this in the stdlib?
 """
-import base64
 import contextlib
 import io
 import os
@@ -72,12 +71,3 @@ def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
     except FileNotFoundError:
         # it's unlikely we can operate on this data?
         return None
-
-
-def b64(digest: bytes) -> str:
-    """This is the string representation used by ADLS.
-
-    We use it in cases where we want to represent the same hash that
-    ADLS will have in UTF-8 string (instead of bytes) format.
-    """
-    return base64.b64encode(digest).decode()
