@@ -1,11 +1,6 @@
-## 1.4
-
-- New `Lazy` and `ThreadLocalLazy` implementation, both promoted from
-  `thds.mops`.
-
 ## 1.3
 
-- Added a `dict_utils` module, providing useful functions and classes for dictionaries.
+Added a `dict_utils` module, providing useful functions and classes for dictionaries.
 
 ## 1.2
 
