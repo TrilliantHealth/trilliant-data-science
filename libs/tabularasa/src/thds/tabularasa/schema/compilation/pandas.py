@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Optional
+from typing import List, NamedTuple, Optional
 
 import numpy as np
 import pandas.core.dtypes.dtypes as pd_dtypes
@@ -8,13 +8,13 @@ import pandera as pa
 import thds.tabularasa.loaders.util
 from thds.tabularasa.schema import metaschema
 
+from ._format import autoformat
 from .util import (
     AUTOGEN_DISCLAIMER,
     VarName,
     _dict_literal,
     _indent,
     _list_literal,
-    autoformat,
     constructor_template,
     render_blob_store_def,
     render_constructor,
@@ -137,12 +137,53 @@ def render_pandera_table_schema(table: metaschema.Table, coerce_run_time_tables:
     return f"{table.snake_case_name}_schema = {table_schema}"
 
 
-def render_pandera_schema(
+class ImportsAndCode(NamedTuple):
+    imports: List[str]
+    code: List[str]
+
+
+def render_pandera_loaders(
     schema: metaschema.Schema,
     package: str,
     data_dir: str,
-    coerce_run_time_tables: bool = False,
     render_pyarrow_schemas: bool = False,
+) -> ImportsAndCode:
+    qualified_pyarrow_module_name = "pyarrow_schemas"
+    import_lines = list()
+    if render_pyarrow_schemas:
+        import_lines.append("\n")
+        import_lines.append(f"from . import pyarrow as {qualified_pyarrow_module_name}")
+    return ImportsAndCode(
+        import_lines,
+        [
+            render_constructor(
+                PANDAS_LOADER_TEMPLATE,
+                kwargs=dict(
+                    table_name=table.snake_case_name,
+                    schema=VarName(f"{table.snake_case_name}_schema"),
+                    package=package,
+                    data_dir=data_dir,
+                    blob_store=None
+                    if schema.remote_blob_store is None
+                    else VarName(REMOTE_BLOB_STORE_VAR_NAME),
+                    md5=table.md5,
+                    pyarrow_schema=VarName(
+                        f"{qualified_pyarrow_module_name}.{table.snake_case_name}_pyarrow_schema"
+                    )
+                    if render_pyarrow_schemas
+                    else None,
+                ),
+                var_name=f"load_{table.snake_case_name}",
+            )
+            for table in schema.package_tables
+        ],
+    )
+
+
+def render_pandera_module(
+    schema: metaschema.Schema,
+    loader_defs: Optional[ImportsAndCode] = None,
+    coerce_run_time_tables: bool = False,
 ) -> str:
     # stdlib imports
     all_constraints = itertools.chain.from_iterable(t.constraints for t in schema.types.values())
@@ -161,7 +202,6 @@ def render_pandera_schema(
         for table in schema.package_tables
     )
 
-    qualified_pyarrow_module_name = "pyarrow_schemas"
     import_lines = ["import " + modname + "\n" for modname in required_stdlib_modules]
     if import_lines:
         import_lines.append("\n")
@@ -171,12 +211,14 @@ def render_pandera_schema(
         import_lines.append("import pandas as pd\n")
     import_lines.append("import pandera as pa\n")
     import_lines.append("\n")
-    import_lines.append(f"import {thds.tabularasa.loaders.util.__name__}\n")
+    if loader_defs:
+        import_lines.append(f"import {thds.tabularasa.loaders.util.__name__}\n")
     if schema.remote_blob_store is not None:
         import_lines.append(f"import {thds.tabularasa.schema.metaschema.__name__}\n")
-    if render_pyarrow_schemas:
-        import_lines.append("\n")
-        import_lines.append(f"from . import pyarrow as {qualified_pyarrow_module_name}")
+
+    if loader_defs:
+        import_lines += loader_defs.imports
+
     imports = "".join(import_lines)
 
     global_var_defs = []
@@ -185,29 +227,7 @@ def render_pandera_schema(
             render_blob_store_def(schema.remote_blob_store, REMOTE_BLOB_STORE_VAR_NAME)
         )
     globals_ = "\n".join(global_var_defs)
-
-    loaders = "\n\n".join(
-        render_constructor(
-            PANDAS_LOADER_TEMPLATE,
-            kwargs=dict(
-                table_name=table.snake_case_name,
-                schema=VarName(f"{table.snake_case_name}_schema"),
-                package=package,
-                data_dir=data_dir,
-                blob_store=None
-                if schema.remote_blob_store is None
-                else VarName(REMOTE_BLOB_STORE_VAR_NAME),
-                md5=table.md5,
-                pyarrow_schema=VarName(
-                    f"{qualified_pyarrow_module_name}.{table.snake_case_name}_pyarrow_schema"
-                )
-                if render_pyarrow_schemas
-                else None,
-            ),
-            var_name=f"load_{table.snake_case_name}",
-        )
-        for table in schema.package_tables
-    )
+    loaders = "\n\n".join(loader_defs.code) if loader_defs else ""
 
     return autoformat(
         f"{imports}\n# {AUTOGEN_DISCLAIMER}\n\n{globals_}\n\n{table_schemas}\n\n{loaders}\n"

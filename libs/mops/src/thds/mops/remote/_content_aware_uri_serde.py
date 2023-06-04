@@ -26,6 +26,7 @@ logger = getLogger(__name__)
 T = ty.TypeVar("T")
 
 
+# TODO for v2 make this mops/blobs
 _CONTENT_HASH_ADDRESSED = "mops/content-hash-addressed"
 # we can save on storage and simplify lots of internals if we just
 # hash all blobs and upload them to a key that is their hash.
@@ -56,14 +57,14 @@ class _downloader(ty.NamedTuple):
     uri: str
 
     def __call__(self, byts: ty.IO[bytes]):
-        return lookup_blob_store(self.uri).read(self.uri, byts)
+        return lookup_blob_store(self.uri).readbytesinto(self.uri, byts)
 
 
 class _ContentAddressedPathStream:
     def local_to_remote(self, src: ty.IO[bytes], key: str):
         """Return fully qualified remote information after put."""
         full_remote_key = _content_addressed(key)
-        lookup_blob_store(full_remote_key).put(full_remote_key, src, type_hint="path")
+        lookup_blob_store(full_remote_key).putbytes(full_remote_key, src, type_hint="path")
 
     def get_downloader(self, remote_key: str) -> Downloader:
         return _downloader(_content_addressed(remote_key))  # type: ignore # NamedTuple silliness
@@ -78,7 +79,7 @@ def make_dumper(
 
 def _get_bytes(blob_store: BlobStore, remote_uri: str, type_hint: str) -> bytes:
     with io.BytesIO() as tb:
-        blob_store.read(remote_uri, tb, type_hint=type_hint)
+        blob_store.readbytesinto(remote_uri, tb, type_hint=type_hint)
         tb.seek(0)
         return tb.read()
 
@@ -130,10 +131,10 @@ def _upload_pickle_to_content_addressed_path(
             nest(hash_using(bio, hashlib.sha256()).hexdigest()),
         )
         bytes_uri = fs.join(base_uri, "_bytes")
-        fs.put(bytes_uri, bio)
+        fs.putbytes(bytes_uri, bio)
         if debug_name:
             # this name is purely for debugging and affects no part of the runtime.
-            fs.put(fs.join(base_uri, f"debugname_{debug_name}"), "goodbeef".encode())
+            fs.putbytes(fs.join(base_uri, f"debugname_{debug_name}"), "goodbeef".encode())
 
     return _UnpickleFromUri(bytes_uri)
 

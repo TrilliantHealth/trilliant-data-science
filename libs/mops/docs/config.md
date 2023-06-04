@@ -67,10 +67,10 @@ be available forever and in a sensible location will be:
 
 `mops.memo.storage_root` - change this so that your hash-addressed
 memoized invocations and results will not be deleted after 30
-days. You should probably set it to `adls://uaapdatascience/data`.
+days. You should probably set it to `adls://thdsdatasets/prod-datasets`.
 
 `mops.datasets.storage_root` - change this so any `DestFiles` created
 (or `SrcFiles` uploaded) will not be deleted after 30 days. This also
-should likely be set to `adls://uaapdatascience/data`, but you may
+should likely be set to `adls://thdsdatasets/prod-datasets`, but you may
 wish to consult with others who have used `mops` in the past or senior
 members of the team who know where data ought to live.

@@ -25,9 +25,11 @@ import setuptools.command.build_py
 from thds.tabularasa.loaders.util import PandasParquetLoader, default_parquet_package_data_path
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_schema,
+    render_attrs_loaders,
+    render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_schema,
+    render_pandera_loaders,
+    render_pandera_module,
     render_pyarrow_schema,
     render_sql_schema,
     write_if_ast_changed,
@@ -208,7 +210,10 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
             )
             package_data_paths.append(self.options.sqlite_db_path)
 
-        package_data = {"": [METADATA_FILE, "py.typed"], self.package_name: package_data_paths}
+        package_data = {
+            "": [METADATA_FILE, "py.typed"],
+            self.package_name: package_data_paths,
+        }
         if hasattr(self, "package_data") and self.package_data is not None:
             self.package_data = {
                 key: self.package_data.get(key, []) + package_data.get(key, [])
@@ -222,40 +227,41 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
     def write_derived_source_code(self):
         # attrs classes needed for sqlite interface
         if self.options.attrs or self.options.sqlite_interface:
-            assert (
-                self.options.package_data_dir is not None
-            ), "No package_data_dir defined; can't derive attrs loaders"
-            attrs_source = render_attrs_schema(
+            attrs_source = render_attrs_module(
                 self.schema,
-                package=self.package_name,
-                data_dir=self.options.package_data_dir,
+                render_attrs_loaders(
+                    self.schema,
+                    package=self.package_name,
+                    data_dir=self.options.package_data_dir,
+                    render_pyarrow_schemas=self.options.pyarrow,
+                )
+                if self.options.package_data_dir
+                else None,
                 use_newtypes=self.options.use_newtypes,
                 type_constraint_comments=self.options.type_constraint_comments,
-                render_pyarrow_schemas=self.options.pyarrow,
             )
             write_if_ast_changed(attrs_source, self.derived_code_submodule_dir / "attrs.py")
         if self.options.pandas:
-            assert (
-                self.options.package_data_dir is not None
-            ), "No package_data_dir defined; can't derive pandas loaders"
-            pandas_source = render_pandera_schema(
+            pandas_source = render_pandera_module(
                 self.schema,
-                package=self.package_name,
-                data_dir=self.options.package_data_dir,
-                render_pyarrow_schemas=self.options.pyarrow,
+                loader_defs=render_pandera_loaders(
+                    self.schema,
+                    package=self.package_name,
+                    data_dir=self.options.package_data_dir,
+                    render_pyarrow_schemas=self.options.pyarrow,
+                )
+                if self.options.package_data_dir
+                else None,
             )
             write_if_ast_changed(pandas_source, self.derived_code_submodule_dir / "pandas.py")
         if self.options.pyarrow:
             pyarrow_source = render_pyarrow_schema(self.schema)
             write_if_ast_changed(pyarrow_source, self.derived_code_submodule_dir / "pyarrow.py")
         if self.options.sqlite_interface:
-            assert (
-                self.options.sqlite_db_path is not None
-            ), "No sqlite_db_path specified; can't derive accessor code"
             attrs_sqlite_source = render_attrs_sqlite_schema(
                 self.schema,
                 package=self.package_name,
-                db_path=self.options.sqlite_db_path,
+                db_path=self.options.sqlite_db_path or "",
             )
             write_if_ast_changed(
                 attrs_sqlite_source, self.derived_code_submodule_dir / "attrs_sqlite.py"
@@ -376,7 +382,8 @@ def write_package_data_tables(
             for dep in deps:
                 if isinstance(dep, ReferenceDataRef) and last_indexes[dep] <= ix:
                     _LOGGER.info(
-                        "Collecting table %s which is not needed in any downstream build step", dep
+                        "Collecting table %s which is not needed in any downstream build step",
+                        dep,
                     )
                     del ref_cache[str(dep)]
 
@@ -490,7 +497,8 @@ def _computation_order_and_dependencies(
     for table in schema.filter_tables(lambda t: t.graph_ref in dag):
         derived_pqt_md5 = table.md5
         pqt_package_data_path = default_parquet_package_data_path(
-            table.name, data_dir=transient_data_dir if table.transient else output_data_dir
+            table.name,
+            data_dir=transient_data_dir if table.transient else output_data_dir,
         )
 
         if check_hash:

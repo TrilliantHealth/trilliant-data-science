@@ -45,7 +45,7 @@ class DType(Enum):
     BOOL = "bool"
 
     @property
-    def enum(self) -> Optional[EnumList]:
+    def enum(self) -> None:
         return None
 
     @property
@@ -57,10 +57,14 @@ class DType(Enum):
         return self.value.startswith("float")
 
     def pandas(
-        self, nullable: bool = False, index: bool = False, enum: Optional[EnumList] = None
+        self,
+        nullable: bool = False,
+        index: bool = False,
+        enum: Optional[EnumList] = None,
+        ordered: bool = False,
     ) -> Union[np.dtype, pd_dtypes.ExtensionDtype]:
         if enum:
-            return pd.CategoricalDtype(enum)
+            return pd.CategoricalDtype(enum, ordered=ordered)
         elif self == DType.DATE or self == DType.DATETIME:
             # pandas supports *only* nanosecond datetimes
             return np.dtype("datetime64[ns]")

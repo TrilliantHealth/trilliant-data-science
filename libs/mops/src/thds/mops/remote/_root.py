@@ -54,6 +54,8 @@ def get_pipeline_id() -> str:
 
 def set_pipeline_id(name: str):
     """Override the current global pipeline id."""
+    if not name:
+        return  # quietly disallow empty strings, since we always want a value here.
     global _PIPELINE_ID
     _PIPELINE_ID = name
 

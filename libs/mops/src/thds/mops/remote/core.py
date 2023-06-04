@@ -6,14 +6,13 @@ import os
 import typing as ty
 from functools import wraps
 
-from thds.core import scope
-from thds.core.log import getLogger, logger_context
+from thds.core import log, scope
 from thds.core.stack_context import StackContext
 
 from ._root import get_pipeline_id, is_remote, set_pipeline_id
 from .types import ResultChannel, Runner
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 F = ty.TypeVar("F", bound=ty.Callable)
 LazyBool = ty.Callable[[], bool]
 T = ty.TypeVar("T")
@@ -34,21 +33,25 @@ def pure_remote(
     remote context and not refer to anything that will not be
     accessible in that context.
     """
-    _bypass_remote = (
-        lambda: bypass_remote if isinstance(bypass_remote, bool) else bypass_remote  # noqa: E731
-    )
+
+    def _bypass_remote() -> bool:
+        if isinstance(bypass_remote, bool):
+            return bypass_remote
+        bypass = bypass_remote()
+        assert isinstance(bypass, bool), bypass
+        return bypass
 
     def deco(f: F) -> F:
         @scope.bound
         @wraps(f)
         def wrapper(*args, **kwargs):  # type: ignore
             if is_remote():
-                scope.enter(logger_context(remote=get_pipeline_id()))
+                scope.enter(log.logger_context(remote=get_pipeline_id()))
                 logger.debug("Calling function directly...")
             if is_remote() or _bypass_remote():
                 return f(*args, **kwargs)
 
-            scope.enter(logger_context(local=get_pipeline_id()))
+            scope.enter(log.logger_context(local=get_pipeline_id()))
             logger.debug("Forwarding local function call to runner...")
             return runner(f, args, kwargs)
 
@@ -126,7 +129,7 @@ def forwarding_call(
 ):
     """Your shell implementation doesn't have to use this, but it's a reasonable approach."""
     set_pipeline_id(pipeline_id)
-    scope.enter(logger_context(remote=pipeline_id, pid=os.getpid()))
+    scope.enter(log.logger_context(remote=pipeline_id, pid=os.getpid()))
     serializable_thunk = get_serializable_thunk()  # defer until debug info set up
     try:
         scope.enter(InvocationUniqueKey.set(invocation_unique_key))

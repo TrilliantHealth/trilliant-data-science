@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -11,15 +10,16 @@ from thds.adls import AdlsFqn
 from thds.mops.config import get_datasets_storage_root
 from thds.mops.remote import AdlsDatasetContext, DestFile, SrcFile
 from thds.mops.remote._pickle import gimme_bytes
+from thds.mops.remote._src2 import _srcfile_from_serialized
 from thds.mops.remote.adls_remote_files import (
     AdlsDirectory,
     Serialized,
     _download_serialized,
     _read_possible_serialized,
+    _sd_from_serialized,
     _try_parse_adls_path_repr,
     adls_dataset_context,
     adls_remote_src,
-    srcfile_from_serialized,
 )
 
 from ._util import adls_shell, runner
@@ -42,6 +42,7 @@ def _context():
 
 
 def put_into_dest_remotely(dest_file: DestFile) -> DestFile:
+    assert isinstance(dest_file, DestFile), dest_file
     with dest_file as dfname:
         with open(dfname, "w") as f:
             f.write("testing123")
@@ -150,7 +151,7 @@ def test_src_file_is_reentrant():
             assert f1 == f2
 
 
-def remote_dest_file_creator() -> DestFile:
+def _remote_dest_file_creator() -> DestFile:
     """Proves that even if the orchestrator doesn't provide you a DestFile,
     you can create one yourself and hand it back, if you use remote_dest.
     """
@@ -163,11 +164,8 @@ def remote_dest_file_creator() -> DestFile:
 
 
 def test_dest_file_created_remotely():
-    try:
-        dest = adls_shell(remote_dest_file_creator)()
-        assert os.path.exists(str(dest))
-    finally:
-        shutil.rmtree(TOP_DIR)
+    dest = adls_shell(_remote_dest_file_creator)()
+    assert not os.path.exists(str(dest))
 
 
 def test_src_file_serialization_includes_deterministic_md5b64():
@@ -196,27 +194,29 @@ def test_remote_src_file_is_identical_on_serialization_to_local_src_file():
     src = sd_context.src(Path(__file__).parent / "a_path.txt")
     src._upload_if_not_already_remote()
 
-    rem_src = srcfile_from_serialized(src._serialized_remote_pointer)
+    sd = _sd_from_serialized(src._serialized_remote_pointer)
+
+    rem_src = adls_remote_src(sd["sa"], sd["container"], sd["key"], sd["md5b64"])
     assert rem_src._serialized_remote_pointer == src._serialized_remote_pointer
     assert gimme_bytes(dumper, src) == gimme_bytes(dumper, rem_src)
 
 
 def test_from_serialized_sad_paths():
-    with pytest.raises(TypeError):
-        srcfile_from_serialized("")  # type: ignore
     with pytest.raises(ValueError):
-        srcfile_from_serialized('{"type": "S3", "bucket": "foo", "key": "bar"}')  # type: ignore
+        _srcfile_from_serialized("")  # type: ignore
+    with pytest.raises(ValueError):
+        _srcfile_from_serialized('{"type": "S3", "bucket": "foo", "key": "bar"}')  # type: ignore
     with pytest.raises(AssertionError):
-        srcfile_from_serialized(
+        _srcfile_from_serialized(
             Serialized(r'{"type": "ADLS", "bucket": "foo", "key": "{\"type\": \"ADLS\""}')
         )
     with pytest.raises(TypeError):
         # is missing 'key'
-        srcfile_from_serialized(Serialized('{"type": "ADLS", "sa": "thdsscratch", "container": "tmp"}'))
+        _srcfile_from_serialized(Serialized('{"type": "ADLS", "sa": "thdsscratch", "container": "tmp"}'))
 
     with pytest.raises(ValueError):
         # valueerror here means blob does not exist
-        srcfile_from_serialized(
+        _srcfile_from_serialized(
             Serialized(
                 '{"type": "ADLS", "sa": "thdsscratch", "container": "tmp", '
                 '"key": "this-path-should-never-exist.txt"}'
@@ -234,4 +234,4 @@ def test_from_serialized_sad_paths():
 
     with pytest.raises(ValueError):
         # valueError here means we failed md5 validation
-        srcfile_from_serialized(Serialized(json.dumps(sd)))
+        _srcfile_from_serialized(Serialized(json.dumps(sd)))

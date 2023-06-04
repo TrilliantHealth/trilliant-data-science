@@ -61,5 +61,6 @@ types:
     constraints:
       - case: lower
       - enum: [foo, bar, baz]
+        ordered: true
       - len_ge: 3
       - len_lt: 4  # only length 3 allowed

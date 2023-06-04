@@ -5,18 +5,17 @@ that you keep forgetting to set.
 """
 import os
 import subprocess
-import sys
 import typing as ty
 from pathlib import Path
 
-from thds.core.log import getLogger
+from thds.core import lazy, log
 
-from .._lazy import Lazy
 from ..colorize import colorized
+from ..remote.core import is_remote
 from .image_backoff import YIKES
 from .launch import autocr
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 PINK = colorized(fg="black", bg="pink")
@@ -57,8 +56,12 @@ def std_docker_build_push_develop_cmd(root: Path) -> ty.List[str]:
     dev-only and therefore should never be imported inside the
     application.
     """
+    if is_remote():
+        return list()
     script = root / "docker/build_push.py"
-    assert script.is_file(), f"We were unable to find {script}"
+    if not script.is_file():
+        logger.warning(f"We were unable to find {script}; this will not result in an attempt to build.")
+        return list()
     return [
         "poetry",
         "run",
@@ -67,7 +70,7 @@ def std_docker_build_push_develop_cmd(root: Path) -> ty.List[str]:
     ]
 
 
-def build_push_image(cmd: ty.List[str]) -> ty.Callable[[], str]:
+def build_push_image(cmd: ty.List[str]) -> ty.Optional[ty.Callable[[], str]]:
     """This is kind of a hack, but it should work for everything
     currently in the monorepo, as well as demandforecast.
 
@@ -75,35 +78,35 @@ def build_push_image(cmd: ty.List[str]) -> ty.Callable[[], str]:
     stderr lines prefixed with `full_tag: `, of which the last will be
     used.
     """
+    if not cmd:
+        return None
 
     def docker_build_push_develop() -> str:
+        logger.info(PINK(f"Attempting to build and push docker image with `{' '.join(cmd)}`"))
+        # only capture stdout because that's where we expect the full_tag to be,
+        # and the rest can get printed to the console for user visibility.
+        proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE)
+        if proc.returncode:  # failure!
+            print(proc.stdout)
+            return ""
+
         try:
-            logger.info(PINK(f"Attempting to build and push docker image with `{' '.join(cmd)}`"))
-            proc = subprocess.run(
-                cmd,
-                check=True,
-                text=True,
-                capture_output=True,
-            )
-            full_tags = list()
-            for line in proc.stderr.split("\n"):
-                FULL_TAG = "full_tag: "  # see docker-tools/build_push.py
-                if line.startswith(FULL_TAG):
-                    full_tags.append(line[len(FULL_TAG) :])
+            from thds.docker_tools.build_push import parse_full_tags_from_stdout  # type: ignore
+
+            full_tags = parse_full_tags_from_stdout(proc.stdout)
             if full_tags:
-                logger.info(PINK(f"Built and pushed images; selecting tag '{full_tags[-1]}'"))
+                logger.info(PINK(f"Found {len(full_tags)} built tags; selecting tag '{full_tags[-1]}'"))
                 return full_tags[-1]
             logger.warning(YIKES("Build/push command succeeded but no tags were found."))
-            return ""
-        except subprocess.CalledProcessError:
-            sys.stdout.write(proc.stdout)
-            sys.stderr.write(proc.stderr)
-            return ""
+        except ImportError:
+            logger.info(PINK("Unable to parse full tags because thds.docker_tools is not installed."))
+        return ""
 
-    return Lazy(docker_build_push_develop)
+    # prevent this from running multiple times
+    return lazy.Lazy(docker_build_push_develop)
 
 
-def std_docker_build_push_develop(root: Path) -> ty.Callable[[], str]:
+def std_docker_build_push_develop(root: Path) -> ty.Optional[ty.Callable[[], str]]:
     """Easiest possible approach to getting yourself a docker image built and pushed."""
     return build_push_image(std_docker_build_push_develop_cmd(root))
 

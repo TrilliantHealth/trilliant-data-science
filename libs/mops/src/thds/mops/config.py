@@ -19,11 +19,10 @@ from pathlib import Path
 import tomli
 
 from thds.adls import AdlsFqn
-from thds.core import scope
 from thds.core.stack_context import StackContext
 
 _WDIR_TOML = Path(".mops.toml").resolve()
-_TOML_TOP_LEVEL_TABLE = "mops"
+_ROOT_CFG_KEY = "mops"
 
 
 def _load_config() -> ty.Dict[str, ty.Any]:
@@ -41,14 +40,33 @@ def _load_config() -> ty.Dict[str, ty.Any]:
 _CONFIG = StackContext("MOPS_CONFIG", _load_config())
 
 
-def set_global_config(dict_like_config: ty.Mapping):
-    """Call this to replace the default config with a pre-parsed
-    dict-like such as a Dynaconf settings object that your application
-    already manages. It will only override the specific keys that you
-    provide.
+def _set_val_at_path(d: dict, value: ty.Any, *path: str):
+    if path[0] != _ROOT_CFG_KEY:
+        path = (_ROOT_CFG_KEY, *path)
+
+    loc = d
+    for path_part in path[:-1]:
+        if path_part not in loc:
+            loc[path_part] = dict()
+        loc = loc[path_part]
+    loc[path[-1]] = value
+
+
+def set_global_config(*path: str) -> ty.Callable[[ty.Any], None]:
+    """Call this to replace pieces of the default config with a value
+    from wherever you might be loading your own config.
+
+    If you have a pre-parsed dict-like such as a Dynaconf settings
+    object that your application already manages, you could do something like:
+
+    for key, value in settings.items():
+        set_global_config(*key.split('.'))(value)
     """
-    global _CONFIG
-    scope.enter(_CONFIG.set({**_CONFIG(), **dict_like_config}))
+
+    def set_global_config_(value: ty.Any) -> None:
+        _set_val_at_path(_CONFIG(), value, *path)
+
+    return set_global_config_
 
 
 def set_config(
@@ -56,17 +74,8 @@ def set_config(
 ) -> ty.Callable[[ty.Any], contextlib._GeneratorContextManager]:
     @contextlib.contextmanager
     def set_config_(value: ty.Any) -> ty.Generator[None, None, None]:
-        nonlocal path
-        if path[0] != _TOML_TOP_LEVEL_TABLE:
-            path = (_TOML_TOP_LEVEL_TABLE, *path)
-
         config = copy.deepcopy(_CONFIG())
-        loc = config
-        for path_part in path[:-1]:
-            if path_part not in loc:
-                loc[path_part] = dict()
-            loc = loc[path_part]
-        loc[path[-1]] = value
+        _set_val_at_path(config, value, *path)
         with _CONFIG.set(config):
             yield
 
@@ -105,7 +114,7 @@ class _StackConfig(ty.Generic[T]):
 
 
 def _make_stack_config(dotted_path: str, default: T) -> _StackConfig[T]:
-    return _StackConfig(default, _TOML_TOP_LEVEL_TABLE, *dotted_path.split("."))
+    return _StackConfig(default, _ROOT_CFG_KEY, *dotted_path.split("."))
 
 
 # k8s namespace will default to your OS username
@@ -114,12 +123,6 @@ try:
 except OSError:
     _K8S_NAMESPACE = "CICD-Runner"
 
-
-# Kubernetes config stuff
-k8s_cluster_name = _make_stack_config("k8s.cluster.name", "")
-k8s_cluster_resource_group = _make_stack_config("k8s.cluster.resource_group", "")
-k8s_cluster_url = _make_stack_config("k8s.cluster.url", "")
-k8s_cluster_api_version = _make_stack_config("k8s.cluster.api_version", "")
 
 k8s_namespace = _make_stack_config("k8s.namespace", _K8S_NAMESPACE)
 

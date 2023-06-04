@@ -26,29 +26,28 @@ really benefit from this, and ideally our solution will solve for a
 somewhat broader range of use cases.
 
 """
-import io
 import os
-import pickle  # only used for recursive visiting
 import shutil
 import tempfile
 import typing as ty
 from pathlib import Path
-from threading import RLock
 
 from thds.core.log import getLogger
 
+from ._remote_file_updn import (
+    Downloader,
+    NamedDownloader,
+    NamedUriUploader,
+    Serialized,
+    StrOrPath,
+    Uploader,
+    reify_downloader,
+    reify_uploader,
+)
 from ._root import is_remote
-from .types import T
 
 logger = getLogger(__name__)
 
-
-Serialized = ty.NewType("Serialized", str)
-StrOrPath = ty.Union[str, os.PathLike]
-Uploader = ty.Callable[[StrOrPath], Serialized]
-# uploads local file and returns serialized representation of remote file location
-Downloader = ty.Callable[[Serialized, StrOrPath], None]
-# interprets the serialized string as a remote file location and downloads it to the provided local path
 
 MAX_FILENAME_LEN = 150
 # conservative cap on the max temp filename length
@@ -60,10 +59,14 @@ class DestFile:
     The file MUST NOT be accessed except via its context manager
     (`with dest_file as writable_filepath:`).
 
-    They additionally represent enforced atomicity, as the initial
-    file write will happen in a temporary file, and only once the
-    context is exited will the resulting file be moved to its final or
-    remote destination.
+    Also, the file MUST NOT be read, before or after write.  In order
+    to 'read' the previously-written contents of a DestFile, you must
+    first convert it into a SrcFile.
+
+    DestFiles additionally represent enforced atomicity, as the
+    initial file write will happen in a temporary file, and only once
+    the context is exited will the resulting file be moved to its
+    final or remote destination.
 
     If the computation is not running remotely, it will instead place
     the file in a local location.
@@ -78,11 +81,13 @@ class DestFile:
     Should usually be initially constructed in a local orchestrator
     process. May be used in the same local process or in a remote
     process.
+
     """
 
-    def __init__(self, uploader: Uploader, str_or_path: StrOrPath):
+    def __init__(self, uploader: ty.Union[Uploader, NamedUriUploader], local_filename: StrOrPath):
+        reify_uploader(uploader)
         self._uploader = uploader
-        self._local_filename = os.fspath(str_or_path)
+        self._local_filename = os.fspath(local_filename)
         # we are careful throughout this class (and SrcFile) to
         # refrain from storing things as Paths, because it is likely
         # that these objects will pass through a `pure_remote`
@@ -92,12 +97,20 @@ class DestFile:
         # pickled and uploaded/downloaded.
         self._serialized_remote_pointer = Serialized("")
 
+    def _force_serialization(self) -> None:
+        """Only meaningful to call this on the local orchestrator."""
+        if not self._serialized_remote_pointer:
+            logger.warning(f"Uploading file {self._local_filename} so that we have its serialization")
+            assert os.path.exists(self._local_filename), "Only valid for locally-present DestFiles"
+            self._serialized_remote_pointer = reify_uploader(self._uploader)(self._local_filename)
+
     def __enter__(self) -> Path:
         """Return a temporary local file Path that may be used for opening or moving to.
 
         When the context exits, this temporary file will be uploaded if remote,
         or moved to the local destination if not remote.
         """
+        reify_uploader(self._uploader)
         _fh, self._temp_dest_filepath = tempfile.mkstemp(
             suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
         )
@@ -105,7 +118,7 @@ class DestFile:
         os.close(_fh)  # and we specifically don't want this open ourselves.
         return Path(self._temp_dest_filepath)
 
-    def __exit__(self, *_args, **_kwargs):
+    def __exit__(self, exc_type, _exc_val, _exc_tb):
         """Upload locally-created file if remote - otherwise move to local destination directly.
 
         It's critical that this get run within the is_remote scope if
@@ -113,45 +126,58 @@ class DestFile:
         context when you write to the file and then close it as soon
         as you are done writing it for the last time.
         """
+        if exc_type is not None:
+            # do not upload - this constitutes a failure
+            os.remove(self._temp_dest_filepath)
+            del self._temp_dest_filepath
+            return
+
         if is_remote():
             try:
-                self._serialized_remote_pointer = self._uploader(self._temp_dest_filepath)
+                self._serialized_remote_pointer = reify_uploader(self._uploader)(
+                    self._temp_dest_filepath
+                )
                 logger.info(f"Uploaded DestFile to {self._serialized_remote_pointer}")
             finally:
                 os.remove(self._temp_dest_filepath)
         else:
-            logger.info(f"Moving temp file to dest file on local system: {self._local_filename}")
-            shutil.move(os.fspath(self._temp_dest_filepath), self._local_filename)
-            # we use shutil.move instead of os.rename because it will transparently handle
-            # moving across different filesystems if for some reason the temporary file is created on a different FS.
-        del self._temp_dest_filepath  # we don't want this meaningless file path to exist later
-
-    def _write_serialized_remote_to_placeholder(self):
-        """For use by framework code in the local orchestrator process.
-
-        Called during _return_ from `pure_remote`.
-        """
-        if not self._serialized_remote_pointer:
-            # this means that no file was written remotely.
-            # therefore, no file should be written locally either
-            if not Path(self._local_filename).exists():
-                logger.warning(
-                    f"DestFile {self._local_filename} with empty serialization "
-                    "returned from pure_remote-decorated function."
-                )
+            if self._local_filename:
+                logger.info(f"Moving temp file to dest file on local system: {self._local_filename}")
+                shutil.move(os.fspath(self._temp_dest_filepath), self._local_filename)
+                # we use shutil.move instead of os.rename because it will
+                # transparently handle moving across different filesystems
+                # if for some reason the temporary file is created on a
+                # different FS.
             else:
-                logger.debug("Local dest file being returned without modification")
-            return
-        logger.info(f"Writing remote file pointer to local path {self._local_filename}")
-        Path(self._local_filename).parent.mkdir(exist_ok=True, parents=True)
-        with open(self._local_filename, "w") as f:
-            f.write(self._serialized_remote_pointer)
+                logger.warning("Using temp file path because no local filename was provided")
+                # this should mostly only ever happen in rare cases with a remotely-created
+                # DestFile that is being tested outside a remote function context.
+                self._local_filename = self._temp_dest_filepath
+        del self._temp_dest_filepath
+        # we don't want this meaningless file path to exist later
 
     def __str__(self) -> str:
         return self._local_filename
 
     def __fspath__(self) -> str:
         return self._local_filename
+
+
+# TODO 2.0 SrcFile is a monstrously large class that I'd love to see
+# simplified.  It seems plausible that it could be split into two
+# completely separate classes - one that represents a
+# locally-available file, and another that represents a file that must
+# be downloaded to be used. The former could be 'replaced' by the
+# latter upon upload.
+#
+# Unfortunately, it also seems like that to perform this split,
+# we'd need to make changes that would be backward-incompatible with
+# existing serialized SrcFiles, which would break memoization.
+
+# TODO don't store any local paths in SrcFile
+# across serialization boundaries. The only 'determinstic' part of the object
+# is the remote representation, so it would be nice to make memoization
+# work regardless of fully-qualified local paths.
 
 
 class SrcFile:
@@ -173,10 +199,10 @@ class SrcFile:
 
     def __init__(
         self,
-        downloader: Downloader,
+        downloader: ty.Union[Downloader, NamedDownloader],
         serialized_remote_pointer: Serialized = Serialized(""),  # noqa: B008
         local_path: StrOrPath = "",
-        uploader: ty.Optional[Uploader] = None,
+        uploader: ty.Union[NamedUriUploader, Uploader, None] = None,
     ):
         """Must only be called on a local orchestrator process."""
         # immediately determine whether this represents a fully-present local source
@@ -188,15 +214,17 @@ class SrcFile:
                 "Source must exist at construction time on local orchestrator: " + self._local_filename
             )
         if not self._local_filename:
-            assert (
-                self._serialized_remote_pointer
-            ), "Must provide either local file or remote file pointer"
+            if not self._serialized_remote_pointer:
+                raise ValueError("Must provide either local path or serialized remote pointer")
         self._uploader = uploader
+        if uploader:
+            reify_uploader(uploader)
         if not self._serialized_remote_pointer:
             assert (
                 self._uploader
             ), "If file is not a remote file pointer, uploader must be provided as well"
         self._downloader = downloader
+        reify_downloader(downloader)
         self._temp_src_filepath: str = ""
         self._entrance_count = 0
 
@@ -205,12 +233,14 @@ class SrcFile:
 
         Called by framework code in the local orchestrator process at
         the beginning of `pure_remote`, before handoff to the Runner.
+
+        Once uploaded, the file can no longer be used from its local filename.
         """
         if self._serialized_remote_pointer:
             return  # it's already available remotely
         assert self._uploader, "No serialized remote pointer is present and no uploader is available"
         logger.info(f"Local file {self._local_filename} requires upload")
-        self._serialized_remote_pointer = self._uploader(self._local_filename)
+        self._serialized_remote_pointer = reify_uploader(self._uploader)(self._local_filename)
         self._local_filename = ""
         self._uploader = None
 
@@ -235,7 +265,7 @@ class SrcFile:
                 suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
             )
             os.close(_fh)  # we don't want the file to be open
-            self._downloader(self._serialized_remote_pointer, self._temp_src_filepath)
+            reify_downloader(self._downloader)(self._serialized_remote_pointer, self._temp_src_filepath)
             return Path(self._temp_src_filepath)
 
         assert os.path.exists(
@@ -250,63 +280,8 @@ class SrcFile:
             assert (
                 is_remote() or self._serialized_remote_pointer
             ), "No temp file should have been created in this context."
-            os.remove(self._temp_src_filepath)
+            try:
+                os.remove(self._temp_src_filepath)
+            except FileNotFoundError:
+                pass
             self._temp_src_filepath = ""
-
-
-def _recursive_visit(visitor: ty.Callable[[ty.Any], bool], obj: ty.Any):
-    """A hilarious abuse of pickle to do nearly limitless object recursion in Python for us.
-
-    Because pure_remote depends on serializability, in general this
-    will not cause significant limitations that would not have been
-    incurred during serialization later. This is, however, purely an
-    implementation detail, so it could be replaced with some other
-    approach later.
-    """
-
-    class PickleVisit(pickle.Pickler):
-        def __init__(self, file):
-            super().__init__(file)
-
-        def reducer_override(self, obj: ty.Any):
-            visitor(obj)
-            return NotImplemented
-
-    PickleVisit(io.BytesIO()).dump(obj)
-
-
-def trigger_dest_files_placeholder_write(rval: T) -> T:
-    """Runner implementations making use of remote filesystems should
-    call this after remote function execution.
-    """
-
-    def visitor(obj: ty.Any):
-        if isinstance(obj, DestFile):
-            obj._write_serialized_remote_to_placeholder()
-
-    _recursive_visit(visitor, rval)  # type: ignore
-    return rval
-
-
-_GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
-# SrcFiles are generally created on the orchestrator in order to fan
-# out across multiple workers. If multiple threads launch workers
-# concurrently, you don't want to cause multiple re-uploads of the same
-# file.
-#
-# This is a simplistic approach to avoiding that, by forcing all SrcFiles
-# to upload one after the other.
-
-
-def trigger_src_files_upload(args, kwargs):
-    """Runner implementations making use of remote filesystems should
-    call this before remote function execution.
-    """
-
-    def visitor(obj: ty.Any):
-        if isinstance(obj, SrcFile):
-            with _GLOBAL_SRC_FILE_UPLOAD_LOCK:
-                obj._upload_if_not_already_remote()
-
-    _recursive_visit(visitor, args)
-    _recursive_visit(visitor, kwargs)

@@ -59,7 +59,7 @@ match_constraint = schema.constraints.MatchesRegex(matches=re.compile("foobar"))
 len_constraint = schema.constraints.LenLessThan(len_lt=5)  # type: ignore[call-arg]
 # I can't figure out this type issue - the pydantic plugin is enabled.
 
-int_enum_constraint = schema.constraints.EnumConstraint(enum=[1, 2])
+int_enum_constraint = schema.constraints.EnumConstraint(enum=[1, 2], ordered=True)
 
 build_options = metaschema.BuildOptions(
     attrs=True,
@@ -176,7 +176,9 @@ bad_schema = dict(
         ),
     ),
     types=dict(
-        type1=dict(type="int32", constraints=[dict(enum=[]), len_constraint]),  # empty enum  # bad type
+        type1=dict(
+            type="int32", constraints=[dict(enum=[], ordered=False), len_constraint]
+        ),  # empty enum  # bad type
         type2=dict(
             type="float32",
             constraints=[

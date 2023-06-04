@@ -1,36 +1,12 @@
 import itertools
-import logging
 import re
-import tempfile
 import textwrap
 from inspect import Signature, signature
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union
-from warnings import warn
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import thds.tabularasa.schema.metaschema as metaschema
 
-try:
-    import black
-except ImportError:
-    warn(
-        "`black` is unavailable; generated python code will not be auto-formatted. "
-        "Specify the 'cli' extra to ensure this dependency is present."
-    )
-    black = None  # type: ignore
-try:
-    from isort.main import main as isort_main  # type: ignore
-except ImportError:
-    warn(
-        "`isort` is unavailable; imports in generated python code will not be automatically sorted. "
-        "Specify the 'cli' extra to ensure this dependency is present."
-    )
-    isort_main = None  # type: ignore
-
-_LOGGER = logging.getLogger(__name__)
-
 AUTOGEN_DISCLAIMER = "This code is auto-generated; do not edit!"
-
-T = TypeVar("T")
 
 
 def sorted_class_names_for_import(names: Iterable[str]) -> List[str]:
@@ -38,20 +14,6 @@ def sorted_class_names_for_import(names: Iterable[str]) -> List[str]:
     names_upper = [name for name in all_names if name.isupper()]
     class_names = all_names.difference(names_upper)
     return sorted(names_upper) + sorted(class_names, key=str.lower)
-
-
-def autoformat(py_code: str) -> str:
-    if black is not None:
-        _LOGGER.info("Applying `black` formatting to auto-generated code")
-        py_code = black.format_str(py_code, mode=black.FileMode())
-    if isort_main is not None:
-        _LOGGER.info("Applying `isort` formatting to auto-generated code")
-        with tempfile.NamedTemporaryFile("w+") as f:
-            f.write(py_code)
-            isort_main([f.name])
-            f.seek(0)
-            py_code = f.read()
-    return py_code
 
 
 def _list_literal(exprs: Iterable[str], linebreak: bool = True) -> str:
@@ -90,7 +52,10 @@ def _indent(expr: str, level: int = 1, first_line: bool = False) -> str:
 
 
 def _wrap_lines_with_prefix(
-    text: str, line_width: int, first_line_prefix_len: int, trailing_line_indent: int = 0
+    text: str,
+    line_width: int,
+    first_line_prefix_len: int,
+    trailing_line_indent: int = 0,
 ) -> str:
     text_ = re.sub(r"\s+", " ", text).strip()
     first_line = textwrap.shorten(text_, line_width - first_line_prefix_len, placeholder="")
@@ -117,7 +82,6 @@ def constructor_template(
     name = type_.__name__
     if sig is None:
         if isinstance(type_, type):
-
             sig = signature(type_.__init__)  # type: ignore
             is_method = True
         else:

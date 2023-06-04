@@ -1,21 +1,18 @@
 """Mostly generic ADLS utilities for non-async operation."""
-import base64
 import logging
 import typing as ty
 
 import azure.core.exceptions
-from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
 from thds.adls import AdlsFqn, join
-from thds.adls._upload import _get_checksum_content_settings
+from thds.adls._upload import content_settings_if_upload_required
+from thds.adls.global_client import get_global_client
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
 from ..colorize import colorized
-from ..config import adls_skip_already_uploaded_check_if_smaller_than_bytes
 from ..fretry import expo, retry_regular, sleep
-from ._adls_shared import get_global_client
 from ._on_slow import on_slow
 from .types import AnyStrSrc, BlobStore
 
@@ -49,28 +46,6 @@ def yield_filenames(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[str]:
             yield azure_file["name"]
 
 
-def _content_settings_unless_checksum_already_present(
-    fc: DataLakeFileClient, data: AnyStrSrc
-) -> ty.Optional[ContentSettings]:
-    local_content_settings = _get_checksum_content_settings(data)
-    if not local_content_settings:
-        return ContentSettings()  # nothing we can do
-    try:
-        if len(data) < adls_skip_already_uploaded_check_if_smaller_than_bytes():  # type: ignore
-            logger.debug("Too small to bother with an early call - let's just upload...")
-            return local_content_settings
-    except TypeError:
-        pass
-    try:
-        props = fc.get_file_properties()
-        if props.content_settings.content_md5 == local_content_settings.content_md5:
-            logger.info(f"Remote file {props.name} already exists and has matching checksum")
-            return None
-    except azure.core.exceptions.ResourceNotFoundError:
-        pass  # just means the file doesn't exist remotely, so obviously the checksum doesn't match
-    return local_content_settings
-
-
 class BlobNotFoundError(Exception):
     def __init__(self, fqn: AdlsFqn, type_hint: str = "Blob"):
         super().__init__(f"{type_hint} not found: {fqn}")
@@ -101,7 +76,7 @@ class AdlsFileSystem(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def read(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(logger_context(download=fqn))
         logger.info(f"<----- downloading {type_hint}")
@@ -117,18 +92,16 @@ class AdlsFileSystem(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def put(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> str:
+    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> str:
         """Upload data to a remote path and return the fully-qualified URI."""
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(logger_context(upload=fqn))
         file_client = self._client(fqn)
-        content_settings_if_upload_needed = _content_settings_unless_checksum_already_present(
-            file_client, data
-        )
+        content_settings_if_upload_needed = content_settings_if_upload_required(file_client, data)
         if not content_settings_if_upload_needed:
             return remote_uri
         logger.info(f"======> uploading {type_hint}")
-        on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"),)(
+        on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"))(
             lambda: file_client.upload_data(
                 data,
                 overwrite=True,
@@ -152,12 +125,3 @@ class AdlsFileSystem(BlobStore):
 
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
-
-
-def b64(digest: bytes) -> str:
-    """This is the string representation used by ADLS.
-
-    We use it in cases where we want to represent the same hash that
-    ADLS will have in UTF-8 string (instead of bytes) format.
-    """
-    return base64.b64encode(digest).decode()

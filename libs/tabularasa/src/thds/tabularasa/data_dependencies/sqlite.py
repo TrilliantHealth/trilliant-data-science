@@ -53,7 +53,7 @@ def insert_table(
 
     loader = PandasParquetLoader.from_schema_table(
         table,
-        package=package,
+        package=package or None,
         data_dir=data_dir,
         filename=filename,
         derive_schema=validate,

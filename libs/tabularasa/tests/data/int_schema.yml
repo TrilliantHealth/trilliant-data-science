@@ -46,10 +46,12 @@ types:
     constraints:
       - gt: 0
       - le: 10
+  # unused type - no error, just a warning
   string_enum:
     type: str
     constraints:
       - case: lower
       - enum: [foo, bar, baz]
+        ordered: false
       - len_ge: 3
       - len_lt: 4  # only length 3 allowed

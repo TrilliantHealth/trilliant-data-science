@@ -28,9 +28,11 @@ from thds.tabularasa.loaders.util import (
 )
 from thds.tabularasa.schema import metaschema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_schema,
+    render_attrs_loaders,
+    render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_schema,
+    render_pandera_loaders,
+    render_pandera_module,
     render_pyarrow_schema,
     render_sphinx_docs,
     render_sql_schema,
@@ -42,6 +44,7 @@ try:
 except ImportError:
     warnings.warn("bourbaki.application unavailable; CLI undefined")
 
+    # stand-in decorators
     def noop_decorator(obj):
         return obj
 
@@ -53,6 +56,13 @@ except ImportError:
     noncommand = noop_decorator
     cli = None
 else:
+    # increase default log verbosity
+    # this ensures all log messages at INFO level or greater are rendered,
+    # and that tracebacks are always shown
+    import bourbaki.application.cli.main as _bourbaki
+
+    _bourbaki.MIN_VERBOSITY = _bourbaki.TRACEBACK_VERBOSITY = _bourbaki.LOG_LEVEL_NAMES.index("INFO")
+
     cli = CommandLineInterface(
         prog="tabularasa",
         require_options=False,
@@ -64,10 +74,7 @@ else:
         use_config_file="tabularasa.yaml",
         package="thds.tabularasa",
     )
-    import bourbaki.application.cli.main as _bourbaki
-
-    # increase default verbosity
-    _bourbaki.LOG_LEVEL_NAMES = _bourbaki.LOG_LEVEL_NAMES[2:]
+    # decorators
     define_cli = cli.definition
     output_handler = cli_spec.output_handler
     config_top_level = cli_spec.config_top_level
@@ -215,7 +222,12 @@ def to_graphviz(
     for node, attrs in dag.nodes(data=True):
         color = DAG_NODE_COLORS.get(type(node))
         name = repr(node)
-        g.add_node(name, label=name, fillcolor=color, style="bold" if attrs.get("initial") else "filled")
+        g.add_node(
+            name,
+            label=name,
+            fillcolor=color,
+            style="bold" if attrs.get("initial") else "filled",
+        )
 
     g.add_edges_from((repr(head), repr(tail)) for head, tail in dag.edges)
 
@@ -283,7 +295,10 @@ def write_dependency_dag(
     try:
         subprocess.run(["open", str(output)])
     except Exception as e:
-        print(f"Couldn't run `open {output}` ({e}); open the file manually", file=sys.stderr)
+        print(
+            f"Couldn't run `open {output}` ({e}); open the file manually",
+            file=sys.stderr,
+        )
 
 
 @define_cli
@@ -469,28 +484,38 @@ class ReferenceDataManager:
             renderer = sql_renderer
         elif target == CompilationTarget.pandas:
             renderer = partial(
-                render_pandera_schema,
-                package=self.package,
-                data_dir=self.package_data_dir,
-                render_pyarrow_schemas=self.build_options.pyarrow,
+                render_pandera_module,
+                loader_defs=render_pandera_loaders(
+                    self.schema,
+                    package=self.package,
+                    data_dir=self.package_data_dir,
+                    render_pyarrow_schemas=self.build_options.pyarrow,
+                )
+                if self.package_data_dir
+                else None,
             )
         elif target == CompilationTarget.pyarrow:
             renderer = render_pyarrow_schema
         elif target == CompilationTarget.attrs:
             renderer = partial(
-                render_attrs_schema,
-                package=self.package,
-                data_dir=self.package_data_dir,
+                render_attrs_module,
+                render_attrs_loaders(
+                    self.schema,
+                    package=self.package,
+                    data_dir=self.package_data_dir,
+                    render_pyarrow_schemas=self.build_options.pyarrow,
+                ),
                 use_newtypes=self.build_options.use_newtypes,
                 type_constraint_comments=self.build_options.type_constraint_comments,
-                render_pyarrow_schemas=self.build_options.pyarrow,
             )
         elif target == CompilationTarget.attrs_sqlite:
             assert (
                 self.sqlite_db_path is not None
             ), "Must specify sqlite db path in build options to generate sqlite interface"
             renderer = partial(
-                render_attrs_sqlite_schema, package=self.package, db_path=self.sqlite_db_path
+                render_attrs_sqlite_schema,
+                package=self.package,
+                db_path=self.sqlite_db_path,
             )
         else:
             raise NotImplementedError(f"Compilation hasn't been implemented for target {target.value}")

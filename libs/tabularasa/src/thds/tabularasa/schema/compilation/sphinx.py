@@ -1,6 +1,7 @@
 import os
 import re
 import urllib.parse
+from functools import lru_cache
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path
@@ -9,15 +10,6 @@ from warnings import warn
 
 import networkx as nx
 from pydantic import AnyUrl
-
-try:
-    from tabulate import tabulate
-except ImportError:
-    warn(
-        "tabulate is unavailable; can't render sphinx documentation. "
-        "Specify the 'cli' extra to ensure this dependency is present."
-    )
-    tabulate = None  # type: ignore
 
 from thds.tabularasa.schema import metaschema
 from thds.tabularasa.schema.dtypes import DType
@@ -99,7 +91,22 @@ def escape(text: str) -> str:
     return text
 
 
+@lru_cache
+def __tabulate() -> Optional[Any]:
+    try:
+        from tabulate import tabulate
+
+        return tabulate
+    except ImportError:
+        warn(
+            "tabulate is unavailable; can't render sphinx documentation. "
+            "Specify the 'cli' extra to ensure this dependency is present."
+        )
+        return None
+
+
 def render_table(header: Tuple[str, ...], rows: Iterable[Iterable[Any]]) -> str:
+    tabulate = __tabulate()
     assert tabulate is not None, "can't render tables in rst without `tabulate` dependency"
     return tabulate(rows, headers=header, tablefmt="rst")
 
@@ -302,9 +309,9 @@ def render_table_doc(
 def render_type_entry(type: metaschema.CustomType) -> str:
     entries: List[str] = [type.type.name.lower()]
     entries.extend(map(escape, filter(None, (c.comment_expr() for c in type.constraints))))
-    enum_values = type.enum
-    if enum_values:
-        entries.append("one of " + ", ".join(map("``{}``".format, sorted(enum_values))))
+    enum = type.enum
+    if enum is not None:
+        entries.append("one of " + ", ".join(map("``{}``".format, sorted(enum.enum))))
 
     return "\n".join(map("- {}".format, entries))
 

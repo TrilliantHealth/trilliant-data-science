@@ -15,19 +15,22 @@ from ..config import adls_max_clients
 from ..exception import catch
 from ._byos import ByIdRegistry, MemoizingSerializer
 from ._content_aware_uri_serde import STORAGE_ROOT, SharedPickler, make_dumper, make_read_object
+from ._destfile import trigger_dest_files_placeholder_write
 from ._memoize import args_kwargs_content_address, get_mask_or_pipeline_id, make_function_memospace
 from ._once import Once
 from ._paths import PathContentAddresser
 from ._pickle import Dumper, Serializer, freeze_args_kwargs, gimme_bytes, unfreeze_args_kwargs, wrap_f
 from ._registry import MAIN_HANDLER_BASE_ARGS, register_main_handler
+from ._srcfile import trigger_src_files_upload
 from ._uris import get_root, lookup_blob_store
 from .core import SerializableThunk, forwarding_call
-from .remote_file import trigger_dest_files_placeholder_write, trigger_src_files_upload
+from .memoize import pipeline_id_mask
 from .types import Args, BlobStore, Kwargs, NoResultAfterInvocationError, Shell, T, _ShellBuilder
 
 logger = getLogger(__name__)
 
 
+# TODO for 2.0 make this just mops/memo-v2
 _RUNNER_SUFFIX = f"mops/pipeline-pickled-functions-v{backward_compatible_with()}"
 
 
@@ -102,7 +105,7 @@ class MemoizingPickledFunctionRunner:
         for name, obj in named_objs.items():
             self._by_id_registry[obj] = SharedPickler(name)
 
-    # still not totally sure about thread-safety of lru_cache
+    # LRU cache is not thread-safe in 3.8 and I should replace this.
     @lru_cache(maxsize=None)  # noqa: B019
     def _get_dumper(self, _root: str) -> Dumper:
         """We want one of these per ADLS SA/container, because the
@@ -146,7 +149,9 @@ _INVOCATION = "invocation"
 _RESULT = "result"
 _EXCEPTION = "exception"
 _DarkBlue = colorized(fg="white", bg="#00008b")
+_GreenYellow = colorized(fg="black", bg="#adff2f")
 _LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
+_LogPrepareNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
 
 
 class _NestedFunctionPickle(ty.NamedTuple):
@@ -217,8 +222,9 @@ def _pickle_func_and_run_via_shell(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
                 )
                 return give_result(result)
+            _LogPrepareNewInvocation(f"Preparing new remote invocation for {memo_uri}")
             # but if it does not exist, we need to upload the invocation and then run the shell.
-            fs.put(
+            fs.putbytes(
                 fs.join(memo_uri, _INVOCATION),
                 gimme_bytes(
                     dumper,
@@ -230,12 +236,12 @@ def _pickle_func_and_run_via_shell(
         try:
             shell_ex = None
             shell(
-                [
+                (
                     *MAIN_HANDLER_BASE_ARGS,
                     MemoizingPickledFunctionRunner.__name__,
                     memo_uri,
                     get_mask_or_pipeline_id(),  # for debugging only
-                ]
+                )
             )
         except Exception as ex:
             # network or similar errors are very common and hard to completely eliminate.
@@ -264,14 +270,14 @@ class _ResultExcChannel(ty.NamedTuple):
     call_id: str
 
     def result(self, r: T):
-        self.fs.put(
+        self.fs.putbytes(
             self.fs.join(self.call_id, _RESULT),
             gimme_bytes(self.dumper, r),
             type_hint=_RESULT,
         )
 
     def exception(self, exc: Exception):
-        self.fs.put(
+        self.fs.putbytes(
             self.fs.join(self.call_id, _EXCEPTION),
             gimme_bytes(self.dumper, exc),
             type_hint="EXCEPTION",
@@ -292,7 +298,9 @@ def run_pickled_invocation(*shell_args: str):
             _NestedFunctionPickle,
             make_read_object(_INVOCATION)(fs.join(memo_uri, _INVOCATION)),
         )
-        return SerializableThunk(nested.f, *unfreeze_args_kwargs(nested.args_kwargs_pickle))
+        return pipeline_id_mask(pipeline_id)(
+            SerializableThunk(nested.f, *unfreeze_args_kwargs(nested.args_kwargs_pickle))
+        )
 
     forwarding_call(
         _ResultExcChannel(

@@ -1,24 +1,24 @@
 """A thread-safe lazy callable."""
 import typing as ty
-from threading import RLock, local
+from threading import Lock, local
 
 R = ty.TypeVar("R")
-
-
-_NotSourced = object()  # singleton sentinel value
 
 
 class Lazy(ty.Generic[R]):
     def __init__(self, source: ty.Callable[[], R], storage=None):
         self._source = source
         self._storage = storage if storage is not None else lambda: 0
-        self._storage.cached = _NotSourced
-        self._lock = RLock()
+        self._lock = Lock()
 
     def __call__(self) -> R:
-        if self._storage.cached is _NotSourced:
+        try:
+            return self._storage.cached
+        except AttributeError:
             with self._lock:
-                if self._storage.cached is _NotSourced:
+                try:
+                    return self._storage.cached
+                except AttributeError:
                     self._storage.cached = self._source()
 
         return self._storage.cached

@@ -91,10 +91,12 @@ AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
 
 
 class BlobStore(Protocol):
-    def read(self, __remote_uri: str, __stream: ty.IO[bytes], *, type_hint: str = "bytes") -> None:
+    def readbytesinto(
+        self, __remote_uri: str, __stream_or_file: ty.IO[bytes], *, type_hint: str = "bytes"
+    ) -> None:
         """Allows reading into any stream, including a stream-to-disk."""
 
-    def put(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> str:
+    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> str:
         """Upload bytes from any stream, and return fully-qualified, unambiguous URI."""
 
     def exists(self, __remote_uri: str) -> bool:

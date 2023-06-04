@@ -46,18 +46,23 @@ def yield_objects_from_list(
     get_list_method: GetListMethod[T],
     server_timeout: int = 10,
     object_type_hint: str = "items",
+    init: ty.Optional[ty.Callable[[], None]] = None,
     **kwargs,
 ) -> ty.Iterator[ty.Tuple[str, T]]:
     ex = None
+    if init:
+        init()
     while True:
         try:
             load_config()
             list_method = get_list_method(namespace, ex)
             if not list_method:
-                logger.info(f"No longer watching {object_type_hint} events in namespace: {namespace}")
+                logger.debug(f"No longer watching {object_type_hint} events in namespace: {namespace}")
                 break
             initial_list = list_method(namespace=namespace)
-            logger.info(f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}")
+            logger.debug(
+                f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}"
+            )
             for item in initial_list.items:
                 yield namespace, item
             if initial_list.metadata._continue:
@@ -83,7 +88,7 @@ def yield_objects_from_list(
         except Exception as e:
             too_old = parse_too_old_resource_version(e)
             if too_old:
-                logger.info(f"Immediately retrying {too_old}")
+                logger.debug(f"Immediately retrying {too_old}")
             else:
                 logger.exception(f"Unexpected exception while listing {object_type_hint}")
             ex = e
@@ -161,7 +166,6 @@ class WatchingObjectSource(ty.Generic[T]):
         self._limiter = OneShotLimiter()
 
     def _start_thread(self, namespace: str):
-        logger.info(f"Launching {self.typename}-watching thread in {namespace}")
         threading.Thread(
             target=callback_events,
             args=(
@@ -170,6 +174,7 @@ class WatchingObjectSource(ty.Generic[T]):
                     namespace,
                     self._get_list_method_on_restart,
                     object_type_hint=self.typename + "s",
+                    init=lambda: logger.info(STARTING(f"Watching {self.typename}s in {namespace}")),
                 ),
             ),
             daemon=True,
@@ -188,11 +193,11 @@ class WatchingObjectSource(ty.Generic[T]):
         if exc:
             too_old = parse_too_old_resource_version(exc)
             if not too_old:
-                logger.exception(f"Sleeping before we retry {self.typename} scraping...")
+                logger.exception(f"Not fatal, but sleeping before we retry {self.typename} scraping...")
                 time.sleep(config.k8s_monitor_delay())
                 suffix = f" after {type(exc).__name__}: {exc}"
+                logger.info(f"Watching {self.typename}s in namespace: {namespace}{suffix}")
         self._objs_by_name = dict()  # clear the whole cache
-        logger.info(STARTING(f"Watching {self.typename}s in namespace: {namespace}{suffix}"))
         return self.get_list_method(namespace, exc)
 
     @scope.bound

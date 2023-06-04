@@ -7,8 +7,9 @@ import thds.tabularasa.schema
 from thds.tabularasa.schema import metaschema
 from thds.tabularasa.schema.compilation.attrs import render_attr_field_def
 
+from ._format import autoformat
 from .sqlite import index_name
-from .util import AUTOGEN_DISCLAIMER, autoformat, sorted_class_names_for_import
+from .util import AUTOGEN_DISCLAIMER, sorted_class_names_for_import
 
 _LOGGER = getLogger(__name__)
 
@@ -30,7 +31,7 @@ ATTRS_CLASS_LOADER_TEMPLATE = """class {class_name}Loader:
     {accessors}
 """ % (
     thds.tabularasa.loaders.util.AttrsSQLiteDatabase.__name__,
-    thds.tabularasa.loaders.util.sqlite_constructor_for_record_type.__name__,  # type: ignore
+    thds.tabularasa.loaders.sqlite_util.sqlite_constructor_for_record_type.__name__,  # type: ignore
 )
 
 ATTRS_INDEX_ACCESSOR_TEMPLATE = """
@@ -128,13 +129,16 @@ def render_attrs_main_loader(
 def _import_lines(tables: List[metaschema.Table], attrs_module_name: Optional[str]):
     # need typing always for List and Optional
     stdlib_imports = sorted(
-        {"typing", *chain.from_iterable(t.attrs_sqlite_required_imports for t in tables)}
+        {
+            "typing",
+            *chain.from_iterable(t.attrs_sqlite_required_imports for t in tables),
+        }
     )
     import_lines = [f"import {module}\n" for module in stdlib_imports]
     if import_lines:
         import_lines.append("\n")
 
-    import_lines.append(f"import {thds.tabularasa.loaders.util.__name__} as util\n")
+    import_lines.append(f"import {thds.tabularasa.loaders.sqlite_util.__name__} as util\n")
     import_lines.append("\n")
     if attrs_module_name is not None:
         import_lines.append(f"from {attrs_module_name} import (\n")
@@ -153,10 +157,12 @@ def _has_index(table: metaschema.Table) -> bool:
 
 def render_attrs_sqlite_schema(
     schema: metaschema.Schema,
-    package: str,
-    db_path: str,
+    package: str = "",
+    db_path: str = "",
     attrs_module_name: Optional[str] = ATTRS_MODULE_NAME,
 ) -> str:
+    has_database_loader = bool(package and db_path)
+
     # do not generate a SQLite loader if there is no primary key or index defined on the table def
     tables = [table for table in schema.package_tables if table.has_indexes]
     tables_filtered = [table.name for table in schema.package_tables if not table.has_indexes]
@@ -174,11 +180,15 @@ def render_attrs_sqlite_schema(
         )
 
     imports = _import_lines(tables, attrs_module_name)
-    constants = f'{PACKAGE_VARNAME} = "{package}"\n{DB_PATH_VARNAME} = "{db_path}"'
     loader_defs = [render_attrs_loader_schema(table) for table in tables]
     loaders = "\n\n".join(loader_defs)
 
-    loader_def = render_attrs_main_loader(tables)
+    if has_database_loader:
+        constants = f'{PACKAGE_VARNAME} = "{package}"\n{DB_PATH_VARNAME} = "{db_path}"'
+        loader_def = render_attrs_main_loader(tables)
+    else:
+        constants = ""
+        loader_def = ""
     return autoformat(
         f"{imports}\n# {AUTOGEN_DISCLAIMER}\n\n{constants}\n\n\n{loaders}\n\n{loader_def}\n"
     )

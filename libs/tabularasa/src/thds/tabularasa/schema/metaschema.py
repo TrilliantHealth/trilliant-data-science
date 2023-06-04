@@ -62,8 +62,9 @@ class AnonCustomType(DocumentedMixin):
 
     @property
     def python(self) -> Type:
-        if self.enum:
-            return cast(Type, typing_extensions.Literal[tuple(self.enum)])
+        enum = self.enum
+        if enum is not None:
+            return cast(Type, typing_extensions.Literal[tuple(enum.enum)])
         return self.type.python
 
     def python_type_literal(self, builtin: bool = False) -> str:
@@ -74,10 +75,11 @@ class AnonCustomType(DocumentedMixin):
 
     @property
     def python_type_def_literal(self):
-        if self.enum is not None:
+        enum = self.enum
+        if enum is not None:
             return (
                 f"{(typing if NEW_TYPING else typing_extensions).__name__}.Literal"
-                f"[{', '.join(map(repr, self.enum))}]"
+                f"[{', '.join(map(repr, enum.enum))}]"
             )
         else:
             return self.type.python_type_literal(builtin=False)
@@ -87,13 +89,8 @@ class AnonCustomType(DocumentedMixin):
         return self.type.parquet
 
     @property
-    def enum(self) -> Optional[EnumList]:
-        try:
-            enum = next(c for c in self.constraints if isinstance(c, EnumConstraint))
-        except StopIteration:
-            return None
-        else:
-            return enum.enum
+    def enum(self) -> Optional[EnumConstraint]:
+        return next((c for c in self.constraints if isinstance(c, EnumConstraint)), None)
 
     @property
     def attrs_required_imports(self) -> List[str]:
@@ -203,10 +200,16 @@ class _ComplexBaseType(BaseModel, extra=Extra.forbid):
         return "JSON"
 
     @property
-    def enum(self) -> Optional[EnumList]:
+    def enum(self) -> Optional[EnumConstraint]:
         return None
 
-    def pandas(self, nullable: bool = False, index: bool = False, enum: Optional[EnumList] = None):
+    def pandas(
+        self,
+        nullable: bool = False,
+        index: bool = False,
+        enum: Optional[EnumList] = None,
+        ordered: bool = False,
+    ):
         return np.dtype("object")
 
 
@@ -508,7 +511,13 @@ class Column(_RawColumn):
         return self.type.type if isinstance(self.type, (AnonCustomType, CustomType)) else self.type
 
     def pandas(self, index: bool = False) -> AnyDtype:
-        return self.dtype.pandas(nullable=self.nullable, enum=self.type.enum, index=index)
+        enum = self.type.enum
+        if enum is not None:
+            return self.dtype.pandas(
+                nullable=self.nullable, enum=enum.enum, ordered=enum.ordered, index=index
+            )
+        else:
+            return self.dtype.pandas(nullable=self.nullable, index=index)
 
     def pandas_dtype_literal(self, index: bool = False) -> str:
         dtype = self.pandas(index=index)

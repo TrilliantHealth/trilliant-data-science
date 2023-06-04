@@ -65,7 +65,10 @@ black = "*"
 
 [tool.poetry.extras]
 # support for CLI operations - code and data generation
-cli = ["bourbaki.application", "ruamel.yaml", "tabulate", "isort", "black", "typing-inspect"]
+cli = [
+  "bourbaki.application",
+  "ruamel.yaml", "tabulate", "isort", "black", "typing-inspect"
+]
 # support for visualizing computational/dependency DAGs
 viz = ["pygraphviz"]
 

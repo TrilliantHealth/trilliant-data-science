@@ -1,9 +1,12 @@
 import logging
+import os
 import threading
 
-import lazy_object_proxy
 from azure.identity import DefaultAzureCredential
 
+from thds.core.lazy import Lazy
+
+# suppress noisy Azure identity logs
 logging.getLogger("azure.identity").setLevel(logging.WARNING)
 
 
@@ -30,7 +33,13 @@ class ThreadSafeAzureCredential(DefaultAzureCredential):
 
 
 def _SharedCredential() -> DefaultAzureCredential:
+    if "KUBERNETES_SERVICE_HOST" in os.environ:
+        # in K8s, we use various forms of credentials, but not the EnvironmentCredential,
+        # and that one gets tried early and then warns us about something we don't care about.
+        return ThreadSafeAzureCredential(exclude_environment_credential=True)
+
+    # exclusion due to storage explorer credentials issue when trying to hit East SAs
     return ThreadSafeAzureCredential(exclude_shared_token_cache_credential=True)
 
 
-SharedCredential = lazy_object_proxy.Proxy(_SharedCredential)
+SharedCredential = Lazy(_SharedCredential)

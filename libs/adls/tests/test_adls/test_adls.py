@@ -22,7 +22,7 @@ from typing import NamedTuple
 
 import pytest
 
-from thds.adls import ADLSFileSystemCache, AdlsFqn, format_fqn, parse_fqn
+from thds.adls import ADLSFileSystemCache
 
 TEST_PATHS = ["foo", "/bar", "foo/bar", "foo/", "bar/", "foo/bar/", "foo/bar/baz.txt"]
 TEST_FILE_PATHS = [p for p in TEST_PATHS if not p.endswith("/")]
@@ -143,27 +143,3 @@ def test_cache_valid(
     cache_file_properties_past: MockFileProperties,
 ):
     assert cache.is_valid_for(cache_file_properties_past)  # type: ignore
-
-
-def test_adls_fqn():
-    old_name = "thdsdatasets prod-datasets /lib-datamodel/v22/backerd compat.jsonl"
-    name = "adls://thdsdatasets/prod-datasets/lib-datamodel/v22/backerd compat.jsonl"
-    fqn = parse_fqn(old_name)
-
-    assert fqn.sa == "thdsdatasets"
-    assert fqn.container == "prod-datasets"
-    assert fqn.path == "lib-datamodel/v22/backerd compat.jsonl"
-
-    assert format_fqn(*fqn) == name
-
-    assert format_fqn(fqn.sa, fqn.container, fqn.path) == name
-    # we add the forward slash in front of the path.
-
-    assert str(fqn) == name
-
-    assert AdlsFqn.parse(name) == parse_fqn(name)
-    assert AdlsFqn.parse(old_name) == parse_fqn(name)
-
-    joined = parse_fqn("sa1 cont /path/to/dir/").join("/somedir").path
-    assert "path/to/dir/somedir" in joined, joined  # no double slash
-    assert "path/foo/bar/baz" in parse_fqn("sa2 cont2 path/foo/bar").join("baz").path

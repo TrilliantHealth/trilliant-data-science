@@ -7,6 +7,7 @@ context to the tasks.
 These are some basic utilities to try to make this work as smoothly as possible.
 """
 import concurrent.futures
+import itertools
 import typing as ty
 from collections import defaultdict
 
@@ -28,6 +29,34 @@ ERROR = colorized(fg="white", bg="red")
 DONE = colorized(fg="white", bg="blue")
 
 logger = getLogger(__name__)
+
+
+class IteratorWithLen(ty.Generic[R]):
+    """Suitable for a case where you know how many elements you have
+    and you want to be able to represent that somewhere else but you
+    don't want to 'realize' all the elements upfront.
+    """
+
+    def __init__(self, length: int, iterable: ty.Iterable[R]):
+        self._length = length
+        self._iterator = iter(iterable)
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __iter__(self) -> ty.Iterator[R]:
+        return self
+
+    def __next__(self) -> R:
+        return next(self._iterator)
+
+    @staticmethod
+    def chain(a: IterableWithLen[R], b: IterableWithLen[R]) -> "IteratorWithLen[R]":
+        return IteratorWithLen(len(a) + len(b), itertools.chain(a, b))
+
+    @staticmethod
+    def from_iwl(iwl: IterableWithLen[R]) -> "IteratorWithLen[R]":
+        return IteratorWithLen(len(iwl), iwl)
 
 
 class YieldingMapWithLen(ty.Generic[R]):
@@ -63,26 +92,48 @@ class Thunk(ty.Generic[R]):
         self.kwargs = kwargs
         self.pipeline_id = get_pipeline_id()
 
+    def __str__(self) -> str:
+        return f"Thunk({self.func.__name__}, {self.args}, {self.kwargs})"
+
     def __call__(self) -> R:
         set_pipeline_id(self.pipeline_id)
         return ty.cast(R, self.func(*self.args, **self.kwargs))
 
 
 def parallel_yield_results(
-    thunks: IterableWithLen[ty.Callable[[], R]],
+    thunks: ty.Iterable[ty.Callable[[], R]],
     *,
     executor_cm: ty.Optional[ty.ContextManager[concurrent.futures.Executor]] = None,
 ) -> ty.Iterator[R]:
     """Stream your results so that you don't have to load them all into memory at the same time (necessarily).
 
-    Somewhat robust to failures, in that it will allow each task to
-    fail separately without causing all to fail.  Will log all
-    exceptions and raise a final exception at the end if any are
-    encountered.
+    If your iterable has a length, we will be able to log progress
+    information. In most cases, this will be advantageous for you.
+
+    Additionally, if your iterable has a length and you do not provide
+    a pre-sized Executor, we will create a ThreadPoolExecutor with the
+    same size as your iterable. If you want to throttle the number of
+    parallel tasks, you should provide your own Executor - and for
+    most mops purposes it should be a ThreadPoolExecutor.
+
+    Each task will fail or succeed separately without impacting other tasks.
+
+    However, if any Exceptions are raised in any task, an Exception
+    will be raised at the end of execution to indicate that not all
+    tasks were successful. If you wish to capture Exceptions alongside
+    results, you should wrap your thunks to return a Union type.
+
     """
     _ = get_pipeline_id()  # force existence of lazily-generated pipeline id.
     bump_limits()
-    num_tasks = len(thunks)
+
+    try:
+        num_tasks = len(thunks)  # type: ignore
+        num_tasks_log = f" of {num_tasks}"
+    except TypeError:
+        num_tasks = None  # use system default
+        num_tasks_log = ""
+
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(max_workers=num_tasks)
     exceptions: ty.List[Exception] = list()
     with executor_cm as executor:
@@ -93,10 +144,10 @@ def parallel_yield_results(
                     ERROR(f"; {len(exceptions)} tasks have raised exceptions") if len(exceptions) else ""
                 )
                 res = ty.cast(R, future.result())
-                logger.info(DONE(f"Yielding result {i} of {num_tasks}{errors}"))
+                logger.info(DONE(f"Yielding result {i}{num_tasks_log}{errors}"))
                 yield res
             except Exception as e:
-                logger.exception(ERROR(f"Task {i} of {num_tasks} errored with {str(e)}"))
+                logger.exception(ERROR(f"Task {i}{num_tasks_log} errored with {str(e)}"))
                 exceptions.append(e)
 
     _summarize_exceptions(exceptions)
@@ -121,3 +172,15 @@ def _summarize_exceptions(exceptions: ty.List[Exception]):
 
     logger.info("Raising one of the most common exception type.")
     raise by_type[most_common_type][0]  # type: ignore
+
+
+def thunking(func: ty.Callable[P, R]) -> ty.Callable[P, Thunk[R]]:
+    """Converts a standard function into a function that accepts the
+    exact same arguments but returns a Thunk - something ready to be
+    executed but the execution itself is deferred.
+    """
+
+    def wrapper(*args, **kwargs) -> Thunk[R]:
+        return Thunk(func, *args, **kwargs)
+
+    return wrapper

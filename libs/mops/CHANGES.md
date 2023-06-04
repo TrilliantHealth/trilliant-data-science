@@ -1,3 +1,13 @@
+### 1.6
+
+- Experimental API for ADLS Src/DestFiles, along with improved
+  stability of serialization (and therefore improved memoization of
+  functions using them). I am not yet committing to backward
+  compatiblity for the things exported from `_src2` and `_dest2`, ,
+  but it is reasonably likely this will serve as the basis for
+  `mops 2.0` and the elimination of the current `adls_remote_files`
+  implementation.
+
 ## 1.5
 
 Minor features providing bootstrapping defaults for general use across

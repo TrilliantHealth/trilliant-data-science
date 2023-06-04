@@ -6,7 +6,8 @@ import pyarrow as pa
 
 from thds.tabularasa.schema import metaschema
 
-from .util import AUTOGEN_DISCLAIMER, autoformat
+from ._format import autoformat
+from .util import AUTOGEN_DISCLAIMER
 
 _pyarrow_type_to_name: Dict[pa.DataType, str] = {}
 _pyarrow_type_to_name.update(

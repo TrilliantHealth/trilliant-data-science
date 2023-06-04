@@ -19,7 +19,7 @@ strings_schema = pa.DataFrameSchema(
             unique=True,
         ),
         enum=pa.Column(
-            pd.CategoricalDtype(["foo", "bar", "baz"], ordered=False),
+            pd.CategoricalDtype(["foo", "bar", "baz"], ordered=True),
             checks=[
                 pa.Check(lambda s: s.str.islower().fillna(True), name="case=lower"),
                 pa.Check.isin(["foo", "bar", "baz"]),

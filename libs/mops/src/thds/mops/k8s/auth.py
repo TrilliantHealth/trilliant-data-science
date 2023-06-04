@@ -1,22 +1,25 @@
-import logging
-import typing as ty
 from threading import RLock
 
 from cachetools import TTLCache
 from kubernetes import client, config
-from retry import retry
 
 from thds.core import scope
 from thds.core.log import getLogger
 
+from ..fretry import expo, retry_regular, sleep
 from ..locked_cache import locked_cached
 
 logger = getLogger(__name__)
 
 
-empty_config_retry = retry(
-    config.ConfigException, delay=0.2, tries=3, logger=ty.cast(logging.Logger, logger)
-)
+def _retry_config(exc: Exception):
+    if isinstance(exc, config.ConfigException):
+        logger.debug("Retrying config load...")
+        return True
+    return False
+
+
+empty_config_retry = retry_regular(_retry_config, sleep(expo(retries=3, delay=0.2)))
 
 _AUTH_RLOCK = RLock()
 
@@ -24,7 +27,7 @@ _AUTH_RLOCK = RLock()
 # load_config gets called all over the place and way too often.
 @locked_cached(TTLCache(1, ttl=120), lock=_AUTH_RLOCK)
 def load_config():
-    logger.info("Loading Kubernetes config...")
+    logger.debug("Loading Kubernetes config...")
     try:
         empty_config_retry(config.load_config)()
     except config.ConfigException:

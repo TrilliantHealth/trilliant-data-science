@@ -84,7 +84,7 @@ class PandasCSVLoader:
                         null_values=frozenset(["", JSON_NULL]),
                     )
                 self.converters[column.header_name] = converter  # type: ignore
-            elif (column.header_name not in self.parse_date_cols) and (not column.type.enum):
+            elif (column.header_name not in self.parse_date_cols) and (column.type.enum is None):
                 # read_csv requires passing `parse_dates` for this purpose
                 # also do NOT tell pandas.read_csv you want an enum; it will mangle unknown values to null!
                 self.dtypes_for_csv_read[column.header_name] = dtype

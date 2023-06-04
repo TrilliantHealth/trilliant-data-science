@@ -3,14 +3,14 @@ import typing as ty
 
 from azure.storage.filedatalake import DataLakeServiceClient, FileSystemClient
 
-from ._azure import SharedCredential
+from .shared_credential import SharedCredential
 
 
 def adls_fs_client(storage_account: str, container: str) -> FileSystemClient:
     """No context managers - is this better?"""
     return DataLakeServiceClient(
         account_url=f"https://{storage_account}.dfs.core.windows.net",
-        credential=SharedCredential,
+        credential=SharedCredential(),
     ).get_file_system_client(file_system=container)
 
 
@@ -19,8 +19,11 @@ _GLOBAL_CLIENTS: ty.Dict[ty.Tuple[str, str], FileSystemClient] = dict()
 
 
 def get_global_client(sa: str, container: str) -> FileSystemClient:
-    """Arguably this should not be used directly, but in practice this
-    appears to be the best approach for all applications.
+    """Singletons are scary, but in practice this appears to be the
+    best approach for all applications.
+
+    This avoids creating a client at a module level and is
+    thread-safe.
     """
     key = (sa, container)
     if key not in _GLOBAL_CLIENTS:

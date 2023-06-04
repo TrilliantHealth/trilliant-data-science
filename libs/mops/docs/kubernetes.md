@@ -14,35 +14,38 @@ services (e.g. APIs).
 
 This is now documented in the [Guidebook](https://guidebook.trillianthealth.com/data-science/kubernetes-access/).
 
-### Additional Cluster setup [optional but recommended as of Q2 2023]
+### Register your namespace for Workload Identity [optional but recommended as of Q2 2023]
+
+It's recommended that you make a small PR[^1] to `engineering-infra`
+[here](https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf#L4),
+and a corresponding PR
+[in this library](../src/thds/mops/east_config.toml) to add the K8s
+namespace(s) you're running under[^2]. This will automatically enable
+the use of
+[more reliable and performant auth](https://azure.github.io/azure-workload-identity/docs/introduction.html)[^3]
+from your K8s pods against Azure resources such as ADLS.
 
 These steps are not required, and will also not benefit anyone who is
 not using the `mops` library as part of their application (e.g. who is
 just deploying applications via Helm).
 
-Background: A K8s namespace using a sanitized version your local
-computer's user account name will eventually be created if you use
-this library. If that generated namespace does not appear in the list
-of `common_azure_access_identity.namespaces`
-[here](https://github.com/TrilliantHealth/engineering-infra/blob/main/engineering-stable/datascience/identities.tf#L4),
-and the corresponding default config value for
-`namespaces_supporting_workload_identity`
-[in this library](src/thds/mops/east_config.toml), then you are more
-likely to run into non-deterministic Azure authentication failures
-because of the
+[^1]: Unfortunately this manual step appears to be unavoidable at this time,
+because the configuration must live in a part of Azure that we do not
+have permission to directly edit.
+
+[^2]: A K8s namespace using a sanitized version of your local
+computer's user account name will be created if you use this library
+from your local machine without further configuration.
+
+[^3]: If the namespace you're using does not appear in the list of
+`common_azure_access_identity.namespaces` in `engineering-infra` and
+the corresponding default config value for
+`namespaces_supporting_workload_identity` in `mops`, then you are
+more likely to run into non-deterministic Azure authentication
+failures because of the
 [older](https://learn.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity)
 authn/authz method that must be used to support your unknown
 namespace.
-
-It's recommended that you make a small PR to `engineering-infra` and a
-corresponding PR to this library to add your namespace. This will
-automatically enable the use of
-[more reliable and performant auth](https://azure.github.io/azure-workload-identity/docs/introduction.html)
-from your K8s pods against Azure resources such as ADLS.
-
-Unfortunately this manual step appears to be unavoidable at this time,
-because the configuration must live in a part of Azure that we do not
-have permission to directly edit.
 
 ## Declarative usage with mops `pure_remote`:
 
@@ -50,8 +53,9 @@ This approach is preferred for cases where the code to be run on
 Kubernetes can be considered a [pure function](./pure_functions.md)
 and is implemented as or wrapped by Python.
 
-> If you're trying to wrap a Docker image that you don't control,
-> you'll need to use the low-level imperative API instead.
+> If you're trying to wrap a Docker image that you can't or don't want
+> to install `mops` on, you'll need to use the low-level imperative
+> API instead.
 
 You will need to construct a `k8s_shell` with configuration
 appropriate to the Python function that will ultimately be invoked

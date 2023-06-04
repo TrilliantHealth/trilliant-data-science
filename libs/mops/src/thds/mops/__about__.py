@@ -1,17 +1,16 @@
-from importlib.metadata import PackageNotFoundError, version
-
 from thds.core import meta
 
 __basepackage__ = __name__
-try:
-    __version__ = version("thds.mops")
-except PackageNotFoundError:  # pragma: no cover
-    __version__ = "1.x"
+__version__ = meta.get_version("thds.mops")
 __commit__ = meta.read_metadata(__name__).git_commit
 
 
 def backward_compatible_with() -> int:
-    return int(__version__.split(".")[0])
+    try:
+        return int(__version__.split(".")[0])
+    except ValueError:
+        print(f"Unable to parse version <{__version__}>; assuming major version is 1")
+        return 1
 
 
 def feature_compatible_with() -> float:

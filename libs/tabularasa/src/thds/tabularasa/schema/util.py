@@ -12,18 +12,22 @@ from pydantic import BaseModel, Extra, StrictFloat, StrictInt, StrictStr, constr
 
 EnumList = Union[List[StrictInt], List[StrictFloat], List[StrictStr]]
 
-_identifier_pattern = r"[\w][\w\d_]*"
+_identifier_pattern = r"[a-zA-Z]\w*"
+_dunder_identifier_pattern = r"[a-zA-Z_]\w*"
 _dashed_identifier_pattern = rf"{_identifier_pattern}(-{_identifier_pattern})*"
-_dotted_identifier_pattern = rf"{_identifier_pattern}(\.{_identifier_pattern})*"
-_path_pattern = r"[\w\d\s._-]+(/[\w\d\s._-]+)*"
+_dotted_identifier_pattern = rf"{_identifier_pattern}(\.{_dunder_identifier_pattern})*"
+_path_pattern = r"[\w\s._-]+(/[\w\s._-]+)*/?"
 _md5_hex_pattern = r"[0-9a-f]{32}"
 
 if not typing.TYPE_CHECKING:
-    Identifier = constr(regex=_identifier_pattern)
-    DottedIdentifier = constr(regex=_dotted_identifier_pattern)
-    DashedIdentifier = constr(regex=_dashed_identifier_pattern)
-    PathStr = constr(regex=_path_pattern)
-    HexStr = constr(regex=_md5_hex_pattern)
+    # pydantic (hilariously) uses match instead of fullmatch, so we
+    # have to anchor the regexes, but only at the end, since re.match
+    # requires the match to be found at the beginning of the string.
+    Identifier = constr(regex=_identifier_pattern + "$")
+    DottedIdentifier = constr(regex=_dotted_identifier_pattern + "$")
+    DashedIdentifier = constr(regex=_dashed_identifier_pattern + "$")
+    PathStr = constr(regex=_path_pattern + "$")
+    HexStr = constr(regex=_md5_hex_pattern + "$")
     NonEmptyStr = constr(min_length=1)
 else:
     Identifier = str

@@ -3,33 +3,36 @@ import json
 import logging
 import os
 import sys
-import typing
-from functools import lru_cache
+import typing as ty
+from functools import lru_cache, wraps
 from pathlib import Path
-from typing import AnyStr, Callable, Optional, Type, TypeVar
+from typing import Callable, Optional, Type
 
+import attr
 import cattrs.preconf.json
 import pkg_resources
 from typing_inspect import get_args, get_origin, is_literal_type, is_optional_type, is_union_type
 
+from thds.core.types import StrOrPath
+from thds.tabularasa.schema.dtypes import DType
 from thds.tabularasa.sqlite3_compat import sqlite3
 
-T = TypeVar("T")
-
+DEFAULT_ATTR_SQLITE_CACHE_SIZE = 100_000
+DEFAULT_MMAP_BYTES = int(os.environ.get("TABULA_RASA_DEFAULT_MMAP_BYTES", 8_589_934_592))  # 8 GB
 DISABLE_WAL_MODE = bool(os.environ.get("REF_D_DISABLE_SQLITE_WAL_MODE", False))
 
 PARAMETERIZABLE_BUILTINS = sys.version_info >= (3, 9)
 
 if not PARAMETERIZABLE_BUILTINS:
     _builtin_to_typing = {
-        list: typing.List,
-        set: typing.Set,
-        frozenset: typing.FrozenSet,
-        tuple: typing.Tuple,
-        dict: typing.Dict,
+        list: ty.List,
+        set: ty.Set,
+        frozenset: ty.FrozenSet,
+        tuple: ty.Tuple,
+        dict: ty.Dict,
     }
 
-    def get_generic_origin(t) -> Optional[Type]:
+    def get_generic_origin(t) -> ty.Optional[ty.Type]:
         org = get_origin(t)
         return None if org is None else _builtin_to_typing.get(org, org)  # type: ignore
 
@@ -43,16 +46,19 @@ LITERAL_SQLITE_TYPES = {int, float, bool, str, type(None), datetime.date, dateti
 CONVERTER = cattrs.preconf.json.make_converter()
 
 
-def structure_date(s: str, dt: Type[datetime.date] = datetime.date) -> datetime.date:
+def structure_date(s: str, dt: ty.Type[datetime.date] = datetime.date) -> datetime.date:
     return dt.fromisoformat(s)
 
 
 CONVERTER.register_structure_hook(datetime.date, structure_date)
 CONVERTER.register_unstructure_hook(datetime.date, datetime.date.isoformat)
 
+T = ty.TypeVar("T")
+Record = ty.TypeVar("Record", bound=attr.AttrsInstance)
+
 
 @lru_cache(None)
-def sqlite_postprocessor_for_type(t: Type[T]) -> Optional[Callable[[AnyStr], Optional[T]]]:
+def sqlite_postprocessor_for_type(t: ty.Type[T]) -> Optional[Callable[[ty.AnyStr], Optional[T]]]:
     """Construct a parser converting an optional JSON string from a sqlite query to a python value of
     type T"""
     t = resolve_newtypes(t)
@@ -62,7 +68,7 @@ def sqlite_postprocessor_for_type(t: Type[T]) -> Optional[Callable[[AnyStr], Opt
 
     if is_optional_type(t):
 
-        def parse(s: AnyStr) -> Optional[T]:
+        def parse(s: ty.AnyStr) -> Optional[T]:
             if s is None:
                 return None
             raw = json.loads(s)
@@ -70,7 +76,7 @@ def sqlite_postprocessor_for_type(t: Type[T]) -> Optional[Callable[[AnyStr], Opt
 
     else:
 
-        def parse(s: AnyStr) -> Optional[T]:
+        def parse(s: ty.AnyStr) -> Optional[T]:
             raw = json.loads(s)
             return CONVERTER.structure(raw, t)
 
@@ -78,7 +84,7 @@ def sqlite_postprocessor_for_type(t: Type[T]) -> Optional[Callable[[AnyStr], Opt
 
 
 @lru_cache(None)
-def sqlite_preprocessor_for_type(t: Type[T]) -> Optional[Callable[[T], Optional[str]]]:
+def sqlite_preprocessor_for_type(t: ty.Type[T]) -> Optional[Callable[[T], Optional[str]]]:
     """Prepare a value of type T for inserting into a sqlite TEXT/JSON column by serializing it as
     JSON"""
     t = resolve_newtypes(t)
@@ -135,11 +141,11 @@ def nonnull_type_of(t: Type) -> Type:
     if type(None) not in types:
         return t
     nonnull_types = tuple(t_ for t_ in types if t_ is not type(None))  # noqa
-    return typing.Union[nonnull_types]  # type: ignore
+    return ty.Union[nonnull_types]  # type: ignore
 
 
 def sqlite_connection(
-    db_path: str,
+    db_path: StrOrPath,
     package: Optional[str] = None,
     *,
     mmap_size: Optional[int] = None,
@@ -148,7 +154,7 @@ def sqlite_connection(
     if package is None:
         db_filename = db_path
     else:
-        db_filename = pkg_resources.resource_filename(package, db_path)
+        db_filename = pkg_resources.resource_filename(package, str(db_path))
 
     db_full_path = str(Path(db_filename).absolute())
 
@@ -177,3 +183,69 @@ def _log_exec_sql(
 ):
     logger.log(level, "sqlite: %s", statement)
     con.execute(statement)
+
+
+@lru_cache(None)
+def sqlite_constructor_for_record_type(cls):
+    """Wrap an `attrs` record class to allow it to accept raw JSON strings from sqlite queries in place
+    of collection types. If not fields of the class have collection types, simply return the record class
+    unwrapped"""
+    postprocessors = [sqlite_postprocessor_for_type(type_) for type_ in cls.__annotations__.values()]
+    if not any(postprocessors):
+        return cls
+
+    @wraps(cls)
+    def cons(*args):
+        return cls(*(v if f is None else f(v) for f, v in zip(postprocessors, args)))
+
+    return cons
+
+
+class AttrsSQLiteDatabase:
+    """Base interface for loading package resources as record iterators"""
+
+    def __init__(
+        self,
+        package: ty.Optional[str],
+        db_path: StrOrPath,
+        cache_size: ty.Optional[int] = DEFAULT_ATTR_SQLITE_CACHE_SIZE,
+        mmap_size: int = DEFAULT_MMAP_BYTES,
+    ):
+        if cache_size is not None:
+            self.sqlite_index_query = lru_cache(cache_size)(self.sqlite_index_query)  # type: ignore
+
+        self._sqlite_con = sqlite_connection(
+            db_path, package, mmap_size=mmap_size, bulk_write_mode=False
+        )
+
+    def sqlite_index_query(
+        self, clazz: ty.Callable[..., Record], query: str, args: ty.Tuple
+    ) -> ty.List[Record]:
+        result = self._sqlite_con.execute(query, args).fetchall()
+        return [clazz(*r) for r in result]
+
+    def sqlite_pk_query(
+        self, clazz: ty.Callable[..., Record], query: str, args: ty.Tuple
+    ) -> ty.Optional[Record]:
+        # Note: when we create PK indexes on our sqlite tables, we enforce a UNIQUE constraint, so if the
+        # build succeeds then we're guaranteed 0 or 1 results here
+        result = self.sqlite_index_query(clazz, query, args)
+        return result[0] if result else None
+
+
+# SQL pre/post processing
+
+
+def load_date(datestr: Optional[bytes]) -> Optional[datetime.date]:
+    return None if datestr is None else datetime.datetime.fromisoformat(datestr.decode()).date()
+
+
+def load_datetime(datestr: Optional[bytes]) -> Optional[datetime.datetime]:
+    return None if datestr is None else datetime.datetime.fromisoformat(datestr.decode())
+
+
+sqlite3.register_converter(DType.BOOL.sqlite, lambda b: bool(int(b)))
+sqlite3.register_converter(DType.DATE.sqlite, load_date)
+sqlite3.register_converter(DType.DATETIME.sqlite, load_datetime)
+sqlite3.register_adapter(datetime.date, datetime.date.isoformat)
+sqlite3.register_adapter(datetime.datetime, datetime.datetime.isoformat)

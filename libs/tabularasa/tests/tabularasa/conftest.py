@@ -20,9 +20,11 @@ from thds.tabularasa.data_dependencies.tabular import PandasCSVLoader
 from thds.tabularasa.loaders.util import AttrsParquetLoader, PandasParquetLoader
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_schema,
+    render_attrs_loaders,
+    render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_schema,
+    render_pandera_loaders,
+    render_pandera_module,
     render_sql_schema,
 )
 from thds.tabularasa.schema.metaschema import Schema
@@ -73,7 +75,10 @@ class ReferenceDataTestCase:
 
         with context:
             schema = load_schema(
-                self.package, self.schema_path, require_data_resources=True, require_preprocessors=True
+                self.package,
+                self.schema_path,
+                require_data_resources=True,
+                require_preprocessors=True,
             )
 
         return self.with_attrs(schema=schema)
@@ -148,8 +153,9 @@ class ReferenceDataTestCase:
 
     def compile_pandas_source(self):
         assert self.schema is not None
-        pandas_source = render_pandera_schema(
-            self.schema, package=self.package, data_dir=TEST_DATA_OUTPUT_DIR
+        pandas_source = render_pandera_module(
+            self.schema,
+            render_pandera_loaders(self.schema, package=self.package, data_dir=TEST_DATA_OUTPUT_DIR),
         )
         return self.with_attrs(pandas_source=pandas_source)
 
@@ -161,10 +167,13 @@ class ReferenceDataTestCase:
 
     def compile_attrs_source(self):
         assert self.schema is not None
-        attrs_source = render_attrs_schema(
+        attrs_source = render_attrs_module(
             self.schema,
-            package=self.package,
-            data_dir=TEST_DATA_OUTPUT_DIR,
+            render_attrs_loaders(
+                self.schema,
+                package=self.package,
+                data_dir=TEST_DATA_OUTPUT_DIR,
+            ),
             use_newtypes=True,
         )
         return self.with_attrs(attrs_source=attrs_source)
@@ -191,7 +200,10 @@ class ReferenceDataTestCase:
         assert self.schema is not None
         # we specify attrs_module_name=None here to skip rendering the import of attrs classes
         attrs_sqlite_source = render_attrs_sqlite_schema(
-            self.schema, package=self.package, db_path=self.sqlite_db_path, attrs_module_name=None
+            self.schema,
+            package=self.package,
+            db_path=self.sqlite_db_path,
+            attrs_module_name=None,
         )
         return self.with_attrs(attrs_sqlite_source=attrs_sqlite_source)
 
@@ -229,8 +241,8 @@ class ReferenceDataTestCase:
         return pandas_loader
 
     def dynamic_pandas_parquet_loader_for(self, table_name: str) -> PandasParquetLoader:
-        assert self.pandas_module is not None
         assert self.schema is not None
+        assert self.pandas_module is not None
         pandas_loader: PandasParquetLoader = PandasParquetLoader.from_schema_table(
             self.schema.tables[table_name],
             package=self.package,
@@ -264,7 +276,12 @@ class ReferenceDataTestCase:
 
 int_dataframes = dict(
     ints=pd.DataFrame(
-        dict(col1=[1, -2, 3, -4], col2=[1, None, 3, None], col3=[1, 2, 3, 4], col4=[10, 8, 6, 4]),
+        dict(
+            col1=[1, -2, 3, -4],
+            col2=[1, None, 3, None],
+            col3=[1, 2, 3, 4],
+            col4=[10, 8, 6, 4],
+        ),
     )
     .astype(dict(col1=np.int64, col2=pd.Int32Dtype(), col3=np.uint16, col4=np.uint8))
     .set_index("col3"),
@@ -281,7 +298,7 @@ string_dataframes = dict(
     .astype(
         dict(
             uppercase=pd.StringDtype(),
-            enum=pd.CategoricalDtype(["foo", "bar", "baz"]),
+            enum=pd.CategoricalDtype(["foo", "bar", "baz"], ordered=True),
             lowercase=pd.StringDtype(),
         )
     )
@@ -303,7 +320,13 @@ bool_dataframes = dict(
 date_dataframes = dict(
     dates=pd.DataFrame(
         dict(
-            date1=["1920-01-02", "1950-02-03", "1980-03-05", "2010-05-08", "2040-08-13"],
+            date1=[
+                "1920-01-02",
+                "1950-02-03",
+                "1980-03-05",
+                "2010-05-08",
+                "2040-08-13",
+            ],
             date2=[None, "1900-01-10", "1950-06-20", "2000-11-30", None],
             datetime1=[
                 "1920-01-02T01:02:03",
@@ -312,7 +335,13 @@ date_dataframes = dict(
                 "2010-05-08T04:08:12",
                 "2040-08-13T05:10:15",
             ],
-            datetime2=["1920-01-02T01:02:03", None, "1980-03-05T03:06:09", None, "2040-08-13T05:10:15"],
+            datetime2=[
+                "1920-01-02T01:02:03",
+                None,
+                "1980-03-05T03:06:09",
+                None,
+                "2040-08-13T05:10:15",
+            ],
         ),
     )
     .astype(
@@ -330,8 +359,20 @@ array_dataframes = dict(
     arrays=pd.DataFrame(
         dict(
             pk=[0, 1, 2, 3, 4],
-            int_array=[[-2, -1, 0, 1, 2], None, [2, 3, 5, 7, 11, 13], None, [1, 1, 2, 3, 5, 8, 13]],
-            nested_string_array=[None, [["FOO"], ["BAR"], ["BAZ"]], [[], ["1"], ["1", "2"]], [], None],
+            int_array=[
+                [-2, -1, 0, 1, 2],
+                None,
+                [2, 3, 5, 7, 11, 13],
+                None,
+                [1, 1, 2, 3, 5, 8, 13],
+            ],
+            nested_string_array=[
+                None,
+                [["FOO"], ["BAR"], ["BAZ"]],
+                [[], ["1"], ["1", "2"]],
+                [],
+                None,
+            ],
             nested_date_array=[
                 [],
                 [[]],
@@ -364,12 +405,22 @@ mapping_dataframes = dict(
     .set_index("pk"),
     nested_mappings=pd.DataFrame(
         dict(
-            string_to_int_array=[{}, {"one": [1]}, {"two": [1, 2]}, {"three": [1, 2, 3]}],
+            string_to_int_array=[
+                {},
+                {"one": [1]},
+                {"two": [1, 2]},
+                {"three": [1, 2, 3]},
+            ],
             date_to_datetime_array=[
                 None,
                 {d("1900-01-01"): []},
                 {d("1950-02-02"): [dt("1950-02-02T01:02:03")]},
-                {d("2000-03-03"): [dt("2000-03-03T01:02:03"), dt("2000-03-03T04:05:06")]},
+                {
+                    d("2000-03-03"): [
+                        dt("2000-03-03T01:02:03"),
+                        dt("2000-03-03T04:05:06"),
+                    ]
+                },
             ],
         ),
     ).astype(dict(string_to_int_array="object")),
@@ -385,7 +436,15 @@ dependency_dataframes = dict(
             is_fibonacci=[True, True, True, False, True, False],
         ),
     )
-    .astype(dict(n="int16", fibonacci="int16", square="int16", triangular="int16", is_fibonacci="bool"))
+    .astype(
+        dict(
+            n="int16",
+            fibonacci="int16",
+            square="int16",
+            triangular="int16",
+            is_fibonacci="bool",
+        )
+    )
     .set_index("n"),
 )
 
@@ -411,7 +470,12 @@ date_tuples: TupleTestCases = dict(
     dates=[
         (d("1920-01-02"), None, dt("1920-01-02T01:02:03"), dt("1920-01-02T01:02:03")),
         (d("1950-02-03"), d("1900-01-10"), dt("1950-02-03T02:04:06"), None),
-        (d("1980-03-05"), d("1950-06-20"), dt("1980-03-05T03:06:09"), dt("1980-03-05T03:06:09")),
+        (
+            d("1980-03-05"),
+            d("1950-06-20"),
+            dt("1980-03-05T03:06:09"),
+            dt("1980-03-05T03:06:09"),
+        ),
         (d("2010-05-08"), d("2000-11-30"), dt("2010-05-08T04:08:12"), None),
         (d("2040-08-13"), None, dt("2040-08-13T05:10:15"), dt("2040-08-13T05:10:15")),
     ],

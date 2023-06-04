@@ -1,6 +1,5 @@
-import datetime
 import os
-from functools import lru_cache, partial, wraps
+from functools import partial
 from logging import getLogger
 from pathlib import Path
 from typing import (
@@ -29,10 +28,9 @@ import pyarrow.parquet as pq
 
 from thds.tabularasa.data_dependencies.adls import sync_adls_data
 from thds.tabularasa.data_dependencies.util import hash_file
-from thds.tabularasa.schema.dtypes import DType, PyType
+from thds.tabularasa.schema.dtypes import PyType
 from thds.tabularasa.schema.metaschema import RemoteBlobStoreSpec, Table
 from thds.tabularasa.schema.util import snake_case
-from thds.tabularasa.sqlite3_compat import sqlite3
 
 from .parquet_util import (
     TypeCheckLevel,
@@ -41,7 +39,13 @@ from .parquet_util import (
     postprocessor_for_pyarrow_type,
     type_check_pyarrow_schemas,
 )
-from .sqlite_util import sqlite_connection, sqlite_postprocessor_for_type
+
+# sqlite_constructor_for_record_type and AttrsSQLiteDatabase are not
+# used here but they're imported for backward compatibility with
+# existing generated code, which expects it to be importable from
+# here.  They were moved to sqlite_util to reduce the size of this file.
+from .sqlite_util import AttrsSQLiteDatabase  # noqa: F401
+from .sqlite_util import sqlite_constructor_for_record_type  # noqa: F401
 
 T = TypeVar("T")
 K = TypeVar("K", bound=PyType)
@@ -51,8 +55,6 @@ Record = TypeVar("Record", bound=attr.AttrsInstance)
 PARQUET_EXT = ".parquet"
 PQ_BATCH_SIZE_ATTRS = 100
 PQ_BATCH_SIZE_PANDAS = 2**16
-DEFAULT_ATTR_SQLITE_CACHE_SIZE = 100_000
-DEFAULT_MMAP_BYTES = int(os.environ.get("REF_D_DEFAULT_MMAP_BYTES", 8_589_934_592))  # 8 GB
 
 
 def identity(x):
@@ -90,40 +92,6 @@ def package_data_path(filename: str, data_dir: str, as_package_data: bool = True
     )
 
 
-# SQL pre/post processing
-
-
-def load_date(datestr: Optional[bytes]) -> Optional[datetime.date]:
-    return None if datestr is None else datetime.datetime.fromisoformat(datestr.decode()).date()
-
-
-def load_datetime(datestr: Optional[bytes]) -> Optional[datetime.datetime]:
-    return None if datestr is None else datetime.datetime.fromisoformat(datestr.decode())
-
-
-@lru_cache(None)
-def sqlite_constructor_for_record_type(cls):
-    """Wrap an `attrs` record class to allow it to accept raw JSON strings from sqlite queries in place
-    of collection types. If not fields of the class have collection types, simply return the record class
-    unwrapped"""
-    postprocessors = [sqlite_postprocessor_for_type(type_) for type_ in cls.__annotations__.values()]
-    if not any(postprocessors):
-        return cls
-
-    @wraps(cls)
-    def cons(*args):
-        return cls(*(v if f is None else f(v) for f, v in zip(postprocessors, args)))
-
-    return cons
-
-
-sqlite3.register_converter(DType.BOOL.sqlite, lambda b: bool(int(b)))
-sqlite3.register_converter(DType.DATE.sqlite, load_date)
-sqlite3.register_converter(DType.DATETIME.sqlite, load_datetime)
-sqlite3.register_adapter(datetime.date, datetime.date.isoformat)
-sqlite3.register_adapter(datetime.datetime, datetime.datetime.isoformat)
-
-
 class CheckUnique(pa.Check):
     def __init__(self, colnames: List[str]):
         self.colnames = list(colnames)
@@ -159,34 +127,6 @@ def check_unique(colnames: List[str], df: pd.DataFrame) -> pd.Series:
     return pd.Series(~duped, index=df.index)
 
 
-class AttrsSQLiteDatabase:
-    """Base interface for loading package resources as record iterators"""
-
-    def __init__(
-        self,
-        package: Optional[str],
-        db_path: str,
-        cache_size: Optional[int] = DEFAULT_ATTR_SQLITE_CACHE_SIZE,
-        mmap_size: int = DEFAULT_MMAP_BYTES,
-    ):
-        if cache_size is not None:
-            self.sqlite_index_query = lru_cache(cache_size)(self.sqlite_index_query)  # type: ignore
-
-        self._sqlite_con = sqlite_connection(
-            db_path, package, mmap_size=mmap_size, bulk_write_mode=False
-        )
-
-    def sqlite_index_query(self, clazz: Callable[..., Record], query: str, args: Tuple) -> List[Record]:
-        result = self._sqlite_con.execute(query, args).fetchall()
-        return [clazz(*r) for r in result]
-
-    def sqlite_pk_query(self, clazz: Callable[..., Record], query: str, args: Tuple) -> Optional[Record]:
-        # Note: when we create PK indexes on our sqlite tables, we enforce a UNIQUE constraint, so if the
-        # build succeeds then we're guaranteed 0 or 1 results here
-        result = self.sqlite_index_query(clazz, query, args)
-        return result[0] if result else None
-
-
 class _PackageDataOrFileInterface:
     package: Optional[str]
     data_path: str
@@ -202,7 +142,7 @@ class _PackageDataOrFileInterface:
             )
         else:
             self.data_path = package_data_path(filename, str(data_dir), as_package_data=as_package_data)
-
+            assert os.path.exists(self.data_path)
         if self.blob_store is not None and self.md5 is None:
             raise ValueError(
                 f"No md5 defined for remote file in blob store {self.blob_store} for table with local path "

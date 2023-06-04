@@ -1,6 +1,6 @@
 import re
 from functools import reduce
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar, Union
 
 ADLS_SCHEME = (
     "adls://"  # this is our invention, but ADLS does not appear to define one suitable for general use.
@@ -25,14 +25,20 @@ class AdlsRoot(NamedTuple):
     def __str__(self) -> str:
         return format_fqn(*self)
 
-    @classmethod
-    def parse(cls, root_uri: str) -> "AdlsRoot":
+    @staticmethod
+    def parse(root_uri: str) -> "AdlsRoot":
+        if not root_uri.endswith("/"):
+            root_uri = root_uri + "/"
         fqn = AdlsFqn.parse(root_uri)
         assert not fqn.path, f"URI '{root_uri}' does not represent an ADLS root!"
         return AdlsRoot(fqn.sa, fqn.container)
 
-    def join(self, path: str) -> "AdlsFqn":
-        return AdlsFqn(self.sa, self.container, join("", path))
+    def join(self, *path: str) -> "AdlsFqn":
+        return AdlsFqn(self.sa, self.container, join("", *path))
+
+    @property
+    def parent(self) -> "AdlsRoot":
+        return self
 
 
 class AdlsFqn(NamedTuple):
@@ -51,21 +57,37 @@ class AdlsFqn(NamedTuple):
     def __str__(self) -> str:
         return format_fqn(*self)
 
-    @classmethod
-    def of(cls, storage_account: str, container: str, path: str = "") -> "AdlsFqn":
+    @staticmethod
+    def of(storage_account: str, container: str, path: str = "") -> "AdlsFqn":
         """Expensive but includes validation."""
         return AdlsFqn.parse(format_fqn(storage_account, container, path))
 
-    @classmethod
-    def parse(cls, fully_qualified_name: str) -> "AdlsFqn":
+    @staticmethod
+    def parse(fully_qualified_name: str) -> "AdlsFqn":
         return parse_fqn(fully_qualified_name)
 
-    def join(self, path_suffix: str) -> "AdlsFqn":
-        return AdlsFqn(self.sa, self.container, join(self.path, path_suffix))
+    def join(self, *path_suffix: str) -> "AdlsFqn":
+        return AdlsFqn(self.sa, self.container, join(self.path, *path_suffix))
 
     # Should be a property?
     def root(self) -> AdlsRoot:
         return AdlsRoot(self.sa, self.container)
+
+    @property
+    def parent(self) -> "AdlsFqn":
+        return parent(self)
+
+
+FR = TypeVar("FR", bound=Union[AdlsFqn, AdlsRoot])
+
+
+def parent(fqn: FR) -> FR:
+    if isinstance(fqn, AdlsRoot):
+        return fqn  # type: ignore
+    assert isinstance(fqn, AdlsFqn)
+    if "/" not in fqn.path.strip("/"):
+        return AdlsFqn(fqn.sa, fqn.container, "")  # type: ignore
+    return AdlsFqn(fqn.sa, fqn.container, join(*fqn.path.split("/")[:-1]))  # type: ignore
 
 
 SA_REGEX = re.compile(r"^[\w]{3,24}$")

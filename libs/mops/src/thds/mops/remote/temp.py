@@ -22,7 +22,7 @@ class TempDirPath:
     def __call__(self) -> Path:
         with self.lock:
             if self.tempdir is None:
-                self.tempdir = tempfile.TemporaryDirectory(prefix="for_mops_paths")
+                self.tempdir = tempfile.TemporaryDirectory(prefix="mops-tmp-")
             return Path(self.tempdir.name)
 
     def cleanup(self):

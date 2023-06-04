@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from thds.mops._lazy import Lazy
+from thds.core.lazy import Lazy
 
 
 def test_lazy():

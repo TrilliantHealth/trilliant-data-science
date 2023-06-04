@@ -1,9 +1,3 @@
-[mops.k8s.cluster]
-api_version = "rbac.authorization.k8s.io/v1"
-name = "datascience"
-resource_group = "datascience"
-url = "https://datascience-c5f20f9b.privatelink.eastus2.azmk8s.io:443"
-
 [mops.k8s.azure]
 aad_pod_managed_identity = "ds-standard"
 # https://learn.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity
@@ -52,15 +46,12 @@ max_attempts = 100
 
 [mops.acr]
 url = "thdatascience.azurecr.io"
-name = "thdatascience"
-subscription = "engineering-stable"
 
 [mops.memo]
 storage_root = ""
 # prefer configuring this over the deprecated 'tmp' SA/container in the following block
 
 [mops.adls.remote]
-local_cache_dir = ".cache/adls"
 datasets_sa = "thdsscratch"
 datasets_container = "tmp"
 tmp_sa = "thdsscratch"

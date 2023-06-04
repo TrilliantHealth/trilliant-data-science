@@ -8,7 +8,7 @@ class MainHandler(Protocol):
 
 REMOTE_RUNNERS: ty.Dict[str, MainHandler] = dict()
 
-MAIN_HANDLER_BASE_ARGS = ["python", "-m", "thds.mops.remote.main"]
+MAIN_HANDLER_BASE_ARGS = ("python", "-m", "thds.mops.remote.main")
 
 
 def register_main_handler(name: str, mh: MainHandler):
