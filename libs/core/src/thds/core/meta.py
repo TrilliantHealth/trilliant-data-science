@@ -209,6 +209,14 @@ def get_base_package(pkg: Package) -> str:
     return str(pkg)
 
 
+def get_repo_name() -> str:
+    try:
+        return _simple_run("git remote get-url origin").split("/")[-1].rstrip().split(".")[0]
+    except (sp.CalledProcessError, FileNotFoundError):
+        LOGGER.warning("`get_repo_name` found no repo name.")
+        return ""
+
+
 def get_commit(pkg: Package = "") -> str:
     if GIT_COMMIT in os.environ:
         LOGGER.debug("`get_commit` reading from env var.")
