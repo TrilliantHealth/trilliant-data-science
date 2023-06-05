@@ -174,19 +174,24 @@ def norm_name(pkg: str) -> str:
 
 
 @lru_cache(None)
-def get_version(pkg: Package) -> str:
+def get_version(pkg: Package, orig: str = "") -> str:
     try:
         version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         try:
             version_ = version(str(pkg))
         except PackageNotFoundError:
+            # 'recurse' upward, assuming that the package name is overly-specified
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
-                LOGGER.warning("Could not find a version for `%s`. Package not found.", pkg)
+                # we're just about to give up. Before we do, check to see if there's a
+                # meta.json file hanging around, and if so, see if it contains a pyproject_version.
+                metadata = read_metadata(orig or pkg)
+                if metadata and metadata.pyproject_version:
+                    return metadata.pyproject_version
+                LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
                 return ""
-            else:
-                return get_version(".".join(pkg_[:-1]))
+            return get_version(".".join(pkg_[:-1]), orig or pkg)
 
     return version_
 
@@ -328,6 +333,18 @@ def is_deployed(pkg: Package) -> bool:
     return not meta.is_empty
 
 
+def _hacky_get_pyproject_toml_version(pkg: Package, wdir: Path) -> str:
+    ppt = wdir / "pyproject.toml"
+    if ppt.exists():
+        with open(ppt) as f:
+            toml = f.read()
+        # it will be a good day when Python packages a toml reader by default.
+        for line in toml.splitlines():
+            if m := re.match(r"version\s*=\s*[\"'](?P<version>[a-zA-Z0-9.]+)[\"']", line):
+                return m.group("version")
+    return ""
+
+
 MiscType = ty.Mapping[str, ty.Union[str, int, float, bool]]
 
 
@@ -338,6 +355,7 @@ class Metadata:
     git_is_clean: bool = False
     thds_user: str = ""
     misc: MiscType = attrs.field(factory=lambda: MappingProxyType(dict()))
+    pyproject_version: str = ""  # only present if the project defines `version` inside pyproject.toml
 
     @property
     def docker_branch(self) -> str:
@@ -374,13 +392,14 @@ class EmptyMetadataException(Exception):
     pass
 
 
-def init_metadata(misc: ty.Optional[MiscType] = None) -> Metadata:
+def init_metadata(misc: ty.Optional[MiscType] = None, pyproject_toml_version: str = "") -> Metadata:
     return Metadata(
         git_commit=get_commit(),
         git_branch=get_branch(),
         git_is_clean=is_clean(),
         thds_user=os.getenv(THDS_USER, getuser()),
         misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
+        pyproject_version=pyproject_toml_version,
     )
 
 
@@ -397,7 +416,9 @@ def write_metadata(
     assert wdir_
     if os.getenv(DEPLOYING) or deploying:
         LOGGER.debug("Writing metadata.")
-        metadata = init_metadata(misc=misc)
+        metadata = init_metadata(
+            misc=misc, pyproject_toml_version=_hacky_get_pyproject_toml_version(pkg, wdir_)
+        )
         metadata_path = os.path.join(
             "src" if layout == "src" else "",
             namespace.replace(".", "/"),
@@ -426,13 +447,10 @@ def read_metadata(pkg: Package) -> Metadata:
 
     try:
         with open_text(pkg, META_FILE) as f:
-            metadata = meta_converter.structure(json.load(f), Metadata)
+            return meta_converter.structure(json.load(f), Metadata)
     # pkg=__name__ will raise a TypeError unless it is called in an __init__.py
-    except (FileNotFoundError, TypeError):
+    except (ModuleNotFoundError, FileNotFoundError, TypeError):
         pkg_ = pkg.split(".")
         if len(pkg_) <= 1:
-            metadata = Metadata()
-        else:
-            return read_metadata(".".join(pkg_[:-1]))
-
-    return metadata
+            return Metadata()
+        return read_metadata(".".join(pkg_[:-1]))

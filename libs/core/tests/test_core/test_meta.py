@@ -67,6 +67,7 @@ def metadata_unstructured(
         git_is_clean=True,
         thds_user=USER_NAME,
         misc=dict(misc),
+        pyproject_version="",
     )
 
 
