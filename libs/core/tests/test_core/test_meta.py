@@ -560,3 +560,7 @@ def test_write_metadata_not_deploying(
     with pytest.raises(FileNotFoundError):
         with open(d / "meta.json", "r") as f:
             meta.meta_converter.structure(json.load(f), meta.Metadata)
+
+
+def test_get_repo_name():
+    assert meta.get_repo_name() == "ds-monorepo"

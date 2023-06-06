@@ -2,11 +2,11 @@ import os
 import socket
 from datetime import datetime
 
-from thds.core.stack_context import StackContext
+from thds.core import meta, stack_context
 
 from ..config import memo_pipeline_id
 
-_IS_REMOTE = StackContext("is_remote", False)
+_IS_REMOTE = stack_context.StackContext("is_remote", False)
 
 
 def _simple_host() -> str:
@@ -24,8 +24,14 @@ _PIPELINE_ID = ""
 
 
 def __set_or_generate_pipeline_id_if_empty():
+    some_unique_name = meta.get_repo_name() or os.getenv("THDS_DOCKER_IMAGE_NAME") or ""
+    clean_commit = meta.get_commit()[:7] if meta.is_clean() else ""
+    named_clean_commit = (
+        f"{some_unique_name}/{clean_commit}" if some_unique_name and clean_commit else ""
+    )
     set_pipeline_id(
         memo_pipeline_id()
+        or named_clean_commit
         or _simple_host()  # host name can be a group/directory now
         + "/"
         + "-".join(
