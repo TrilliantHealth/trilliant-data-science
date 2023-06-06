@@ -353,9 +353,9 @@ class Metadata:
     git_commit: str = ""
     git_branch: str = ""
     git_is_clean: bool = False
+    pyproject_version: str = ""  # only present if the project defines `version` inside pyproject.toml
     thds_user: str = ""
     misc: MiscType = attrs.field(factory=lambda: MappingProxyType(dict()))
-    pyproject_version: str = ""  # only present if the project defines `version` inside pyproject.toml
 
     @property
     def docker_branch(self) -> str:
@@ -397,9 +397,9 @@ def init_metadata(misc: ty.Optional[MiscType] = None, pyproject_toml_version: st
         git_commit=get_commit(),
         git_branch=get_branch(),
         git_is_clean=is_clean(),
+        pyproject_version=pyproject_toml_version,
         thds_user=os.getenv(THDS_USER, getuser()),
         misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
-        pyproject_version=pyproject_toml_version,
     )
 
 
