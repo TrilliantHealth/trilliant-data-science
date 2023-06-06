@@ -65,6 +65,7 @@ def metadata_unstructured(
         git_commit=COMMIT_HASH,
         git_branch=BRANCH_NAME,
         git_is_clean=True,
+        pyproject_version="",
         thds_user=USER_NAME,
         misc=dict(misc),
     )
