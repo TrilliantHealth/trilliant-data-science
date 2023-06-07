@@ -16,7 +16,7 @@ _identifier_pattern = r"[a-zA-Z]\w*"
 _dunder_identifier_pattern = r"[a-zA-Z_]\w*"
 _dashed_identifier_pattern = rf"{_identifier_pattern}(-{_identifier_pattern})*"
 _dotted_identifier_pattern = rf"{_identifier_pattern}(\.{_dunder_identifier_pattern})*"
-_path_pattern = r"[\w\s._-]+(/[\w\s._-]+)*/?"
+_rel_path_pattern = r"[^/].*"  # paths are validated by the filesystem, not us.
 _md5_hex_pattern = r"[0-9a-f]{32}"
 
 if not typing.TYPE_CHECKING:
@@ -26,7 +26,7 @@ if not typing.TYPE_CHECKING:
     Identifier = constr(regex=_identifier_pattern + "$")
     DottedIdentifier = constr(regex=_dotted_identifier_pattern + "$")
     DashedIdentifier = constr(regex=_dashed_identifier_pattern + "$")
-    PathStr = constr(regex=_path_pattern + "$")
+    PathStr = constr(regex=_rel_path_pattern + "$")
     HexStr = constr(regex=_md5_hex_pattern + "$")
     NonEmptyStr = constr(min_length=1)
 else:
