@@ -1,4 +1,8 @@
-### 1.6
+### 1.6.1
+
+- Make `kubernetes` an optional dependency, via the `k8s` extra.
+
+## 1.6
 
 - Experimental API for ADLS Src/DestFiles, along with improved
   stability of serialization (and therefore improved memoization of

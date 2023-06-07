@@ -21,17 +21,22 @@ krsync = "thds.mops.k8s.orchestrator.krsync:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-requests = "*"
+
 azure-core = "*"
 azure-identity = "*"
-azure-storage-blob = "*"
-pyyaml = "*"
-kubernetes = ">=18.20"  # 22.6 is the best match for current clusters
+azure-storage-file-datalake = "*"
 ansicolors = "*"
 cachetools = "*"
 tomli = "*"
+
 thds-adls = { path="../../libs/adls", develop=true }
 thds-core = { path="../../libs/core", develop=true }
+
+# k8s is extra - there are other shells you can use with mops.pure_remote.
+kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
+
+[tool.poetry.extras]
+k8s = ["kubernetes"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.0"

@@ -14,6 +14,15 @@ services (e.g. APIs).
 
 This is now documented in the [Guidebook](https://guidebook.trillianthealth.com/data-science/kubernetes-access/).
 
+### Installation
+
+You must add mops to your project with the `k8s` extras, or your
+imports of the `k8s` module will fail. Use one of the following,
+depending on whether you're in the monorepo or not:
+
+- `poetry add "../../libs/mops[k8s]" --editable`
+- `pipenv install "thds-mops[k8s]"`
+
 ### Register your namespace for Workload Identity [optional but recommended as of Q2 2023]
 
 It's recommended that you make a small PR[^1] to `engineering-infra`

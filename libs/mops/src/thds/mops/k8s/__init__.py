@@ -1,4 +1,10 @@
 """Trilliant Health abstraction around launching K8S Jobs."""
+try:
+    from kubernetes import client as _  # noqa
+except ImportError:
+    print("Please install mops with the `k8s` extra to use this module.")
+    raise
+
 from .image_ref import ImageFileRef, std_docker_build_push_develop, std_find_image_full_tag  # noqa
 from .launch import K8sJobFailedError, autocr, k8s_shell, launch  # noqa
 from .node_selection import (  # noqa
