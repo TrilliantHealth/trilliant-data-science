@@ -97,33 +97,11 @@ class DotDict(dict):
                 d[self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k] = v
         return d
 
-    def get_value(self, dot_path: str):
-        """Get a value given a dotted path to the value.
-
-        Example
-        -------
-
-        dd = DotDict(a={"b": 100})
-        assert dd.get_value("a.b") == 100
-        """
-        ref = self
-        path = dot_path.split(".")
-        try:
-            for k in path[:-1]:
-                ref = getattr(ref, k)
-            return getattr(ref, path[-1])
-        except AttributeError:
-            raise KeyError(f"can't get path {dot_path} with parts {path}.")
-
     def set_value(self, dot_path: str, val):
-        """Set a vlaue given a dotted path."""
         ref = self
         path = dot_path.split(".")
-        try:
-            for k in path[:-1]:
-                ref = getattr(ref, k)
-        except AttributeError:
-            raise KeyError(f"can't set path {dot_path} with parts {path}.")
+        for k in path[:-1]:
+            ref = ref.__getattr__(k)
         ref.__setattr__(path[-1], val)
 
 

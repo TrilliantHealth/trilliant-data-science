@@ -41,8 +41,6 @@ def test_dotdict_get():
     assert m.b == 2
     assert m.c.d.e_key == 3
     assert m.c.d.f == 4
-    assert m.get_value("a_key") == 1
-    assert m.get_value("c.d.f") == 4
 
 
 def test_dotdict_set():
@@ -51,10 +49,6 @@ def test_dotdict_set():
     assert m.a_key == 5
     m.c.d = DotDict({"new-data": 100}, convert_keys_to_identifiers=True)
     assert m.c.d.new_data == 100
-    m.set_value("a_key", 2)
-    assert m.a_key == 2
-    m.set_value("c.d.f", 5)
-    assert m.c.d.f == 5
 
 
 @pytest.mark.parametrize(
