@@ -41,9 +41,11 @@ UNICODE_MAPPING = {
 SEP = "/"
 HEADING_UNDERLINE_CHARS = '=-^"'
 MAX_HEADING_LEVEL = len(HEADING_UNDERLINE_CHARS)
-HEADING_UNDERLINE_RE = re.compile("|".join(rf"([{c}]+)" for c in HEADING_UNDERLINE_CHARS))
-MISSING_BADGE_MSG = "Curation badges could not be rendered. Make sure that curation_badge_path\
-                        and source_docs_path are both supplied in schema.build_options."
+HEADING_UNDERLINE_RE = re.compile("|".join(f"({re.escape(c)})+" for c in HEADING_UNDERLINE_CHARS))
+MISSING_BADGE_MSG = (
+    "Curation badges could not be rendered. Make sure that curation_badge_path "
+    "and source_docs_path are both supplied in schema.build_options."
+)
 
 
 # Helper Classes/Functions
