@@ -84,6 +84,8 @@ def launch(
     convenience. A generated suffix will be added to it.
 
     """
+    if not container_image:
+        raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
     job_num = f"{_LAUNCH_COUNT.inc():0>3}"
     name = "-".join([name_prefix, str(os.getpid()), job_num, str(uuid.uuid4())[:8]]).lstrip("-")
     scope.enter(logger_context(job=name))
