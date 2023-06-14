@@ -3,8 +3,6 @@ import warnings
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Mapping, Tuple
 
-DEFAULT_SEP = "."
-
 
 def _get_valid_variable_name(var: str):
     """
@@ -14,8 +12,8 @@ def _get_valid_variable_name(var: str):
     return re.sub(r"\W+|^(?=\d)", "_", var)
 
 
-def _flatten_gen(
-    d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP
+def flatten_gen(
+    d: Mapping, parent_key: str = "", sep: str = "."
 ) -> Generator[Tuple[str, Any], None, None]:
     """
     flattens a mapping (usually a dict) using a seperator, returning a generator of the flattened keys and values.
@@ -31,26 +29,13 @@ def _flatten_gen(
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
         if isinstance(v, Mapping):
-            yield from _flatten_gen(v, new_key, sep=sep)
+            yield from flatten_gen(v, new_key, sep=sep)
         else:
             yield new_key, v
 
 
-def unflatten(flat_d: Dict[str, Any], sep: str = DEFAULT_SEP):
-    """Given a flattened dictionary returns the unflatten representation."""
-    unflatten_dict: Dict[str, Any] = {}
-    for path, val in flat_d.items():
-        dict_ref = unflatten_dict
-        path_parts = path.split(sep)
-        for p in path_parts[:-1]:
-            dict_ref[p] = dict_ref.get(p) or {}
-            dict_ref = dict_ref[p]
-        dict_ref[path_parts[-1]] = val
-    return unflatten_dict
-
-
-def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[str, Any]:
-    return dict(_flatten_gen(d, parent_key, sep))
+def flatten(d: Mapping, parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+    return dict(flatten_gen(d, parent_key, sep))
 
 
 class DotDict(dict):
