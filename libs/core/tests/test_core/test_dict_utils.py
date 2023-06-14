@@ -1,6 +1,6 @@
 import pytest
 
-from thds.core.dict_utils import DotDict, flatten, merge_dicts, unflatten
+from thds.core.dict_utils import DotDict, flatten, merge_dicts
 
 
 def test_already_flatten():
@@ -12,13 +12,6 @@ def test_already_flatten():
 def test_deeply_nested():
     nested_dict = {"a": {"b": {"c": {"d": 1, "e": 2}}}, "f": 3}
     assert {"a.b.c.d": 1, "a.b.c.e": 2, "f": 3} == flatten(nested_dict)
-
-
-def test_unflatten():
-    already_flat = {"a": 1, "b": 2}
-    assert already_flat == unflatten(flatten(already_flat))
-    nested_dict = {"a": {"b": {"c": {"d": 1, "e": 2}}}, "f": 3}
-    assert nested_dict == unflatten(flatten(nested_dict))
 
 
 @pytest.mark.parametrize("sep", ["-", "_", " ", "+"])
