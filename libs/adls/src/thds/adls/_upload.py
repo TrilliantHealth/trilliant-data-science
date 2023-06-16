@@ -1,17 +1,23 @@
+import shutil
 import typing as ty
+from pathlib import Path
 
 import azure.core.exceptions
 from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties
 
-from thds.core.log import getLogger
+from thds.core import log, scope
 
+from .fqn import AdlsFqn
+from .global_client import get_global_client
+from .link import link, set_read_only
 from .md5 import AnyStrSrc, try_md5
+from .ro_cache import Cache
 
 _SKIP_ALREADY_UPLOADED_CHECK_IF_MORE_THAN_BYTES = 2 * 2**20  # 2 MB is about right
 
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 def _get_checksum_content_settings(data: AnyStrSrc) -> ty.Optional[ContentSettings]:
@@ -88,3 +94,48 @@ def content_settings_if_upload_required(
 
 async_content_settings_if_upload_required.__doc__ = doc
 content_settings_if_upload_required.__doc__ = doc
+
+
+UploadSrc = ty.Union[Path, bytes, ty.IO[ty.AnyStr]]
+
+
+def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Optional[Path]:
+    if isinstance(data, Path) and data.exists():
+        if not link(data, local_cache_path):
+            shutil.copyfile(data, local_cache_path)
+        set_read_only(local_cache_path)
+        return local_cache_path
+    if hasattr(data, "read") and hasattr(data, "seek"):
+        with local_cache_path.open("wb") as f:
+            f.write(data.read())  # type: ignore
+            data.seek(0)  # type: ignore
+        set_read_only(local_cache_path)
+        return local_cache_path
+    if isinstance(data, bytes):
+        with local_cache_path.open("wb") as f:
+            f.write(data)
+        set_read_only(local_cache_path)
+        return local_cache_path
+    return None
+
+
+@scope.bound
+def upload(fqn: AdlsFqn, data: UploadSrc, write_through_cache: ty.Optional[Cache] = None) -> None:
+    """Uploads only if the remote does not exist or does not match
+    md5.
+
+    Always embeds md5 in upload.
+
+    Can write through a local cache if provided.
+    """
+    if write_through_cache:
+        data = _write_through_local_cache(write_through_cache.path(fqn), data) or data
+        # we can now upload from the local cache path, which has the
+        # advantage (over some kinds of readable byte iterables) of
+        # guaranteeing that we can extract an md5.
+
+    fs_client = get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path)
+    if content_settings := content_settings_if_upload_required(fs_client, data):
+        if isinstance(data, Path):
+            data = scope.enter(open(data, "rb"))
+        fs_client.upload_data(data, overwrite=True, content_settings=content_settings)

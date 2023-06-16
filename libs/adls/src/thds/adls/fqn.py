@@ -26,6 +26,10 @@ class AdlsRoot(NamedTuple):
         return format_fqn(*self)
 
     @staticmethod
+    def of(storage_account: str, container: str) -> "AdlsRoot":
+        return parse_fqn(format_fqn(storage_account, container, "/")).root()
+
+    @staticmethod
     def parse(root_uri: str) -> "AdlsRoot":
         if not root_uri.endswith("/"):
             root_uri = root_uri + "/"
@@ -35,6 +39,9 @@ class AdlsRoot(NamedTuple):
 
     def join(self, *path: str) -> "AdlsFqn":
         return AdlsFqn(self.sa, self.container, join("", *path))
+
+    def __truediv__(self, path: str) -> "AdlsFqn":
+        return self.join(path)
 
     @property
     def parent(self) -> "AdlsRoot":
@@ -68,6 +75,9 @@ class AdlsFqn(NamedTuple):
 
     def join(self, *path_suffix: str) -> "AdlsFqn":
         return AdlsFqn(self.sa, self.container, join(self.path, *path_suffix))
+
+    def __truediv__(self, path: str) -> "AdlsFqn":
+        return self.join(path)
 
     # Should be a property?
     def root(self) -> AdlsRoot:

@@ -8,12 +8,14 @@ from pathlib import Path
 from random import SystemRandom
 from timeit import default_timer
 
+from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient
 
 from thds.core.hashing import b64
 from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
+from .errors import BlobNotFoundError, is_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
 from .ro_cache import Cache, from_cache_path_to_local
@@ -294,6 +296,12 @@ def download_or_use_verified(
                 co_request = co.send(None)
     except StopIteration as si:
         return si.value  # cache hit if True
+    except HttpResponseError as hre:
+        if is_blob_not_found(hre):
+            raise BlobNotFoundError(
+                AdlsFqn.of(fs_client.account_name, fs_client.file_system_name, remote_key)
+            ) from hre
+        raise
 
 
 async def async_download_or_use_verified(
@@ -319,3 +327,9 @@ async def async_download_or_use_verified(
                 co_request = co.send(None)
     except StopIteration as si:
         return si.value  # cache hit if True
+    except HttpResponseError as hre:
+        if is_blob_not_found(hre):
+            raise BlobNotFoundError(
+                AdlsFqn.of(fs_client.account_name, fs_client.file_system_name, remote_key)
+            ) from hre
+        raise

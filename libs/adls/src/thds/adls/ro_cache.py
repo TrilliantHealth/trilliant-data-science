@@ -1,9 +1,6 @@
-import contextlib
 import os
 import platform
 import shutil
-import stat
-import subprocess
 import tempfile
 import typing as ty
 from pathlib import Path
@@ -12,6 +9,7 @@ from thds.core import log
 from thds.core import types as ct
 
 from .fqn import AdlsFqn
+from .link import link, set_read_only
 from .md5 import hash_using, hashlib
 
 _GLOBAL = Path.home() / ".adls-md5-ro-cache"
@@ -55,44 +53,16 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
     return Path(fqn_str).resolve()
 
 
-def _set_read_only(fpath: ct.StrOrPath):
-    # thank you https://stackoverflow.com/a/51262451
-    perms = stat.S_IMODE(os.lstat(fpath).st_mode)
-    ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
-    os.chmod(fpath, perms & ro_mask)
-
-
-def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath, link: bool):
-    _set_read_only(cache_path)
-    if str(cache_path) == str(local_path):
-        # the caller requested the file to be put only in the cache
-        return
-    if link:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(local_path)  # link will fail if the path already exists
-        if _IS_MAC:
-            try:
-                subprocess.check_output(["cp", "-c", str(cache_path), str(local_path)])
-                return
-            except subprocess.CalledProcessError:
-                pass
-        try:
-            os.link(cache_path, local_path)
-            _set_read_only(local_path)
+def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath, do_link: bool):
+    set_read_only(cache_path)
+    if do_link:
+        link_type = link(cache_path, local_path)
+        if link_type in {"hard", "soft"}:
+            set_read_only(local_path)
+        if link_type:
             return
-        except OSError as oserr:
-            logger.warning(
-                f"Unable to hard-link {cache_path} to {local_path}"
-                f" ({oserr}); falling back to symlink."
-            )
-        try:
-            os.symlink(cache_path, local_path)
-            _set_read_only(local_path)
-            return
-        except OSError as oserr:
-            logger.warning(
-                f"Unable to soft-link {cache_path} to {local_path}" f" ({oserr}); falling back to copy."
-            )
+        logger.warning(f"Unable to soft-link {cache_path} to {local_path}; falling back to copy.")
+
     with tempfile.TemporaryDirectory() as dir:
         tmpfile = os.path.join(dir, "tmp")
         shutil.copyfile(cache_path, tmpfile)
