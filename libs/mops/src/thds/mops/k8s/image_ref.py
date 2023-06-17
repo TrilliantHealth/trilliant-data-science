@@ -62,12 +62,7 @@ def std_docker_build_push_develop_cmd(root: Path) -> ty.List[str]:
     if not script.is_file():
         logger.warning(f"We were unable to find {script}; this will not result in an attempt to build.")
         return list()
-    return [
-        "poetry",
-        "run",
-        str(script),
-        "--develop",
-    ]
+    return ["poetry", "run", str(script), "--develop"]
 
 
 def build_push_image(cmd: ty.List[str]) -> ty.Optional[ty.Callable[[], str]]:
@@ -81,7 +76,7 @@ def build_push_image(cmd: ty.List[str]) -> ty.Optional[ty.Callable[[], str]]:
     if not cmd:
         return None
 
-    def docker_build_push_develop() -> str:
+    def docker_build_push() -> str:
         logger.info(PINK(f"Attempting to build and push docker image with `{' '.join(cmd)}`"))
         # only capture stdout because that's where we expect the full_tag to be,
         # and the rest can get printed to the console for user visibility.
@@ -103,7 +98,7 @@ def build_push_image(cmd: ty.List[str]) -> ty.Optional[ty.Callable[[], str]]:
         return ""
 
     # prevent this from running multiple times
-    return lazy.Lazy(docker_build_push_develop)
+    return lazy.Lazy(docker_build_push)
 
 
 def std_docker_build_push_develop(root: Path) -> ty.Optional[ty.Callable[[], str]]:
@@ -129,8 +124,13 @@ def std_find_image_full_tag(
     3. non-empty string result of build_push_image, if available.
     4. ImageFileRef
 
-    build_push_image is the current recommended solution for most applications,
-    and the recommended implementation is std_docker_build_push_develop.
+    for production runs, you should export MOPS_IMAGE_FULL_TAG in your
+    environment.
+
+    build_push_image is the current recommended solution for most
+    development workflows, and the recommended implementation of that
+    is std_docker_build_push_develop.
+
     """
     image_fullref_from_env = os.getenv(MOPS_IMAGE_FULL_TAG)
     if image_fullref_from_env:
