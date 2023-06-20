@@ -768,10 +768,13 @@ class ReferenceDataManager:
                     self.logger.warning(f"Removing existing file {sync_data.local_path}")
                     os.remove(sync_data.local_path)
                 self.logger.info(f"Linking downloaded file to local build file {sync_data.local_path}")
+                sync_data.local_path.parent.mkdir(parents=True, exist_ok=True)
                 os.link(local_cache_path, sync_data.local_path)
             return True
 
-    def sync_blob_store(self, *, up: bool = False, down: bool = False) -> List[str]:
+    def sync_blob_store(
+        self, *, up: bool = False, down: bool = False, no_fail_if_absent: bool = False
+    ) -> List[str]:
         """Sync the local built files to the remote blob store, if one is defined.
         It is assumed that the hashes in the schema file are the source of truth rather than the hashes
         of the on-disk built files; if these should be taken as authoritative instead, run the
@@ -781,6 +784,9 @@ class ReferenceDataManager:
 
         :param up: Upload local files to the blob store if they're available?
         :param down: Download remote blobs to the local build directory if they're available?
+        :param no_fail_if_absent: when passed, don't fail an upload for lack of a local file being
+          present with the expected hash for a version-controlled table. This is useful in development
+          workflows where you just want to regenerate/sync a particular table that you've updated.
         :return: list of table names that were synced successfully
         :raises FileNotExistsError: if a local or remote file was not available for sync
         """
@@ -818,11 +824,18 @@ class ReferenceDataManager:
                     else:
                         failed.append(table.name)
                 else:
+                    # file is present locally with expected hash; no need to sync down
                     synced.append(table.name)
             else:
                 # check remote; download to get hash and link if good
                 addendum = "" if local_file_md5 is None else f" matching expected hash {table.md5}"
                 self.logger.info(f"No local file found for table {table.name}{addendum}")
+                if up and no_fail_if_absent:
+                    self.logger.info(
+                        f"Skipping sync to remote blob store of local file for table {table.name}"
+                    )
+                    continue
+
                 # only link the downloaded file into the build dir if we're syncing down; else just download
                 # the file to check that it has the correct hash
                 success = self.sync_down(sync_data, link_build=down)
