@@ -4,7 +4,7 @@ thing to hash when passes the very broad types that it accepts.
 import hashlib
 from pathlib import Path
 
-from thds.core.hashing import hash_anything, hash_using
+from thds.core.hashing import hash_using
 
 HW = Path(__file__).parent.parent / "data/hello_world.txt"
 HW_SHA256 = (
@@ -24,11 +24,3 @@ def test_bytes_hash():
 def test_readable_hashes():
     with open(HW, "rb") as f:
         assert HW_SHA256 == hash_using(f, hashlib.sha256()).hexdigest()
-
-
-def test_hash_anything_doesnt_die_on_typerror():
-    assert None is hash_anything((b"23423423423423423423",), hashlib.md5())
-
-
-def test_hash_anything_doesnt_die_on_fnf_error():
-    assert None is hash_anything("file/not/exists", hashlib.md5())

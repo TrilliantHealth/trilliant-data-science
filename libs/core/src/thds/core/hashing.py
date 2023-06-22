@@ -69,7 +69,7 @@ def hash_using(data: SomehowReadable, hasher: T) -> T:
 def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
     try:
         return hash_using(data, hasher)
-    except (FileNotFoundError, TypeError):
+    except FileNotFoundError:
         # it's unlikely we can operate on this data?
         return None
 
