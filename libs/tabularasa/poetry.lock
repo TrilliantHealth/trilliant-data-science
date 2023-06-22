@@ -3432,7 +3432,7 @@ test = ["pre-commit", "pytest (>=7.0)", "pytest-timeout"]
 
 [[package]]
 name = "thds-adls"
-version = "1.2"
+version = "1.3"
 description = "ADLS tools"
 category = "main"
 optional = false
@@ -3454,7 +3454,7 @@ url = "../adls"
 
 [[package]]
 name = "thds-core"
-version = "1.3"
+version = "1.4"
 description = "Core utilities."
 category = "main"
 optional = false
@@ -3994,4 +3994,4 @@ viz = ["pygraphviz"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "a3c6d421fa007037339f178f7b58042719a5303e33fd46ac3cc2766fa1a6d4e5"
+content-hash = "b327c95c8cbd583905a272ecf0041d2d6df83e8519650e65500c9402f6748825"
