@@ -10,6 +10,8 @@ logger = log.getLogger(__name__)
 
 
 class AdlsHashedResource(ty.NamedTuple):
+    """See the containing package for documentation on how to use this and its motivation."""
+
     fqn: AdlsFqn
     md5b64: str
 
@@ -19,13 +21,17 @@ class AdlsHashedResource(ty.NamedTuple):
 
     @staticmethod
     def of(fqn_or_uri: ty.Union[AdlsFqn, str], md5b64: str) -> "AdlsHashedResource":
-        assert md5b64, "md5b64 must be non-empty"
-        fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
-        return AdlsHashedResource(fqn, md5b64)
+        return of(fqn_or_uri, md5b64)
 
     @staticmethod
     def parse(serialized_dict: str) -> "AdlsHashedResource":
         return parse(serialized_dict)
+
+
+def of(fqn_or_uri: ty.Union[AdlsFqn, str], md5b64: str) -> AdlsHashedResource:
+    assert md5b64, "md5b64 must be non-empty"
+    fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
+    return AdlsHashedResource(fqn, md5b64)
 
 
 def serialize(resource: AdlsHashedResource) -> str:

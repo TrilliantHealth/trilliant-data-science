@@ -4,7 +4,7 @@ from pathlib import Path
 from random import randint
 
 from thds.adls import ADLSFileSystem
-from thds.adls._upload import content_settings_if_upload_required
+from thds.adls._upload import upload_decision_and_settings
 from thds.adls.global_client import get_global_client
 
 HW = Path(__file__).parent.parent / "data/hello_world.txt"
@@ -16,11 +16,11 @@ def test_basic_upload_without_cache(caplog):
     remote_path = f"test/hello_world/{randint(0, 2**63-1)}.txt"
     with caplog.at_level(logging.DEBUG):
         # synchronous file not found
-        assert content_settings_if_upload_required(
+        assert upload_decision_and_settings(
             get_global_client(fs.account_name, fs.file_system).get_file_client(remote_path),
             HW,
-        )
-        assert "No remote file properties" in caplog.text
+        ).upload_required
+        assert "Too small to bother" in caplog.text
 
     with caplog.at_level(logging.DEBUG):
         # async file not found, plus upload
@@ -42,10 +42,11 @@ def test_basic_upload_without_cache(caplog):
             pw.write(b"some other data")
         with caplog.at_level(logging.DEBUG):
             # synchronous bytes don't match
-            assert content_settings_if_upload_required(
+            assert upload_decision_and_settings(
                 get_global_client(fs.account_name, fs.file_system).get_file_client(remote_path),
                 fb,
-            )
+                min_size_for_remote_check=0,
+            ).upload_required
             assert "Remote file exists but MD5 does not match" in caplog.text
         with caplog.at_level(logging.DEBUG):
             # async bytes don't match

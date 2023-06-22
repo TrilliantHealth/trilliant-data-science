@@ -3,12 +3,14 @@ directly in the current thread. This is a good thing to use when the
 computation derives no advantage from not running locally
 (i.e. exhibits no parallelism) but you still want memoization.
 """
-from typing import Sequence
+from typing import Callable, Sequence, Union
 
+from thds.adls import AdlsFqn, AdlsRoot
 from thds.core.log import getLogger
 
 from ._registry import MAIN_HANDLER_BASE_ARGS, main_handler
 from ._root import _IS_REMOTE
+from .core import F, pure_remote
 from .temp import _REMOTE_TMP
 
 logger = getLogger(__name__)
@@ -25,3 +27,17 @@ def direct_shell(shell_args: Sequence[str]) -> None:
             main_handler(*shell_args[3:])
     finally:
         _REMOTE_TMP.cleanup()
+
+
+def memoize_direct(adls_root: Union[AdlsRoot, AdlsFqn, str, None] = None) -> Callable[[F], F]:
+    """A decorator that makes a function memoizable in the current
+    thread.
+    This is a good thing to use when the computation derives no
+    advantage from not running locally (i.e. exhibits no parallelism)
+    but you still want memoization.
+    """
+    from ._backward_compat import AdlsPickleRunner
+
+    if isinstance(adls_root, str):
+        adls_root = AdlsFqn.parse(adls_root)
+    return pure_remote(AdlsPickleRunner(direct_shell, adls_root, rerun_exceptions=True))

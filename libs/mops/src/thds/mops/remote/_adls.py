@@ -1,12 +1,14 @@
 """Mostly generic ADLS utilities for non-async operation."""
 import logging
 import typing as ty
+from pathlib import Path
 
 import azure.core.exceptions
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
-from thds.adls import AdlsFqn, join
-from thds.adls._upload import content_settings_if_upload_required
+from thds.adls import AdlsFqn, join, resource
+from thds.adls._upload import upload_decision_and_settings
+from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.global_client import get_global_client
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
@@ -19,7 +21,7 @@ from .types import AnyStrSrc, BlobStore
 T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
 FromBytes = ty.Callable[[ty.BinaryIO], T]
-
+_5_MB = 5 * 2**20
 
 # suppress very noisy INFO logs in azure library.
 # This mirrors thds.adls.
@@ -44,6 +46,13 @@ def yield_filenames(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[str]:
     for azure_file in yield_files(fsc, adls_root):
         if not azure_file.get("is_directory"):
             yield azure_file["name"]
+
+
+def _selective_upload_path(path: Path, fqn: AdlsFqn):
+    if path.stat().st_size > _5_MB:
+        upload_through_cache(fqn, path)
+    else:
+        resource.upload(fqn, path)
 
 
 class BlobNotFoundError(Exception):
@@ -92,23 +101,35 @@ class AdlsFileSystem(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> str:
-        """Upload data to a remote path and return the fully-qualified URI."""
+    def getfile(self, remote_uri: str) -> Path:
+        scope.enter(logger_context(download="mops-getfile"))
+        return download_to_cache(AdlsFqn.parse(remote_uri))
+
+    @_azure_creds_retry
+    @scope.bound
+    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):
+        """Upload data to a remote path."""
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(logger_context(upload=fqn))
         file_client = self._client(fqn)
-        content_settings_if_upload_needed = content_settings_if_upload_required(file_client, data)
-        if not content_settings_if_upload_needed:
+        decision = upload_decision_and_settings(file_client, data)
+        if not decision.upload_required:
             return remote_uri
         logger.info(f"======> uploading {type_hint}")
         on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"))(
             lambda: file_client.upload_data(
                 data,
                 overwrite=True,
-                content_settings=content_settings_if_upload_needed,
+                content_settings=decision.content_settings,
             )
         )()
         return remote_uri
+
+    @_azure_creds_retry
+    @scope.bound
+    def putfile(self, path: Path, remote_uri: str):
+        scope.enter(logger_context(upload="mops-putfile"))
+        _selective_upload_path(path, AdlsFqn.parse(remote_uri))
 
     @_azure_creds_retry
     @scope.bound

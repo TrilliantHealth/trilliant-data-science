@@ -8,6 +8,7 @@ import hashlib
 import io
 import pickle
 import typing as ty
+from pathlib import Path
 
 from thds.core.hashing import hash_using
 from thds.core.log import getLogger
@@ -56,15 +57,15 @@ class _downloader(ty.NamedTuple):
 
     uri: str
 
-    def __call__(self, byts: ty.IO[bytes]):
-        return lookup_blob_store(self.uri).readbytesinto(self.uri, byts)
+    def __call__(self) -> Path:
+        return lookup_blob_store(self.uri).getfile(self.uri)
 
 
 class _ContentAddressedPathStream:
-    def local_to_remote(self, src: ty.IO[bytes], key: str):
+    def local_to_remote(self, path: Path, key: str):
         """Return fully qualified remote information after put."""
         full_remote_key = _content_addressed(key)
-        lookup_blob_store(full_remote_key).putbytes(full_remote_key, src, type_hint="path")
+        lookup_blob_store(full_remote_key).putfile(path, full_remote_key)
 
     def get_downloader(self, remote_key: str) -> Downloader:
         return _downloader(_content_addressed(remote_key))  # type: ignore # NamedTuple silliness

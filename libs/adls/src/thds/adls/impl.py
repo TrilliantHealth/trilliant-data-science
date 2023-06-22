@@ -32,7 +32,7 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 
 from thds.core.log import getLogger
 
-from ._upload import async_content_settings_if_upload_required
+from ._upload import async_upload_decision_and_settings
 
 LOGGER = getLogger(__name__)
 getLogger("azure.core").setLevel(logging.WARNING)
@@ -332,9 +332,11 @@ class ADLSFileSystem:
 
         async with file_system_client.get_file_client(remote_path) as file_client:
             with open(local_path, "rb") as fp:
-                content_settings = await async_content_settings_if_upload_required(file_client, fp)
-                if content_settings:
-                    await file_client.upload_data(fp, overwrite=True, content_settings=content_settings)
+                decision = await async_upload_decision_and_settings(file_client, fp)
+                if decision.upload_required:
+                    await file_client.upload_data(
+                        fp, overwrite=True, content_settings=decision.content_settings
+                    )
 
         return remote_path
 

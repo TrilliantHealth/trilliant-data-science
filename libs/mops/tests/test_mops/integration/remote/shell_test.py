@@ -33,7 +33,7 @@ def test_crazy_stuff():
 def func_with_paths(a_path: Path, b: int) -> Path:
     # the Path gets transferred as a temp path - we can read its
     # contents but not use it in any other way.
-    assert isinstance(a_path, Path)
+    assert isinstance(a_path, Path), a_path
     assert a_path.exists()
     path_str = open(a_path).read()
 

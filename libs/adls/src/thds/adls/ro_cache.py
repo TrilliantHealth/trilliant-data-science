@@ -46,7 +46,7 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
         # of the filename bytes with the hash. this gets us
         # consistency even across cache directories, such that the
         # cache directory is basically relocatable. It also makes testing easier.
-        md5_of_key = b"-md5/" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode()
+        md5_of_key = b"-md5-" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode()
         fqn_bytes = fqn_bytes[: _MAX_CACHE_KEY_LEN - len(md5_of_key)] + md5_of_key
         fqn_str = fqn_bytes.decode()
         assert len(fqn_bytes) <= _MAX_CACHE_KEY_LEN, (fqn_str, len(fqn_bytes))
@@ -56,14 +56,18 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
 def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath, do_link: bool):
     set_read_only(cache_path)
     if do_link:
+        # hard and soft links do not have their own permissions - they
+        # share the read-only permissions of their target.  reflinks
+        # and copies will not, but those do not need to be marked as
+        # read-only since edits to them will not affect the original,
+        # cached copy.
         link_type = link(cache_path, local_path)
-        if link_type in {"hard", "soft"}:
-            set_read_only(local_path)
         if link_type:
             return
-        logger.warning(f"Unable to soft-link {cache_path} to {local_path}; falling back to copy.")
+        logger.warning(f"Unable to link {cache_path} to {local_path}; falling back to copy.")
 
     with tempfile.TemporaryDirectory() as dir:
         tmpfile = os.path.join(dir, "tmp")
         shutil.copyfile(cache_path, tmpfile)
-        os.rename(tmpfile, local_path)  # atomic to the final destination
+        shutil.move(tmpfile, local_path)
+        # atomic to the final destination as long as we're on the same filesystem.

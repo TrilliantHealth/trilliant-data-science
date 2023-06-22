@@ -1,30 +1,16 @@
 import hashlib
-import io
-import tempfile
 import typing as ty
 from pathlib import Path
-
-from typing_extensions import Protocol
+from tempfile import NamedTemporaryFile
 
 from thds.core.hashing import hash_using
 from thds.core.log import getLogger
 
 from ._hash import nest
 from ._once import Once
-from .temp import tempdir
 
+Downloader = ty.Callable[[], Path]
 logger = getLogger(__name__)
-
-
-Downloader = ty.Callable[[ty.IO[bytes]], ty.Any]
-
-
-class BlobStream(Protocol):
-    def local_to_remote(self, __src: ty.IO[bytes], __key: str):
-        ...  # pragma: no cover
-
-    def get_downloader(self, __key: str) -> Downloader:
-        ...  # pragma: no cover
 
 
 class PathContentAddresser:
@@ -79,20 +65,18 @@ class PathUnpickler:
 
     def __init__(self, downloader: Downloader, remote_key: str):
         self.downloader = downloader
-        self.remote_key = remote_key
+        self.remote_key = remote_key  # only for debugging
 
     def __call__(self) -> Path:
-        local_dest = tempdir() / self.remote_key.replace("/", "")
-        with tempfile.NamedTemporaryFile("wb", delete=False) as f:
-            # using a temporary file avoids partially-written files if
-            # for some reason this gets downloaded multiple times.
-            logger.info(f"Unpickling a path from id {self.remote_key} to {local_dest}")
-            self.downloader(f)
-            f.flush()
-            Path(f.name).rename(local_dest)
-            # this move is atomic, and the content-addressed
-            # destination should be safe from any possible conflict.
-        return local_dest
+        return self.downloader()
+
+
+class BlobStream(ty.Protocol):
+    def local_to_remote(self, __path: Path, __key: str):
+        ...  # pragma: no cover
+
+    def get_downloader(self, __key: str) -> Downloader:
+        ...  # pragma: no cover
 
 
 def _pickle_file_path_as_upload(
@@ -119,15 +103,18 @@ def _pickle_file_path_as_upload(
 
     def upload():
         logger.info(
-            f"Pickling path {local_src} to {remote_key} - "
-            "its contents will get unpickled on the other side as a local temporary path"
+            f"Uploading Path {local_src} to {remote_key} - "
+            "its contents will get 'unpickled' on the other side"
+            " as a Path pointing to a local, read-only file."
         )
-        with open(local_src, "rb") as f:
-            stream.local_to_remote(f, remote_key)
-        stream.local_to_remote(  # purely debug info
-            io.BytesIO(str(local_src).encode()),
-            f"{remote_root}/debug_{str(local_src).replace('/', '_')}",
-        )
+        stream.local_to_remote(local_src, remote_key)
+        with NamedTemporaryFile("w") as tmp:
+            tmp.write(str(local_src))
+            tmp.flush()
+            stream.local_to_remote(  # purely debug info
+                Path(tmp.name),
+                f"{remote_root}/debug_{str(local_src).replace('/', '_')}",
+            )
 
     once.run_once(remote_key, upload)
     return PathUnpickler(stream.get_downloader(remote_key), remote_key)
@@ -144,7 +131,7 @@ class PathPickler:
         self.once = once
         self.path_addresser = path_addresser
 
-    def __call__(self, maybe_path: ty.Any) -> ty.Union[None, PathUnpickler]:
+    def __call__(self, maybe_path: ty.Any) -> ty.Optional[PathUnpickler]:
         """Returns a persistent ID compatible with CallableUnpickler for any real file Path.
 
         The Persistent ID will actually be a thunk that is self-unpickling.

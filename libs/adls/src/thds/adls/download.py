@@ -24,6 +24,8 @@ logger = getLogger(__name__)
 
 
 _TEMPDIRS_ON_DIFFERENT_FILESYSTEM = False
+_1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
+_LONG_TRANSFER_S = 2
 
 
 class MD5MismatchError(Exception):
@@ -41,12 +43,13 @@ def _atomic_download_and_move(fqn: AdlsFqn, dest: StrOrPath) -> ty.Iterator[ty.I
             dpath = os.path.join(dir, "tmp")
 
         with open(dpath, "wb") as f:
-            logger.info(f"Downloading {fqn} to {dest}")
+            logger.debug(f"Downloading {fqn} to {dest}")
             started = default_timer()
             yield f
         elapsed = default_timer() - started
         size = os.path.getsize(dpath)
-        logger.info(
+        log = logger.info if elapsed > _LONG_TRANSFER_S else logger.debug
+        log(
             f"Downloaded {size:,} bytes in {elapsed:.1f}s at {int(size/10**6/elapsed):,.1f} Mbytes/sec to {dest}"
         )
         try:
@@ -205,6 +208,9 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
         if not path or not os.path.exists(path):
             return None
+        psize = Path(path).stat().st_size
+        if psize > _1GB:
+            logger.info(f"Hashing existing {psize/_1GB:.2f} GB file at {path}...")
         with open(path, "rb") as f:
             return b64(md5_readable(f))
 
@@ -274,6 +280,12 @@ def _prep_download_coroutine(
     return co, co.send(None), None, fs_client.get_file_client(remote_key)
 
 
+def _translate_blob_not_found(client, key: str, hre: HttpResponseError) -> ty.NoReturn:
+    if is_blob_not_found(hre):
+        raise BlobNotFoundError(AdlsFqn.of(client.account_name, client.file_system_name, key)) from hre
+    raise
+
+
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -297,11 +309,7 @@ def download_or_use_verified(
     except StopIteration as si:
         return si.value  # cache hit if True
     except HttpResponseError as hre:
-        if is_blob_not_found(hre):
-            raise BlobNotFoundError(
-                AdlsFqn.of(fs_client.account_name, fs_client.file_system_name, remote_key)
-            ) from hre
-        raise
+        _translate_blob_not_found(fs_client, remote_key, hre)
 
 
 async def async_download_or_use_verified(
@@ -328,8 +336,4 @@ async def async_download_or_use_verified(
     except StopIteration as si:
         return si.value  # cache hit if True
     except HttpResponseError as hre:
-        if is_blob_not_found(hre):
-            raise BlobNotFoundError(
-                AdlsFqn.of(fs_client.account_name, fs_client.file_system_name, remote_key)
-            ) from hre
-        raise
+        _translate_blob_not_found(fs_client, remote_key, hre)

@@ -96,8 +96,20 @@ class BlobStore(Protocol):
     ) -> None:
         """Allows reading into any stream, including a stream-to-disk."""
 
-    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> str:
-        """Upload bytes from any stream, and return fully-qualified, unambiguous URI."""
+    def getfile(self, __remote_uri: str) -> Path:
+        """Read a remote uri directly into a path controlled by the implementation.
+        Optimizations involving caches for remotes may be applied.
+        The returned file is by definition read-only.
+        """
+
+    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes"):
+        """Upload bytes from any stream."""
+
+    def putfile(self, __path: Path, __remote_uri: str) -> None:
+        """Upload a file that exists on the local
+        filesystem. Optimizations including softlinking into caches may be
+        applied.
+        """
 
     def exists(self, __remote_uri: str) -> bool:
         ...

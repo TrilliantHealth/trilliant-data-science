@@ -1,3 +1,11 @@
+## 1.4
+
+- Add write-through caching to `thds.adls.resource`.
+- Provide `download_to_cache` and `upload_through_cache` shortcuts
+  that are the simplest possible call when all you want is to upload
+  or download some read-only bytes and you're sure you want to use the
+  machine-global cache.
+
 ## 1.3
 
 - Add a machine-global optimizing downloader that skips downloads

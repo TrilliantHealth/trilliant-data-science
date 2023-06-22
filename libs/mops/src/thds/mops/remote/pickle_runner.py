@@ -12,7 +12,6 @@ from thds.core.log import getLogger
 from ..__about__ import backward_compatible_with
 from ..colorize import colorized
 from ..config import adls_max_clients
-from ..exception import catch
 from ._byos import ByIdRegistry, MemoizingSerializer
 from ._content_aware_uri_serde import STORAGE_ROOT, SharedPickler, make_dumper, make_read_object
 from ._destfile import trigger_dest_files_placeholder_write
@@ -188,31 +187,31 @@ def _pickle_func_and_run_via_shell(
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
 
             class _success(ty.NamedTuple):
-                result: ty.Any
+                success_uri: str
 
             class _error(ty.NamedTuple):
-                exception: ty.Any
-
-            read_result = make_read_object(_RESULT, _success)
-            read_exception = make_read_object("EXCEPTION", _error)
+                exception_uri: str
 
             def check_result(
                 rerun_excs: bool = False,
             ) -> ty.Union[None, _success, _error]:
-                with catch(fs.is_blob_not_found):
-                    return read_result(fs.join(memo_uri, _RESULT))
+                result_uri = fs.join(memo_uri, _RESULT)
+                if fs.exists(result_uri):
+                    return _success(result_uri)
                 if rerun_excs:
                     return None
-                with catch(fs.is_blob_not_found):
-                    return read_exception(fs.join(memo_uri, _EXCEPTION))
+                error_uri = fs.join(memo_uri, _EXCEPTION)
+                if fs.exists(error_uri):
+                    return _error(error_uri)
                 return None
 
             def give_result(result: ty.Union[_success, _error]) -> T:
                 if isinstance(result, _success):
-                    trigger_dest_files_placeholder_write(result.result)
-                    return ty.cast(T, result.result)
+                    success = ty.cast(T, make_read_object(_RESULT)(result.success_uri))
+                    trigger_dest_files_placeholder_write(success)
+                    return success
                 assert isinstance(result, _error), "Must be _error or _success"
-                raise result.exception
+                raise make_read_object("EXCEPTION")(result.exception_uri)
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.

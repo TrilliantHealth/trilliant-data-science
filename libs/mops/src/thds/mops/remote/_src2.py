@@ -1,6 +1,6 @@
 import json
 
-from thds.adls import AdlsFqn, AdlsHashedResource
+from thds.adls import AdlsFqn, resource
 
 from ._remote_file_updn import DOWNLOADERS
 from .adls_remote_files import _download_serialized, _fqn, _sd_from_serialized, _validate_remote_srcfile
@@ -43,9 +43,7 @@ def remote_only(fqn: AdlsFqn, md5b64: str = "") -> SrcFile:
     md5b64 = md5b64 or str(d.get("md5b64") or "")
     return SrcFile(
         _ADLS_DOWNLOAD_V1,
-        Serialized(
-            AdlsHashedResource(fqn, md5b64).serialized if md5b64 else json.dumps(dict(uri=str(fqn)))
-        ),
+        Serialized(resource.of(fqn, md5b64).serialized if md5b64 else json.dumps(dict(uri=str(fqn)))),
     )
 
 

@@ -10,7 +10,7 @@ new style.
 import typing as ty
 from pathlib import Path
 
-from thds.adls import AdlsFqn, AdlsHashedResource, AdlsRoot
+from thds.adls import AdlsFqn, AdlsRoot, resource
 from thds.adls.md5 import md5_readable
 from thds.core.hashing import b64
 
@@ -22,14 +22,14 @@ from .remote_file import DestFile, Serialized, SrcFile, StrOrPath
 DestFileContext = ty.Callable[[str], DestFile]
 
 
-def resource_from_srcdest(srcdest: ty.Union[SrcFile, DestFile]) -> AdlsHashedResource:
+def resource_from_srcdest(srcdest: ty.Union[SrcFile, DestFile]) -> resource.AHR:
     """Will force upload if not already uploaded."""
     if isinstance(srcdest, SrcFile):
         srcdest._upload_if_not_already_remote()
     else:
         srcdest._force_serialization()
     sd = _sd_from_serialized(srcdest._serialized_remote_pointer)
-    return AdlsHashedResource.of(_fqn(sd), sd["md5b64"])
+    return resource.of(_fqn(sd), sd["md5b64"])
 
 
 def _upload_and_represent_v2(uri: str, local_src: StrOrPath) -> Serialized:
@@ -46,7 +46,7 @@ def _upload_and_represent_v2(uri: str, local_src: StrOrPath) -> Serialized:
         # We use md5 base64 so this is easy to verify against ADLS
         # without downloading the file.  we do not currently make use
         # of this validation but we could in the future.
-        return AdlsHashedResource(fqn, md5b64=b64(md5_readable(file))).serialized  # type: ignore
+        return resource.of(fqn, md5b64=b64(md5_readable(file))).serialized  # type: ignore
 
 
 _ADLS_URI_UPLOAD_V1 = "adls_uri_v1"  # do not ever change this key. it
