@@ -51,7 +51,6 @@ def pure_remote(
             if is_remote() or _bypass_remote():
                 return f(*args, **kwargs)
 
-            scope.enter(log.logger_context(local=get_pipeline_id()))
             logger.debug("Forwarding local function call to runner...")
             return runner(f, args, kwargs)
 

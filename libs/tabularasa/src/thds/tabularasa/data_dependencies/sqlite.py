@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import io
+import warnings
 from logging import getLogger
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Union
@@ -129,7 +130,10 @@ def insert_table(
             _LOGGER.debug(f"Inserting data for table {table.name}")
             for df in batches:
                 df = _prepare_for_sqlite(df, table)
-                df.to_sql(table.snake_case_name, con, if_exists="append", index=False)
+
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", "pandas only supports SQLAlchemy connectable")
+                    df.to_sql(table.snake_case_name, con, if_exists="append", index=False)
 
         if index_ddl:
             with con:

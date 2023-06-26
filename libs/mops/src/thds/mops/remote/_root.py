@@ -2,11 +2,13 @@ import os
 import socket
 from datetime import datetime
 
-from thds.core import meta, stack_context
+from thds.core import log, meta, stack_context
 
+from ..colorize import colorized
 from ..config import memo_pipeline_id
 
 _IS_REMOTE = stack_context.StackContext("is_remote", False)
+logger = log.getLogger(__name__)
 
 
 def _simple_host() -> str:
@@ -29,18 +31,24 @@ def __set_or_generate_pipeline_id_if_empty():
     named_clean_commit = (
         f"{some_unique_name}/{clean_commit}" if some_unique_name and clean_commit else ""
     )
-    set_pipeline_id(
-        memo_pipeline_id()
-        or named_clean_commit
-        or _simple_host()  # host name can be a group/directory now
-        + "/"
-        + "-".join(
-            [
-                datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-                f"p{os.getpid()}",
-            ]
+
+    def gen_pipeline_id() -> str:
+        pipeline_id = (
+            _simple_host()  # host name can be a group/directory now
+            + "/"
+            + "-".join(
+                [
+                    datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    f"p{os.getpid()}",
+                ]
+            )
         )
-    )
+        logger.warning(
+            colorized(fg="black", bg="yellow")(f"Generated pipeline id '{pipeline_id}' for this run")
+        )
+        return pipeline_id
+
+    set_pipeline_id(memo_pipeline_id() or named_clean_commit or gen_pipeline_id())
 
 
 def get_pipeline_id() -> str:
