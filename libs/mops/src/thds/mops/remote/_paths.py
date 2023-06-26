@@ -11,6 +11,7 @@ from ._once import Once
 
 Downloader = ty.Callable[[], Path]
 logger = getLogger(__name__)
+_1_MB = 2**20
 
 
 class PathContentAddresser:
@@ -102,8 +103,11 @@ def _pickle_file_path_as_upload(
     remote_key = remote_root + "/_bytes"
 
     def upload():
-        logger.info(
-            f"Uploading Path {local_src} to {remote_key} - "
+        size = local_src.stat().st_size
+        formatted_size = f"{size / _1_MB:,.2f} MB"
+        log = logger.info if size > 10 * _1_MB else logger.debug
+        log(
+            f"Uploading Path {local_src} of size {formatted_size} to {remote_key} - "
             "its contents will get 'unpickled' on the other side"
             " as a Path pointing to a local, read-only file."
         )

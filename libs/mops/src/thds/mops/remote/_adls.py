@@ -9,6 +9,7 @@ from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 from thds.adls import AdlsFqn, join, resource
 from thds.adls._upload import upload_decision_and_settings
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
+from thds.adls.errors import BlobNotFoundError, is_blob_not_found
 from thds.adls.global_client import get_global_client
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
@@ -22,6 +23,7 @@ T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
 FromBytes = ty.Callable[[ty.BinaryIO], T]
 _5_MB = 5 * 2**20
+_SLOW_CONNECTION_WORKAROUND = 14400  # seconds
 
 # suppress very noisy INFO logs in azure library.
 # This mirrors thds.adls.
@@ -55,17 +57,6 @@ def _selective_upload_path(path: Path, fqn: AdlsFqn):
         resource.upload(fqn, path)
 
 
-class BlobNotFoundError(Exception):
-    def __init__(self, fqn: AdlsFqn, type_hint: str = "Blob"):
-        super().__init__(f"{type_hint} not found: {fqn}")
-
-
-def is_blob_not_found(exc: Exception) -> bool:
-    return (
-        isinstance(exc, azure.core.exceptions.HttpResponseError) and exc.status_code == 404
-    ) or isinstance(exc, BlobNotFoundError)
-
-
 def is_creds_failure(exc: Exception) -> bool:
     return isinstance(exc, azure.core.exceptions.HttpResponseError) and not is_blob_not_found(exc)
 
@@ -88,7 +79,7 @@ class AdlsFileSystem(BlobStore):
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(logger_context(download=fqn))
-        logger.info(f"<----- downloading {type_hint}")
+        logger.debug(f"<----- downloading {type_hint}")
         try:
             on_slow(
                 LOG_SLOW_TRANSFER_S,
@@ -120,6 +111,7 @@ class AdlsFileSystem(BlobStore):
             lambda: file_client.upload_data(
                 data,
                 overwrite=True,
+                connection_timeout=_SLOW_CONNECTION_WORKAROUND,
                 content_settings=decision.content_settings,
             )
         )()

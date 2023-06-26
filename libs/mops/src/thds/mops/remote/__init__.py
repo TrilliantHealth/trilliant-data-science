@@ -8,7 +8,7 @@ from .adls_remote_files import (  # noqa
     load_srcfile,
 )
 from .core import get_pipeline_id, invocation_unique_key, pure_remote, set_pipeline_id  # noqa
-from .direct import direct_shell  # noqa
+from .direct import direct_shell, memoize_direct  # noqa
 from .memoize import pipeline_id_mask, pipeline_id_mask_from_docstr  # noqa
 from .parallel import (  # noqa
     IteratorWithLen,

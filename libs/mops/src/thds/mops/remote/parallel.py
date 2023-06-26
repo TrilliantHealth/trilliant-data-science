@@ -180,7 +180,7 @@ def thunking(func: ty.Callable[P, R]) -> ty.Callable[P, Thunk[R]]:
     executed but the execution itself is deferred.
     """
 
-    def wrapper(*args, **kwargs) -> Thunk[R]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Thunk[R]:
         return Thunk(func, *args, **kwargs)
 
     return wrapper

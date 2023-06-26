@@ -96,15 +96,16 @@ modification to existing code._
 
 Any `pathlib.Path` found (even recursively) while pickling your
 function arguments will be streamed in a memory-efficient manner to
-ADLS, and then on the 'other side' it will be streamed to a temporary
-file and given to you as a `Path` object. It will be semantically
-meaningful as a *read-only source* - writing to this file will produce
-no effect on the orchestrator process.
+ADLS, and then on the 'other side' it will be streamed to a
+**read-only** file and given to you as a `Path` object. The file is
+immutable, and even if written to, those effects will not be visible
+to the orchestrator.
 
-Separately, any `Path` found in the result will similarly be streamed
-to a temporary file on the local orchestrator. This is semantically
-meaningful as a *write-only destination* - writing to this Path will
-transfer its bytes to the orchestrator as a temporary file.
+Separately, any `Path` found in the return value will similarly be
+streamed to a **read-only** file on the local orchestrator. This is
+semantically meaningful as a *write-once destination* - writing to
+this Path will transfer its bytes to the orchestrator as a temporary
+file.
 
 Both of these actions happen automatically across `pure_remote`
 function invocations using the `AdlsPickleRunner`, without further

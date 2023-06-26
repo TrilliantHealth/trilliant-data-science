@@ -5,6 +5,12 @@
   that are the simplest possible call when all you want is to upload
   or download some read-only bytes and you're sure you want to use the
   machine-global cache.
+- Provide `resource.verify_or_create`, which checks a serialized
+  resource pointer (a JSON file committed to the repository) and
+  (re)creates the resource if that pointer cannot be found or the
+  URI/FQN does not match what is expected. This is very handy for
+  caching large test resources on ADLS and enabling them to be created
+  transparently and non-imperatively, including in CI.
 
 ## 1.3
 

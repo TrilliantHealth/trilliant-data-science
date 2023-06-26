@@ -26,12 +26,11 @@ Prefer importing this module `as resource` or `from thds.adls
 import resource`, and then using it as a namespace,
 e.g. `resource.of(uri)`.
 """
-from .core import AdlsHashedResource  # noqa: F401
-from .core import of, parse, serialize  # noqa: F401
+from .core import AdlsHashedResource, of, parse, serialize  # noqa: F401
 from .file_pointers import resource_from_path as from_path  # noqa: F401
 from .file_pointers import resource_to_path as to_path  # noqa: F401
 from .file_pointers import validate_resource as validate  # noqa: F401
-from .up_down import get_or_create_shared_resource as get_or_create_shared  # noqa: F401
 from .up_down import get_read_only, upload  # noqa: F401
+from .up_down import verify_or_create_resource as verify_or_create  # noqa: F401
 
 AHR = AdlsHashedResource  # just an alias
