@@ -30,8 +30,8 @@ HIVE_SUB_CHARACTER = "_"
 VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
 VERSION_SUB_CHARACTER = ""
 
-CI = "runner"
 CI_TIMESTAMP = "CI_TIMESTAMP"
+CI_USER = "runner"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
@@ -403,6 +403,23 @@ def init_metadata(misc: ty.Optional[MiscType] = None, pyproject_toml_version: st
     )
 
 
+def _sanitize_metadata_for_docker_tools(d: dict):
+    """We want our Docker builds to be able to take advantage of
+    caching based on the contents of the sources copied over into
+    them.  If we embed a meta.json into each library where the commit
+    hash changes every time a commit happens, then we've blown away
+    our entire cache.
+
+    The Docker builds already inject this metadata as environment
+    variables after the source copies happen, so there's no need for
+    us to embed it this way.
+    """
+    d["git_commit"] = ""
+    d["git_branch"] = ""
+    d["git_is_clean"] = ""
+    d["thds_user"] = THDS_USER
+
+
 def write_metadata(
     pkg: str,
     *,
@@ -411,6 +428,7 @@ def write_metadata(
     layout: LayoutType = "src",
     wdir: ty.Optional[StrOrPath] = None,
     deploying: bool = False,
+    for_docker_tools_build: bool = False,
 ) -> None:
     wdir_ = Path(wdir) if wdir else Path(".")
     assert wdir_
@@ -428,7 +446,10 @@ def write_metadata(
 
         with open(wdir_ / metadata_path, "w") as f:
             LOGGER.info(f"Writing metadata for {pkg} to {wdir_ / metadata_path}")
-            json.dump(meta_converter.unstructure(metadata), f, indent=2)
+            metadata_dict = meta_converter.unstructure(metadata)
+            if for_docker_tools_build:
+                _sanitize_metadata_for_docker_tools(metadata_dict)
+            json.dump(metadata_dict, f, indent=2)
             f.write("\n")  # Add newline because Py JSON does not
 
 
