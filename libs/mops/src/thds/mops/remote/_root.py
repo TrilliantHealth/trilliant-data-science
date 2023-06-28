@@ -1,6 +1,8 @@
 import os
 import socket
+import typing as ty
 from datetime import datetime
+from functools import wraps
 
 from thds.core import log, meta, stack_context
 
@@ -8,6 +10,7 @@ from ..colorize import colorized
 from ..config import memo_pipeline_id
 
 _IS_REMOTE = stack_context.StackContext("is_remote", False)
+F = ty.TypeVar("F", bound=ty.Callable)
 logger = log.getLogger(__name__)
 
 
@@ -76,3 +79,14 @@ def set_pipeline_id(name: str):
 
 def is_remote() -> bool:
     return _IS_REMOTE()
+
+
+def make_local(f: F) -> F:
+    """Make a function act as though it is local, even if it's running on a remote."""
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        with _IS_REMOTE.set(False):
+            return f(*args, **kwargs)
+
+    return ty.cast(F, wrapper)

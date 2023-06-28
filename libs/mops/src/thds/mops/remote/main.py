@@ -22,6 +22,14 @@ from .temp import _REMOTE_TMP
 logger = getLogger(__name__)
 
 
+def run_main(*args: str):
+    try:
+        with _IS_REMOTE.set(True):
+            main_handler(*args)
+    finally:
+        _REMOTE_TMP.cleanup()
+
+
 def main():
     """Routes remote function calls in a remote process."""
     logger.info(f"Entering remote process {os.getpid()} with installed mops version {__version__}")
@@ -32,11 +40,7 @@ def main():
     )
     # TODO potentially allow things like logger context to be passed in as -- arguments
     args, unknown = parser.parse_known_args()
-    try:
-        with _IS_REMOTE.set(True):
-            main_handler(args.remote_runner, *unknown)
-    finally:
-        _REMOTE_TMP.cleanup()
+    run_main(args.remote_runner, *unknown)
 
 
 if __name__ == "__main__":

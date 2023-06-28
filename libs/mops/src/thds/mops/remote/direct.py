@@ -8,10 +8,9 @@ from typing import Callable, Sequence, Union
 from thds.adls import AdlsFqn, AdlsRoot
 from thds.core.log import getLogger
 
-from ._registry import MAIN_HANDLER_BASE_ARGS, main_handler
-from ._root import _IS_REMOTE
+from ._registry import MAIN_HANDLER_BASE_ARGS
 from .core import F, pure_remote
-from .temp import _REMOTE_TMP
+from .main import run_main
 
 logger = getLogger(__name__)
 
@@ -21,12 +20,12 @@ def direct_shell(shell_args: Sequence[str]) -> None:
     without needing to transfer control to an external process.
     """
     logger.info("Running a pure_remote function locally in the current thread.")
-    assert tuple(shell_args[:3]) == MAIN_HANDLER_BASE_ARGS, (shell_args, MAIN_HANDLER_BASE_ARGS)
-    try:
-        with _IS_REMOTE.set(True):
-            main_handler(*shell_args[3:])
-    finally:
-        _REMOTE_TMP.cleanup()
+    n_base_args = len(MAIN_HANDLER_BASE_ARGS)
+    assert tuple(shell_args[:n_base_args]) == MAIN_HANDLER_BASE_ARGS, (
+        shell_args,
+        MAIN_HANDLER_BASE_ARGS,
+    )
+    run_main(*shell_args[:n_base_args])
 
 
 def memoize_direct(adls_root: Union[AdlsRoot, AdlsFqn, str, None] = None) -> Callable[[F], F]:

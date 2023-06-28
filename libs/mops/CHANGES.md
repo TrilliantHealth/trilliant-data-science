@@ -1,3 +1,15 @@
+### 1.6.2
+
+- Allow marking a function as remote-runnable when you're already
+  inside a remote context.
+
+  This is not generally recommended because it would be inefficient
+  for one remote runner to call another remote runner and wait for it.
+
+  However, there are cases where `memoize_direct` would be able to
+  take advantage of this behavior at no efficiency loss, and the
+  technical implementation is quite simple.
+
 ### 1.6.1
 
 - Make `kubernetes` an optional dependency, via the `k8s` extra.
