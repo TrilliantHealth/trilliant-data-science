@@ -3,6 +3,7 @@ import typing as ty
 
 from azure.storage.filedatalake import DataLakeServiceClient, FileSystemClient
 
+from ._env import MAX_BLOCK_SIZE, MAX_CHUNK_GET_SIZE, MAX_SINGLE_GET_SIZE
 from .shared_credential import SharedCredential
 
 
@@ -11,6 +12,9 @@ def adls_fs_client(storage_account: str, container: str) -> FileSystemClient:
     return DataLakeServiceClient(
         account_url=f"https://{storage_account}.dfs.core.windows.net",
         credential=SharedCredential(),
+        max_single_get_size=MAX_SINGLE_GET_SIZE,  # for downloads
+        max_chunk_get_size=MAX_CHUNK_GET_SIZE,  # for downloads
+        max_block_size=MAX_BLOCK_SIZE,  # for uploads
     ).get_file_system_client(file_system=container)
 
 

@@ -15,6 +15,7 @@ from thds.core.hashing import b64
 from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
+from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from .errors import BlobNotFoundError, is_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
@@ -304,7 +305,10 @@ def download_or_use_verified(
                     file_properties = dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
             else:  # needs file object
-                dl_file_client.download_file().readinto(co_request)
+                dl_file_client.download_file(
+                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY,
+                    connection_timeout=CONNECTION_TIMEOUT,
+                ).readinto(co_request)
                 co_request = co.send(None)
     except StopIteration as si:
         return si.value  # cache hit if True
@@ -330,7 +334,10 @@ async def async_download_or_use_verified(
                     file_properties = await dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
             else:  # needs file object
-                reader = await dl_file_client.download_file()
+                reader = await dl_file_client.download_file(
+                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY,
+                    connection_timeout=CONNECTION_TIMEOUT,
+                )
                 await reader.readinto(co_request)
                 co_request = co.send(None)
     except StopIteration as si:

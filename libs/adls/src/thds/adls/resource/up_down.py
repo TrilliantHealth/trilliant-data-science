@@ -8,6 +8,7 @@ from azure.core.exceptions import HttpResponseError
 
 from thds.core import hashing, log, scope
 
+from .._env import UPLOAD_FILE_MAX_CONCURRENCY
 from .._upload import upload_decision_and_settings
 from ..download import BlobNotFoundError, download_or_use_verified
 from ..fqn import AdlsFqn
@@ -18,6 +19,7 @@ from .file_pointers import AdlsHashedResource, resource_from_path, resource_to_p
 
 logger = log.getLogger(__name__)
 _SLOW_CONNECTION_WORKAROUND = 14400  # seconds
+_REPORT_START_UPLOAD_THRESHOLD = 2**20 * 100  # 100 MiB
 
 
 # DOWNLOAD
@@ -111,7 +113,10 @@ def upload(
         if isinstance(data, Path):
             n_bytes = data.stat().st_size
             size = f"{n_bytes:,} bytes "
+            if n_bytes > _REPORT_START_UPLOAD_THRESHOLD:
+                logger.info(f"Uploading {size}from {data.name} to {fqn}")
             data = scope.enter(open(data, "rb"))
+
         start = default_timer()
 
         fs_client.upload_data(
@@ -119,6 +124,7 @@ def upload(
             overwrite=True,
             content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
+            max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY,
         )
 
         # make use of the stats available to log an informative message...
@@ -202,7 +208,7 @@ def verify_or_create_resource(
 
     logger.info(f"Creating resource for {remote_fqn}...")
     created_path = creator()
-    sz_mb = created_path.stat().st_size / 2**20  # MB
+    sz_mb = created_path.stat().st_size / 2**20  # 1 MB
     logger.info(
         f"Uploading created resource of size {sz_mb:.1f} MB to {remote_fqn} from {created_path} ..."
     )
