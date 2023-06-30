@@ -1,3 +1,9 @@
+### 1.6.3
+
+- Fix bug where `memoize_direct` got broken in 1.6.2 and apparently I
+  had no tests on it? Not sure how this didn't break downstream
+  applications but apparently it did not.
+
 ### 1.6.2
 
 - Allow marking a function as remote-runnable when you're already

@@ -25,7 +25,7 @@ def direct_shell(shell_args: Sequence[str]) -> None:
         shell_args,
         MAIN_HANDLER_BASE_ARGS,
     )
-    run_main(*shell_args[:n_base_args])
+    run_main(*shell_args[n_base_args:])
 
 
 def memoize_direct(adls_root: Union[AdlsRoot, AdlsFqn, str, None] = None) -> Callable[[F], F]:
