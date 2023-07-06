@@ -4,6 +4,7 @@ from threading import RLock
 
 from .._recursive_visit import recursive_visit
 from .remote_file import SrcFile
+from .types import Args, Kwargs
 
 _GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
 # SrcFiles are generally created on the orchestrator in order to fan
@@ -15,7 +16,7 @@ _GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
 # to upload one after the other.
 
 
-def trigger_src_files_upload(args, kwargs):
+def trigger_src_files_upload(args: Args, kwargs: Kwargs):
     """Runner implementations making use of remote filesystems should
     call this before remote function execution.
     """

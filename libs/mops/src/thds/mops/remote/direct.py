@@ -28,15 +28,22 @@ def direct_shell(shell_args: Sequence[str]) -> None:
     run_main(*shell_args[n_base_args:])
 
 
+# TODO rename to something like memoize_shared or memoize_global,
+# since it's storing results in a shared (ADLS) location.
 def memoize_direct(adls_root: Union[AdlsRoot, AdlsFqn, str, None] = None) -> Callable[[F], F]:
     """A decorator that makes a function memoizable in the current
     thread.
     This is a good thing to use when the computation derives no
     advantage from not running locally (i.e. exhibits no parallelism)
     but you still want memoization.
+
+    This enables nested memoized function calls, which is not (yet)
+    the default for `pure_remote`.
     """
     from ._backward_compat import AdlsPickleRunner
 
     if isinstance(adls_root, str):
         adls_root = AdlsFqn.parse(adls_root)
-    return pure_remote(AdlsPickleRunner(direct_shell, adls_root, rerun_exceptions=True))
+    return pure_remote(
+        AdlsPickleRunner(direct_shell, adls_root, rerun_exceptions=True), allow_nested=True
+    )

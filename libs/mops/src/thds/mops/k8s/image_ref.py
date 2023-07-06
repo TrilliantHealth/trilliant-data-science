@@ -11,7 +11,6 @@ from pathlib import Path
 from thds.core import lazy, log
 
 from ..colorize import colorized
-from ..remote.core import is_remote
 from .image_backoff import YIKES
 from .launch import autocr
 
@@ -56,11 +55,9 @@ def std_docker_build_push_develop_cmd(root: Path) -> ty.List[str]:
     dev-only and therefore should never be imported inside the
     application.
     """
-    if is_remote():
-        return list()
     script = root / "docker/build_push.py"
     if not script.is_file():
-        logger.warning(f"We were unable to find {script}; this will not result in an attempt to build.")
+        logger.info(f"We were unable to find {script}; this will not result in an attempt to build.")
         return list()
     return ["poetry", "run", str(script), "--develop"]
 

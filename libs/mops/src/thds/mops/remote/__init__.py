@@ -1,6 +1,5 @@
 from ._backward_compat import AdlsPickleRunner  # noqa
 from ._dest2 import DestFileContext, destfile_context, direct_dest  # noqa
-from ._root import make_local  # noqa
 from ._src2 import fqn_relative_to_src, remote_only, src_from_dest  # noqa
 from .adls_remote_files import (  # noqa
     AdlsDatasetContext,

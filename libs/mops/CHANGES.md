@@ -1,3 +1,14 @@
+## 1.7.0
+
+- `pure_remote` functions can now be called inside other `pure_remote`
+  functions and they will transfer control via the runner rather than
+  being called directly.  This would technically be a
+  backward-incompatible change (although there are no current cases of
+  this being used at Trilliant Health), so this behavior must be
+  enabled via a flag on the `pure_remote` call itself. In a 2.0
+  release, this behavior will be the default, and a method to disable
+  it will be provided.
+
 ### 1.6.3
 
 - Fix bug where `memoize_direct` got broken in 1.6.2 and apparently I

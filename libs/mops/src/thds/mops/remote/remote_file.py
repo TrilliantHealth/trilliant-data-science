@@ -26,6 +26,9 @@ really benefit from this, and ideally our solution will solve for a
 somewhat broader range of use cases.
 
 """
+# This source code no longer has any actual dependencies on the rest
+# of mops.  It is intended to remain that way, so that it can be an
+# abstraction that is obviously 'clean'.
 import os
 import shutil
 import tempfile
@@ -44,7 +47,6 @@ from ._remote_file_updn import (
     reify_downloader,
     reify_uploader,
 )
-from ._root import is_remote
 
 logger = getLogger(__name__)
 
@@ -85,9 +87,14 @@ class DestFile:
     """
 
     def __init__(self, uploader: ty.Union[Uploader, NamedUriUploader], local_filename: StrOrPath):
-        reify_uploader(uploader)
+        reify_uploader(uploader)  # test that it can be reified.
         self._uploader = uploader
         self._local_filename = os.fspath(local_filename)
+        if not local_filename:
+            self._mark_as_remote()
+            # with no local filename, that means we are remote-only
+            # and _must_ upload the file at __exit__.
+
         # we are careful throughout this class (and SrcFile) to
         # refrain from storing things as Paths, because it is likely
         # that these objects will pass through a `pure_remote`
@@ -103,6 +110,12 @@ class DestFile:
             logger.warning(f"Uploading file {self._local_filename} so that we have its serialization")
             assert os.path.exists(self._local_filename), "Only valid for locally-present DestFiles"
             self._serialized_remote_pointer = reify_uploader(self._uploader)(self._local_filename)
+
+    def _is_remote(self) -> bool:
+        return hasattr(self, "_marked_remote")
+
+    def _mark_as_remote(self) -> None:
+        self._marked_remote = True
 
     def __enter__(self) -> Path:
         """Return a temporary local file Path that may be used for opening or moving to.
@@ -132,7 +145,7 @@ class DestFile:
             del self._temp_dest_filepath
             return
 
-        if is_remote():
+        if self._is_remote():
             try:
                 self._serialized_remote_pointer = reify_uploader(self._uploader)(
                     self._temp_dest_filepath
@@ -224,7 +237,7 @@ class SrcFile:
                 self._uploader
             ), "If file is not a remote file pointer, uploader must be provided as well"
         self._downloader = downloader
-        reify_downloader(downloader)
+        reify_downloader(downloader)  # just to test that it can be reified.
         self._temp_src_filepath: str = ""
         self._entrance_count = 0
 
@@ -244,6 +257,12 @@ class SrcFile:
         self._local_filename = ""
         self._uploader = None
 
+    def _mark_as_remote(self) -> None:
+        self._marked_remote = True
+
+    def _is_remote(self) -> bool:
+        return hasattr(self, "_marked_remote")
+
     def __enter__(self) -> Path:
         """Return a local path suitable for opening and reading.
 
@@ -260,7 +279,7 @@ class SrcFile:
                 self._temp_src_filepath
             )  # pragma: nocover  # cannot 'see' test b/c it runs remotely
 
-        if is_remote() or self._serialized_remote_pointer:
+        if self._is_remote() or self._serialized_remote_pointer:
             _fh, self._temp_src_filepath = tempfile.mkstemp(
                 suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
             )
@@ -278,7 +297,7 @@ class SrcFile:
         self._entrance_count -= 1
         if self._temp_src_filepath and not self._entrance_count:
             assert (
-                is_remote() or self._serialized_remote_pointer
+                self._is_remote() or self._serialized_remote_pointer
             ), "No temp file should have been created in this context."
             try:
                 os.remove(self._temp_src_filepath)

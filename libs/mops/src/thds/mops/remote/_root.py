@@ -2,14 +2,13 @@ import os
 import socket
 import typing as ty
 from datetime import datetime
-from functools import wraps
 
 from thds.core import log, meta, stack_context
 
 from ..colorize import colorized
 from ..config import memo_pipeline_id
 
-_IS_REMOTE = stack_context.StackContext("is_remote", False)
+_IS_CALLED_BY_RUNNER = stack_context.StackContext("is_called_by_runner", False)
 F = ty.TypeVar("F", bound=ty.Callable)
 logger = log.getLogger(__name__)
 
@@ -77,16 +76,17 @@ def set_pipeline_id(name: str):
     _PIPELINE_ID = name
 
 
-def is_remote() -> bool:
-    return _IS_REMOTE()
+def is_called_by_runner() -> bool:
+    """In other words, should I call a wrapped function directly, or
+    should I call it via the Runner?
+    """
+    return _IS_CALLED_BY_RUNNER()
 
 
 def make_local(f: F) -> F:
     """Make a function act as though it is local, even if it's running on a remote."""
-
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        with _IS_REMOTE.set(False):
-            return f(*args, **kwargs)
-
-    return ty.cast(F, wrapper)
+    # This used to be necessary to allow nested calls when _IS_REMOTE
+    # was a permanent setting, but now we automatically allow nested
+    # calls by only running the top-level function as a remote, so
+    # this is a no-op.
+    return f

@@ -15,6 +15,7 @@ from ..config import adls_max_clients
 from ._byos import ByIdRegistry, MemoizingSerializer
 from ._content_aware_uri_serde import STORAGE_ROOT, SharedPickler, make_dumper, make_read_object
 from ._destfile import trigger_dest_files_placeholder_write
+from ._mark_remote import mark_as_remote
 from ._memoize import args_kwargs_content_address, get_mask_or_pipeline_id, make_function_memospace
 from ._once import Once
 from ._paths import PathContentAddresser
@@ -298,7 +299,9 @@ def run_pickled_invocation(*shell_args: str):
             make_read_object(_INVOCATION)(fs.join(memo_uri, _INVOCATION)),
         )
         return pipeline_id_mask(pipeline_id)(
-            SerializableThunk(nested.f, *unfreeze_args_kwargs(nested.args_kwargs_pickle))
+            SerializableThunk(
+                nested.f, *mark_as_remote(*unfreeze_args_kwargs(nested.args_kwargs_pickle))
+            )
         )
 
     forwarding_call(

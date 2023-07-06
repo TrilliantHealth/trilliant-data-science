@@ -118,7 +118,7 @@ def _download_serialized(serialized: Serialized, local_dest: StrOrPath):
     local_filename = os.fspath(local_dest)
     sd = _try_parse_adls_path_repr(serialized)
     if not sd:
-        raise ValueError(f"{serialized} does not represent a remote ADLS file")
+        raise ValueError(f"'{serialized}' does not represent a remote ADLS file")
 
     fqn = _fqn(sd)
     # This gives us a machine-global cache to use, and also gives us maximum possible

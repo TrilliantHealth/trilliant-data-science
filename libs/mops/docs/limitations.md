@@ -6,16 +6,6 @@ This is the only blob store we currently support. In the future, we
 could lift this implementation, as `mops` is already designed in such
 a way as to minimize the direct dependency on ADLS.
 
-### No 'remote recursion'
-
-Currently, only a single 'level' of remote functions are
-supported. That is to say, once running remotely, no function which is
-itself a remote function may be called and expected to be launched on
-yet another remote machine.
-
-This is a simple technical limitation and may be removed with some
-additional work.
-
 ### Network bottlenecks
 
 This library has improved over time, but over many runs we have

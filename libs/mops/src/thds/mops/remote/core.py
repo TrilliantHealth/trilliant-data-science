@@ -2,6 +2,7 @@
 
 Full implementations require a ser/de approach as well as an accessible storage location.
 """
+import contextlib
 import os
 import typing as ty
 from functools import wraps
@@ -9,7 +10,7 @@ from functools import wraps
 from thds.core import log, scope
 from thds.core.stack_context import StackContext
 
-from ._root import get_pipeline_id, is_remote, set_pipeline_id
+from ._root import _IS_CALLED_BY_RUNNER, get_pipeline_id, is_called_by_runner, set_pipeline_id
 from .types import ResultChannel, Runner
 
 logger = log.getLogger(__name__)
@@ -24,6 +25,7 @@ def pure_remote(
     runner: Runner,
     *,
     bypass_remote: ty.Union[bool, LazyBool] = False,
+    allow_nested: bool = False,  # future versions will switch this default to True.
 ) -> ty.Callable[[F], F]:
     """Wrap a function that is pure with respect to its arguments and result.
 
@@ -34,7 +36,7 @@ def pure_remote(
     accessible in that context.
     """
 
-    def _bypass_remote() -> bool:
+    def _skip_runner() -> bool:
         if isinstance(bypass_remote, bool):
             return bypass_remote
         bypass = bypass_remote()
@@ -45,11 +47,12 @@ def pure_remote(
         @scope.bound
         @wraps(f)
         def wrapper(*args, **kwargs):  # type: ignore
-            if is_remote():
+            if is_called_by_runner():
                 scope.enter(log.logger_context(remote=get_pipeline_id()))
                 logger.debug("Calling function directly...")
-            if is_remote() or _bypass_remote():
-                return f(*args, **kwargs)
+            if is_called_by_runner() or _skip_runner():
+                with _IS_CALLED_BY_RUNNER.set(False) if allow_nested else contextlib.nullcontext():
+                    return f(*args, **kwargs)
 
             logger.debug("Forwarding local function call to runner...")
             return runner(f, args, kwargs)
@@ -122,17 +125,17 @@ def invocation_unique_key() -> ty.Optional[str]:
 @scope.bound
 def forwarding_call(
     channel: ResultChannel[T_contra],
-    get_serializable_thunk: ty.Callable[[], SerializableThunk[FT]],
+    get_thunk: ty.Callable[[], ty.Callable[[], T_contra]],
     pipeline_id: str = "",
     invocation_unique_key: str = "",
 ):
     """Your shell implementation doesn't have to use this, but it's a reasonable approach."""
     set_pipeline_id(pipeline_id)
     scope.enter(log.logger_context(remote=pipeline_id, pid=os.getpid()))
-    serializable_thunk = get_serializable_thunk()  # defer until debug info set up
+    thunk = get_thunk()  # defer until debug info set up
     try:
         scope.enter(InvocationUniqueKey.set(invocation_unique_key))
-        channel.result(serializable_thunk())
+        channel.result(thunk())
     except Exception as ex:
-        logger.exception(f"Serializable thunk {serializable_thunk} invocation failed")
+        logger.exception(f"Thunk {thunk} invocation failed")
         channel.exception(ex)
