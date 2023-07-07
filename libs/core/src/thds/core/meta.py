@@ -18,11 +18,13 @@ from .log import getLogger
 from .types import StrOrPath
 
 LayoutType = ty.Literal["flat", "src"]
-NameFormatType = ty.Literal["git", "docker", "hive"]
+NameFormatType = ty.Literal["git", "dbx", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
 
+DBX_EXCLUSION_REGEX = r"[^\w\-]+"
+DBX_SUB_CHARACTER = "-"
 DOCKER_EXCLUSION_REGEX = r"[^\w\-\.]+"
 DOCKER_SUB_CHARACTER = "-"
 HIVE_EXCLUSION_REGEX = r"[\W]+"
@@ -48,6 +50,8 @@ LOGGER = getLogger(__name__)
 def format_name(name: str, format: NameFormatType = "git") -> str:
     if format == "git":
         return name
+    elif format == "dbx":
+        return re.sub(DBX_EXCLUSION_REGEX, DBX_SUB_CHARACTER, name)
     elif format == "docker":
         return re.sub(DOCKER_EXCLUSION_REGEX, DOCKER_SUB_CHARACTER, name)
     elif format == "hive":

@@ -19,9 +19,10 @@ from thds.core import meta
 
 PACKAGE_NAME = "thds.test"
 MODULE_NAME = "thds.test.module"
-BRANCH_NAME = "feature/test-branch#3750"
-DOCKER_BRANCH_NAME = "feature-test-branch-3750"
-HIVE_BRANCH_NAME = "feature_test_branch_3750"
+BRANCH_NAME = "feature/test_my-branch#37.50"
+DBX_BRANCH_NAME = "feature-test_my-branch-37-50"
+DOCKER_BRANCH_NAME = "feature-test_my-branch-37.50"
+HIVE_BRANCH_NAME = "feature_test_my_branch_37_50"
 COMMIT_HASH = "hash123"
 USER_NAME = "test.user"
 HIVE_USER_NAME = "test_user"
@@ -206,6 +207,10 @@ def test_metadata_unstructure(
 
 def test_format_name_git() -> None:
     assert meta.format_name(BRANCH_NAME, format="git") == BRANCH_NAME
+
+
+def test_format_name_dbx() -> None:
+    assert meta.format_name(BRANCH_NAME, format="dbx") == DBX_BRANCH_NAME
 
 
 def test_format_name_docker() -> None:

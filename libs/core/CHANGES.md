@@ -1,3 +1,7 @@
+## 1.5.20230707
+
+- Added a `"dbx"` `format` option to `meta.format_name`.
+
 ## 1.5
 
 - Added the inverse function, `unflatten`, of `flatten` in `dict_utils`.
