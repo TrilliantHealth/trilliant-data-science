@@ -18,7 +18,7 @@ from .log import getLogger
 from .types import StrOrPath
 
 LayoutType = ty.Literal["flat", "src"]
-NameFormatType = ty.Literal["git", "dbx", "docker", "hive"]
+NameFormatType = ty.Literal["git", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
