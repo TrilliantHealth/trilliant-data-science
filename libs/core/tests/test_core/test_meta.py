@@ -19,9 +19,9 @@ from thds.core import meta
 
 PACKAGE_NAME = "thds.test"
 MODULE_NAME = "thds.test.module"
-BRANCH_NAME = "feature/test-branch#3750"
-DOCKER_BRANCH_NAME = "feature-test-branch-3750"
-HIVE_BRANCH_NAME = "feature_test_branch_3750"
+BRANCH_NAME = "feature/test_my-branch#37.50"
+DOCKER_BRANCH_NAME = "feature-test_my-branch-37.50"
+HIVE_BRANCH_NAME = "feature_test_my_branch_37_50"
 COMMIT_HASH = "hash123"
 USER_NAME = "test.user"
 HIVE_USER_NAME = "test_user"

@@ -1,3 +1,7 @@
+## 1.5.20230707
+
+- Some name format regex clean up in `meta`.
+
 ## 1.5
 
 - Added the inverse function, `unflatten`, of `flatten` in `dict_utils`.
