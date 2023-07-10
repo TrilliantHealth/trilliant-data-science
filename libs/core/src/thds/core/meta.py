@@ -23,13 +23,11 @@ NameFormatType = ty.Literal["git", "dbx", "docker", "hive"]
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
 
-DBX_EXCLUSION_REGEX = r"[^\w\-]+"
-DBX_SUB_CHARACTER = "-"
-DOCKER_EXCLUSION_REGEX = r"[^\w\-\.]+"
+DOCKER_EXCLUSION_REGEX = r"[^\w\-.]+"
 DOCKER_SUB_CHARACTER = "-"
 HIVE_EXCLUSION_REGEX = r"[\W]+"
 HIVE_SUB_CHARACTER = "_"
-VERSION_EXCLUSION_REGEX = r"[^\d\.]+"
+VERSION_EXCLUSION_REGEX = r"[^\d.]+"
 VERSION_SUB_CHARACTER = ""
 
 CI_TIMESTAMP = "CI_TIMESTAMP"
@@ -50,8 +48,6 @@ LOGGER = getLogger(__name__)
 def format_name(name: str, format: NameFormatType = "git") -> str:
     if format == "git":
         return name
-    elif format == "dbx":
-        return re.sub(DBX_EXCLUSION_REGEX, DBX_SUB_CHARACTER, name)
     elif format == "docker":
         return re.sub(DOCKER_EXCLUSION_REGEX, DOCKER_SUB_CHARACTER, name)
     elif format == "hive":

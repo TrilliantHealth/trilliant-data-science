@@ -1,6 +1,6 @@
 ## 1.5.20230707
 
-- Added a `"dbx"` `format` option to `meta.format_name`.
+- Some name format regex clean up in `meta`.
 
 ## 1.5
 
