@@ -6,7 +6,6 @@ import tempfile
 import typing as ty
 from pathlib import Path
 from random import SystemRandom
-from timeit import default_timer
 
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient
@@ -16,6 +15,7 @@ from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
 from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
+from ._timing import download_timer
 from .errors import BlobNotFoundError, is_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
@@ -44,15 +44,9 @@ def _atomic_download_and_move(fqn: AdlsFqn, dest: StrOrPath) -> ty.Iterator[ty.I
             dpath = os.path.join(dir, "tmp")
 
         with open(dpath, "wb") as f:
-            logger.debug(f"Downloading {fqn} to {dest}")
-            started = default_timer()
-            yield f
-        elapsed = default_timer() - started
-        size = os.path.getsize(dpath)
-        log = logger.info if elapsed > _LONG_TRANSFER_S else logger.debug
-        log(
-            f"Downloaded {size:,} bytes in {elapsed:.1f}s at {int(size/10**6/elapsed):,.1f} Mbytes/sec to {dest}"
-        )
+            with download_timer(str(fqn), str(dest), _LONG_TRANSFER_S, logger) as emit:
+                yield f
+                emit(os.path.getsize(dpath))
         try:
             os.rename(dpath, dest)
         except OSError as oserr:

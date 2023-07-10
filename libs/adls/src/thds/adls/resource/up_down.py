@@ -2,13 +2,13 @@
 import shutil
 import typing as ty
 from pathlib import Path
-from timeit import default_timer
 
 from azure.core.exceptions import HttpResponseError
 
 from thds.core import hashing, log, scope
 
 from .._env import UPLOAD_FILE_MAX_CONCURRENCY
+from .._timing import upload_timer
 from .._upload import upload_decision_and_settings
 from ..download import BlobNotFoundError, download_or_use_verified
 from ..fqn import AdlsFqn
@@ -109,16 +109,14 @@ def upload(
     decision = upload_decision_and_settings(fs_client, data)
     if decision.upload_required:
         # set up some bookkeeping
-        n_bytes, size = 0, ""
+        n_bytes, large_upload_size, src = 0, 0, ""
         if isinstance(data, Path):
             n_bytes = data.stat().st_size
-            size = f"{n_bytes:,} bytes "
-            if n_bytes > _REPORT_START_UPLOAD_THRESHOLD:
-                logger.info(f"Uploading {size}from {data.name} to {fqn}")
+            large_upload_size = n_bytes if n_bytes > _REPORT_START_UPLOAD_THRESHOLD else 0
+            src = str(data)
             data = scope.enter(open(data, "rb"))
 
-        start = default_timer()
-
+        emit_rate = scope.enter(upload_timer(fqn, src, 3.0, logger, large_upload_size))
         fs_client.upload_data(
             data,
             overwrite=True,
@@ -126,12 +124,8 @@ def upload(
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY,
         )
-
         # make use of the stats available to log an informative message...
-        elapsed = default_timer() - start
-        log = logger.info if elapsed > 3.0 else logger.debug
-        rate = f"at {int(n_bytes/10**6/elapsed):,.1f} Mbytes/sec " if n_bytes else ""
-        log(f"Uploaded {size}in {elapsed:.1f}s {rate}to {fqn}")
+        emit_rate(n_bytes)
 
     # if at all possible (if the md5 is known), return a resource containing it.
     if decision.content_settings and decision.content_settings.content_md5:
