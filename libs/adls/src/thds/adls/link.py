@@ -1,6 +1,8 @@
 """Best-effort to link a destination to a source depending on file system support."""
+# this whole module should really get moved to core.
 import os
 import platform
+import shutil
 import stat
 import subprocess
 import typing as ty
@@ -64,6 +66,23 @@ def link(
             logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
 
     return ""
+
+
+def reify_if_link(path: Path):
+    """Turn a softlink to a target file into a copy of the target file at the link location.
+
+    Useful for cases where a symlink crossing filesystems may not work
+    as expected, e.g. a Docker build.
+
+    No-op for anything that is not a symlink to a file.
+    """
+    if not path.is_symlink() or not path.is_file():
+        return
+    logger.info(f'Reifying softlink "{path}"')
+    dest = path.absolute()
+    src = path.resolve()
+    dest.unlink()
+    shutil.copy(src, dest)
 
 
 def set_read_only(fpath: ct.StrOrPath):
