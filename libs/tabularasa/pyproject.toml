@@ -15,7 +15,7 @@ cattrs = ">=22.2.0"
 networkx = ">=3.0"
 numpy = "*"
 pandas = "^1.4"
-pydantic = ">=1.10.0"
+pydantic = "^1.10.0"  # V2 introduces breaking changes
 pyarrow = ">=10.0.0"
 pyyaml = "*"
 setuptools = ">=66.1.1"
