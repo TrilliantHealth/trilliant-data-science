@@ -1,7 +1,3 @@
-## 1.7
-
-- `fretry` module for in-house retry decorators.
-
 ## 1.6
 
 - Add `env` module that just defines a known set of application-global
