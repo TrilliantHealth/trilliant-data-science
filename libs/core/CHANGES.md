@@ -1,3 +1,9 @@
+## 1.6
+
+- Add `env` module that just defines a known set of application-global
+  'environments' that other libraries and applications can use for
+  whatever purposes.
+
 ## 1.5.20230707
 
 - Some name format regex clean up in `meta`.

@@ -39,10 +39,11 @@ wrap your function with a `PickleRunner` that can reference that
 Shell.
 
 ```python
+from thds.adls import defaults
 from thds.mops.remote import pure_remote, AdlsPickleRunner
 from .k8s_shell import df_k8s_spot_11g_shell
 
-run_on_k8s = pure_remote(AdlsPickleRunner(df_k8s_spot_11g_shell))
+run_on_k8s = pure_remote(AdlsPickleRunner(df_k8s_spot_11g_shell, defaults.env_root))
 # ^ a decorator that can now cause any pure function to be run remotely on K8s...
 
 @run_on_k8s

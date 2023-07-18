@@ -1,3 +1,8 @@
+## 1.8.0
+
+- `MemoizingPickledFunctionRunner` now supports lazy `storage_root`
+  configuration.
+
 ## 1.7.0
 
 - `pure_remote` functions can now be called inside other `pure_remote`

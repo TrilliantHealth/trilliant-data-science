@@ -46,13 +46,22 @@ def _extract_invocation_unique_key(memo_uri: str) -> str:
     return memo_uri[len(storage_root) :]
 
 
+def builder(shell: Shell) -> _ShellBuilder:
+    """If you have a Shell and you want to make it into the simplest possible ShellBuilder."""
+
+    def shell_builder(_f, *_args, **_kwargs) -> Shell:
+        return shell
+
+    return ty.cast(_ShellBuilder, shell_builder)
+
+
 class MemoizingPickledFunctionRunner:
     """Runs functions in a remote process as defined by the Shell."""
 
     def __init__(
         self,
         shell_builder: _ShellBuilder,
-        storage_root: str,
+        storage_root: ty.Union[str, ty.Callable[[], str]],
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
@@ -83,7 +92,10 @@ class MemoizingPickledFunctionRunner:
 
         """
         self._shell_builder = shell_builder
-        self._runner_prefix = _runner_prefix_for_pickled_functions(storage_root)
+        if isinstance(storage_root, str):
+            self._get_storage_root = lambda: storage_root
+        else:
+            self._get_storage_root = storage_root
         self._rerun_exceptions = rerun_exceptions
         self._by_id_registry = serialization_registry
 
@@ -130,7 +142,7 @@ class MemoizingPickledFunctionRunner:
         """
         logger.debug("Preparing to run function via remote shell")
         return _pickle_func_and_run_via_shell(
-            make_function_memospace(self._runner_prefix, f),
+            make_function_memospace(_runner_prefix_for_pickled_functions(self._get_storage_root()), f),
             self._get_dumper,
             f,
         )(self._shell_builder(f, *args, **kwargs), self._rerun_exceptions, args, kwargs)

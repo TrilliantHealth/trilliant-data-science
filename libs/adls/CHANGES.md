@@ -1,3 +1,8 @@
+## 1.5
+
+- Add `defaults` module that contains some simple env-based defaults
+  for DS.
+
 ## 1.4
 
 - Add write-through caching to `thds.adls.resource`.
