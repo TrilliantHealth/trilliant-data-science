@@ -3,9 +3,9 @@ import shutil
 import typing as ty
 from pathlib import Path
 
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, ResourceModifiedError
 
-from thds.core import hashing, log, scope
+from thds.core import fretry, hashing, log, scope
 
 from .._env import UPLOAD_FILE_MAX_CONCURRENCY
 from .._timing import upload_timer
@@ -86,6 +86,13 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
 
 
 @scope.bound
+@fretry.retry_sleep(
+    # ADLS lib has a bug where parallel uploads of the same thing will
+    # hit a race condition and error.  this will detect that scenario
+    # and avoid re-uploading as well.
+    fretry.is_exc(ResourceModifiedError),
+    fretry.expo(retries=2),
+)
 def upload(
     fqn: AdlsFqn, data: UploadSrc, write_through_cache: ty.Optional[Cache] = None
 ) -> ty.Optional[AdlsHashedResource]:

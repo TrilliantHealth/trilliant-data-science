@@ -3,13 +3,11 @@ from threading import RLock
 from cachetools import TTLCache
 from kubernetes import client, config
 
-from thds.core import scope
-from thds.core.log import getLogger
+from thds.core import fretry, log, scope
 
-from ..fretry import expo, retry_regular, sleep
 from ..locked_cache import locked_cached
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 def _retry_config(exc: Exception):
@@ -19,7 +17,7 @@ def _retry_config(exc: Exception):
     return False
 
 
-empty_config_retry = retry_regular(_retry_config, sleep(expo(retries=3, delay=0.2)))
+empty_config_retry = fretry.retry_sleep(_retry_config, fretry.expo(retries=3, delay=0.2))
 
 _AUTH_RLOCK = RLock()
 

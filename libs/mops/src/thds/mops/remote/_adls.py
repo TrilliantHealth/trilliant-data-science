@@ -11,11 +11,9 @@ from thds.adls._upload import upload_decision_and_settings
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import BlobNotFoundError, is_blob_not_found
 from thds.adls.global_client import get_global_client
-from thds.core import scope
-from thds.core.log import getLogger, logger_context
+from thds.core import fretry, log, scope
 
 from ..colorize import colorized
-from ..fretry import expo, retry_regular, sleep
 from ._on_slow import on_slow
 from .types import AnyStrSrc, BlobStore
 
@@ -27,9 +25,9 @@ _SLOW_CONNECTION_WORKAROUND = 14400  # seconds
 
 # suppress very noisy INFO logs in azure library.
 # This mirrors thds.adls.
-getLogger("azure.core").setLevel(logging.WARNING)
+log.getLogger("azure.core").setLevel(logging.WARNING)
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 def yield_files(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[ty.Any]:
@@ -61,7 +59,7 @@ def is_creds_failure(exc: Exception) -> bool:
     return isinstance(exc, azure.core.exceptions.HttpResponseError) and not is_blob_not_found(exc)
 
 
-_azure_creds_retry = retry_regular(is_creds_failure, sleep(expo(retries=9, delay=1.0)))
+_azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9, delay=1.0))
 # sometimes Azure Cli credentials expire but would succeed if retried
 # and the azure library does not seem to retry these on its own.
 
@@ -78,7 +76,7 @@ class AdlsFileSystem(BlobStore):
     @scope.bound
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
         fqn = AdlsFqn.parse(remote_uri)
-        scope.enter(logger_context(download=fqn))
+        scope.enter(log.logger_context(download=fqn))
         logger.debug(f"<----- downloading {type_hint}")
         try:
             on_slow(
@@ -93,7 +91,7 @@ class AdlsFileSystem(BlobStore):
     @_azure_creds_retry
     @scope.bound
     def getfile(self, remote_uri: str) -> Path:
-        scope.enter(logger_context(download="mops-getfile"))
+        scope.enter(log.logger_context(download="mops-getfile"))
         return download_to_cache(AdlsFqn.parse(remote_uri))
 
     @_azure_creds_retry
@@ -101,7 +99,7 @@ class AdlsFileSystem(BlobStore):
     def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):
         """Upload data to a remote path."""
         fqn = AdlsFqn.parse(remote_uri)
-        scope.enter(logger_context(upload=fqn))
+        scope.enter(log.logger_context(upload=fqn))
         file_client = self._client(fqn)
         decision = upload_decision_and_settings(file_client, data)
         if not decision.upload_required:
@@ -120,14 +118,14 @@ class AdlsFileSystem(BlobStore):
     @_azure_creds_retry
     @scope.bound
     def putfile(self, path: Path, remote_uri: str):
-        scope.enter(logger_context(upload="mops-putfile"))
+        scope.enter(log.logger_context(upload="mops-putfile"))
         _selective_upload_path(path, AdlsFqn.parse(remote_uri))
 
     @_azure_creds_retry
     @scope.bound
     def exists(self, remote_uri: str) -> bool:
         fqn = AdlsFqn.parse(remote_uri)
-        scope.enter(logger_context(exists=fqn))
+        scope.enter(log.logger_context(exists=fqn))
         return on_slow(
             1.2,
             lambda secs: LogSlow(f"Took {int(secs)}s to check if file exists."),

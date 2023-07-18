@@ -66,3 +66,18 @@ def retry_regular(
     intervals_factory: ty.Callable[[], ty.Iterable[ty.Any]],
 ) -> ty.Callable[[F], F]:
     return retry(lambda: (is_retryable for _ in intervals_factory()))
+
+
+def retry_sleep(
+    is_retryable: IsRetryable,
+    seconds_iter: ty.Iterable[float],
+) -> ty.Callable[[F], F]:
+    """E.g. retry_sleep(expo(retries=5))"""
+    return retry_regular(is_retryable, sleep(seconds_iter))
+
+
+def is_exc(*exc_types: ty.Type[Exception]) -> IsRetryable:
+    def _is_exc_retryable(exc: Exception) -> bool:
+        return isinstance(exc, exc_types)
+
+    return _is_exc_retryable
