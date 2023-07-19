@@ -215,10 +215,24 @@ def _render_attrs_schema(
     table_defs = [render_attrs_table_schema(table) for table in schema.package_tables]
 
     # imports
-    stdlib_imports = sorted(
-        set(chain.from_iterable(t.attrs_required_imports for t in schema.package_tables))
+    def iter_code() -> ty.Iterator[str]:
+        for tdstr in table_defs:
+            yield tdstr
+        if loader_defs:
+            for ldstr in loader_defs.code:
+                yield ldstr
+        for tdstr in type_defs.code:
+            yield tdstr
+
+    stdlib_imports_set = set(
+        chain.from_iterable(t.attrs_required_imports for t in schema.package_tables)
     )
+    if "typing" not in stdlib_imports_set and any("typing." in co_str for co_str in iter_code()):
+        stdlib_imports_set.add("typing")
+
+    stdlib_imports = sorted(stdlib_imports_set)
     import_lines = [f"import {module}\n" for module in stdlib_imports]
+
     if import_lines:
         import_lines.append("\n")
     import_lines.append("import attr\n")
