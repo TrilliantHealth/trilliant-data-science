@@ -12,10 +12,20 @@ _1MB = 2**20
 
 @contextlib.contextmanager
 def download_timer(
-    src: ty.Any, dest: str = "", long_transfer_s: float = 3.0, logger: LoggerAdapter = logger
+    src: ty.Any,
+    dest: str = "",
+    long_transfer_s: float = 3.0,
+    logger: LoggerAdapter = logger,
+    known_size: int = 0,
 ) -> ty.Iterator[EmitRate]:
     dest_s = f" to {dest}" if dest else ""
-    logger.debug(f"Downloading {src}{dest_s}")
+    if known_size > 100 * _1MB:
+        log = logger.info
+        size_s = f" of size {known_size:,} bytes"
+    else:
+        log = logger.debug
+        size_s = ""
+    log(f"Downloading {src}{dest_s}{size_s}")
 
     start = default_timer()
     elapsed = None

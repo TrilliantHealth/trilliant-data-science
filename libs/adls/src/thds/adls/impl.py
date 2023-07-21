@@ -33,6 +33,8 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 from thds.core.log import getLogger
 
 from ._upload import async_upload_decision_and_settings
+from .download import async_download_or_use_verified
+from .ro_cache import from_cache_path_to_local, global_cache
 
 LOGGER = getLogger(__name__)
 getLogger("azure.core").setLevel(logging.WARNING)
@@ -194,43 +196,31 @@ class ADLSFileSystem:
         # may download into another path if there is a cache
         return_path = self._local_path_for(remote_path, local_path)
         download_path: Path
-        stream: Optional[IO[bytes]]
+
+        if self.cache is None:
+            download_path = return_path
+        else:
+            download_path = self.cache.cache_path(remote_path)
 
         dir_path = return_path.parent
         dir_path.mkdir(exist_ok=True, parents=True)
 
-        async with file_system_client.get_file_client(remote_path) as file_client:
-            if self.cache is None:
-                download_path = return_path
-                stream = open(return_path, "wb")
-            else:
-                # if we perform a download, it will go here
-                download_path = self.cache.cache_path(remote_path)
-
+        locally_cached = False
+        if self.cache:
+            async with file_system_client.get_file_client(remote_path) as file_client:
                 file_properties = await file_client.get_file_properties()
                 if self.cache.is_valid_for(file_properties):
-                    # cache is up-to-date for this file; skip download
+                    # local timestamp cache is up-to-date for this file; skip download
                     LOGGER.debug(f"Skipping download of cached {remote_path}")
-                    stream = None
-                else:
-                    # prepare the cache for download by removing existing file/dir and creating new file
-                    self.cache.remove(remote_path)
-                    stream = self.cache.file_handle(remote_path, "wb")
+                    locally_cached = True
+        if not locally_cached:
+            await async_download_or_use_verified(
+                file_system_client, remote_path, download_path, cache=global_cache()
+            )
 
-            if stream is not None:
-                with stream:
-                    LOGGER.debug(f"Downloading {remote_path} -> {download_path}")
-                    download = await file_client.download_file()
-                    await download.readinto(stream)
-                    LOGGER.debug(f"Complete downloading {remote_path}")
-
+        assert download_path.exists(), "File should have been downloaded by this point"
         if download_path != return_path:
-            # hard link if we downloaded to the cache but an explicit local path was supplied
-            LOGGER.debug(f"Linking {return_path} -> {download_path}")
-            if return_path.exists():
-                os.remove(return_path)
-
-            os.link(download_path, return_path)
+            from_cache_path_to_local(download_path, return_path, do_link=True)
 
         return return_path
 

@@ -34,7 +34,11 @@ class MD5MismatchError(Exception):
 
 
 @contextlib.contextmanager
-def _atomic_download_and_move(fqn: AdlsFqn, dest: StrOrPath) -> ty.Iterator[ty.IO[bytes]]:
+def _atomic_download_and_move(
+    fqn: AdlsFqn,
+    dest: StrOrPath,
+    properties: ty.Optional[FileProperties] = None,
+) -> ty.Iterator[ty.IO[bytes]]:
     global _TEMPDIRS_ON_DIFFERENT_FILESYSTEM
     with tempfile.TemporaryDirectory() as dir:
         # TODO lock dest
@@ -44,7 +48,13 @@ def _atomic_download_and_move(fqn: AdlsFqn, dest: StrOrPath) -> ty.Iterator[ty.I
             dpath = os.path.join(dir, "tmp")
 
         with open(dpath, "wb") as f:
-            with download_timer(str(fqn), str(dest), _LONG_TRANSFER_S, logger) as emit:
+            with download_timer(
+                str(fqn),
+                str(dest),
+                _LONG_TRANSFER_S,
+                logger,
+                known_size=(properties.size or 0) if properties else 0,
+            ) as emit:
                 yield f
                 emit(os.path.getsize(dpath))
         try:
@@ -179,6 +189,8 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     if not local_path:
         raise ValueError("Must provide a destination path.")
 
+    file_properties = None
+
     def remote_md5b64(file_properties: FileProperties) -> str:
         if file_properties.content_settings.content_md5:
             return b64(file_properties.content_settings.content_md5)
@@ -192,7 +204,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
 
     if not md5b64:
         # refuse to cache without md5 of some kind, either local or remote
-        with _atomic_download_and_move(fqn, local_path) as tmpwriter:
+        with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
             yield tmpwriter
             return False  # noqa: B901 # this is perfectly intentional
 
@@ -221,7 +233,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
             fqn,
             local_path,
         ):
-            with _atomic_download_and_move(fqn, local_path) as tmpwriter:
+            with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
                 yield tmpwriter
         return False
 
@@ -238,7 +250,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         fqn,
         cache_path,
     ):
-        with _atomic_download_and_move(fqn, cache_path) as tmpwriter:
+        with _atomic_download_and_move(fqn, cache_path, file_properties) as tmpwriter:
             yield tmpwriter
 
     from_cache_path_to_local(cache_path, local_path, cache.link)

@@ -7,7 +7,6 @@ import azure.core.exceptions
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
 from thds.adls import AdlsFqn, AdlsRoot, join, resource
-from thds.adls._upload import upload_decision_and_settings
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import BlobNotFoundError, is_blob_not_found
 from thds.adls.global_client import get_global_client
@@ -98,21 +97,7 @@ class AdlsFileSystem(BlobStore):
     @scope.bound
     def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):
         """Upload data to a remote path."""
-        fqn = AdlsFqn.parse(remote_uri)
-        scope.enter(log.logger_context(upload=fqn))
-        file_client = self._client(fqn)
-        decision = upload_decision_and_settings(file_client, data)
-        if not decision.upload_required:
-            return remote_uri
-        logger.info(f"======> uploading {type_hint}")
-        on_slow(LOG_SLOW_TRANSFER_S, lambda secs: LogSlow(f"Took {int(secs)}s to upload {type_hint}"))(
-            lambda: file_client.upload_data(
-                data,
-                overwrite=True,
-                connection_timeout=_SLOW_CONNECTION_WORKAROUND,
-                content_settings=decision.content_settings,
-            )
-        )()
+        resource.upload(AdlsFqn.parse(remote_uri), data)
         return remote_uri
 
     @_azure_creds_retry
