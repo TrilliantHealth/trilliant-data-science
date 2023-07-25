@@ -8,7 +8,7 @@ from azure.core.exceptions import HttpResponseError, ResourceModifiedError
 from thds.core import fretry, hashing, log, scope
 
 from .._env import UPLOAD_FILE_MAX_CONCURRENCY
-from .._timing import upload_timer
+from .._progress import report_upload_progress
 from .._upload import upload_decision_and_settings
 from ..download import BlobNotFoundError, download_or_use_verified
 from ..fqn import AdlsFqn
@@ -19,7 +19,6 @@ from .file_pointers import AdlsHashedResource, resource_from_path, resource_to_p
 
 logger = log.getLogger(__name__)
 _SLOW_CONNECTION_WORKAROUND = 14400  # seconds
-_REPORT_START_UPLOAD_THRESHOLD = 2**20 * 100  # 100 MiB
 
 
 # DOWNLOAD
@@ -116,23 +115,18 @@ def upload(
     decision = upload_decision_and_settings(fs_client, data)
     if decision.upload_required:
         # set up some bookkeeping
-        n_bytes, large_upload_size, src = 0, 0, ""
+        n_bytes = 0
         if isinstance(data, Path):
             n_bytes = data.stat().st_size
-            large_upload_size = n_bytes if n_bytes > _REPORT_START_UPLOAD_THRESHOLD else 0
-            src = str(data)
             data = scope.enter(open(data, "rb"))
 
-        emit_rate = scope.enter(upload_timer(fqn, src, 3.0, logger, large_upload_size))
         fs_client.upload_data(
-            data,
+            report_upload_progress(ty.cast(ty.IO, data), str(fqn), n_bytes),
             overwrite=True,
             content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY,
         )
-        # make use of the stats available to log an informative message...
-        emit_rate(n_bytes)
 
     # if at all possible (if the md5 is known), return a resource containing it.
     if decision.content_settings and decision.content_settings.content_md5:

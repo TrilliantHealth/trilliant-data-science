@@ -15,7 +15,7 @@ from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
 from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
-from ._timing import download_timer
+from ._progress import report_download_progress
 from .errors import BlobNotFoundError, is_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
@@ -26,7 +26,6 @@ logger = getLogger(__name__)
 
 _TEMPDIRS_ON_DIFFERENT_FILESYSTEM = False
 _1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
-_LONG_TRANSFER_S = 2
 
 
 class MD5MismatchError(Exception):
@@ -48,15 +47,8 @@ def _atomic_download_and_move(
             dpath = os.path.join(dir, "tmp")
 
         with open(dpath, "wb") as f:
-            with download_timer(
-                str(fqn),
-                str(dest),
-                _LONG_TRANSFER_S,
-                logger,
-                known_size=(properties.size or 0) if properties else 0,
-            ) as emit:
-                yield f
-                emit(os.path.getsize(dpath))
+            known_size = (properties.size or 0) if properties else 0
+            yield report_download_progress(f, str(dest), known_size)
         try:
             os.rename(dpath, dest)
         except OSError as oserr:
