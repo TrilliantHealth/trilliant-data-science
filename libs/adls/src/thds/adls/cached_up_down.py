@@ -10,12 +10,10 @@ from .ro_cache import global_cache
 def download_to_cache(fqn: AdlsFqn, md5b64: str = "") -> Path:
     """Downloads directly to the cache and returns a Path to the read-only file.
 
-    Because we never want to have something in the cache where an MD5
-    is not available to check against, this will fail if both:
-
-    - the file on ADLS does not have an MD5 embedded, _and_
-    - the caller does not provide an MD5 to check any existing cached data against.
-
+    This will allow you to download a file 'into' the cache even if
+    you provide no MD5 and the remote file properties does not have
+    one. However, future attempts to reuse the cache will force a
+    re-download if no MD5 is available at that time.
     """
     cache_path = global_cache().path(fqn)
     download_or_use_verified(

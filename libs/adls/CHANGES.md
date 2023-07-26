@@ -1,3 +1,16 @@
+## 1.6
+
+- Set (missing) MD5s on all files downloaded via this library.
+- All downloads will go into the cache now if one is
+  provided. Previously, files with no known md5 would not have been
+  downloaded there at all, but this was unnecessarily cautious, since
+  files in the cache are not 'trusted' in any way.
+- Disable symlinks to/from caches by default. They cause too many problems.
+- Additionally, start putting the cache on the same volume as the repo
+  checkout in GitHub runners. This will avoid the need for symlinks or
+  copies, and won't require any more space, since hardlinks will be an
+  option.
+
 ## 1.5
 
 - Add `defaults` module that contains some simple env-based defaults

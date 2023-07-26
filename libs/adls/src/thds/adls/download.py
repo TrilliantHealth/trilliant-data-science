@@ -4,11 +4,18 @@ import os
 import shutil
 import tempfile
 import typing as ty
+from base64 import b64decode
 from pathlib import Path
 from random import SystemRandom
 
+from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
-from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient
+from azure.storage.filedatalake import (
+    ContentSettings,
+    DataLakeFileClient,
+    FileProperties,
+    FileSystemClient,
+)
 
 from thds.core.hashing import b64
 from thds.core.log import getLogger
@@ -19,7 +26,7 @@ from ._progress import report_download_progress
 from .errors import BlobNotFoundError, is_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
-from .ro_cache import Cache, from_cache_path_to_local
+from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
 logger = getLogger(__name__)
 
@@ -61,30 +68,50 @@ def _atomic_download_and_move(
 
 @contextlib.contextmanager
 def _verify_md5s_before_and_after_download(
-    remote_md5b64: str, md5b64: str, fqn: AdlsFqn, local_dest: StrOrPath
+    remote_md5b64: str, expected_md5b64: str, fqn: AdlsFqn, local_dest: StrOrPath
 ) -> ty.Iterator[None]:
-    check_reasonable_md5b64(md5b64)
-    if remote_md5b64 and remote_md5b64 != md5b64:
+    if expected_md5b64:
+        check_reasonable_md5b64(expected_md5b64)
+    if remote_md5b64:
+        check_reasonable_md5b64(remote_md5b64)
+    if remote_md5b64 and expected_md5b64 and remote_md5b64 != expected_md5b64:
         raise MD5MismatchError(
-            f"ADLS thinks the MD5 of {fqn} is {remote_md5b64}, but we wanted {md5b64}."
+            f"ADLS thinks the MD5 of {fqn} is {remote_md5b64}, but we expected {expected_md5b64}."
             " This may indicate that we need to update a hash in the codebase."
         )
     yield  # perform download
     local_md5b64 = b64(md5_readable(local_dest))
+    check_reasonable_md5b64(local_md5b64)  # must always exist
     if remote_md5b64 and remote_md5b64 != local_md5b64:
         raise MD5MismatchError(
             f"The MD5 of the downloaded file {local_dest} is {local_md5b64},"
             f" but the remote ({fqn}) says it should be {remote_md5b64}."
             f" This may indicate that ADLS has an erroneous MD5 for {fqn}."
         )
-    if local_md5b64 != md5b64:
+    if expected_md5b64 and local_md5b64 != expected_md5b64:
         raise MD5MismatchError(
             f"The MD5 of the downloaded file {local_dest} is {local_md5b64},"
-            f" but we expected it to be {md5b64}."
+            f" but we expected it to be {expected_md5b64}."
             f" This probably indicates a corrupted download of {fqn}"
         )
-    all_hashes = [local_md5b64, remote_md5b64, md5b64]
-    assert 1 == len(set(filter(None, all_hashes))), all_hashes
+    all_hashes = dict(local=local_md5b64, remote=remote_md5b64, expected=expected_md5b64)
+    assert 1 == len(set(filter(None, all_hashes.values()))), all_hashes
+
+
+def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
+    if not path or not os.path.exists(path):  # does not exist if it's a symlink with a bad referent.
+        return None
+    psize = Path(path).stat().st_size
+    if psize > _1GB:
+        logger.info(f"Hashing existing {psize/_1GB:.2f} GB file at {path}...")
+    with open(path, "rb") as f:
+        return b64(md5_readable(f))
+
+
+def _remote_md5b64(file_properties: FileProperties) -> str:
+    if file_properties.content_settings.content_md5:
+        return b64(file_properties.content_settings.content_md5)
+    return ""
 
 
 # Async is weird.
@@ -133,12 +160,17 @@ IoRequest = ty.Union[_IoRequest, ty.IO[bytes]]
 IoResponse = ty.Union[FileProperties, None]
 
 
+class _FileResult(ty.NamedTuple):
+    md5b64: str
+    hit: bool
+
+
 def _download_or_use_verified_cached_coroutine(  # noqa: C901
     fqn: AdlsFqn,
     local_path: StrOrPath,
     md5b64: str = "",
     cache: ty.Optional[Cache] = None,
-) -> ty.Generator[IoRequest, IoResponse, bool]:
+) -> ty.Generator[IoRequest, IoResponse, _FileResult]:
     """Make a file on ADLS available at the local path provided.
 
     When we download from ADLS we want to know for sure that we have
@@ -162,11 +194,11 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     the file from ADLS and then verify that the local hash matches
     both what we expected and what ADLS told us it would be, if any.
 
-    The downloaded file will be placed into the cache if it meets the
-    provided cache's requirements. If it does, the local path, if
-    different from the cache path, will either be linked or copied
-    to, as selected by `cache.link`. `link=True` will save storage
-    space but is not what you want if you intend to modify the file.
+    The downloaded file will always placed into the cache if a cache
+    is provided.  The local path, if different from the cache path,
+    will either be linked or copied to, as selected by
+    `cache.link`. `link=True` will save storage space but is not what
+    you want if you intend to modify the file.
 
     Files placed in the cache will be marked as read-only to prevent
     _some_ types of accidents. This will not prevent you from
@@ -174,84 +206,61 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     files, but it will prevent you from opening those files for
     writing in a standard fashion.
 
-    Raises StopIteration when complete. The StopIteration.value will
-    be True if there was a cache hit, and False if a download was required.
-
+    Raises StopIteration when complete. StopIteration.value.hit will
+    be True if there was a cache hit, and False if a download was
+    required. `.value` will also contain the md5b64 of the downloaded
+    file, which may be used as desired.
     """
     if not local_path:
         raise ValueError("Must provide a destination path.")
 
     file_properties = None
-
-    def remote_md5b64(file_properties: FileProperties) -> str:
-        if file_properties.content_settings.content_md5:
-            return b64(file_properties.content_settings.content_md5)
-        return ""
-
     if not md5b64:
         # we don't know what we expect, so attempt to retrieve an
         # expectation from ADLS itself.
         file_properties = yield _IoRequest.FILE_PROPERTIES
-        md5b64 = remote_md5b64(file_properties)
+        md5b64 = _remote_md5b64(file_properties)
 
-    if not md5b64:
-        # refuse to cache without md5 of some kind, either local or remote
-        with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
-            yield tmpwriter
-            return False  # noqa: B901 # this is perfectly intentional
+    if md5b64:
+        # attempt cache hit
+        check_reasonable_md5b64(md5b64)
+        local_md5b64 = _md5b64_path_if_exists(local_path)
+        if local_md5b64 == md5b64:  # local path data matches - no need for cache!
+            if cache:
+                from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
+            return _FileResult(local_md5b64, hit=True)  # noqa: B901
+        if local_md5b64:
+            logger.debug("Local path exists but % does not match expected md5 %", local_md5b64, md5b64)
+        if cache:
+            cache_path = cache.path(fqn)
+            cache_md5b64 = _md5b64_path_if_exists(cache_path)
+            if cache_md5b64 == md5b64:  # file in cache matches!
+                from_cache_path_to_local(cache_path, local_path, cache.link)
+                return _FileResult(cache_md5b64, hit=True)  # noqa: B901
+            if cache_md5b64:
+                logger.debug(
+                    "Cache path exists but % does not match expected md5 %", cache_md5b64, md5b64
+                )
 
-    # past this point, we have at least one md5 to verify against,
-    # so an existing local file might be returned without a download.
-    check_reasonable_md5b64(md5b64)
-
-    def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
-        if not path or not os.path.exists(path):
-            return None
-        psize = Path(path).stat().st_size
-        if psize > _1GB:
-            logger.info(f"Hashing existing {psize/_1GB:.2f} GB file at {path}...")
-        with open(path, "rb") as f:
-            return b64(md5_readable(f))
-
-    local_md5b64 = _md5b64_path_if_exists(local_path)
-    if local_md5b64 == md5b64:
-        return True
-
-    if not cache:
-        file_properties = yield _IoRequest.FILE_PROPERTIES
-        with _verify_md5s_before_and_after_download(
-            remote_md5b64(file_properties),
-            md5b64,
-            fqn,
-            local_path,
-        ):
-            with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
-                yield tmpwriter
-        return False
-
-    cache_path = cache.path(fqn)
-    cache_md5b64 = _md5b64_path_if_exists(cache_path)
-    if cache_md5b64 == md5b64:
-        from_cache_path_to_local(cache_path, local_path, cache.link)
-        return True
-
+    # no luck - download.
     file_properties = yield _IoRequest.FILE_PROPERTIES
+    # no point in downloading if we've asked for hash X but ADLS only has hash Y.
     with _verify_md5s_before_and_after_download(
-        remote_md5b64(file_properties),
+        _remote_md5b64(file_properties),
         md5b64,
         fqn,
-        cache_path,
-    ):
-        with _atomic_download_and_move(fqn, cache_path, file_properties) as tmpwriter:
+        local_path,
+    ):  # download new data directly to local path
+        with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
             yield tmpwriter
-
-    from_cache_path_to_local(cache_path, local_path, cache.link)
-    return False
+    if cache:
+        from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
+    return _FileResult(md5b64 or b64(md5_readable(local_path)), hit=False)
 
 
 # So ends the crazy download caching coroutine.
 #
-# Below this point is a helper function, and after that are the two
+# Below this point are several helper functions, and after that are the two
 # (async and non-async) coroutine controllers. While you can still see duplication
 # between the two controllers, it is clearly much less code than would otherwise
 # have to be duplicated in order to maintain an async and non-async
@@ -265,7 +274,7 @@ def _prep_download_coroutine(
     md5b64: str = "",
     cache: ty.Optional[Cache] = None,
 ) -> ty.Tuple[
-    ty.Generator[IoRequest, IoResponse, bool],
+    ty.Generator[IoRequest, IoResponse, _FileResult],
     IoRequest,
     ty.Optional[FileProperties],
     DataLakeFileClient,
@@ -285,6 +294,20 @@ def _translate_blob_not_found(client, key: str, hre: HttpResponseError) -> ty.No
     raise
 
 
+def _set_md5_if_missing(
+    file_properties: ty.Optional[FileProperties], md5b64: str
+) -> ty.Optional[ContentSettings]:
+    if not file_properties or file_properties.content_settings.content_md5:
+        return None
+    file_properties.content_settings.content_md5 = b64decode(md5b64)
+    return file_properties.content_settings
+
+
+def _if_etag(file_properties: ty.Optional[FileProperties]) -> dict:
+    assert file_properties, "This is checked by the previous statement"
+    return dict(etag=file_properties.etag, match_condition=MatchConditions.IfNotModified)
+
+
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -292,6 +315,7 @@ def download_or_use_verified(
     md5b64: str = "",
     cache: ty.Optional[Cache] = None,
 ) -> bool:
+    file_properties = None
     try:
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
@@ -309,7 +333,9 @@ def download_or_use_verified(
                 ).readinto(co_request)
                 co_request = co.send(None)
     except StopIteration as si:
-        return si.value  # cache hit if True
+        if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
+            dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+        return si.value.hit
     except HttpResponseError as hre:
         _translate_blob_not_found(fs_client, remote_key, hre)
 
@@ -321,6 +347,7 @@ async def async_download_or_use_verified(
     md5b64: str = "",
     cache: ty.Optional[Cache] = None,
 ) -> bool:
+    file_properties = None
     try:
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
@@ -339,6 +366,8 @@ async def async_download_or_use_verified(
                 await reader.readinto(co_request)
                 co_request = co.send(None)
     except StopIteration as si:
-        return si.value  # cache hit if True
+        if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
+            await dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+        return si.value.hit
     except HttpResponseError as hre:
         _translate_blob_not_found(fs_client, remote_key, hre)

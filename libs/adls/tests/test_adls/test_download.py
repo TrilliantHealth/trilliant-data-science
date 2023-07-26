@@ -13,6 +13,7 @@ from thds.adls.download import (
     _IoRequest,
     _verify_md5s_before_and_after_download,
     async_download_or_use_verified,
+    b64,
     download_or_use_verified,
 )
 from thds.adls.global_client import get_global_client
@@ -24,6 +25,7 @@ __TMPDIR = TemporaryDirectory(prefix="for-adls-tests--")
 _TEST_DEST = Path(__TMPDIR.name)
 
 _TEST_REMOTE = "thdsdatasets", "prod-datasets"
+_TMP_REMOTE = "thdsscratch", "tmp"
 global_client = get_global_client(*_TEST_REMOTE)
 # this location for test data has been blessed by Matt Eby himself.
 
@@ -41,6 +43,12 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64():
 
     request = co.send(None)
     assert request == _IoRequest.FILE_PROPERTIES
+    # this time, we're asking because we don't have an md5
+
+    request = co.send(FileProperties())
+    assert request == _IoRequest.FILE_PROPERTIES
+    # this time, we're asking because we're about to do a download and
+    # we need to know whether to skip the download.
 
     wfp = co.send(FileProperties())
     assert isinstance(wfp, io.IOBase)
@@ -49,8 +57,9 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64():
     with pytest.raises(StopIteration) as si:
         co.send(None)
 
-    assert not si.value.value  # not a cache hit
-    assert not _TEST_CACHE.path(fake).exists()
+    assert not si.value.value.hit  # not a cache hit
+    assert _TEST_CACHE.path(fake).exists()  # file _was_ downloaded _into_ cache, however.
+    assert (_TEST_DEST / "exist.lol").exists()  # file also downloaded locally
 
 
 def test_integration_download_to_local_and_reuse_from_there():
@@ -151,3 +160,23 @@ async def test_integration_async():
     hit = await async_download_or_use_verified(async_client, remote, lcl, "U3vtigRGuroWtJFEQ5dKoQ==")
     assert hit
     assert lcl.exists()
+
+
+@pytest.mark.asyncio
+async def test_file_missing_md5_gets_one_assigned_after_download():
+    fs_client = _async_adls_fs_client(*_TMP_REMOTE)
+    key = "test/writable/missing-md5.txt"
+    file_client = fs_client.get_file_client(key)
+    await file_client.upload_data(b"hi-i-have-no-md5", overwrite=True)
+    fp = await file_client.get_file_properties()
+    assert not fp.content_settings.content_md5
+
+    cache_hit = await async_download_or_use_verified(fs_client, key, _TEST_DEST / "missing-md5.txt")
+    assert not cache_hit
+
+    fp = await file_client.get_file_properties()
+    assert b64(fp.content_settings.content_md5) == "8Wz15VCq6d73Z0+KUDNqVg=="
+
+    # should not error since the md5 should be correct
+    cache_hit = await async_download_or_use_verified(fs_client, key, _TEST_DEST / "missing-md5.txt")
+    assert cache_hit

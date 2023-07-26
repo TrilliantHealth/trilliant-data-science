@@ -220,7 +220,7 @@ class ADLSFileSystem:
 
         assert download_path.exists(), "File should have been downloaded by this point"
         if download_path != return_path:
-            from_cache_path_to_local(download_path, return_path, do_link=True)
+            from_cache_path_to_local(download_path, return_path, link_opts=("ref", "hard"))
 
         return return_path
 
