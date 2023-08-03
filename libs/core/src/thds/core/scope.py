@@ -79,7 +79,7 @@ def _bound(key: str, func: F) -> F:
     """
 
     @wraps(func)
-    def __scope_boundary_wrap(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         if key not in _KEYED_SCOPE_CONTEXTS:
             _init_sc(key, contextlib.ExitStack())  # this root stack will probably not get used
 
@@ -87,7 +87,7 @@ def _bound(key: str, func: F) -> F:
             with scoped_exit_stack:  # enter and exit the ExitStack itself
                 return func(*args, **kwargs)
 
-    return ty.cast(F, __scope_boundary_wrap)
+    return ty.cast(F, wrapper)
 
 
 class NoScopeFound(Exception):
