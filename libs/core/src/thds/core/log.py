@@ -120,7 +120,7 @@ class JavaGateWayFilter(logging.Filter):
 class JavaClientServerFilter(logging.Filter):
     # Filters out noisy py4j logs when logging on a Databricks 11.3 cluster.
     def filter(self, record):
-        return not record.name.startswith("py4j.java_gateway")
+        return not record.name.startswith("py4j.clientserver")
 
 
 if not logging.getLogger().hasHandlers():
