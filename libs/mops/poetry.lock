@@ -1397,6 +1397,18 @@ files = [
 ]
 
 [[package]]
+name = "tblib"
+version = "2.0.0"
+description = "Traceback serialization library."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tblib-2.0.0-py3-none-any.whl", hash = "sha256:9100bfa016b047d5b980d66e7efed952fbd20bd85b56110aaf473cb97d18709a"},
+    {file = "tblib-2.0.0.tar.gz", hash = "sha256:a6df30f272c08bf8be66e0775fad862005d950a6b8449b94f7c788731d70ecd7"},
+]
+
+[[package]]
 name = "thds-adls"
 version = "1.3"
 description = "ADLS tools"
@@ -1613,4 +1625,4 @@ k8s = ["kubernetes"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "b54f5e71ea42d6d3fb24b8f1631be9e3d5f2ad93790cf7a4b0f968dbb27c4b10"
+content-hash = "8a61766f7d41026978a2a5bc9adc849a2fec357887a69441690fd15a1cceda28"

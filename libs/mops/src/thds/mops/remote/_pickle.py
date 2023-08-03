@@ -5,6 +5,9 @@ import io
 import pickle
 import typing as ty
 
+# so we can pickle and re-raise exceptions with remote tracebacks
+from tblib import pickling_support  # type: ignore
+
 from thds.core.log import getLogger
 
 from .types import Args, Kwargs
@@ -61,6 +64,8 @@ class _CallbackPickler(pickle.Pickler):
         self.handlers = handlers
 
     def persistent_id(self, obj):
+        if isinstance(obj, Exception):
+            pickling_support.install(obj)
         for handler in self.handlers:
             pid = handler(obj)
             if pid is not None:

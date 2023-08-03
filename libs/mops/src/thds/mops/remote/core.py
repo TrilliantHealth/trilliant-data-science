@@ -46,7 +46,7 @@ def pure_remote(
     def deco(f: F) -> F:
         @scope.bound
         @wraps(f)
-        def wrapper(*args, **kwargs):  # type: ignore
+        def __pure_remote_wrap(*args, **kwargs):  # type: ignore
             if is_called_by_runner():
                 scope.enter(log.logger_context(remote=get_pipeline_id()))
                 logger.debug("Calling function directly...")
@@ -57,7 +57,7 @@ def pure_remote(
             logger.debug("Forwarding local function call to runner...")
             return runner(f, args, kwargs)
 
-        return ty.cast(F, wrapper)
+        return ty.cast(F, __pure_remote_wrap)
 
     return deco
 
@@ -74,7 +74,7 @@ class SerializableThunk(ty.Generic[FT]):
     same function and arguments, which would allow for result caching.
 
     The remote shell must handle the result or any Exceptions raised
-    somehow. See `forwarding_call` for a reasonable approach.
+    somehow. See `route_result_or_exception` for a reasonable approach.
 
     Note that if the name of this class or the names of its attributes
     change, it will likely become incompatible with all previously
@@ -123,7 +123,7 @@ def invocation_unique_key() -> ty.Optional[str]:
 
 
 @scope.bound
-def forwarding_call(
+def route_result_or_exception(
     channel: ResultChannel[T_contra],
     get_thunk: ty.Callable[[], ty.Callable[[], T_contra]],
     pipeline_id: str = "",

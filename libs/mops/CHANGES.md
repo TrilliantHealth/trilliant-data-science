@@ -2,6 +2,8 @@
 
 - `MemoizingPickledFunctionRunner` now supports lazy `storage_root`
   configuration.
+- Exceptions are now pickled using `tblib`, so the orchestrator-side
+  stack trace should look a lot more meaningful.
 
 ## 1.7.0
 

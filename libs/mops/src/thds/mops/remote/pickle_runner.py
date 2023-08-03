@@ -1,6 +1,6 @@
-"""Joins pickle functionality and ADLS functionality
+"""Joins pickle functionality and Blob Store functionality to run functions remotely.
 
-into a full implementation for the pure_remote Channel/Runner system.
+Does not depend directly on ADLS; instead uses the `lookup_blob_store` abstraction.
 """
 import threading
 import typing as ty
@@ -23,7 +23,7 @@ from ._pickle import Dumper, Serializer, freeze_args_kwargs, gimme_bytes, unfree
 from ._registry import MAIN_HANDLER_BASE_ARGS, register_main_handler
 from ._srcfile import trigger_src_files_upload
 from ._uris import get_root, lookup_blob_store
-from .core import SerializableThunk, forwarding_call
+from .core import SerializableThunk, route_result_or_exception
 from .memoize import pipeline_id_mask
 from .types import Args, BlobStore, Kwargs, NoResultAfterInvocationError, Shell, T, _ShellBuilder
 
@@ -205,7 +205,7 @@ def _pickle_func_and_run_via_shell(
             class _error(ty.NamedTuple):
                 exception_uri: str
 
-            def check_result(
+            def fetch_result_if_exists(
                 rerun_excs: bool = False,
             ) -> ty.Union[None, _success, _error]:
                 result_uri = fs.join(memo_uri, _RESULT)
@@ -218,7 +218,7 @@ def _pickle_func_and_run_via_shell(
                     return _error(error_uri)
                 return None
 
-            def give_result(result: ty.Union[_success, _error]) -> T:
+            def unwrap_remote_result(result: ty.Union[_success, _error]) -> T:
                 if isinstance(result, _success):
                     success = ty.cast(T, make_read_object(_RESULT)(result.success_uri))
                     trigger_dest_files_placeholder_write(success)
@@ -228,12 +228,12 @@ def _pickle_func_and_run_via_shell(
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            result = check_result(rerun_excs=rerun_exceptions)
+            result = fetch_result_if_exists(rerun_excs=rerun_exceptions)
             if result:
                 _LogKnownResult(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
                 )
-                return give_result(result)
+                return unwrap_remote_result(result)
             _LogPrepareNewInvocation(f"Preparing new remote invocation for {memo_uri}")
             # but if it does not exist, we need to upload the invocation and then run the shell.
             fs.putbytes(
@@ -266,12 +266,12 @@ def _pickle_func_and_run_via_shell(
 
         # the network ops being grouped by _IN include one or more downloads.
         with _IN_SEMAPHORE:
-            result = check_result()
+            result = fetch_result_if_exists()
             if not result:
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
                 raise NoResultAfterInvocationError(memo_uri)
-            return give_result(result)
+            return unwrap_remote_result(result)
 
     return run_shell_via_pickles_
 
@@ -316,7 +316,7 @@ def run_pickled_invocation(*shell_args: str):
             )
         )
 
-    forwarding_call(
+    route_result_or_exception(
         _ResultExcChannel(
             fs,
             make_dumper(Once(), MemoizingSerializer(ByIdRegistry()), PathContentAddresser()),

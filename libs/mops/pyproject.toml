@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "1.7"
+version = "1.8"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
 readme = "README.md"
@@ -34,6 +34,7 @@ thds-core = { path="../../libs/core", develop=true }
 
 # k8s is extra - there are other shells you can use with mops.pure_remote.
 kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
+tblib = "^2.0.0"
 
 [tool.poetry.extras]
 k8s = ["kubernetes"]
