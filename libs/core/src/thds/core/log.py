@@ -25,6 +25,7 @@ logger.info("testing 5")
 """
 import contextlib
 import logging
+import logging.config
 import os
 from copy import copy
 from typing import Any, Dict, MutableMapping, Optional
@@ -32,6 +33,10 @@ from typing import Any, Dict, MutableMapping, Optional
 from .stack_context import StackContext
 
 _LOGLEVEL = os.environ.get("LOGLEVEL", logging.INFO)
+_LOGGERS_TO_DEBUG = os.environ.get("THDS_DEBUG_LOGGERS", "").split(";")
+# set this env var to (for example)
+# `thds.adls.download;thds.mops.remote.pickle_runner` to get debug
+# logs for those two modules.
 
 _LOGGING_KWARGS = ("exc_info", "stack_info", "stacklevel", "extra")
 # These are the officially accepted keyword-arguments for a call to
@@ -46,6 +51,32 @@ _TH_REC_CTXT = "th_context"
 TH_DEFAULT_LOG_FORMAT = f"%(asctime)s - %(name)s - %(levelname)s - %({_TH_REC_CTXT})s - %(message)s"
 # Default log format used when not configuring one's own logging,
 # including the th_context key-value pairs
+
+# this is what gets passed to logging.dictConfig.
+_DEFAULT_LOG_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"default": {"format": TH_DEFAULT_LOG_FORMAT}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
+    "root": {
+        "handlers": ["console"],
+        "level": _LOGLEVEL,
+    },
+}
+
+
+def set_logger_to_console_debug(config: dict, logger_name: str) -> dict:
+    loggers = config.get("loggers") or dict()
+    loggers = {**loggers, logger_name: {"level": "DEBUG", "handlers": ["console"], "propagate": False}}
+    # propagate=False means, don't pass this up the chain to loggers
+    # matching a subset of our name.  The level is set on the logger,
+    # not the handler, but if a logger is set to propagate,then it
+    # will pass its message up the chain until it hits propagate=False
+    # or the root. And any loggers with the appropriate logging level
+    # will emit to any handlers they have configured. So, generally,
+    # you want to put handlers at the same level where
+    # propagate=False, which is what we do here.
+    return dict(config, loggers=loggers)
 
 
 class _THContext(Dict[str, Any]):
@@ -118,6 +149,9 @@ class NoJavaFilter(logging.Filter):
 
 
 if not logging.getLogger().hasHandlers():
-    logging.basicConfig(level=_LOGLEVEL, format=TH_DEFAULT_LOG_FORMAT)
+    config = _DEFAULT_LOG_CONFIG
+    for logger_name in _LOGGERS_TO_DEBUG:
+        config = set_logger_to_console_debug(config, logger_name)
+    logging.config.dictConfig(config)
     make_th_formatters_safe(logging.getLogger())
     logging.getLogger("py4j.java_gateway").addFilter(NoJavaFilter())
