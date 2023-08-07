@@ -25,16 +25,13 @@ logger.info("testing 5")
 """
 import contextlib
 import logging
-import logging.config
 import os
 from copy import copy
-from typing import Any, Dict, Iterator, MutableMapping, Optional, Tuple
+from typing import Any, Dict, MutableMapping, Optional
 
 from .stack_context import StackContext
 
-_LOGLEVEL = logging.INFO
-_LOGLEVELS_FILEPATH = os.environ.get("THDS_LOGLEVELS", "")
-# see _parse_thds_loglevels_file for format of this file.
+_LOGLEVEL = os.environ.get("LOGLEVEL", logging.INFO)
 
 _LOGGING_KWARGS = ("exc_info", "stack_info", "stacklevel", "extra")
 # These are the officially accepted keyword-arguments for a call to
@@ -114,83 +111,20 @@ def make_th_formatters_safe(logger: logging.Logger):
             setattr(formatter, "formatMessage", wrapper_formatMessage)  # noqa: B010
 
 
-class DatabricksPy4JFilter(logging.Filter):
+class JavaGateWayFilter(logging.Filter):
+    # Filters out noisy py4j logs when logging on a Databricks 9.1 cluster.
     def filter(self, record):
-        return not (
-            record.name.startswith("py4j.java_gateway")  # 9.1
-            or record.name.startswith("py4j.clientserver")  # 11.3
-        )
+        return not record.name.startswith("py4j.java_gateway")
 
 
-# this is the base of what gets passed to logging.dictConfig.
-_BASE_LOG_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {"default": {"format": TH_DEFAULT_LOG_FORMAT}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
-    "root": {
-        "handlers": ["console"],
-        "level": _LOGLEVEL,
-    },
-}
-
-
-def set_logger_to_console_level(config: dict, logger_name: str, level: int) -> dict:
-    if logger_name == "*":
-        if level != _LOGLEVEL:
-            getLogger(__name__).warning(f"Setting root logger to {logging.getLevelName(level)}")
-        return dict(config, root=dict(config["root"], level=level))
-    loggers = config.get("loggers") or dict()
-    loggers = {**loggers, logger_name: {"level": level, "handlers": ["console"], "propagate": False}}
-    # propagate=False means, don't pass this up the chain to loggers
-    # matching a subset of our name.  The level is set on the logger,
-    # not the handler, but if a logger is set to propagate,then it
-    # will pass its message up the chain until it hits propagate=False
-    # or the root. And any loggers with the appropriate logging level
-    # will emit to any handlers they have configured. So, generally,
-    # you want to put handlers at the same level where
-    # propagate=False, which is what we do here.
-    return dict(config, loggers=loggers)
-
-
-def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
-    """Example loglevels file:
-
-    ```
-    [debug]
-    thds.adls.download
-    thds.mops.remote.pickle_runner
-    thds.nppes.intake.parquet_from_csv
-
-    [warning]
-    *
-    # the * sets the root logger to warning-and-above. INFO is the default.
-    ```
-
-    The last value encountered for any given logger (or the root) will
-    override any previous values.
-    """
-    current_level = _LOGLEVEL
-    if not os.path.exists(filepath):
-        return
-    with open(filepath) as f:
-        for line in f.readlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                current_level = getattr(
-                    logging, line[1:-1].upper()
-                )  # AttributeError means invalid level
-                continue
-            logger_name = line
-            yield logger_name, current_level
+class JavaClientServerFilter(logging.Filter):
+    # Filters out noisy py4j logs when logging on a Databricks 11.3 cluster.
+    def filter(self, record):
+        return not record.name.startswith("py4j.clientserver")
 
 
 if not logging.getLogger().hasHandlers():
-    config = _BASE_LOG_CONFIG
-    for logger_name, level in _parse_thds_loglevels_file(_LOGLEVELS_FILEPATH):
-        config = set_logger_to_console_level(config, logger_name, level)
-    logging.config.dictConfig(config)
+    logging.basicConfig(level=_LOGLEVEL, format=TH_DEFAULT_LOG_FORMAT)
     make_th_formatters_safe(logging.getLogger())
-    logging.getLogger("py4j").addFilter(DatabricksPy4JFilter())
+    logging.getLogger("py4j.java_gateway").addFilter(JavaGateWayFilter())
+    logging.getLogger("py4j.clientserver").addFilter(JavaClientServerFilter())
