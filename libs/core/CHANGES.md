@@ -4,6 +4,10 @@
   (usually its module name) via newline-separated entries in a text
   file pointed to by the environment variable `THDS_LOGLEVELS`.
 
+### 1.7.20230803
+
+- Added a `py4j` logging filter relevant to running on Databricks Runtime 11.3.
+
 ## 1.7
 
 - `fretry` module for in-house retry decorators.

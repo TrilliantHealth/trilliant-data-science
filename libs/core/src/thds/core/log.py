@@ -114,10 +114,12 @@ def make_th_formatters_safe(logger: logging.Logger):
             setattr(formatter, "formatMessage", wrapper_formatMessage)  # noqa: B010
 
 
-class NoJavaFilter(logging.Filter):
-    # Filters out noisy py4j logs when logging on a Spark cluster.
+class DatabricksPy4JFilter(logging.Filter):
     def filter(self, record):
-        return not record.name.startswith("py4j.java_gateway")
+        return not (
+            record.name.startswith("py4j.java_gateway")  # 9.1
+            or record.name.startswith("py4j.clientserver")  # 11.3
+        )
 
 
 # this is the base of what gets passed to logging.dictConfig.
@@ -191,4 +193,4 @@ if not logging.getLogger().hasHandlers():
         config = set_logger_to_console_level(config, logger_name, level)
     logging.config.dictConfig(config)
     make_th_formatters_safe(logging.getLogger())
-    logging.getLogger("py4j.java_gateway").addFilter(NoJavaFilter())
+    logging.getLogger("py4j").addFilter(DatabricksPy4JFilter())
