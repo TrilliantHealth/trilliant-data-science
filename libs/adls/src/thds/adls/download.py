@@ -17,8 +17,8 @@ from azure.storage.filedatalake import (
     FileSystemClient,
 )
 
+from thds.core import log, scope
 from thds.core.hashing import b64
-from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
 from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
@@ -28,7 +28,7 @@ from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 _TEMPDIRS_ON_DIFFERENT_FILESYSTEM = False
@@ -55,6 +55,7 @@ def _atomic_download_and_move(
 
         with open(dpath, "wb") as f:
             known_size = (properties.size or 0) if properties else 0
+            logger.debug("Downloading %s", fqn)
             yield report_download_progress(f, str(dest), known_size)
         try:
             os.rename(dpath, dest)
@@ -165,6 +166,10 @@ class _FileResult(ty.NamedTuple):
     hit: bool
 
 
+_dl_scope = scope.Scope("adls.download")
+
+
+@_dl_scope.bound
 def _download_or_use_verified_cached_coroutine(  # noqa: C901
     fqn: AdlsFqn,
     local_path: StrOrPath,
@@ -214,6 +219,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     if not local_path:
         raise ValueError("Must provide a destination path.")
 
+    _dl_scope.enter(log.logger_context(dl=fqn))
     file_properties = None
     if not md5b64:
         # we don't know what we expect, so attempt to retrieve an
@@ -225,12 +231,14 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         # attempt cache hit
         check_reasonable_md5b64(md5b64)
         local_md5b64 = _md5b64_path_if_exists(local_path)
-        if local_md5b64 == md5b64:  # local path data matches - no need for cache!
+        if local_md5b64 == md5b64:
+            logger.debug("Local path matches MD5 - no need to look further")
             if cache:
-                from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
+                cache_path = cache.path(fqn)
+                from_local_path_to_cache(local_path, cache_path, cache.link)
             return _FileResult(local_md5b64, hit=True)  # noqa: B901
         if local_md5b64:
-            logger.debug("Local path exists but % does not match expected md5 %", local_md5b64, md5b64)
+            logger.debug("Local path exists but does not match expected md5 %", md5b64)
         if cache:
             cache_path = cache.path(fqn)
             cache_md5b64 = _md5b64_path_if_exists(cache_path)
@@ -238,11 +246,9 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
                 from_cache_path_to_local(cache_path, local_path, cache.link)
                 return _FileResult(cache_md5b64, hit=True)  # noqa: B901
             if cache_md5b64:
-                logger.debug(
-                    "Cache path exists but % does not match expected md5 %", cache_md5b64, md5b64
-                )
+                logger.debug("Cache path exists but does not match expected md5 %", md5b64)
 
-    # no luck - download.
+    logger.debug("Unable to find a cached version anywhere that we looked...")
     file_properties = yield _IoRequest.FILE_PROPERTIES
     # no point in downloading if we've asked for hash X but ADLS only has hash Y.
     with _verify_md5s_before_and_after_download(

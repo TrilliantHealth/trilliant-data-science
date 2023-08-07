@@ -1,7 +1,6 @@
 import os
 import platform
-import shutil
-import tempfile
+import stat
 import typing as ty
 from pathlib import Path
 
@@ -9,7 +8,7 @@ from thds.core import log
 from thds.core import types as ct
 
 from .fqn import AdlsFqn
-from .link import LinkType, link, set_read_only
+from .link import LinkType, link_or_copy
 from .md5 import hash_using, hashlib
 
 # On our GitHub runners, we can't make hardlinks from /runner/home to where our stuff actually goes.
@@ -64,26 +63,26 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
     return Path(fqn_str).absolute()
 
 
-def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, link_opts: LinkOpts) -> LinkType:
-    if link_opts:
-        link_types = tuple() if isinstance(link_opts, bool) else link_opts
-        link_success_type = link(src, dest, *link_types)
-        if link_success_type:
-            return link_success_type
-        logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
+def _opts_to_types(opts: LinkOpts) -> ty.Tuple[LinkType, ...]:
+    if opts is True:
+        return ("ref", "hard")
+    elif opts is False:
+        return tuple()
+    return opts
 
-    with tempfile.TemporaryDirectory() as dir:
-        tmpfile = os.path.join(dir, "tmp")
-        shutil.copyfile(src, tmpfile)
-        shutil.move(tmpfile, dest)
-        # atomic to the final destination as long as we're on the same filesystem.
-    return ""
+
+def set_read_only(fpath: ct.StrOrPath):
+    # thank you https://stackoverflow.com/a/51262451
+    perms = stat.S_IMODE(os.lstat(fpath).st_mode)
+    ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
+    os.chmod(fpath, perms & ro_mask)
 
 
 def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath, link_opts: LinkOpts):
     set_read_only(cache_path)
-    link_success_type = link_or_copy(cache_path, local_path, link_opts)
-    if link_success_type in {"ref", ""}:
+
+    link_type = link_or_copy(cache_path, local_path, *_opts_to_types(link_opts))
+    if link_type in {"ref", "", "same"}:
         # hard and soft links do not have their own permissions - they
         # share the read-only permissions of their target.  reflinks
         # and copies will not, so those do not need to be marked as
@@ -93,5 +92,5 @@ def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath,
 
 
 def from_local_path_to_cache(local_path: ct.StrOrPath, cache_path: ct.StrOrPath, link_opts: LinkOpts):
-    link_or_copy(local_path, cache_path, link_opts)
+    link_or_copy(local_path, cache_path, *_opts_to_types(link_opts))
     set_read_only(cache_path)

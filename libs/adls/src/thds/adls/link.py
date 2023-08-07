@@ -1,10 +1,11 @@
 """Best-effort to link a destination to a source depending on file system support."""
 # this whole module should really get moved to core.
+import filecmp
 import os
 import platform
 import shutil
-import stat
 import subprocess
+import tempfile
 import typing as ty
 from pathlib import Path
 
@@ -85,8 +86,25 @@ def reify_if_link(path: Path):
     shutil.copy(src, dest)
 
 
-def set_read_only(fpath: ct.StrOrPath):
-    # thank you https://stackoverflow.com/a/51262451
-    perms = stat.S_IMODE(os.lstat(fpath).st_mode)
-    ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
-    os.chmod(fpath, perms & ro_mask)
+def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -> LinkType:
+    if Path(src).exists() and Path(dest).exists() and filecmp.cmp(src, dest, shallow=False):
+        # this filecmp operation may be somewhat expensive for large
+        # files when they _are_ identical, but it's still better than
+        # the race condition that exists with a file copy or a link
+        # where the destination already exists.
+        logger.debug("Destination %s for link is identical to source", dest)
+        return "same"
+
+    if link_types:
+        link_success_type = link(src, dest, *link_types)
+        if link_success_type:
+            return link_success_type
+        logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
+
+    logger.debug("Copying %s to %s", src, dest)
+    with tempfile.TemporaryDirectory() as dir:
+        tmpfile = os.path.join(dir, "tmp")
+        shutil.copyfile(src, tmpfile)
+        shutil.move(tmpfile, dest)
+        # atomic to the final destination as long as we're on the same filesystem.
+    return ""

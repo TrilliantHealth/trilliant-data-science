@@ -106,6 +106,10 @@ CONT_REGEX = re.compile(r"^\w[\w\-]{2,63}$")
 # https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
 
 
+class NotAdlsUri(ValueError):
+    """This string does not represent an adls:// uri"""
+
+
 def parse_fqn(fully_qualified_uri: str) -> AdlsFqn:
     """There are many ways to represent a fully qualified ADLS path, and most of them are cumbersome.
 
@@ -133,7 +137,12 @@ def parse_fqn(fully_qualified_uri: str) -> AdlsFqn:
         sep = "/"
     else:
         sep = None
-    sa, container, path = fully_qualified_uri.split(sep, 2)
+    try:
+        sa, container, path = fully_qualified_uri.split(sep, 2)
+    except ValueError as ve:
+        raise NotAdlsUri(
+            f"Cannot split {fully_qualified_uri} into at least three '/'-separated pieces."
+        ) from ve
     assert SA_REGEX.match(sa), sa
     assert CONT_REGEX.match(container), container
     return AdlsFqn(sa, container, path.lstrip("/"))

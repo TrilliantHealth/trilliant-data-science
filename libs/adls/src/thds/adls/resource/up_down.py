@@ -13,8 +13,8 @@ from .._upload import upload_decision_and_settings
 from ..download import BlobNotFoundError, download_or_use_verified
 from ..fqn import AdlsFqn
 from ..global_client import get_global_client
-from ..link import link, set_read_only
-from ..ro_cache import Cache, global_cache
+from ..link import link
+from ..ro_cache import Cache, global_cache, set_read_only
 from .file_pointers import AdlsHashedResource, resource_from_path, resource_to_path
 
 logger = log.getLogger(__name__)
