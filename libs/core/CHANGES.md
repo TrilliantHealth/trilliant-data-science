@@ -1,8 +1,6 @@
-## 1.8
+### 1.7.20230803
 
-- Can configure the level of any Trilliant Health logger by name
-  (usually its module name) via newline-separated entries in a text
-  file pointed to by the environment variable `THDS_LOGLEVELS`.
+- Added a `py4j` logging filter relevant to running on Databricks Runtime 11.3.
 
 ## 1.7
 
