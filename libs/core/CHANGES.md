@@ -1,3 +1,9 @@
+## 1.8
+
+- Can configure the level of any Trilliant Health logger by name
+  (usually its module name) via newline-separated entries in a text
+  file pointed to by the environment variable `THDS_LOGLEVELS`.
+
 ## 1.7
 
 - `fretry` module for in-house retry decorators.
