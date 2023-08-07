@@ -10,7 +10,7 @@ TMP = AdlsRoot.parse("adls://thdsscratch/tmp")
 
 def env_root(env: Env = "") -> AdlsRoot:
     """In many cases, you may want to call this with no arguments
-    so as to default to using the THDS_ENV environment variable.
+    to default to using the THDS_ENV environment variable.
     """
     env = active_env(env)
     if env == "prod":
