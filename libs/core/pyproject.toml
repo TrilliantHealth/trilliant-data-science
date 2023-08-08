@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "1.8"
+version = "1.7"
 authors = ["Trilliant Health"]
 description = "Core utilities."
 readme = "README.md"
@@ -19,9 +19,6 @@ mypy-extensions = "^1.0"
 pytest = "^7.2"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
-
-[tool.poetry.scripts]
-new-calgitver = "thds.core.meta:print_calgitver"
 
 [build-system]
 requires = ["poetry-core", "attrs", "cattrs>=22.2"]

@@ -100,10 +100,6 @@ def make_calgitver() -> str:
     ).rstrip("-")
 
 
-def print_calgitver():
-    print(make_calgitver())
-
-
 CALGITVER_EXTRACT_RE = re.compile(
     r"""
     (?P<year>\d{4})
