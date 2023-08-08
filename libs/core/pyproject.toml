@@ -20,9 +20,6 @@ pytest = "^7.2"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
 
-[tool.poetry.scripts]
-make-calgitver = "thds.core.meta:make_calgitver"
-
 [build-system]
 requires = ["poetry-core", "attrs", "cattrs>=22.2"]
 build-backend = "poetry.core.masonry.api"
