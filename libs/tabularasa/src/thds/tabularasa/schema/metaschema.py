@@ -46,8 +46,6 @@ from .util import (
 
 JSON = Dict[str, Union[Dict[str, Any], List[Any], int, float, str, bool, None]]
 
-NEW_TYPING = hasattr(typing, "Literal")
-
 IdTuple = Tuple[Identifier, ...]
 
 
@@ -67,22 +65,20 @@ class AnonCustomType(DocumentedMixin):
             return cast(Type, typing_extensions.Literal[tuple(enum.enum)])
         return self.type.python
 
-    def python_type_literal(self, builtin: bool = False) -> str:
+    def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False) -> str:
         if builtin:
-            return self.type.python_type_literal(builtin=builtin)
+            return self.type.python_type_literal(build_options=build_options, builtin=builtin)
         else:
-            return self.python_type_def_literal
+            return self.python_type_def_literal(build_options=build_options)
 
-    @property
-    def python_type_def_literal(self):
+    def python_type_def_literal(self, build_options: "BuildOptions"):
         enum = self.enum
         if enum is not None:
-            return (
-                f"{(typing if NEW_TYPING else typing_extensions).__name__}.Literal"
-                f"[{', '.join(map(repr, enum.enum))}]"
-            )
+            module = typing_extensions if build_options.require_typing_extensions else typing
+            values = ", ".join(map(repr, enum.enum))
+            return f"{module.__name__}.Literal[{values}]"
         else:
-            return self.type.python_type_literal(builtin=False)
+            return self.type.python_type_literal(builtin=False, build_options=build_options)
 
     @property
     def parquet(self) -> pyarrow.DataType:
@@ -92,9 +88,19 @@ class AnonCustomType(DocumentedMixin):
     def enum(self) -> Optional[EnumConstraint]:
         return next((c for c in self.constraints if isinstance(c, EnumConstraint)), None)
 
-    @property
-    def attrs_required_imports(self) -> List[str]:
-        return self.type.attrs_required_imports
+    def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        imports = self.type.attrs_required_imports(build_options=build_options)
+        extra = None
+        if self.enum is not None:
+            # render as literal
+            # extensions is technically not a std lib but it's easier to account for this way
+            extra = "typing_extensions" if build_options.require_typing_extensions else "typing"
+        elif build_options.use_newtypes:
+            # render as newtype
+            extra = "typing"
+        if extra is not None:
+            imports.add(extra)
+        return imports
 
     @property
     def custom_type_refs(self) -> Iterator[Identifier]:
@@ -115,11 +121,18 @@ class CustomType(AnonCustomType, extra=Extra.forbid):
     def class_name(self) -> str:
         return snake_to_title(self.name)
 
-    def python_type_literal(self, builtin: bool = False) -> str:
+    def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False) -> str:
         if builtin:
-            return self.type.python_type_literal(builtin=builtin)
+            return self.type.python_type_literal(build_options=build_options, builtin=builtin)
         else:
             return self.class_name
+
+    def python_type_def_literal(self, build_options: "BuildOptions"):
+        literal = super().python_type_def_literal(build_options)
+        if build_options.use_newtypes and self.enum is None:
+            return f'typing.NewType("{self.class_name}", {literal})'
+        else:
+            return literal
 
     @property
     def custom_type_refs(self) -> Iterator[Identifier]:
@@ -151,11 +164,6 @@ class ExternalCustomType(CustomType, extra=Extra.forbid):
     package: DottedIdentifier
     derived_code_submodule: DottedIdentifier
     external_name: Identifier
-
-    @property
-    def attrs_required_imports(self) -> List[str]:
-        # This type will be imported from another module; no supporting imports are required
-        return []
 
     @property
     def module_path(self) -> str:
@@ -232,13 +240,11 @@ class ArrayType(_RawArrayType):
     def parquet(self) -> pyarrow.DataType:
         return pyarrow.list_(self.values.parquet)
 
-    @property
-    def attrs_required_imports(self) -> List[str]:
-        modules = {"typing", *self.values.attrs_required_imports}
-        return sorted(modules)
+    def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        return {"typing", *self.values.attrs_required_imports(build_options=build_options)}
 
-    def python_type_literal(self, builtin: bool = False):
-        return f"typing.List[{self.values.python_type_literal(builtin=builtin)}]"
+    def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False):
+        return f"typing.List[{self.values.python_type_literal(build_options=build_options, builtin=builtin)}]"
 
 
 class _RawMappingType(_ComplexBaseType, extra=Extra.forbid):
@@ -263,15 +269,17 @@ class MappingType(_RawMappingType, extra=Extra.forbid):
     def parquet(self) -> pyarrow.DataType:
         return pyarrow.map_(self.keys.parquet, self.values.parquet)
 
-    @property
-    def attrs_required_imports(self) -> List[str]:
-        modules = {"typing", *self.keys.attrs_required_imports, *self.values.attrs_required_imports}
-        return sorted(modules)
+    def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        return {
+            "typing",
+            *self.keys.attrs_required_imports(build_options),
+            *self.values.attrs_required_imports(build_options),
+        }
 
-    def python_type_literal(self, builtin: bool = False):
+    def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False):
         return (
-            f"typing.Dict[{self.keys.python_type_literal(builtin=builtin)}, "
-            f"{self.values.python_type_literal(builtin=builtin)}]"
+            f"typing.Dict[{self.keys.python_type_literal(build_options=build_options, builtin=builtin)}, "
+            f"{self.values.python_type_literal(build_options=build_options, builtin=builtin)}]"
         )
 
 
@@ -310,6 +318,7 @@ class _RawColumn(BaseModel, extra=Extra.forbid):
     nullable: bool = False
     doc: NonEmptyStr
     source_name: Optional[str] = None
+    na_values: Optional[Set[str]] = None
 
     def with_attrs(
         self,
@@ -458,10 +467,14 @@ class BuildOptions(BaseModel, extra=Extra.forbid):
     pandas: bool
     pyarrow: bool
     # interface options
-    use_newtypes: bool
     type_constraint_comments: bool
-    require_typing_extensions: bool
     validate_transient_tables: bool
+    # set this to true if you want to generate code that's compatible with python 3.7 and lower
+    require_typing_extensions: bool
+    # import types from external schemas, or re-render them?
+    import_external_types: bool = True
+    # render custom types with constraints as typing.NewType instances?
+    use_newtypes: bool = True
     # boolean to override behavior of dropping types not referenced by any table;
     # allows a schema that defines only types to render source code definitions
     render_all_types: bool = False
@@ -527,10 +540,10 @@ class Column(_RawColumn):
     def python(self) -> Type:
         return Optional[self.type.python] if self.nullable else self.type.python  # type: ignore
 
-    def python_type_literal(self, builtin: bool = False) -> str:
+    def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False) -> str:
         # column type literals are always within the body of a record class def, i.e. not a custom type
         # def
-        literal = self.type.python_type_literal(builtin=builtin)
+        literal = self.type.python_type_literal(build_options=build_options, builtin=builtin)
         return f"typing.Optional[{literal}]" if self.nullable else literal
 
     @property
@@ -577,7 +590,9 @@ class Table(_RawTable):
         else:
             return self.title
 
-    def _attrs_required_imports(self, sqlite_interface: bool = False) -> List[str]:
+    def _attrs_required_imports(
+        self, build_options: "BuildOptions", sqlite_interface: bool = False
+    ) -> Set[str]:
         columns: Iterator[Column]
         if sqlite_interface:
             index_cols = self.index_columns
@@ -594,16 +609,14 @@ class Table(_RawTable):
         for column in columns:
             if column.nullable:
                 modules.add("typing")
-            modules.update(column.type.attrs_required_imports)
-        return sorted(modules)
+            modules.update(column.type.attrs_required_imports(build_options))
+        return modules
 
-    @property
-    def attrs_required_imports(self) -> List[str]:
-        return self._attrs_required_imports(sqlite_interface=False)
+    def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        return self._attrs_required_imports(build_options=build_options, sqlite_interface=False)
 
-    @property
-    def attrs_sqlite_required_imports(self) -> List[str]:
-        return self._attrs_required_imports(sqlite_interface=True)
+    def attrs_sqlite_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        return self._attrs_required_imports(build_options=build_options, sqlite_interface=True)
 
     @property
     def parquet_schema(self) -> pyarrow.Schema:
@@ -628,6 +641,21 @@ class Table(_RawTable):
                 casts[c.snake_case_name] = dtype
 
         return casts
+
+    @property
+    def csv_na_values(self) -> Dict[str, Set[str]]:
+        """Dict of column name to set of string values that should be considered null when reading a
+        tabular text file. Used for `na_values` arg of `pandas.read_csv`"""
+        na_values: Dict[str, Set[str]] = {}
+        default_na_values = (
+            self.dependencies.na_values if isinstance(self.dependencies, TabularFileSource) else None
+        )
+        for c in self.columns:
+            if c.na_values is not None:
+                na_values[c.header_name] = c.na_values
+            elif c.nullable and default_na_values is not None:
+                na_values[c.header_name] = default_na_values
+        return na_values
 
     @property
     def pandera_schema(self) -> pa.DataFrameSchema:
@@ -692,7 +720,7 @@ def render_pandera_schema(
 
     for column in table.columns:
         check_exprs: Optional[Union[List[str], List[pa.Check]]]
-        if isinstance(column.type, CustomType):
+        if isinstance(column.type, (AnonCustomType, CustomType)):
             if as_str:
                 check_exprs = [c.pandera_check_expr() for c in column.type.constraints]
             else:
@@ -824,9 +852,29 @@ class Schema(_RawSchema):
         )
 
     @property
+    def attrs_required_imports(self) -> Set[str]:
+        assert self.build_options is not None, "can't generate attrs schema without `build_options`"
+        # all types referenced in tables. Includes imports needed for inline-defined anonymous types
+        modules = set(
+            itertools.chain.from_iterable(
+                t.attrs_required_imports(self.build_options) for t in self.tables.values()
+            )
+        )
+        # all top-level defined field types. Includes imports needed for types not used in any table
+        modules.update(
+            itertools.chain.from_iterable(
+                t.attrs_required_imports(self.build_options) for t in self.defined_types
+            )
+        )
+        return modules
+
+    @property
     def external_type_imports(self) -> Dict[str, Set[str]]:
         """Mapping from qualified module name to class name or
         '<external class name> as <internal class name>' expression"""
+        if not self.build_options.import_external_types:
+            return {}
+
         imports: Dict[str, Set[str]] = defaultdict(set)
         for ref in self.external_type_refs:
             t = self.types[ref]
@@ -836,6 +884,15 @@ class Schema(_RawSchema):
             imports[module].add(import_name)
 
         return imports
+
+    @property
+    def defined_types(self) -> List[CustomType]:
+        """All field types which are defined non-anonymously in the generated attrs code for this schema"""
+        referenced_custom_type_refs = set(self.packaged_custom_type_refs)
+        if not self.build_options.import_external_types:
+            referenced_custom_type_refs.update(self.external_type_refs)
+
+        return [self.types[name] for name in referenced_custom_type_refs]
 
     def dependency_dag(
         self, table_predicate: Callable[[Table], bool] = is_build_time_package_table

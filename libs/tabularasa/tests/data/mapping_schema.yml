@@ -35,12 +35,14 @@ tables:
           values:
             custom: short_upper
         nullable: true
+        na_values: ['null', '']
         doc: mapping of int to string
     primary_key: ['pk']
     doc: table with mapping columns
     dependencies:
       filename: tests/data/mappings.csv
       delimiter: '|'
+      na_values: ['nothing', '']
   nested_mappings:
     columns:
       - name: string_to_int_array

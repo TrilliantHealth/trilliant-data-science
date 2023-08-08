@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, TypeVar
+from typing import AbstractSet, Any, Callable, Dict, List, Optional, TypeVar, cast
 
 import pandas as pd
 import pandera as pa
@@ -41,8 +41,6 @@ class PandasCSVLoader:
         self.schema = schema
         self.table = table
         self.header = [column.header_name for column in self.table.columns]
-        self.skip_rows = table.dependencies.skiprows
-        self.encoding = table.dependencies.encoding
         self.rename = {column.header_name: column.name for column in self.table.columns}
         # set the primary key as the index
         self.index_cols: List[str] = list(self.table.primary_key) if self.table.primary_key else []
@@ -53,39 +51,30 @@ class PandasCSVLoader:
             for column in self.table.columns
             if column.dtype in (DType.DATE, DType.DATETIME)
         ]
-        self.date_cols = [column.name for column in self.table.columns if column.dtype == DType.DATE]
-        self.nullable_bool_cols = [
-            column.name
-            for column in self.table.columns
-            if column.dtype == DType.BOOL and column.nullable
-        ]
+        self.na_values = table.csv_na_values
         self.dtypes = {}
         self.dtypes_for_csv_read = {}
         self.converters: Dict[str, Callable[[str], Any]] = {}
         for column in self.table.columns:
-            index = column.name in self.index_cols
-            dtype = column.pandas(index=index)
+            dtype = column.pandas(index=column.name in self.index_cols)
             self.dtypes[column.name] = dtype
+            na_values_for_col = self.na_values.get(column.header_name)
             if column.dtype == DType.BOOL:
+                # we have a custom converter (parser) for boolean values.
+                # converters override na_values in pandas.read_csv, so we have to specify them here.
                 self.converters[column.header_name] = (
-                    parse_optional(parse_bool) if column.nullable else parse_bool
+                    parse_optional(parse_bool, na_values_for_col) if na_values_for_col else parse_bool
                 )
-            elif column.dtype == DType.STR and not column.nullable:
-                # read_csv treats empty strings as null; we want to let them pass through unchanged
-                # this also includes string enums - if they're not nullable and there are empty strings
-                # that are invalid they'll fail downstream when we check
-                self.converters[column.header_name] = identity
             elif isinstance(column.dtype, (metaschema.ArrayType, metaschema.MappingType)):
+                # parse as json - again a custom converter which overrides na_values
                 converter = sqlite_postprocessor_for_type(column.dtype.python)
                 assert converter is not None  # converter for a structured type will not be None
-                if column.nullable:
-                    converter = parse_optional(  # type: ignore
-                        converter,
-                        null_values=frozenset(["", JSON_NULL]),
-                    )
-                self.converters[column.header_name] = converter  # type: ignore
+                self.converters[column.header_name] = cast(
+                    Callable[[str], Any],
+                    parse_optional(converter, na_values_for_col) if na_values_for_col else converter,
+                )
             elif (column.header_name not in self.parse_date_cols) and (column.type.enum is None):
-                # read_csv requires passing `parse_dates` for this purpose
+                # read_csv requires passing `parse_dates` for determining date-typed columns
                 # also do NOT tell pandas.read_csv you want an enum; it will mangle unknown values to null!
                 self.dtypes_for_csv_read[column.header_name] = dtype
 
@@ -100,17 +89,22 @@ class PandasCSVLoader:
 
     def read(self):
         # make mypy happy; this is checked in __init__
-        assert isinstance(self.table.dependencies, TabularFileSource)
-        with self.table.dependencies.file_handle as f:
+        deps = self.table.dependencies
+        assert isinstance(deps, TabularFileSource)
+        with deps.file_handle as f:
             df = pd.read_csv(  # type: ignore
                 f,
                 usecols=self.header,
                 dtype=self.dtypes_for_csv_read,
                 parse_dates=self.parse_date_cols,
                 converters=self.converters,
-                skiprows=self.skip_rows,
-                encoding=self.encoding,
-                dialect=self.table.dependencies.csv_dialect,
+                skiprows=deps.skiprows,
+                encoding=deps.encoding,
+                dialect=deps.csv_dialect,
+                na_values=self.na_values,
+                # without this, pandas adds in its own extensive set of strings to interpret as null.
+                # we force the user to be explicit about the values they want to parse as null.
+                keep_default_na=False,
             )
 
         return df
@@ -124,7 +118,9 @@ class PandasCSVLoader:
 
         # pandas silently nullifies values not matching a categorical dtype!
         # so we have to do this ourselves before we coerce with .astype below
-        for name, dtype in self.dtypes.items():
+        for col in self.table.columns:
+            name = col.name
+            dtype = self.dtypes[name]
             if isinstance(dtype, pd.CategoricalDtype):
                 if not (df[name].isin(dtype.categories) | df[name].isna()).all():
                     categories = (
@@ -153,7 +149,7 @@ def identity(x):
 
 
 def parse_optional(
-    func: Callable[[str], V], null_values: FrozenSet[str] = frozenset([""])
+    func: Callable[[str], V], null_values: AbstractSet[str] = frozenset([""])
 ) -> Callable[[str], Optional[V]]:
     """Turn a csv parser for a type V into a parser for Optional[V] by treating the empty string as a
     null value"""

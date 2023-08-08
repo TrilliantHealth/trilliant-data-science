@@ -1,0 +1,49 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: false
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: null
+  transient_data_dir: null
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: false
+  validate_transient_tables: true
+  require_typing_extensions: false
+  render_all_types: true
+
+tables:
+  table1:
+    columns:
+      - name: foo
+        type:
+          # inline custom type def
+          type: int16
+          constraints:
+            - enum: [1, 2, 3]
+              ordered: true
+        doc: just an int
+    doc: just a table
+    primary_key: [foo]
+    build_time_installed: false
+  table2:
+    columns:
+      - name: bar
+        type:
+          # inline custom type def
+          keys:
+            type: str
+            constraints:
+              - enum: ["4", "5", "6"]
+          values:
+            type: str
+            constraints:
+              - len_le: 10
+        doc: just a mapping
+    doc: just another table
+    build_time_installed: false
+
+types: {}

@@ -25,10 +25,8 @@ import setuptools.command.build_py
 from thds.tabularasa.loaders.util import PandasParquetLoader, default_parquet_package_data_path
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_loaders,
     render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_loaders,
     render_pandera_module,
     render_pyarrow_schema,
     render_sql_schema,
@@ -137,12 +135,6 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
                 self.options.derived_code_submodule.replace(".", "/"),
             )
         )
-        if self.options.require_typing_extensions:
-            # patch
-            import thds.tabularasa.schema.metaschema
-
-            thds.tabularasa.schema.metaschema.NEW_TYPING = False
-
         assert self.schema.build_options is not None, "Can't build without build_options being specified"
 
         if self.for_setup_py_build:
@@ -229,29 +221,13 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
         if self.options.attrs or self.options.sqlite_interface:
             attrs_source = render_attrs_module(
                 self.schema,
-                render_attrs_loaders(
-                    self.schema,
-                    package=self.package_name,
-                    data_dir=self.options.package_data_dir,
-                    render_pyarrow_schemas=self.options.pyarrow,
-                )
-                if self.options.package_data_dir
-                else None,
-                use_newtypes=self.options.use_newtypes,
-                type_constraint_comments=self.options.type_constraint_comments,
+                package=self.package_name,
             )
             write_if_ast_changed(attrs_source, self.derived_code_submodule_dir / "attrs.py")
         if self.options.pandas:
             pandas_source = render_pandera_module(
                 self.schema,
-                loader_defs=render_pandera_loaders(
-                    self.schema,
-                    package=self.package_name,
-                    data_dir=self.options.package_data_dir,
-                    render_pyarrow_schemas=self.options.pyarrow,
-                )
-                if self.options.package_data_dir
-                else None,
+                package=self.package_name,
             )
             write_if_ast_changed(pandas_source, self.derived_code_submodule_dir / "pandas.py")
         if self.options.pyarrow:

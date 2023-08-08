@@ -26,6 +26,7 @@ tables:
         type:
           values: int32
         nullable: true
+        na_values: ['null', '']
         doc: array of ints
       - name: nested_string_array
         type:
@@ -33,6 +34,7 @@ tables:
             values:
               custom: short_upper
         nullable: true
+        na_values: ['NA', '']
         doc: array of array of strings
       - name: nested_date_array
         type:

@@ -10,6 +10,8 @@ def test_loader_dataframe_equals(test_case_with_pandas_module: ReferenceDataTest
     assert test_case.schema is not None
     assert test_case.pandas_module is not None
     for table in test_case.schema.package_tables:
+        if table.name not in test_case.dataframes:
+            continue
         df_expected = test_case.dataframes[table.name]
         static_loader: PandasParquetLoader = test_case.pandas_parquet_loader_for(table.name)
         dynamic_loader: PandasParquetLoader = test_case.dynamic_pandas_parquet_loader_for(table.name)

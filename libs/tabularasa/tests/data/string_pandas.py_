@@ -29,6 +29,14 @@ strings_schema = pa.DataFrameSchema(
             nullable=True,
             unique=False,
         ),
+        empty=pa.Column(
+            pd.StringDtype(),
+            checks=[
+                pa.Check.str_length(max_value=0)
+            ],
+            nullable=False,
+            unique=False,
+        )
     ),
     index=pa.Index(
         pd.StringDtype(),

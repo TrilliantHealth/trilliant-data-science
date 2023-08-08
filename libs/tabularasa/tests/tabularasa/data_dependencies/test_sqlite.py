@@ -2,9 +2,10 @@ from thds.tabularasa.data_dependencies.sqlite import table_exists, table_populat
 
 
 def test_populate_sqlite_db(test_case_with_sqlite_db):
-    conn = test_case_with_sqlite_db.sqlite_db_conn
-    for table in test_case_with_sqlite_db.schema.build_time_package_tables:
-        _assert_table_correct(conn, table)
+    if test_case_with_sqlite_db.schema.build_options.package_data_dir:
+        conn = test_case_with_sqlite_db.sqlite_db_conn
+        for table in test_case_with_sqlite_db.schema.build_time_package_tables:
+            _assert_table_correct(conn, table)
 
 
 def _assert_table_correct(conn, table):

@@ -57,6 +57,8 @@ def test_attrs_loader(test_case_with_attrs_module: ReferenceDataTestCase):
     assert test_case_with_attrs_module.schema is not None
     assert test_case_with_attrs_module.schema.package_tables is not None
     for table in test_case_with_attrs_module.schema.package_tables:
+        if table.run_time_installed:
+            continue
         loader = test_case_with_attrs_module.attrs_loader_for(table.name)
         rows: Iterable[Any] = loader()
         schema = list(loader.type_.__annotations__.items())
@@ -79,6 +81,8 @@ def test_loader_rows_equal(test_case_with_attrs_module: ReferenceDataTestCase):
     assert test_case.schema is not None
     assert test_case.attrs_module is not None
     for table in test_case.schema.package_tables:
+        if table.name not in test_case.tuples:
+            continue
         tuples = test_case.tuples[table.name]
         if table.primary_key:
             columns = [c.name for c in table.columns]

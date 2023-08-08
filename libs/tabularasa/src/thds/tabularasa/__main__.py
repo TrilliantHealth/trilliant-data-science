@@ -28,10 +28,8 @@ from thds.tabularasa.loaders.util import (
 )
 from thds.tabularasa.schema import metaschema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_loaders,
     render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_loaders,
     render_pandera_module,
     render_pyarrow_schema,
     render_sphinx_docs,
@@ -485,28 +483,14 @@ class ReferenceDataManager:
         elif target == CompilationTarget.pandas:
             renderer = partial(
                 render_pandera_module,
-                loader_defs=render_pandera_loaders(
-                    self.schema,
-                    package=self.package,
-                    data_dir=self.package_data_dir,
-                    render_pyarrow_schemas=self.build_options.pyarrow,
-                )
-                if self.package_data_dir
-                else None,
+                package=self.package,
             )
         elif target == CompilationTarget.pyarrow:
             renderer = render_pyarrow_schema
         elif target == CompilationTarget.attrs:
             renderer = partial(
                 render_attrs_module,
-                render_attrs_loaders(
-                    self.schema,
-                    package=self.package,
-                    data_dir=self.package_data_dir,
-                    render_pyarrow_schemas=self.build_options.pyarrow,
-                ),
-                use_newtypes=self.build_options.use_newtypes,
-                type_constraint_comments=self.build_options.type_constraint_comments,
+                package=self.package,
             )
         elif target == CompilationTarget.attrs_sqlite:
             assert (

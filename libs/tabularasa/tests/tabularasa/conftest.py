@@ -13,17 +13,14 @@ import pandera as pa
 import pkg_resources
 import pytest
 
-import thds.tabularasa.schema.metaschema
 from thds.tabularasa.data_dependencies.build import write_package_data_tables
 from thds.tabularasa.data_dependencies.sqlite import populate_sqlite_db
 from thds.tabularasa.data_dependencies.tabular import PandasCSVLoader
 from thds.tabularasa.loaders.util import AttrsParquetLoader, PandasParquetLoader
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
-    render_attrs_loaders,
     render_attrs_module,
     render_attrs_sqlite_schema,
-    render_pandera_loaders,
     render_pandera_module,
     render_sql_schema,
 )
@@ -34,13 +31,7 @@ dt = datetime.datetime.fromisoformat
 
 TupleTestCases = Dict[str, List[Tuple]]
 
-# patch to ensure code generation is python 3.7-compatible for test cases
-# this generated code is also compatible with 3.8, but uses the typing_extensions module which is
-# no longer necessary when using 3.8+
-thds.tabularasa.schema.metaschema.NEW_TYPING = False
-
 TEST_PACKAGE = "tests"
-TEST_DATA_OUTPUT_DIR = "data/derived/"
 
 
 def line_diff(generated_source: str, expected_source: str) -> str:
@@ -85,13 +76,15 @@ class ReferenceDataTestCase:
 
     def derive_data(self):
         assert self.schema is not None
-        write_package_data_tables(
-            self.schema,
-            package=self.package,
-            check_hash=False,
-            output_data_dir=TEST_DATA_OUTPUT_DIR,
-            transient_data_dir=TEST_DATA_OUTPUT_DIR,
-        )
+        if self.schema.build_options.package_data_dir:
+            write_package_data_tables(
+                self.schema,
+                package=self.package,
+                check_hash=True,
+                output_data_dir=self.schema.build_options.package_data_dir,
+                transient_data_dir=self.schema.build_options.package_data_dir,
+                validate_transient_tables=True,
+            )
 
     def with_attrs(self, **attrs):
         current_attrs = self.__dict__.copy()
@@ -108,7 +101,9 @@ class ReferenceDataTestCase:
 
     @property
     def sqlite_db_path(self) -> str:
-        return f"{TEST_DATA_OUTPUT_DIR}{self.schema_prefix.split('/')[-1]}.sqlite"
+        assert self.schema is not None
+        assert self.schema.build_options.package_data_dir is not None
+        return f"{self.schema.build_options.package_data_dir}{self.schema_prefix.split('/')[-1]}.sqlite"
 
     @property
     def sqlite_db_conn(self) -> sqlite3.Connection:
@@ -155,7 +150,7 @@ class ReferenceDataTestCase:
         assert self.schema is not None
         pandas_source = render_pandera_module(
             self.schema,
-            render_pandera_loaders(self.schema, package=self.package, data_dir=TEST_DATA_OUTPUT_DIR),
+            package=self.package,
         )
         return self.with_attrs(pandas_source=pandas_source)
 
@@ -169,12 +164,7 @@ class ReferenceDataTestCase:
         assert self.schema is not None
         attrs_source = render_attrs_module(
             self.schema,
-            render_attrs_loaders(
-                self.schema,
-                package=self.package,
-                data_dir=TEST_DATA_OUTPUT_DIR,
-            ),
-            use_newtypes=True,
+            package=self.package,
         )
         return self.with_attrs(attrs_source=attrs_source)
 
@@ -186,15 +176,16 @@ class ReferenceDataTestCase:
 
     def populate_sqlite_db(self):
         assert self.schema is not None
-        populate_sqlite_db(
-            self.schema,
-            db_package=self.package,
-            db_path=self.sqlite_db_path,
-            data_package=self.package,
-            data_dir=TEST_DATA_OUTPUT_DIR,
-            transient_data_dir=TEST_DATA_OUTPUT_DIR,
-            check_hash=False,
-        )
+        if self.schema.build_options.package_data_dir is not None:
+            populate_sqlite_db(
+                self.schema,
+                db_package=self.package,
+                db_path=self.sqlite_db_path,
+                data_package=self.package,
+                data_dir=self.schema.build_options.package_data_dir,
+                transient_data_dir=self.schema.build_options.package_data_dir,
+                check_hash=False,
+            )
 
     def compile_attrs_sqlite_source(self):
         assert self.schema is not None
@@ -202,7 +193,7 @@ class ReferenceDataTestCase:
         attrs_sqlite_source = render_attrs_sqlite_schema(
             self.schema,
             package=self.package,
-            db_path=self.sqlite_db_path,
+            db_path=self.sqlite_db_path if self.schema.build_options.package_data_dir else "",
             attrs_module_name=None,
         )
         return self.with_attrs(attrs_sqlite_source=attrs_sqlite_source)
@@ -243,10 +234,11 @@ class ReferenceDataTestCase:
     def dynamic_pandas_parquet_loader_for(self, table_name: str) -> PandasParquetLoader:
         assert self.schema is not None
         assert self.pandas_module is not None
+        assert self.schema.build_options.package_data_dir is not None
         pandas_loader: PandasParquetLoader = PandasParquetLoader.from_schema_table(
             self.schema.tables[table_name],
             package=self.package,
-            data_dir=TEST_DATA_OUTPUT_DIR,
+            data_dir=self.schema.build_options.package_data_dir,
             derive_schema=True,
         )
         return pandas_loader
@@ -293,6 +285,7 @@ string_dataframes = dict(
             uppercase=["ONE", "TWO", None, "THREE", "FOUR"],
             enum=[None, "foo", "bar", "baz", None],
             lowercase=["complex is", "better", "than", "", "complicated"],
+            empty=[""] * 5,
         ),
     )
     .astype(
@@ -300,6 +293,7 @@ string_dataframes = dict(
             uppercase=pd.StringDtype(),
             enum=pd.CategoricalDtype(["foo", "bar", "baz"], ordered=True),
             lowercase=pd.StringDtype(),
+            empty=pd.StringDtype(),
         )
     )
     .set_index("lowercase")
@@ -454,11 +448,11 @@ int_tuples: TupleTestCases = dict(
 
 string_tuples: TupleTestCases = dict(
     strings=[
-        ("ONE", None, "complex is"),
-        ("TWO", "foo", "better"),
-        (None, "bar", "than"),
-        ("THREE", "baz", ""),
-        ("FOUR", None, "complicated"),
+        ("ONE", None, "complex is", ""),
+        ("TWO", "foo", "better", ""),
+        (None, "bar", "than", ""),
+        ("THREE", "baz", "", ""),
+        ("FOUR", None, "complicated", ""),
     ],
 )
 
@@ -607,6 +601,22 @@ def preprocess_int_sequences_table(
                 r"downstream dependencies",
             ),
             id="dependency_schema",
+        ),
+        pytest.param(
+            ReferenceDataTestCase(
+                "data/types_schema.yml",
+                {},
+                {},
+            ),
+            id="mixed_types_schema",
+        ),
+        pytest.param(
+            ReferenceDataTestCase(
+                "data/types2_schema.yml",
+                {},
+                {},
+            ),
+            id="mixed_types_schema_2",
         ),
     ],
 )

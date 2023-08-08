@@ -66,17 +66,25 @@ ATTRS_MAIN_LOADER_TEMPLATE = """class SQLiteLoader:
 )
 
 
-def render_attrs_loader_schema(table: metaschema.Table) -> str:
+def render_attrs_loader_schema(table: metaschema.Table, build_options: metaschema.BuildOptions) -> str:
     accessor_defs = []
     column_lookup = {col.name: col for col in table.columns}
     unq_constraints = {frozenset(c.unique) for c in table.unique_constraints}
 
     if table.primary_key:
-        accessor_defs.append(render_accessor_method(table, table.primary_key, column_lookup, pk=True))
+        accessor_defs.append(
+            render_accessor_method(
+                table, table.primary_key, column_lookup, pk=True, build_options=build_options
+            )
+        )
 
     for idx in table.indexes:
         unique = frozenset(idx) in unq_constraints
-        accessor_defs.append(render_accessor_method(table, idx, column_lookup, pk=False, unique=unique))
+        accessor_defs.append(
+            render_accessor_method(
+                table, idx, column_lookup, pk=False, unique=unique, build_options=build_options
+            )
+        )
 
     accessors = "".join(accessor_defs).strip()
     return ATTRS_CLASS_LOADER_TEMPLATE.format(
@@ -89,6 +97,7 @@ def render_accessor_method(
     table: metaschema.Table,
     index_columns: Tuple[str, ...],
     column_lookup: Dict[str, metaschema.Column],
+    build_options: metaschema.BuildOptions,
     pk: bool = False,
     unique: bool = False,
 ) -> str:
@@ -104,7 +113,10 @@ def render_accessor_method(
         method_name=method_name,
         # use builtin types (as opposed to e.g. Literals and Newtypes) to make the API simpler to use
         typed_args=", ".join(
-            [render_attr_field_def(column_lookup[col], builtin=True) for col in index_columns]
+            [
+                render_attr_field_def(column_lookup[col], builtin=True, build_options=build_options)
+                for col in index_columns
+            ]
         ),
         return_type=return_type,
         index_kind=index_kind,
@@ -126,12 +138,16 @@ def render_attrs_main_loader(
     return ATTRS_MAIN_LOADER_TEMPLATE.format(table_loaders=table_loaders)
 
 
-def _import_lines(tables: List[metaschema.Table], attrs_module_name: Optional[str]):
+def _import_lines(
+    tables: List[metaschema.Table],
+    attrs_module_name: Optional[str],
+    build_options: metaschema.BuildOptions,
+):
     # need typing always for List and Optional
     stdlib_imports = sorted(
         {
             "typing",
-            *chain.from_iterable(t.attrs_sqlite_required_imports for t in tables),
+            *chain.from_iterable(t.attrs_sqlite_required_imports(build_options) for t in tables),
         }
     )
     import_lines = [f"import {module}\n" for module in stdlib_imports]
@@ -179,8 +195,8 @@ def render_attrs_sqlite_schema(
             f"tables because no indices or primary keys are defined: {', '.join(tables_filtered)}"
         )
 
-    imports = _import_lines(tables, attrs_module_name)
-    loader_defs = [render_attrs_loader_schema(table) for table in tables]
+    imports = _import_lines(tables, attrs_module_name, schema.build_options)
+    loader_defs = [render_attrs_loader_schema(table, schema.build_options) for table in tables]
     loaders = "\n\n".join(loader_defs)
 
     if has_database_loader:

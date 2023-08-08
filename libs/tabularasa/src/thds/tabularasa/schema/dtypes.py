@@ -1,7 +1,7 @@
 import builtins
 import datetime
 from enum import Enum
-from typing import Callable, Iterator, List, Optional, Type, Union
+from typing import Any, Callable, Iterator, Optional, Set, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -119,7 +119,7 @@ class DType(Enum):
         else:
             raise TypeError(f"No python type registered for {self}")
 
-    def python_type_literal(self, builtin: bool = False) -> str:
+    def python_type_literal(self, build_options: Any = None, builtin: bool = False) -> str:
         cls = self.python
         if cls.__module__ == builtins.__name__:
             # int, str, bool, etc
@@ -145,8 +145,7 @@ class DType(Enum):
             dtype: Callable[[], pyarrow.DataType] = getattr(pyarrow, self.name.lower())
             return dtype()
 
-    @property
-    def attrs_required_imports(self) -> List[str]:
+    def attrs_required_imports(self, build_options: Any = None) -> Set[str]:
         if self in (DType.DATE, DType.DATETIME):
-            return ["datetime"]
-        return []
+            return {"datetime"}
+        return set()

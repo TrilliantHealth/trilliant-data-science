@@ -1,13 +1,13 @@
 import typing
 
 import attr
-import typing_extensions
 
 import thds.tabularasa.loaders.util
 
+Empty = typing.NewType("Empty", str)
 LowerNoPunct = typing.NewType("LowerNoPunct", str)
 ShortUpper = typing.NewType("ShortUpper", str)
-StringEnum = typing_extensions.Literal["foo", "bar", "baz"]
+StringEnum = typing.Literal["foo", "bar", "baz"]
 
 
 @attr.s(auto_attribs=True, frozen=True)
@@ -17,11 +17,13 @@ class Strings:
     :param uppercase: only short uppercase strings
     :param enum: only foo bar and baz
     :param lowercase: only lowercase strings
+    :param empty: only the empty string
     """
 
     uppercase: typing.Optional[ShortUpper]
     enum: typing.Optional[StringEnum]
     lowercase: LowerNoPunct
+    empty: Empty
 
 
 load_strings = thds.tabularasa.loaders.util.AttrsParquetLoader[Strings](

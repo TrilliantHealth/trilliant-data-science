@@ -12,7 +12,7 @@ build_options:
   use_newtypes: true
   type_constraint_comments: true
   validate_transient_tables: true
-  require_typing_extensions: true
+  require_typing_extensions: false
 
 tables:
   strings:
@@ -35,6 +35,10 @@ tables:
           custom: lower_no_punct
         nullable: false
         doc: only lowercase strings
+      - name: empty
+        type:
+          custom: empty
+        doc: only the empty string
     primary_key: ['lowercase']
     constraints:
       - unique: ['uppercase']
@@ -64,3 +68,7 @@ types:
         ordered: true
       - len_ge: 3
       - len_lt: 4  # only length 3 allowed
+  empty:
+    type: str
+    constraints:
+      - len_le: 0

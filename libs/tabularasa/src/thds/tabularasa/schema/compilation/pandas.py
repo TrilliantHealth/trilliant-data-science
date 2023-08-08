@@ -145,9 +145,9 @@ class ImportsAndCode(NamedTuple):
 def render_pandera_loaders(
     schema: metaschema.Schema,
     package: str,
-    data_dir: str,
-    render_pyarrow_schemas: bool = False,
 ) -> ImportsAndCode:
+    data_dir = schema.build_options.package_data_dir
+    render_pyarrow_schemas = schema.build_options.pyarrow
     qualified_pyarrow_module_name = "pyarrow_schemas"
     import_lines = list()
     if render_pyarrow_schemas:
@@ -182,9 +182,20 @@ def render_pandera_loaders(
 
 def render_pandera_module(
     schema: metaschema.Schema,
-    loader_defs: Optional[ImportsAndCode] = None,
+    package: str,
     coerce_run_time_tables: bool = False,
+    loader_defs: Optional[ImportsAndCode] = None,
 ) -> str:
+    if loader_defs is None:
+        loader_defs = (
+            render_pandera_loaders(
+                schema,
+                package=package,
+            )
+            if schema.build_options.package_data_dir
+            else None
+        )
+
     # stdlib imports
     all_constraints = itertools.chain.from_iterable(t.constraints for t in schema.types.values())
     required_stdlib_modules = sorted(

@@ -1,0 +1,28 @@
+import numpy as np
+import pandera as pa
+
+table_schema = pa.DataFrameSchema(
+    columns=dict(
+        foo=pa.Column(
+            np.dtype("int16"),
+            checks=[pa.Check.ge(10)],
+            nullable=False,
+            unique=False,
+        ),
+    ),
+    index=None,
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+# load_table = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+#     table_name="table",
+#     schema=table_schema,
+#     package="tests",
+#     data_dir="data/derived/",
+#     blob_store=None,
+#     md5=None,
+#     pyarrow_schema=None,
+# )

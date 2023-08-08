@@ -6,6 +6,8 @@ def test_attrs_sqlite_loader(test_case_with_attrs_sqlite_module: ReferenceDataTe
     assert test_case.schema is not None
     assert test_case.attrs_sqlite_module is not None
     for table in test_case.schema.package_tables:
+        if table.run_time_installed:
+            continue
         unq_constraints = {frozenset(c.unique) for c in table.unique_constraints}
         loader = test_case_with_attrs_sqlite_module.attrs_sqlite_loader_for(table.name)
         attrs_class = test_case_with_attrs_sqlite_module.attrs_class_for(table.name)

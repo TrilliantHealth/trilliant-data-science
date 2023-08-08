@@ -618,6 +618,7 @@ def _resolve_column_typerefs(
         nullable=column.nullable,
         doc=column.doc,
         source_name=column.source_name,
+        na_values=column.na_values,
     )
 
 

@@ -3,7 +3,7 @@ import datetime
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Set, Union
 
 import pkg_resources
 from pydantic import AnyUrl, BaseModel, Extra, Field
@@ -72,6 +72,9 @@ class TabularFileSource(DocumentedMixin, LocalFileSourceMixin):
     skiprows: Optional[int] = None
     quoting: Optional[CSVQuotingConvention] = CSVQuotingConvention.QUOTE_MINIMAL
     package: Optional[DottedIdentifier] = None
+    # Fairly conservative choice - only empty string is treated as explicitly null,
+    # and only on nullable columns
+    na_values: Optional[Set[str]] = Field(default_factory=lambda: {""})
 
     @property
     def csv_dialect(self) -> csv.Dialect:
