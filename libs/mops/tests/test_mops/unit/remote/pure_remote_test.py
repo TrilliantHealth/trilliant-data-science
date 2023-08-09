@@ -15,7 +15,6 @@ def test_multiprocessing_pool_apply():
 
 
 def test_concurrent_futures_executor_submit():
-
     with concurrent.futures.ThreadPoolExecutor() as tpe:
 
         def to_submit(f, args, kwargs):

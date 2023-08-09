@@ -91,7 +91,6 @@ def colorized(fg: str, bg: str = "", style: str = "") -> ty.Callable[[str], str]
 
 
 def make_colorized_out(colorized, prefix: str = "", out=print):
-
     if prefix[-1] != " ":
         prefix += " "
 
