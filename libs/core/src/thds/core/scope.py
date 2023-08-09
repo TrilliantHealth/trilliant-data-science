@@ -38,6 +38,7 @@ wrapping function, which is higher than a `with` statement.
 """
 import atexit
 import contextlib
+import sys
 import typing as ty
 from functools import wraps
 from uuid import uuid4
@@ -49,10 +50,13 @@ _KEYED_SCOPE_CONTEXTS: ty.Dict[str, StackContext[contextlib.ExitStack]] = dict()
 
 
 def _close_root_scopes_atexit():
-    for scope_sc in _KEYED_SCOPE_CONTEXTS.values():
+    for name, scope_sc in _KEYED_SCOPE_CONTEXTS.items():
         scope = scope_sc()
         if scope:
-            scope.close()
+            try:
+                scope.close()
+            except ValueError as ve:
+                print(f"Unable to close scope '{name}' at exit because {ve}", file=sys.stderr)
 
 
 atexit.register(_close_root_scopes_atexit)
