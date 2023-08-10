@@ -1,12 +1,14 @@
 import io
+import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 import pytest
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, aio
 
-from thds.adls import AdlsFqn
+from thds.adls import ADLSFileSystem, AdlsFqn
 from thds.adls.download import (
     MD5MismatchError,
     _download_or_use_verified_cached_coroutine,
@@ -180,3 +182,18 @@ async def test_file_missing_md5_gets_one_assigned_after_download():
     # should not error since the md5 should be correct
     cache_hit = await async_download_or_use_verified(fs_client, key, _TEST_DEST / "missing-md5.txt")
     assert cache_hit
+
+
+def test_file_with_md5_doesnt_try_to_set_it(caplog):
+    fs = ADLSFileSystem("thdsscratch", "tmp")
+    key = uuid4().hex
+    fs.put_file(Path(__file__).parent.parent / "data" / "hello_world.txt", key)
+
+    with caplog.at_level(logging.INFO):
+        with TemporaryDirectory() as td:
+            download_or_use_verified(
+                get_global_client(fs.account_name, fs.file_system), key, Path(td) / "whatever"
+            )
+
+    for record in caplog.records:
+        assert "missing MD5" not in record.getMessage()

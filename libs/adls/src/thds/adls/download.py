@@ -341,6 +341,7 @@ def download_or_use_verified(
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
+                logger.info(f"Setting missing MD5 for {remote_key}")
                 dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
             except HttpResponseError as hre:
                 logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
@@ -377,6 +378,7 @@ async def async_download_or_use_verified(
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
+                logger.info(f"Setting missing MD5 for {remote_key}")
                 await dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
             except HttpResponseError as hre:
                 logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
