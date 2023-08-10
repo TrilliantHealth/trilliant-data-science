@@ -1,3 +1,14 @@
+### 1.6.20230810
+
+- Turns out a blob's ETag gets changed when its metadata is
+  changed... which is what we've been doing at the end of downloads
+  for files that have no known MD5. This change fixes the explosion
+  that occurs when two simultaneous downloads using this same system
+  both try to set the same MD5 on the same blob at the same time, and
+  only one of them succeeds because the etag changes (and we
+  conservatively don't change things if they've changed since we
+  downloaded them).
+
 ## 1.6
 
 - Set (missing) MD5s on all files downloaded via this library.

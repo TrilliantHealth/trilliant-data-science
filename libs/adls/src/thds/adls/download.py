@@ -340,7 +340,10 @@ def download_or_use_verified(
                 co_request = co.send(None)
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
-            dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+            try:
+                dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+            except HttpResponseError as hre:
+                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except HttpResponseError as hre:
         _translate_blob_not_found(fs_client, remote_key, hre)
@@ -373,7 +376,10 @@ async def async_download_or_use_verified(
                 co_request = co.send(None)
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
-            await dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+            try:
+                await dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+            except HttpResponseError as hre:
+                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except HttpResponseError as hre:
         _translate_blob_not_found(fs_client, remote_key, hre)
