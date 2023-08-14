@@ -1199,7 +1199,7 @@ files = [
 
 [[package]]
 name = "thds-core"
-version = "1.4"
+version = "1.8"
 description = "Core utilities."
 category = "main"
 optional = false

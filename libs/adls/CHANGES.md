@@ -1,3 +1,7 @@
+## 1.7
+
+* Add an environment variable `THDS_ADLS_UPLOAD_CHUNK_SIZE` (100MB by default) for more configurable uploads.
+
 ### 1.6.20230810
 
 - Turns out a blob's ETag gets changed when its metadata is

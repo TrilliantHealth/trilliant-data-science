@@ -7,7 +7,7 @@ from azure.core.exceptions import HttpResponseError, ResourceModifiedError
 
 from thds.core import fretry, hashing, log, scope
 
-from .._env import UPLOAD_FILE_MAX_CONCURRENCY
+from .._env import UPLOAD_CHUNK_SIZE, UPLOAD_FILE_MAX_CONCURRENCY
 from .._progress import report_upload_progress
 from .._upload import upload_decision_and_settings
 from ..download import BlobNotFoundError, download_or_use_verified
@@ -126,6 +126,7 @@ def upload(
             content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY,
+            chunk_size=UPLOAD_CHUNK_SIZE,
         )
 
     # if at all possible (if the md5 is known), return a resource containing it.

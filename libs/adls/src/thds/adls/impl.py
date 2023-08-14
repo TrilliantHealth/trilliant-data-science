@@ -32,6 +32,7 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 
 from thds.core.log import getLogger
 
+from ._env import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
 from ._upload import async_upload_decision_and_settings
 from .download import async_download_or_use_verified
 from .ro_cache import from_cache_path_to_local, global_cache
@@ -325,7 +326,11 @@ class ADLSFileSystem:
                 decision = await async_upload_decision_and_settings(file_client, fp)
                 if decision.upload_required:
                     await file_client.upload_data(
-                        fp, overwrite=True, content_settings=decision.content_settings
+                        fp,
+                        overwrite=True,
+                        content_settings=decision.content_settings,
+                        connection_timeout=CONNECTION_TIMEOUT,
+                        chunk_size=UPLOAD_CHUNK_SIZE,
                     )
 
         return remote_path

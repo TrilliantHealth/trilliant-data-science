@@ -1410,7 +1410,7 @@ files = [
 
 [[package]]
 name = "thds-adls"
-version = "1.3"
+version = "1.7"
 description = "ADLS tools"
 category = "main"
 optional = false
@@ -1432,7 +1432,7 @@ url = "../adls"
 
 [[package]]
 name = "thds-core"
-version = "1.4"
+version = "1.8"
 description = "Core utilities."
 category = "main"
 optional = false

@@ -26,5 +26,6 @@ MAX_SINGLE_GET_SIZE = max(
 # these achieved 380 MB/sec on a 2 core machine on Kubernetes
 MAX_BLOCK_SIZE = int(os.getenv("THDS_ADLS_MAX_BLOCK_PUT_SIZE") or 2**20 * 64)  # 64MB
 UPLOAD_FILE_MAX_CONCURRENCY = int(os.getenv("THDS_ADLS_UPLOAD_FILE_MAX_CONCURRENCY") or 10)
+UPLOAD_CHUNK_SIZE = int(os.getenv("THDS_ADLS_UPLOAD_CHUNK_SIZE") or 2**20 * 100)  # 100MB
 
 CONNECTION_TIMEOUT = 2000  # seconds
