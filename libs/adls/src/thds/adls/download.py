@@ -23,7 +23,7 @@ from thds.core.types import StrOrPath
 
 from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from ._progress import report_download_progress
-from .errors import BlobNotFoundError, is_blob_not_found
+from .errors import translate_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
@@ -295,9 +295,7 @@ def _prep_download_coroutine(
 
 
 def _translate_blob_not_found(client, key: str, hre: HttpResponseError) -> ty.NoReturn:
-    if is_blob_not_found(hre):
-        raise BlobNotFoundError(AdlsFqn.of(client.account_name, client.file_system_name, key)) from hre
-    raise
+    translate_blob_not_found(hre, client.account_name, client.file_system_name, key)
 
 
 def _set_md5_if_missing(

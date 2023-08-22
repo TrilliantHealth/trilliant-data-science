@@ -382,7 +382,7 @@ class AdlsDatasetContext:
 
         Path if returned to orchestrator will be the process working
         directory plus the full ADLS path... so you probably don't want to return this, but
-        rather should transform it into a SrcFile before returning with src_from_dest.
+        rather should transform it into a SrcFile before returning, using src_from_dest.
         """
         return DestFile(
             _directory_adjusting_uploader(self.adls_dir.upload, "", remote_relative_path),

@@ -67,7 +67,7 @@ class AdlsFqn(NamedTuple):
     @staticmethod
     def of(storage_account: str, container: str, path: str = "") -> "AdlsFqn":
         """Expensive but includes validation."""
-        return AdlsFqn.parse(format_fqn(storage_account, container, path))
+        return of(storage_account, container, path)
 
     @staticmethod
     def parse(fully_qualified_name: str) -> "AdlsFqn":
@@ -89,6 +89,10 @@ class AdlsFqn(NamedTuple):
 
 
 FR = TypeVar("FR", bound=Union[AdlsFqn, AdlsRoot])
+
+
+def of(storage_account: str, container: str, path: str = "") -> AdlsFqn:
+    return AdlsFqn.parse(format_fqn(storage_account, container, path))
 
 
 def parent(fqn: FR) -> FR:

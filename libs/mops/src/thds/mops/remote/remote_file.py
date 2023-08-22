@@ -105,7 +105,10 @@ class DestFile:
         self._serialized_remote_pointer = Serialized("")
 
     def _force_serialization(self) -> None:
-        """Only meaningful to call this on the local orchestrator."""
+        """Only meaningful to call this once the file has been written
+        to, and can only meaningfully be called in the same execution
+        context where the file was written.
+        """
         if not self._serialized_remote_pointer:
             logger.warning(f"Uploading file {self._local_filename} so that we have its serialization")
             assert os.path.exists(self._local_filename), "Only valid for locally-present DestFiles"

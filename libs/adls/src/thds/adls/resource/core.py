@@ -2,8 +2,11 @@ import json
 import typing as ty
 
 from thds.core import log
+from thds.core.hashing import b64
 
+from ..errors import blob_not_found_translation
 from ..fqn import AdlsFqn
+from ..global_client import get_global_client
 from ..md5 import check_reasonable_md5b64
 
 logger = log.getLogger(__name__)
@@ -47,3 +50,15 @@ def parse(serialized_dict: str) -> AdlsHashedResource:
     md5b64 = actual_dict["md5b64"]
     check_reasonable_md5b64(md5b64)
     return AdlsHashedResource.of(AdlsFqn.parse(uri), md5b64)
+
+
+def get(fqn_or_uri: ty.Union[AdlsFqn, str]) -> AdlsHashedResource:
+    """Creates an AdlsHashedResource from a remote-only file.
+
+    The file _must_ have a pre-existing Content MD5!
+    """
+    fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
+    with blob_not_found_translation(fqn):
+        props = get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
+        assert props.content_settings.content_md5, "ADLS file has empty Content-MD5!"
+        return AdlsHashedResource.of(fqn, b64(props.content_settings.content_md5))

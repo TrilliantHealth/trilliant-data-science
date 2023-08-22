@@ -6,7 +6,7 @@ from pathlib import Path
 import azure.core.exceptions
 from azure.storage.filedatalake import DataLakeFileClient, FileSystemClient
 
-from thds.adls import AdlsFqn, AdlsRoot, join, resource
+from thds.adls import AdlsFqn, join, resource
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import BlobNotFoundError, is_blob_not_found
 from thds.adls.global_client import get_global_client
@@ -121,15 +121,3 @@ class AdlsFileSystem(BlobStore):
 
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
-
-
-UriIsh = ty.Union[AdlsRoot, AdlsFqn, str]
-UriResolvable = ty.Union[UriIsh, ty.Callable[[], UriIsh]]
-
-
-def to_lazy_uri(resolvable: UriResolvable) -> ty.Callable[[], str]:
-    if isinstance(resolvable, str):
-        return lambda: str(resolvable)
-    if isinstance(resolvable, (AdlsRoot, AdlsFqn)):
-        return lambda: str(resolvable)
-    return lambda: str(resolvable())  # type: ignore

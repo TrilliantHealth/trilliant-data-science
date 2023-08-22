@@ -10,7 +10,8 @@ from thds.core import fretry, hashing, log, scope
 from .._env import UPLOAD_CHUNK_SIZE, UPLOAD_FILE_MAX_CONCURRENCY
 from .._progress import report_upload_progress
 from .._upload import upload_decision_and_settings
-from ..download import BlobNotFoundError, download_or_use_verified
+from ..download import download_or_use_verified
+from ..errors import BlobNotFoundError
 from ..fqn import AdlsFqn
 from ..global_client import get_global_client
 from ..link import link

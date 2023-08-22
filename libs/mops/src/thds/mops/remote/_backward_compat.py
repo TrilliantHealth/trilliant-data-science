@@ -2,7 +2,7 @@
 import typing as ty
 
 from ..config import get_memo_storage_root
-from ._adls import UriResolvable, to_lazy_uri
+from ._uris import UriResolvable, to_lazy_uri
 from .pickle_runner import MemoizingPickledFunctionRunner
 from .types import Shell, ShellBuilder, _ShellBuilder
 

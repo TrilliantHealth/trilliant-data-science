@@ -1,4 +1,5 @@
-from thds.mops.remote._adls import AdlsFqn, AdlsRoot, to_lazy_uri
+from thds.adls.fqn import AdlsFqn, AdlsRoot
+from thds.mops.remote._uris import to_lazy_uri
 
 
 def test_to_lazy_uri():
