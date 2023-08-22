@@ -1,3 +1,8 @@
+## 1.8.20230822
+
+- Fix downstream usage of `get_env` to be `active_env` as originally
+  intended.
+
 ## 1.8
 
 - Can configure the level of any Trilliant Health logger by name
