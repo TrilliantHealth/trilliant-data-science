@@ -1,3 +1,4 @@
+"""v2 ADLS shims for the DestFile/SrcFile abstractions."""
 import json
 
 from thds.adls import AdlsFqn, resource
@@ -30,6 +31,16 @@ def src_from_dest(destfile: DestFile) -> SrcFile:
     """
     destfile._force_serialization()
     return _srcfile_from_serialized(destfile._serialized_remote_pointer)
+
+
+def resource_from_src(srcfile: SrcFile) -> resource.AHR:
+    """Only works for ADLS srcfiles."""
+    return resource.parse(srcfile._serialized_remote_pointer)
+
+
+def resource_from_dest(destfile: DestFile) -> resource.AHR:
+    """Only works for ADLS destfiles."""
+    return resource_from_src(src_from_dest(destfile))
 
 
 def remote_only(fqn: AdlsFqn, md5b64: str = "") -> SrcFile:
