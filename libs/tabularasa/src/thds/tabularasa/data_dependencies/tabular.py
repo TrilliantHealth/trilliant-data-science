@@ -73,10 +73,16 @@ class PandasCSVLoader:
                     Callable[[str], Any],
                     parse_optional(converter, na_values_for_col) if na_values_for_col else converter,
                 )
-            elif (column.header_name not in self.parse_date_cols) and (column.type.enum is None):
+            elif column.header_name not in self.parse_date_cols:
                 # read_csv requires passing `parse_dates` for determining date-typed columns
                 # also do NOT tell pandas.read_csv you want an enum; it will mangle unknown values to null!
-                self.dtypes_for_csv_read[column.header_name] = dtype
+                self.dtypes_for_csv_read[column.header_name] = (
+                    dtype
+                    if column.type.enum is None
+                    else column.dtype.pandas(
+                        nullable=column.nullable, index=column.name in self.index_cols
+                    )
+                )
 
     def __call__(self, validate: bool = False) -> pd.DataFrame:
         if validate and self.schema is None:
