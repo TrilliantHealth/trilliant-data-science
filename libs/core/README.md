@@ -24,7 +24,7 @@ create a file that looks like this:
 thds.adls.download
 thds.adls.link
 [warning]
-thds.mops.pure.pickle_runner
+thds.mops.remote.pickle_runner
 thds.mops.k8s.watch
 ```
 
