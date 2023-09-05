@@ -35,7 +35,7 @@ def yield_files(fsc: FileSystemClient, adls_root: str) -> ty.Iterable[ty.Any]:
         try:
             yield from client.get_paths(adls_root)
         except azure.core.exceptions.ResourceNotFoundError as rnfe:
-            if rnfe.response.status_code == 404:
+            if rnfe.response and rnfe.response.status_code == 404:
                 return  # no paths
             raise
 
