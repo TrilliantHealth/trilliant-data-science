@@ -1,12 +1,12 @@
 import os.path
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Protocol, Union
 
 import attr
 
-from thds.adls import ADLSFileSystem
-from thds.tabularasa.schema.files import ADLSDataSpec
+from thds.adls import ADLSFileSystem, fqn
+from thds.tabularasa.schema.files import ADLSDataSpec, RemoteBlobStoreSpec
 
 CACHE_DIR = ".cache/"
 
@@ -77,3 +77,21 @@ def sync_adls_data(
         return [result_order[os.path.basename(path.name)] for path in adls_spec.paths]
     else:
         return results
+
+
+class SupportsRemoteData(Protocol):
+    md5: Optional[str] = None
+    blob_store: Optional[RemoteBlobStoreSpec] = None
+
+
+def get_remote_data_fqn(interface: SupportsRemoteData) -> fqn.AdlsFqn:
+    if interface.md5 and interface.blob_store:
+        return (
+            fqn.of(
+                storage_account=interface.blob_store.adls_account,
+                container=interface.blob_store.adls_filesystem,
+                path=interface.blob_store.path,
+            )
+            / interface.md5
+        )
+    raise ValueError("Getting a remote data path requires both the `md5` and `blob_store` to be set.")

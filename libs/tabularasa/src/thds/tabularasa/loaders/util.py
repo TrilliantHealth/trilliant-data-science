@@ -155,7 +155,38 @@ class _PackageDataOrFileInterface:
         else:
             return pkg_resources.resource_exists(self.package, self.data_path)
 
-    def _resource_stream(self) -> IO[bytes]:
+    def _resource_stream(self, sync: bool = True) -> IO[bytes]:
+        if sync:
+            maybe_path = self.sync_blob()
+            if maybe_path:
+                return open(maybe_path, "rb")
+
+        if self.package is None:
+            return open(self.data_path, "rb")
+        else:
+            return pkg_resources.resource_stream(self.package, self.data_path)
+
+    def file_path(self, sync: bool = True) -> Path:
+        """Path on the local filesystem to the file underlying this loader. If a blob store is specified
+        and the local path doesn't exist, it will be synced, unless `sync=False` is passed."""
+        if sync:
+            maybe_path = self.sync_blob()
+            if maybe_path:
+                return maybe_path
+
+        if self.package is None:
+            return Path(self.data_path)
+        else:
+            return Path(pkg_resources.resource_filename(self.package, self.data_path))
+
+    def sync_blob(self, link: bool = False) -> Optional[Path]:
+        """Ensure that the local file underlying this loader is available.
+        If the file does not exist, sync it from the blob store, or raise `FileNotFoundError` when no
+        blob store is defined. Returns a local path to the cached download if a sync was performed,
+        otherwise returns `None`.
+        When `link` is True and a download is performed, the resulting file is linked to the local file
+        associated with this resource.
+        """
         if not self.file_exists():
             if self.blob_store is None:
                 raise FileNotFoundError(
@@ -163,22 +194,28 @@ class _PackageDataOrFileInterface:
                     f"with local path {self.data_path}"
                 )
             else:
-                assert self.md5 is not None
+                assert (
+                    self.md5 is not None
+                ), f"No md5 defined for {self.data_path}; can't safely sync blob"
+                target_local_path = self.file_path(sync=False)
+                getLogger(__name__).info(
+                    f"Syncing blob with hash {self.md5}" f" to {target_local_path}" if link else ""
+                )
                 remote_data_spec = self.blob_store.data_spec(self.md5)
                 local_files = sync_adls_data(remote_data_spec)
                 local_path = local_files[0].local_path
-                if self.package is None:
-                    os.link(local_path, self.data_path)
-                return open(local_path, "rb")
-        if self.package is None:
-            return open(self.data_path, "rb")
+                if link:
+                    os.link(local_path, target_local_path)
+                return local_path
         else:
-            return pkg_resources.resource_stream(self.package, self.data_path)
+            return None
 
     def file_hash(self) -> str:
         with self._resource_stream() as f:
             return hash_file(f)
 
+
+class _ParquetPackageDataOrFileInterface(_PackageDataOrFileInterface):
     def metadata(self) -> pq.FileMetaData:
         with self._resource_stream() as f:
             return pq.ParquetFile(f).metadata
@@ -187,7 +224,7 @@ class _PackageDataOrFileInterface:
         return self.metadata().num_rows
 
 
-class AttrsParquetLoader(Generic[Record], _PackageDataOrFileInterface):
+class AttrsParquetLoader(Generic[Record], _ParquetPackageDataOrFileInterface):
     """Base interface for loading package resources as record iterators"""
 
     def __init__(
@@ -210,10 +247,14 @@ class AttrsParquetLoader(Generic[Record], _PackageDataOrFileInterface):
         self.blob_store = blob_store
         self.set_path(table_name=table_name, data_dir=data_dir, filename=filename)
 
-    def __call__(self, type_check: Optional[Union[int, TypeCheckLevel]] = None) -> Iterator[Record]:
+    def __call__(
+        self, path: Optional[Path] = None, type_check: Optional[Union[int, TypeCheckLevel]] = None
+    ) -> Iterator[Record]:
         """Load an iterator of instances of the attrs record type `self.type_` from a package data
         parqet file.
 
+        :param path: Optional path to a local parquet file. Overrides the underlying package data file
+          when passed.
         :param type_check: Optional `reference_data.loaders.parquet_util.TypeCheckLevel` indicating that
           a type check should be performed on the arrow schema of the parquet file _before_ reading any
           data, and at what level of strictness.
@@ -223,7 +264,7 @@ class AttrsParquetLoader(Generic[Record], _PackageDataOrFileInterface):
         if type_check is not None and self.pyarrow_schema is None:
             raise ValueError(f"Can't type check table {self.table_name} with no pyarrow schema")
 
-        with self._resource_stream() as f:
+        with (self._resource_stream() if path is None else open(path, "rb")) as f:
             col_order = [col.name for col in attr.fields(self.type_)]
             parquet_file = pq.ParquetFile(f)
             schema = parquet_file.schema.to_arrow_schema()
@@ -251,7 +292,7 @@ class AttrsParquetLoader(Generic[Record], _PackageDataOrFileInterface):
                 yield from parsed_rows
 
 
-class PandasParquetLoader(_PackageDataOrFileInterface):
+class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
     def __init__(
         self,
         table_name: str,
@@ -280,6 +321,7 @@ class PandasParquetLoader(_PackageDataOrFileInterface):
 
     def __call__(
         self,
+        path: Optional[Path] = None,
         validate: bool = False,
         type_check: Optional[Union[int, TypeCheckLevel]] = None,
         postprocess: bool = True,
@@ -290,6 +332,7 @@ class PandasParquetLoader(_PackageDataOrFileInterface):
         See the `load_batched` method for documentation of the parameters"""
         return next(
             self.load_batched(
+                path,
                 validate=validate,
                 type_check=type_check,
                 postprocess=postprocess,
@@ -300,6 +343,7 @@ class PandasParquetLoader(_PackageDataOrFileInterface):
 
     def load_batched(
         self,
+        path: Optional[Path] = None,
         batch_size: Optional[int] = PQ_BATCH_SIZE_PANDAS,
         validate: bool = False,
         type_check: Optional[Union[int, TypeCheckLevel]] = None,
@@ -308,6 +352,8 @@ class PandasParquetLoader(_PackageDataOrFileInterface):
     ) -> Iterator[pd.DataFrame]:
         """Load an iterator of `pandas.DataFrame`s from a package data parqet file in a memory-efficient way.
 
+        :param path: Optional path to a local parquet file. Overrides the underlying package data file
+          when passed.
         :param batch_size: Read the data in batches of this many rows. Every DataFrame yielded except
           possibly the last will have this many rows. Allows for control of memory usage. If `None`,
           the entire table will be read and yielded as a single DataFrame.
@@ -335,7 +381,7 @@ class PandasParquetLoader(_PackageDataOrFileInterface):
 
         logger = getLogger(__name__)
 
-        with self._resource_stream() as f:
+        with (self._resource_stream() if path is None else open(path, "rb")) as f:
             pq_file = pyarrow.parquet.ParquetFile(f)
             schema = pq_file.schema.to_arrow_schema()
             if type_check is not None:
