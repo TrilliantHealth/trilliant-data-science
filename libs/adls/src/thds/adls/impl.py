@@ -24,6 +24,7 @@ from typing import (
 )
 
 import attr
+import azure.core.exceptions
 import lazy_object_proxy
 from aiostream import stream
 from azure.identity.aio import DefaultAzureCredential
@@ -141,14 +142,16 @@ class ADLSFileSystem:
     def dir_exists(self, path: str) -> bool:
         return self._run(self._path_exists, path, True)
 
-    @staticmethod
-    async def _path_exists(file_system_client: FileSystemClient, path: str, directory: bool) -> bool:
-        if directory:
-            client = file_system_client.get_directory_client(path)
-        else:
-            client = file_system_client.get_file_client(path)  # type: ignore
-        async with client as client:
-            return await client.exists()
+    async def _path_exists(
+        self, file_system_client: FileSystemClient, path: str, directory: bool
+    ) -> bool:
+        try:
+            info = await self._get_file_info(file_system_client, path)
+        except azure.core.exceptions.ResourceNotFoundError:
+            return False
+        # from https://github.com/Azure/azure-sdk-for-python/issues/24814#issuecomment-1159280840
+        is_dir = str(info.metadata.get("hdi_isfolder", "")).lower() == "true"
+        return directory == is_dir
 
     @async_run
     async def _run(self, func: Callable[..., Awaitable], *args, **kwargs):
