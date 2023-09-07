@@ -1,3 +1,9 @@
+### 1.8.20230907
+
+- Fix an unfortunate issue where generator functions were not
+  getting wrapped correctly by `scope.bound`, leading to the scope
+  never actually getting closed.
+
 ## 1.8.20230822
 
 - Fix downstream usage of `get_env` to be `active_env` as originally
