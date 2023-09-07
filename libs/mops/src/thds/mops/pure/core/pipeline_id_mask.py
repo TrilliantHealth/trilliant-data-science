@@ -1,0 +1,95 @@
+"""Public API for masking the mops pipeline id.
+"""
+import re
+import typing as ty
+from contextlib import contextmanager
+from types import TracebackType
+
+from thds.core.stack_context import StackContext
+
+from .pipeline_id import get_pipeline_id
+
+_PIPELINE_ID_MASK = StackContext("PIPELINE_ID_MASK", "")
+
+
+def get_pipeline_id_mask() -> str:
+    """Returns the 'current' pipeline id, preferring a mask over the global."""
+    return _PIPELINE_ID_MASK() or get_pipeline_id()
+
+
+@contextmanager
+def pipeline_id_mask(pipeline_id: str) -> ty.Iterator[bool]:
+    """Sets the pipeline id, but if it's already set, then the outer
+    mask will take precedence over this one, i.e. this will be a
+    no-op.
+
+    Is a decorator as well as a ContextManager, thanks to the magic of
+    @contextmanager. 🤯
+
+    When used as a Context Manager, be aware that it will not be
+    applied to threads launched by the current thread. To cross thread
+    boundaries, prefer decorating an actual function that will then be
+    launched in the thread.
+
+    When used as a context manager, return True if this is the
+    outermost layer and will actually be applied to the function;
+    return False if not.
+
+    The outermost configuration on this particular thread/green thread
+    stack will be used. This pattern is very useful for libraries that
+    want to define a default pipeline_id for their
+    use_runner-decorated function.
+
+    """
+    if _PIPELINE_ID_MASK():
+        yield False
+    else:
+        with _PIPELINE_ID_MASK.set(pipeline_id):
+            yield True
+
+
+F = ty.TypeVar("F", bound=ty.Callable)
+_DOCSTRING_MASK_RE = re.compile(r".*pipeline-id-mask:\s*(?P<mask>[^\s]+)\b", re.DOTALL)
+
+
+def extract_mask_from_docstr(func: F) -> str:
+    if not func.__doc__:
+        raise ValueError(f"Function {func} must have a non-empty docstring to extract pipeline-id-mask")
+    m = _DOCSTRING_MASK_RE.match(func.__doc__)
+    if not m:
+        if "pipeline-id-mask:" in func.__doc__:
+            raise ValueError("pipeline-id-mask is present but empty - this is probably an accident")
+        raise ValueError(f"Cannot extract pipeline-id-mask from docstring for {func}")
+    mask = m.group("mask")
+    assert mask, "pipeline-id-mask should not have matched if it is empty"
+    return mask
+
+
+T_co = ty.TypeVar("T_co", covariant=True)
+
+
+class ContextManagerDeco(ty.Protocol[T_co]):
+    """I can't find a type exported by the stdlib that correctly
+    represents what contextlib.contextmanager provides.
+    """
+
+    def __call__(self, __f: F) -> F:
+        ...
+
+    def __enter__(self) -> T_co:
+        ...
+
+    def __exit__(
+        self,
+        __typ: ty.Optional[ty.Type[BaseException]],
+        __value: ty.Optional[BaseException],
+        __traceback: ty.Optional[TracebackType],
+    ) -> ty.Optional[bool]:
+        ...
+
+
+def pipeline_id_mask_from_docstr(
+    func: F,
+) -> ContextManagerDeco[bool]:
+    """Use this to more firmly attach a 'default' pipeline id mask to a function."""
+    return pipeline_id_mask(extract_mask_from_docstr(func))

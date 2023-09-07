@@ -85,7 +85,7 @@ def assert_is_module(name: str):
         pytest.param("import thds", ["thds.mops"], True, id="'import thds' does not import thds.mops"),
         pytest.param(
             "import thds.mops",
-            ["thds.mops.config", "thds.mops.exception"],
+            ["thds.mops.config", "thds.mops.pure"],
             "'import thds.mops' does not import submodules",
         ),
     ],

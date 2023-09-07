@@ -17,7 +17,7 @@ Optionally (but by default):
 > launching a K8s image where the program being run is not Python.
 >
 > If you are running Python, you should look into using the declarative
-> approach supported by `mops.remote.PickleRunner`.
+> approach supported by `mops.pure.PickleRunner`.
 
 ```python
 from thds.mops.k8s import launch, autocr

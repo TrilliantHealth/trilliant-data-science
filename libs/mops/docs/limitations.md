@@ -10,7 +10,7 @@ a way as to minimize the direct dependency on ADLS.
 
 This library has improved over time, but over many runs we have
 observed that while you can run small-to-medium workloads against ADLS
-just fine, large workloads (tens of thousands of `pure_remote` calls
+just fine, large workloads (tens of thousands of `use_runner` calls
 simultaneously) may be difficult to manage over a network connection
 between your laptop and the Azure datacenters, causing spurious
 authentication, connection timeout, and other network errors. If you

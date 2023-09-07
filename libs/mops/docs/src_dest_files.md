@@ -1,5 +1,10 @@
 # Src/Dest Files
 
+> These are used for special cases and most of the time you should
+> probably just `from thds.adls import download_to_cache,
+> upload_through_cache` alongside
+> `thds.mops.pure.adls.invocation_output_fqn(name='foobar')`.
+
 This is the one interface that `mops` introduces that will
 specifically change the code that you are using with `mops`. It is
 designed to be low-impact, but nevertheless requires you to opt in to
@@ -36,23 +41,24 @@ path.
 > is not part of the result payload, it will _NOT_ be uploaded and the
 > data will be LOST.
 
-`DestFile` supports two methods of creation:
+An ADLS-based `DestFile` may be created on the local orchestrator or
+inside the remote, but you should strongly prefer to find some method
+of guaranteeing that the underlying fully-qualified name (FQN) for your
+DestFile is unique to your invocation and correctly reflects the intended
+ADLS Storage Account and Container that is configured at the time of running
+the orchestrator process.
 
-1. On the local orchestrator process, before passing to the
-   remote. Use `AdlsDatasetContext.dest`, which will specify a
-   location for the remote file pointer to be placed upon return from
-   the remote process. Prefer this usage, because it makes clearer the
-   _purity_ of your function, since the destination of the final data
-   was a parameter to the function and therefore cannot accidentally
-   be non-deterministic.
-2. Less preferably, it may be created on the remote process (inside
-   the decorated function). Use `AdlsDatasetContext.remote_dest`. The
-   data will be uploaded to that ADLS path, and if returned to the
-   local orchestrator, the local filepath will be a concatenation of
-   the process working directory and the full ADLS path. If you're not
-   careful to pick the remote path determinstically based on the
-   parameters to your function, this will make your function
-   ['logically impure'](./pure_functions.md).
+In general, this means passing all or at least the root of a storage
+URI/FQN into the function as an argument. It's strongly recommended
+that you not construct a URI from scratch on the remote function, as
+your application config will likely not carry over to the remote, and
+this will cause your function to be [impure](./pure_functions.md).
+
+A good general pattern to use is to construct the DestFile on the
+remote, but to construct a URI based on `invocation_output_fqn`, like
+so: ```
+destf = adls.dest(invocation_output_fqn(storage_root_passed_to_function, name='a-meaningful-name'))
+```
 
 The populated `DestFile` can then be 'converted' on the local
 orchestrator (either from the remote pointer on the local filesystem,
@@ -64,28 +70,34 @@ made available for read-only access.
 As an example of this flow, you might do something like the following:
 
 ```python
-from thds.mops.remote import DestFile, SrcFile, adls_dataset_context, pure_remote, ...
+from thds.adls import defaults
+from thds.mops import srcdest
+
 
 def orchestrator(...):
-    my_ds = adls_dataset_context('my-dataset')
-    created_dest = remote_creator(my_ds.dest('relative/path/where/i/want/it.parquet'))
+    my_app_root = defaults.env_root() / 'myapp'
+    mk_destfile = srcdest.DestFileContext(my_app_root, 'a_local_dir')
+	mk_srcfile = srcdest.SrcFileContext(my_app_root)
+
+    created_dest = remote_creator(mk_destfile('relative/path/where/i/want/it.parquet'))
     # created_dest now actually exists on your filesystem, but only as a pointer
+
     result_dest = remote_processor(
-        my_ds.dest('relative/path/to/final/result.parquet'),
-        my_ds.src(created_dest),
+        mk_destfile('relative/path/to/final/result.parquet'),
+        mk_srcfile(created_dest),
     )
     # result_dest also exists on your filesystem as a pointer.
 
-@pure_remote(...)
-def remote_creator(dest: DestFile, *args, **kwargs) -> DestFile:
+@use_runner(...)
+def remote_creator(dest: srcdest.DestFile, *args, **kwargs) -> srcdest.DestFile:
     created_file_path = create_stuff(*args, **kwargs)
     with dest as dest_path:
         # when this context closes, the file at dest_path will be uploaded as necessary
         created_file_path.rename(dest_path)
         return dest  # dest must be returned in order to be referenced in the orchestrator
 
-@pure_remote(...)
-def remote_processor(dest: DestFile, src: SrcFile, *args, **kwargs) -> DestFile:
+@use_runner(...)
+def remote_processor(dest: srcdest.DestFile, src: srcdest.SrcFile, *args, **kwargs) -> srcdest.DestFile:
     with src as src_path:
         # this makes sure the src path is available locally
         result_df = process_stuff(src_path, *args, **kwargs)
@@ -98,7 +110,7 @@ The Context Managers are a bit ugly, so you may wish to use
 `thds.core.scope.enter` to avoid the extra nesting.
 
 ⚠️  However, it is critical that your `DestFile` context be closed
-_before_ exiting the `pure_remote`-decorated function, or else your
+_before_ exiting the `use_runner`-decorated function, or else your
 data will remain in the temp location and will not get delivered to
 its final destination.
 
@@ -109,21 +121,19 @@ depending on your situation.
 
 1. Locally present file that you want uploaded for a given process run
    if and only if the function actually gets run remotely. Use
-   `AdlsDatasetContext.src`. A local-only run will transparently use
-   the local file.
+   `srcdest.local_src` or `srcdest.SrcFileContext`. A local-only run will
+   transparently use the local file.
 2. Locally present remote file pointer (JSON string), created using
-   `DestFile` or with some other means. Use `AdlsDatasetContext.src`
-   for this as well. A local-only run will have to download the file
-   inside the function where it is used.
+   `DestFile` or with some other means. Use `srcdest.load_srcfile` for
+   this.  A local-only run will have to download the file inside the
+   function where it is used.
 3. Fully remote file that you have never downloaded, with no
-   locally-present remote file pointer. Use
-   `AdlsDatasetContext.remote_src`. A local-only run will have to
-   download the file.
+   locally-present remote file pointer. Use `srcdest.src` or
+   `srcdest.SrcFileContext`. A local-only run will have to download
+   the file.
 
-Any use of a remote-only `SrcFile` will require that it be downloaded
- upon every access, even if computing locally (skipping the
- `pure_remote` decorator). At the present time, there is no fancy
- caching that happens on a per-process basis. The `SrcFile` Context
- Manager will be forced to re-download the file after every `__exit__`
- and subsequent `__enter__`. This is an implementation detail and
- could potentially be lifted in the future.
+In theory, any use of a remote-only `SrcFile` will require that it be
+ downloaded upon every access, even if computing locally (skipping the
+ `use_runner` decorator). However, for ADLS SrcFiles, the underlying
+ `thds.adls` download implementation will use a global cache for the
+ download.

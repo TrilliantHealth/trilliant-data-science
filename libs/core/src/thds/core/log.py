@@ -114,14 +114,6 @@ def make_th_formatters_safe(logger: logging.Logger):
             setattr(formatter, "formatMessage", wrapper_formatMessage)  # noqa: B010
 
 
-class DatabricksPy4JFilter(logging.Filter):
-    def filter(self, record):
-        return not (
-            record.name.startswith("py4j.java_gateway")  # 9.1
-            or record.name.startswith("py4j.clientserver")  # 11.3
-        )
-
-
 # this is the base of what gets passed to logging.dictConfig.
 _BASE_LOG_CONFIG = {
     "version": 1,
@@ -159,7 +151,7 @@ def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
     ```
     [debug]
     thds.adls.download
-    thds.mops.remote.pickle_runner
+    thds.mops.pure.pickle_runner
     thds.nppes.intake.parquet_from_csv
 
     [warning]
@@ -193,4 +185,13 @@ if not logging.getLogger().hasHandlers():
         config = set_logger_to_console_level(config, logger_name, level)
     logging.config.dictConfig(config)
     make_th_formatters_safe(logging.getLogger())
-    logging.getLogger("py4j").addFilter(DatabricksPy4JFilter())
+
+    class StartsWithFilter(logging.Filter):
+        def __init__(self, startswith: str):
+            self.startswith = startswith
+
+        def filter(self, record):
+            return not record.name.startswith(self.startswith)
+
+    for noisy_logger in ("py4j.java_gateway", "py4j.clientserver"):  # 11.3, 9.1
+        logging.getLogger(noisy_logger).addFilter(StartsWithFilter(noisy_logger))

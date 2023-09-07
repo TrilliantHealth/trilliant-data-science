@@ -22,7 +22,7 @@ willing to write your own code to 'plan' or 'order' their execution.
 
 ### Concurrency
 
-When running many `pure_remote` functions concurrently, you should
+When running many `use_runner` functions concurrently, you should
 prefer to use **threads** rather than parallel processes. Shared
 memory within the orchestration parts of the process allows for much
 simpler reuse of various contexts, and since the Runner you are using
@@ -31,7 +31,7 @@ additional advantage (and _many_ possible disadvantages) to layering
 extra polling processes on top of the underlying processes.
 
 To help with this, we've provided
-`thds.mops.remote.parallel:parallel_yield_results`, which should be
+`thds.mops.parallel:parallel_yield_results`, which should be
 general enough for many use cases. If it is not, feel free to bring
 your own concurrency primitives.
 

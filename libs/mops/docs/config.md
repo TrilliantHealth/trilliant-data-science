@@ -3,9 +3,7 @@
 `mops` ships with a limited set of default config that is generally
 suitable for data science at Trilliant Health. This includes basic
 information about where our [Kubernetes](./kubernetes.md) cluster is
-(should you need to use that), some default timeouts, and the ADLS
-storage account and container that should be used by default for two
-different scenarios.
+(should you need to use that), and some default timeouts.
 
 This configuration file is [TOML](https://toml.io/en/), and if you
 wish to configure `mops` differently, there are _several_
@@ -48,7 +46,7 @@ so:
 
 ```python
 
-with mops.config.set_config("mops", "memo", "storage_root")(your_value):
+with mops.config.set_config("mops", "k8s", "namespace")(your_value):
     call_some_func()
 	do_more_stuff()
 	# everything in here will see your config value,
@@ -61,16 +59,8 @@ use_original_config()  # and this will not see the configured value from above
 # Production runs
 
 The default `mops` configuration file ships with
-"development-appropriate defaults." The most critical of these to
-change if you are doing a production run where you want the results to
-be available forever and in a sensible location will be:
-
-`mops.memo.storage_root` - change this so that your hash-addressed
-memoized invocations and results will not be deleted after 30
-days. You should probably set it to `adls://thdsdatasets/prod-datasets`.
-
-`mops.datasets.storage_root` - change this so any `DestFiles` created
-(or `SrcFiles` uploaded) will not be deleted after 30 days. This also
-should likely be set to `adls://thdsdatasets/prod-datasets`, but you may
-wish to consult with others who have used `mops` in the past or senior
-members of the team who know where data ought to live.
+"development-appropriate defaults." To provide the `AdlsPickleRunner`
+with config that will save your mops memoization files in a production
+SA/container, make sure to pass `thds.adls.defaults.env_root` as the
+second argument to the pickle runner, and then enable the `prod`
+environment as per the `thds.core.env` configuration system.

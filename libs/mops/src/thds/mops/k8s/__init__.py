@@ -6,8 +6,7 @@ except ModuleNotFoundError as mnf:
         "Please install mops with the `k8s` extra to use `thds.mops.k8s`."
     ) from mnf
 
-from .image_ref import ImageFileRef, std_docker_build_push_develop, std_find_image_full_tag  # noqa
-from .launch import K8sJobFailedError, autocr, k8s_shell, launch  # noqa
+from .launch import K8sJobFailedError, autocr, launch, mops_shell  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
     ResourceDefinition,

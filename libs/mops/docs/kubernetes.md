@@ -56,7 +56,7 @@ failures because of the
 authn/authz method that must be used to support your unknown
 namespace.
 
-## Declarative usage with mops `pure_remote`:
+## Declarative usage with mops `use_runner`:
 
 This approach is preferred for cases where the code to be run on
 Kubernetes can be considered a [pure function](./pure_functions.md)
@@ -99,7 +99,7 @@ environment via ADLS. All Data Science K8s clusters will provide
 read/write access to a set of ADLS Storage Accounts by default.
 
 Once you have contructed an appropriate Shell, you need only pass it
-to the `AdlsPickleRunner` constructor, and then use `pure_remote` plus
+to the `AdlsPickleRunner` constructor, and then use `use_runner` plus
 that runner to construct a decorator that will transmit computation
 for any pure function to the remote K8s environment, and inject its
 result right back into the local/orchestrator context.

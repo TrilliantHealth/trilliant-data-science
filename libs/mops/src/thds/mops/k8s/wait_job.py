@@ -7,7 +7,7 @@ from thds.core import scope
 from thds.core.log import logger_context
 
 from .. import config
-from ..colorize import colorized
+from .._utils.colorize import colorized
 from ._shared import logger
 from .jobs import get_job
 

@@ -18,7 +18,6 @@ from pathlib import Path
 
 import tomli
 
-from thds.adls import AdlsFqn
 from thds.core.stack_context import StackContext
 
 _WDIR_TOML = Path(".mops.toml").resolve()
@@ -126,6 +125,9 @@ except OSError:
 
 k8s_namespace = _make_stack_config("k8s.namespace", _K8S_NAMESPACE)
 
+# Container registry stuff
+k8s_acr_url = _make_stack_config("k8s.acr.url", "")
+
 k8s_namespace_env_var_key = _make_stack_config("k8s.namespace_env_var_key", "K8S_NAMESPACE")
 # for embedding the namespace in an env var in the pod/container
 k8s_job_retry_count = _make_stack_config("k8s.job.retry_count", 6)
@@ -152,22 +154,7 @@ namespaces_supporting_workload_identity = _make_stack_config(
     "k8s.azure.namespaces_supporting_workload_identity", ["default"]
 )
 
-# TODO eliminate these for 2.0 in favor of `memo_storage_root`. `tmp`
-# is an implementation detail; what it is is 'memoization storage'.
-adls_remote_tmp_sa = _make_stack_config("adls.remote.tmp_sa", "")
-adls_remote_tmp_container = _make_stack_config("adls.remote.tmp_container", "")
-
-memo_storage_root = _make_stack_config("memo.storage_root", "")
-# use this instead of the remote_tmp config objects.
-
-
-def get_memo_storage_root() -> str:
-    return memo_storage_root() or str(AdlsFqn.of(adls_remote_tmp_sa(), adls_remote_tmp_container()))
-
-
-memo_pipeline_id = _make_stack_config("memo.pipeline_id", "")
-
-adls_max_clients = _make_stack_config("adls.max_clients", 8)
+max_concurrent_network_ops = _make_stack_config("max_concurrent_network_ops", 8)
 # 8 clients has been obtained experimentally via the `stress_test`
 # application running on a Mac M1 laptop running 200 parallel 5 second
 # tasks, though no significant difference was obtained between 5 and
@@ -175,24 +162,5 @@ adls_max_clients = _make_stack_config("adls.max_clients", 8)
 # be a good idea if you are dealing with hundreds of micro (<20
 # second) remote tasks.
 
-adls_skip_already_uploaded_check_if_smaller_than_bytes = _make_stack_config(
-    "adls.skip_already_uploaded_check_if_smaller_than_bytes", 2 * 2**20
-)  # 2 MB is about right for how slow ADLS is to respond to individual requests.
-
-# TODO eliminate these for 2.0 in favor of `datasets_storage_root`
-adls_remote_datasets_sa = _make_stack_config("adls.remote.datasets_sa", "")
-adls_remote_datasets_container = _make_stack_config("adls.remote.datasets_container", "")
-
-datasets_storage_root = _make_stack_config("datasets.storage_root", "")
-
-
-def get_datasets_storage_root() -> str:
-    return datasets_storage_root() or str(
-        AdlsFqn.of(adls_remote_datasets_sa(), adls_remote_datasets_container())
-    )
-
-
-# Container registry stuff
-acr_url = _make_stack_config("acr.url", "")
 
 open_files_limit = _make_stack_config("resources.max_open_files", 10000)

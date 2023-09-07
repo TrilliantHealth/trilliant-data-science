@@ -14,7 +14,7 @@ from thds.core import scope
 from thds.core.log import getLogger, logger_context
 
 from .. import config
-from ..colorize import colorized
+from .._utils.colorize import colorized
 from .auth import load_config
 from .too_old_resource_version import parse_too_old_resource_version
 

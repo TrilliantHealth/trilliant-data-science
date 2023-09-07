@@ -9,7 +9,7 @@ result rather than re-computing.
 
 ## in `mops`:
 
-Each `pure_remote`-decorated function using `mops` `PickleRunner` will
+Each `use_runner`-decorated function using `mops` `PickleRunner` will
 combine the current[^1] `pipeline_id`, the fully-qualfied name
 (including module) of the function, and the hash of the serialized
 arguments to the function, to produce a _deterministic_ remote storage
@@ -44,20 +44,20 @@ derived from 3 'logical' pieces:
 
 1. A storage root provided by your top-level configuration, plus a
    `mops`-specific suffix, making up a runner prefix that is the
-   global default for any `mops.pure_remote` decorated function in
+   global default for any `mops.use_runner` decorated function in
    your application.
 2. The `pipeline_id`. It can be set globally by the application, but a
    unique default is generated upon the first call to a `mops`
-   `pure_remote` function if one has not already been
+   `use_runner` function if one has not already been
    set. `pipeline_id` may also be masked via the `pipeline_id_mask`
    decorator and context manager, applied _over top_ of the
-   `pure_remote` decorator.
+   `use_runner` decorator.
 
    You may conceptualize the pipeline id as representing a static
    codebase; if your code does not change, there is no reason to
    change the pipeline id. A future version of `mops` may rename this
    concept to better communicate its intended semantics.
-3. A `function_id`, derived from the `pure_remote`-decorated function
+3. A `function_id`, derived from the `use_runner`-decorated function
    module+name. This exists to keep identical `(*args, **kwargs)`
    separate from each other if passed to different functions.
 
@@ -70,18 +70,18 @@ the application run.
 
 This is an example full `memo_uri` with all its constituent parts
 labeled. You'll find most of these names directly
-[in the source code](../src/thds/mops/remote/_memoize.py). For
+[in the source code](../src/thds/mops/pure/core/memo/function_memospace.py). For
 memoization to retrieve an existing result, the _full_ constructed
 memo uri must be retrievable from the provided storage system.
 
 ```
-adls://thdsscratch/tmp/mops/pipeline-pickled-functions-v1/Peter-Gaultney/2023-04-12T15:46:24-p36529/demandforecast.extract:extract_asset_geo_level/1/82e81dbaa7fc3c7d264aff80130f955c802523bc3d9764a261e256caf7debc7
+adls://thdsscratch/tmp/mops2-mpf/Peter-Gaultney/2023-04-12T15:46:24-p36529/demandforecast.extract:extract_asset_geo_level/CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs/
 <storage root ------->
-<runner prefix -----------------------------------------> <pipeline_id ---------------------------> <function_id --------------------------------> <(args, kwargs) sha256 hash ------------------------------------>
-<pipeline memospace ------------------------------------------------------------------------------>
-<function memospace ----------------------------------------------------------------------------------------------------------------------------->
-                                                          <invocation-unique-key ---------------------------------------------------------------------------------------------------------------------------------->
-<memo uri --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+<runner prefix ----------------> <pipeline_id ---------------------------> <function_id --------------------------------> <(args, kwargs) sha256 hash ------------------------>
+<pipeline memospace ----------------------------------------------------->
+<function memospace ---------------------------------------------------------------------------------------------------->
+                                <invocation-unique-key ----------------------------------------------------------------------------------------------------------------------->
+<memo uri -------------------------------------------------------------------------------------------------------------------------------------------------------------------->
 ```
 
 Note that the `invocation-unique-key` is a way of uniquely identifying
@@ -125,7 +125,7 @@ including `pipeline_id` will allow you to just pick up where you left
 off.
 
 The simplest way to set the global pipeline id is by calling
-`thds.mops.remote:set_pipeline_id('yourpipeid')` in the CLI of your
+`thds.mops.pure:set_pipeline_id('yourpipeid')` in the CLI of your
 application. Be aware that this is a global call that must be
 performed before calling any `mops`-decorated functions.
 
@@ -134,9 +134,9 @@ performed before calling any `mops`-decorated functions.
 > Operation: global storage root, plus stack-local pipeline id mask
 > set by the application or library via decorator or context manager.
 
-You may decorate any `pure_remote`-decorated function with
-`thds.mops.remote.pipeline_id_mask`. It _must_ be applied outside the
-`pure_remote` decorator, because it will set a stack-local variable at
+You may decorate any `use_runner`-decorated function with
+`thds.mops.pure.pipeline_id_mask`. It _must_ be applied outside the
+`use_runner` decorator, because it will set a stack-local variable at
 the time of invocation of the function, but prior to the operation of
 the underlying `Runner` that will reference its work.
 
@@ -148,7 +148,7 @@ will _not_ propagate to threads created in the current context.
 
 > ☠️ ☠️ ☠️ Logically, the 'pipeline id mask' for a given function changes
 > every time the function code changes. If you use this as a decorator
-> directly on a `pure_remote` function, and fail to change its string
+> directly on a `use_runner` function, and fail to change its string
 > value after the underlying code has changed, then your function's
 > callers will get **unwanted** memoization.  **YOU HAVE BEEN
 > WARNED.**
@@ -158,12 +158,12 @@ will _not_ propagate to threads created in the current context.
 # The decorator will always apply regardless of threading.
 
 @pipeline_id_mask('2023-05-02')
-@pure_remote(AdlsPickleRunner(...))
+@use_runner(AdlsPickleRunner(...))
 def generate_nppes(...):
     ...
 
 @pipeline_id_mask('other')
-@pure_remote(AdlsPickleRunner(...))
+@use_runner(AdlsPickleRunner(...))
 def use_nppes(...):
     ...
 

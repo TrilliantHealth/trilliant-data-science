@@ -10,7 +10,7 @@ from thds.core import scope
 from thds.core.log import logger_context
 
 from .. import config
-from ..colorize import colorized
+from .._utils.colorize import colorized
 from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .logging import JobLogWatcher
@@ -32,7 +32,7 @@ def autocr(container_image_name: str, cr_url: str = "") -> str:
 
     Idempotent, so it will not apply if called a second time.
     """
-    cr_url = cr_url or config.acr_url()
+    cr_url = cr_url or config.k8s_acr_url()
     prefix = cr_url + "/" if not cr_url.endswith("/") else cr_url
     if not container_image_name.startswith(prefix):
         return prefix + container_image_name
@@ -212,11 +212,11 @@ def launch(
         logger.info(COMPLETE(f"Job {job_num} Complete! {counts()}"))
 
 
-def k8s_shell(
+def mops_shell(
     container_image: ty.Union[str, ty.Callable[[], str]],
     **outer_kwargs,
 ) -> ty.Callable[[ty.Sequence[str]], None]:
-    """Return a closure that can launch the given configuration with specific arguments.
+    """Return a closure that can launch the given configuration and run a mops pure function.
 
     Now supports callables that return a container image name; the
     goal being to allow applications to perform this lazily on the
@@ -235,6 +235,10 @@ def k8s_shell(
 
     def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
         assert "args" not in inner_kwargs
-        launch(get_container_image(), args, **{**outer_kwargs, **inner_kwargs})
+        launch(
+            get_container_image(),
+            ["python", "-m", "thds.mops.pure.core.entry.main", *args],
+            **{**outer_kwargs, **inner_kwargs},
+        )
 
     return launch_container_on_k8s_with_args

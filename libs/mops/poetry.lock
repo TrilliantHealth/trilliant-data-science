@@ -1516,6 +1516,18 @@ optional = ["python-socks", "wsaccel"]
 test = ["websockets"]
 
 [[package]]
+name = "wordybin"
+version = "0.2.0"
+description = "Memorable word-based encoding for binary data."
+category = "main"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "wordybin-0.2.0-py3-none-any.whl", hash = "sha256:4ff7f46a2413508336d1f5c5852f60cd08e5148e9227ea0128b257781fbd55e3"},
+    {file = "wordybin-0.2.0.tar.gz", hash = "sha256:ed434136975498789691ff2af87ed28b2d3e2a27faeecdb3f43ddc572e1a37ae"},
+]
+
+[[package]]
 name = "yarl"
 version = "1.9.2"
 description = "Yet another URL library"
@@ -1609,4 +1621,4 @@ k8s = ["kubernetes"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "8a61766f7d41026978a2a5bc9adc849a2fec357887a69441690fd15a1cceda28"
+content-hash = "07f1988aa8b615ace6ae105b24825d258dfa061b5f7fc0e67b89a034ef8a8dbb"

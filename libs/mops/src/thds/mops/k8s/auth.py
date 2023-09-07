@@ -5,7 +5,7 @@ from kubernetes import client, config
 
 from thds.core import fretry, log, scope
 
-from ..locked_cache import locked_cached
+from .._utils.locked_cache import locked_cached
 
 logger = log.getLogger(__name__)
 

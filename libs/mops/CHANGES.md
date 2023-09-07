@@ -1,3 +1,14 @@
+# 2.0
+
+Cleaning up a lot of old cruft. No big fancy new features.
+
+Many renames.
+ - `mops.remote` was renamed to `mops.pure`.
+ - `@pure_remote` decorator factory is now `@use_runner`.
+ - `mops.k8s.image_ref` is now `mops.image`.
+ - `mops.remote.remote_file` is now `mops.srcdest`.
+ - `mops.remote.adls_remote_files` is now `mops.pure.adls`.
+
 ## 1.8.0
 
 - `MemoizingPickledFunctionRunner` now supports lazy `storage_root`
@@ -18,7 +29,7 @@
 
 ### 1.6.3
 
-- Fix bug where `memoize_direct` got broken in 1.6.2 and apparently I
+- Fix bug where `memoize_in` got broken in 1.6.2 and apparently I
   had no tests on it? Not sure how this didn't break downstream
   applications but apparently it did not.
 
@@ -30,7 +41,7 @@
   This is not generally recommended because it would be inefficient
   for one remote runner to call another remote runner and wait for it.
 
-  However, there are cases where `memoize_direct` would be able to
+  However, there are cases where `memoize_in` would be able to
   take advantage of this behavior at no efficiency loss, and the
   technical implementation is quite simple.
 

@@ -1,6 +1,6 @@
 # Basic usage
 
-You'll decorate your function with `pure_remote`, which requires a
+You'll decorate your function with `use_runner`, which requires a
 `PickleRunner` instance, which itself requires a `Shell`.
 
 ## execution environment
@@ -40,10 +40,10 @@ Shell.
 
 ```python
 from thds.adls import defaults
-from thds.mops.remote import pure_remote, AdlsPickleRunner
+from thds.mops import pure
 from .k8s_shell import df_k8s_spot_11g_shell
 
-run_on_k8s = pure_remote(AdlsPickleRunner(df_k8s_spot_11g_shell, defaults.env_root))
+run_on_k8s = pure.use_runner(AdlsPickleRunner(df_k8s_spot_11g_shell, defaults.env_root))
 # ^ a decorator that can now cause any pure function to be run remotely on K8s...
 
 @run_on_k8s
@@ -58,17 +58,18 @@ assert type(df) == pd.DataFrame
 
 Now you run your application locally, and your functions will be
 called remotely and their results will be returned to you. Your local
-process can call `pure_remote`-decorated functions in threads or even
+process can call `use_runner`-decorated functions in threads or even
 separate processes, though threads are your best bet for the large
 majority of scenarios.
 
 ## Development vs production
 
-By default, `mops` has chosen certain ADLS Storage Accounts and
-Containers to be used for data transfer, and these are generally
-appropriate when doing development runs, because they will ensure that
-non-critical data does not live beyond a limited timeframe, usually 30
-days.
+In general, you should use `thds.adls.defaults.env_root` as
+lazily-loaded configuration to split production and dev-only runs.
+
+This also means you should pass the value of `env_root()`:
+`invocation_output_fqn(storage_root=env_root)` in most cases when
+defining an output location for large output data.
 
 However, if you're doing a production run and want to
 [memoize](./memoization.md) your results so that others can use them,
@@ -76,7 +77,7 @@ you should [configure](./config.md#production-runs) `mops` to use a
 different Storage Account and Container for long-term storage of the
 invocations, results, and output [`DestFiles`](./src_dest_files.md).
 
-### Remote runner bypass
+### Runner bypass
 
 This system has been carefully designed to allow you to integrate it
 with your existing code with a minimum of changes. This includes the
@@ -91,10 +92,10 @@ want to run remotely at runtime.
 
 However, for all-or-nothing cases, such as local test runs of a
 pipeline designed to be run remotely, your application may simply pass
-`bypass_remote=True` to the `pure_remote` decorator factory wherever
+`skip_runner=True` to the `use_runner` decorator factory wherever
 you are using it, and all calls via that decorator will be directly
 passed to the implementing function without further
 ceremony.
-* `bypass_remote` may also be any parameterless callable returning a
+* `skip_runner` may also be any parameterless callable returning a
   `bool` in order to make this easy to configure at runtime,
   e.g. `lambda: bool(os.getenv('YOUR_APP_NO_REMOTE'))`.

@@ -44,18 +44,5 @@ namespaces_supporting_workload_identity = [
 delay_seconds = 5
 max_attempts = 100
 
-[mops.acr]
+[mops.k8s.acr]
 url = "thdatascience.azurecr.io"
-
-[mops.memo]
-storage_root = ""
-# prefer configuring this over the deprecated 'tmp' SA/container in the following block
-
-[mops.adls.remote]
-datasets_sa = "thdsscratch"
-datasets_container = "tmp"
-tmp_sa = "thdsscratch"
-tmp_container = "tmp"
-
-[mops.datasets]
-storage_root = ""  # prefer this over the deprecated 'datasets' SA/container in the preceding block

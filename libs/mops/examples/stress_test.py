@@ -8,7 +8,7 @@ adls_max_clients and to stress-test any changes made to AdlsPickleRunner.
 import logging
 
 from thds.mops import config
-from thds.mops.remote.tools.stress import stress
+from thds.mops.pure.tools.stress import stress
 
 
 def log_debug(handler: logging.Handler, logger: str = "urllib3"):
@@ -26,7 +26,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max-clients", "-c", type=int, default=config.adls_max_clients())
+    parser.add_argument("--max-clients", "-c", type=int, default=config.max_concurrent_network_ops())
     parser.add_argument("--num-tasks", "-n", type=int, default=100)
     parser.add_argument("--task-time", "-t", type=float, default=5.0)
 

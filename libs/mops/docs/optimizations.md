@@ -29,7 +29,7 @@ This is a feature of the `PickleRunner`, and usage will look something
 like this:
 
 ```python
-runner = PickleRunner(...)
+runner = AdlsPickleRunner(...)
 
 def your_orchestrator(...):
     ...
@@ -39,7 +39,7 @@ def your_orchestrator(...):
 	the_remote_df_func(training_x_df, training_y_ndarr, ...)
 
 
-@pure_remote(runner)
+@use_runner(runner)
 def the_remote_df_func(x_df, y_ndarr, ...):
     ...
 ```
@@ -50,7 +50,7 @@ collision.
 
 ## File transfer
 
-**(Many-byte sources and sinks via `pathlib.Path`)
+**(Simple large-file sources and sinks via `pathlib.Path`)
 
 There are lots of Python objects that take up significantly more space
 in memory than on disk. A parquet-ified DataFrame is a pretty common
@@ -77,7 +77,7 @@ rather than transferring in-memory bytes objects.
 
  * _ADLS required for remote use_ - Remote use of these abstractions
    both depend on using the included `AdlsPickleRunner` with the
-   `pure_remote` decorator factory. Any future runner implementations
+   `use_runner` decorator factory. Any future runner implementations
    will not exhibit this behavior by default.
 
  * _Local computation supported_ - However, both of these abstractions
@@ -101,13 +101,16 @@ ADLS, and then on the 'other side' it will be streamed to a
 immutable, and even if written to, those effects will not be visible
 to the orchestrator.
 
+> The file must already exist; a Path pointing to a directory or to
+> nothing at all will cause subclass of ValueError to be raised.
+
 Separately, any `Path` found in the return value will similarly be
 streamed to a **read-only** file on the local orchestrator. This is
 semantically meaningful as a *write-once destination* - writing to
 this Path will transfer its bytes to the orchestrator as a temporary
 file.
 
-Both of these actions happen automatically across `pure_remote`
+Both of these actions happen automatically across `use_runner`
 function invocations using the `AdlsPickleRunner`, without further
 changes to the code. And within a given `pipeline_id`, a unique set of
 local bytes referenced by a `Path` will only be transferred up to
@@ -118,7 +121,7 @@ normal. **However**, if you want `Path`s transferred back to an
 orchestrator to live in a particular directory, you'll have to write
 the code on the orchestrator side to make sure the files get moved to
 the appropriate destination, since the `Path` crossing the
-`pure_remote` function boundary back into the orchestrator process
+`use_runner` function boundary back into the orchestrator process
 will point to a temporary location.
 
 See `tests.integration.remote.shell_test.func_with_paths` to see

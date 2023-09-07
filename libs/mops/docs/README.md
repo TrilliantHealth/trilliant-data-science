@@ -4,10 +4,10 @@
 
 It solves for three core issues:
 
-- Transfer of task execution to [remote](./remote.md) runtimes with
-  more &| different compute resources
-- [Efficient](./optimizations.md) transfer of required data to/from remote
-  runtimes.
+- Transfer of pure function execution to [remote](./remote.md) execution environments
+  with more &| different compute resources
+- [Efficient](./optimizations.md) transfer of required data to/from other
+  environments.
 - [Memoization](./memoization.md) — i.e. _reproducibility_ — of individual tasks
 
 It is used by

@@ -14,8 +14,8 @@ from thds.core import scope
 from thds.core.log import logger_context
 
 from .. import config
-from ..colorize import colorized, make_colorized_out, next_color
-from ..locked_cache import locked_cached
+from .._utils.colorize import colorized, make_colorized_out, next_color
+from .._utils.locked_cache import locked_cached
 from ._shared import logger
 from .jobs import get_job
 from .retry import k8s_sdk_retry
