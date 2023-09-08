@@ -152,6 +152,9 @@ def parse_fqn(fully_qualified_uri: str) -> AdlsFqn:
     return AdlsFqn(sa, container, path.lstrip("/"))
 
 
+parse = parse_fqn
+
+
 def format_fqn(storage_account: str, container: str, path: str = "") -> str:
     """Returns a fully-qualifed ADLS name in URI format, with adls:// as a prefix.
 

@@ -38,6 +38,7 @@ wrapping function, which is higher than a `with` statement.
 """
 import atexit
 import contextlib
+import inspect
 import sys
 import typing as ty
 from functools import wraps
@@ -81,6 +82,19 @@ def _bound(key: str, func: F) -> F:
     that can now be `enter`ed, and will then be exited when this
     boundary is returned to.
     """
+    if inspect.isgeneratorfunction(func):
+
+        @wraps(func)
+        def __scope_boundary_generator_wrap(*args, **kwargs):
+            if key not in _KEYED_SCOPE_CONTEXTS:
+                _init_sc(key, contextlib.ExitStack())  # this root stack will probably not get used
+
+            with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
+                with scoped_exit_stack:  # enter and exit the ExitStack itself
+                    ret = yield from func(*args, **kwargs)
+                    return ret  # weird syntax here, Python...
+
+        return ty.cast(F, __scope_boundary_generator_wrap)
 
     @wraps(func)
     def __scope_boundary_wrap(*args, **kwargs):
