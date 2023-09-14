@@ -56,4 +56,4 @@ def make_unique_name_including_docstring_key(f) -> str:
             name = f.__class__.__name__
         except AttributeError:
             name = "MOPS_UNKNOWN_NAME"
-    return f"{module}:{name}@{version}".rstrip("@")
+    return f"{module}--{name}@{version}".rstrip("@")

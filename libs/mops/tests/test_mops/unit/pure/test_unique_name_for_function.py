@@ -16,7 +16,7 @@ MODULE_BASE = "tests.test_mops.unit.pure.test_unique_name_for_function"
 
 
 def test_extract_name_and_version_for_function():
-    assert f"{MODULE_BASE}:foobar@2.3.7" == make_unique_name_including_docstring_key(foobar)
+    assert f"{MODULE_BASE}--foobar@2.3.7" == make_unique_name_including_docstring_key(foobar)
 
 
 def barbaz():
@@ -29,7 +29,7 @@ def barbaz():
 
 
 def test_key_can_be_arbitrary_string():
-    assert f"{MODULE_BASE}:barbaz@2023-03-13-foobar" == make_unique_name_including_docstring_key(barbaz)
+    assert f"{MODULE_BASE}--barbaz@2023-03-13-foobar" == make_unique_name_including_docstring_key(barbaz)
 
 
 class CallableClass:
@@ -40,7 +40,7 @@ class CallableClass:
 
 
 def test_extract_name_and_version_for_classobject():
-    assert f"{MODULE_BASE}:CallableClass@7.88" == make_unique_name_including_docstring_key(
+    assert f"{MODULE_BASE}--CallableClass@7.88" == make_unique_name_including_docstring_key(
         CallableClass()
     )
 
@@ -51,4 +51,4 @@ def yoyo(a, b):
 
 
 def test_extract_name_and_version_for_partial_func():
-    assert f"{MODULE_BASE}:yoyo@3.1415" == make_unique_name_including_docstring_key(partial(yoyo, 1))
+    assert f"{MODULE_BASE}--yoyo@3.1415" == make_unique_name_including_docstring_key(partial(yoyo, 1))

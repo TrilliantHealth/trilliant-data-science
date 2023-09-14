@@ -1,3 +1,8 @@
+## 2.1
+
+- Unique names for functions from `mops.pure.core.memo.unique_name_for_function` now separates module from function
+name with "--" instead of ":", because the presence of the latter in URIs can cause issues for Spark read/writes.
+
 # 2.0
 
 Cleaning up a lot of old cruft. No big fancy new features.

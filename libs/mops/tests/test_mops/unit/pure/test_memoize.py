@@ -9,7 +9,7 @@ def fx(a: int) -> float:
     return float(a)
 
 
-FX_NAME = "tests.test_mops.unit.pure.test_memoize:fx"
+FX_NAME = "tests.test_mops.unit.pure.test_memoize--fx"
 
 
 def test_that_set_function_pipeline_id_contextmanager_works():
