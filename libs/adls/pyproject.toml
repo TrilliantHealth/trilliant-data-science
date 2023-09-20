@@ -26,6 +26,9 @@ pytest-mock = "^3.10"
 pytest-asyncio = "^0.21.0"
 pytest-xdist = "^3.3.1"
 
+[tool.poetry.scripts]
+adls-download-uri = "thds.adls.tools.download:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
