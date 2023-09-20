@@ -1,3 +1,10 @@
+### 2.1.20230920
+
+- Enable memoization of functions inside the module named `__main__`
+  when the function is called in the same process as the original
+  orchestrator. This enables writing simple one-file scripts that make
+  use of memoization alone.
+
 ## 2.1
 
 - Unique names for functions from `mops.pure.core.memo.unique_name_for_function` now separates module from function

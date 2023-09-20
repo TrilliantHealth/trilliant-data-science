@@ -12,6 +12,7 @@ from pathlib import Path
 from thds.core import log
 
 from ..core.uris import get_bytes, lookup_blob_store
+from .same_process import add_main_module_function, get_main_module_function
 
 logger = log.getLogger(__name__)
 
@@ -33,11 +34,7 @@ class PicklableFunction:
 
     def __init__(self, f):
         if f.__module__ == "__main__":
-            raise ValueError(
-                f"Cannot pickle function {f} that is in the __main__ module"
-                " because it will not be able to be found in a different process with a different __main__."
-                " Please move it to a different module."
-            )
+            add_main_module_function(f.__name__, f)
         self.fmod = f.__module__
         self.fname = f.__name__
         self.f = None
@@ -47,8 +44,11 @@ class PicklableFunction:
 
     def __call__(self, *args, **kwargs):
         logger.debug(f"Dynamically importing function {str(self)}")
-        mod = importlib.import_module(self.fmod)
-        self.f = getattr(mod, self.fname)
+        if self.fmod == "__main__":
+            self.f = get_main_module_function(self.fname)
+        else:
+            mod = importlib.import_module(self.fmod)
+            self.f = getattr(mod, self.fname)
         return self.f(*args, **kwargs)
 
 
