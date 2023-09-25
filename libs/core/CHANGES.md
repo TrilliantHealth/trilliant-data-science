@@ -1,3 +1,9 @@
+### 1.9
+
+- Added the beginnings of `concurrency.py`, which will be a collection
+  of utilities for sprinkling concurrency into our systems with a
+  slightly more opinionated approach.
+
 ### 1.8.20230907
 
 - Fix an unfortunate issue where generator functions were not

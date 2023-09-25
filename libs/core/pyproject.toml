@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "1.8"
+version = "1.9"
 authors = ["Trilliant Health"]
 description = "Core utilities."
 readme = "README.md"
