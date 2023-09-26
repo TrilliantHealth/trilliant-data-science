@@ -3,6 +3,8 @@
 - Added the beginnings of `concurrency.py`, which will be a collection
   of utilities for sprinkling concurrency into our systems with a
   slightly more opinionated approach.
+- `env.temp_env` now has a default of `""` which will result in the current active env being set for the duration of
+the `env.temp_env` context manager.
 
 ### 1.8.20230907
 
