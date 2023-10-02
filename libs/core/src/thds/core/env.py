@@ -24,14 +24,14 @@ def get_raw_env() -> Env:
 
 
 @contextmanager
-def temp_env(env: Env) -> ty.Iterator[Env]:
+def temp_env(env: Env = "") -> ty.Iterator[Env]:
     """Temporarily set the value of `THDS_ENV` for the current stack/thread.
 
     Useful if you have special cases where you need to fetch a result
     from a different environment than the one you're intending to run,
     without affecting the global state of your application.
     """
-    with _TEMP_ENV.set(env):
+    with _TEMP_ENV.set(env or active_env()):
         yield _TEMP_ENV()
 
 
