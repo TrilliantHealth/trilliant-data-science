@@ -179,6 +179,30 @@ def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
             yield logger_name, current_level
 
 
+class DuplicateFilter:
+    """Filters away duplicate log messages.
+
+    Taken from @erb's answer on SO: https://stackoverflow.com/questions/31953272/logging-print-message-only-once
+    """
+
+    def __init__(self, logger):
+        self.msgs = set()
+        self.logger = logger
+
+    def filter(self, record):
+        msg = str(record.msg)
+        is_duplicate = msg in self.msgs
+        if not is_duplicate:
+            self.msgs.add(msg)
+        return not is_duplicate
+
+    def __enter__(self):
+        self.logger.addFilter(self)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.logger.removeFilter(self)
+
+
 if not logging.getLogger().hasHandlers():
     config = _BASE_LOG_CONFIG
     for logger_name, level in _parse_thds_loglevels_file(_LOGLEVELS_FILEPATH):
