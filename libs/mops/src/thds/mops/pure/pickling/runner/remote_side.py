@@ -37,17 +37,16 @@ class _ResultExcChannel(ty.NamedTuple):
 
 
 def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
-    fs = uris.lookup_blob_store(memo_uri)
     nested = ty.cast(
         NestedFunctionPickle,
-        make_read_object(INVOCATION)(fs.join(memo_uri, INVOCATION)),
+        make_read_object(INVOCATION)(uris.lookup_blob_store(memo_uri).join(memo_uri, INVOCATION)),
     )
     args, kwargs = mark_as_remote(unfreeze_args_kwargs(nested.args_kwargs_pickle))
     return nested.f, args, kwargs
 
 
 def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
-    """The arguments are those supplied by MemoizingPicklingFunctionRunner."""
+    """The arguments are those supplied by MemoizingPicklingRunner."""
     fs = uris.lookup_blob_store(memo_uri)
 
     def do_work_return_result() -> object:

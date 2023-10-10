@@ -54,6 +54,7 @@ def _mk_builder(shell: ty.Union[Shell, ShellBuilder]) -> ShellBuilder:
 
 logger = log.getLogger(__name__)
 RUNNER_SUFFIX = f"mops{backward_compatible_with()}-mpf"
+Redirect = ty.Callable[[F, Args, Kwargs], F]
 
 
 def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
@@ -70,6 +71,7 @@ class MemoizingPicklingRunner:
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
+        redirect: Redirect = lambda f, _args, _kwargs: f,
     ):
         """Construct a memoizing shell runner.
 
@@ -100,6 +102,7 @@ class MemoizingPicklingRunner:
         self._get_storage_root = uris.to_lazy_uri(blob_storage_root)
         self._rerun_exceptions = rerun_exceptions
         self._by_id_registry = serialization_registry
+        self._redirect = redirect
 
     def shared(self, *objs: ty.Any, **named_objs: ty.Any):
         """Set up memoizing pickle serialization for these objects.
@@ -142,7 +145,7 @@ class MemoizingPicklingRunner:
             make_function_memospace(_runner_prefix_for_pickled_functions(self._get_storage_root()), f),
             self._get_stateful_dumper,
             f,
-        )(self._shell_builder(f, args, kwargs), self._rerun_exceptions, args, kwargs)
+        )(self._shell_builder(f, args, kwargs), self._rerun_exceptions, self._redirect, args, kwargs)
 
 
 # these two semaphores allow us to prioritize getting meaningful units
@@ -166,14 +169,15 @@ _LogPrepareNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
 def _pickle_func_and_run_via_shell(
     function_memospace: str,
     get_dumper: ty.Callable[[str], Dumper],
-    f: ty.Callable[..., T],
-) -> ty.Callable[[Shell, bool, Args, Kwargs], T]:
+    func: ty.Callable[..., T],
+) -> ty.Callable[[Shell, bool, Redirect, Args, Kwargs], T]:
     storage_root = uris.get_root(function_memospace)
 
     @scope.bound
     def run_shell_via_pickles_(
         shell: Shell,
         rerun_exceptions: bool,
+        redirect: Redirect,
         args: Args,
         kwargs: Kwargs,
     ) -> T:
@@ -186,7 +190,7 @@ def _pickle_func_and_run_via_shell(
         # one or more uploads (embedded Paths, invocation).
         with _OUT_SEMAPHORE:
             trigger_src_files_upload(args, kwargs)
-            args_kwargs_bytes = freeze_args_kwargs(dumper, f, args, kwargs)
+            args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
 
             class _success(ty.NamedTuple):
@@ -230,7 +234,7 @@ def _pickle_func_and_run_via_shell(
                 fs.join(memo_uri, INVOCATION),
                 gimme_bytes(
                     dumper,
-                    NestedFunctionPickle(wrap_f(f), args_kwargs_bytes),
+                    NestedFunctionPickle(wrap_f(redirect(func, args, kwargs)), args_kwargs_bytes),
                 ),
                 type_hint=INVOCATION,
             )

@@ -1,6 +1,6 @@
 """In theory, our core concept supports multiple different Runner 'types' being registered and used at the time of remote entry.
 
-In practice we only have a single Runner type registered, the MemoizingPicklingFunctionRunner.
+In practice we only have a single Runner type registered, the MemoizingPicklingRunner.
 """
 import typing as ty
 
