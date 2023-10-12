@@ -784,6 +784,7 @@ def validate(
                 external_schema = external_schemas[t.schema_name]
                 external_type = external_schema.types[t.type_name]
                 schema_ref = raw_schema.external_schemas[t.schema_name]
+                schema_ref.derived_code_submodule = external_schema.build_options.derived_code_submodule
                 named_custom_types[name] = external_type.from_external(schema_ref, name)
             else:
                 named_custom_types[name] = t.with_name(name)

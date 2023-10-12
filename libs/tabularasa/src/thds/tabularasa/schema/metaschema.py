@@ -179,6 +179,12 @@ class ExternalCustomType(CustomType, extra=Extra.forbid):
         new_name = self.class_name
         return self.module_path, old_name if old_name == new_name else f"{old_name} as {new_name}"
 
+    def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
+        if build_options.import_external_types:
+            return set()
+        else:
+            return super().attrs_required_imports(build_options)
+
 
 class _CustomTypeRef(BaseModel, extra=Extra.forbid):
     custom: Identifier
@@ -607,7 +613,9 @@ class Table(_RawTable):
 
         modules = set()
         for column in columns:
-            if column.nullable:
+            if column.nullable and not (
+                isinstance(column.type, ExternalCustomType) and build_options.import_external_types
+            ):
                 modules.add("typing")
             modules.update(column.type.attrs_required_imports(build_options))
         return modules
