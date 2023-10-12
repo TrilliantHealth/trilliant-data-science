@@ -127,9 +127,9 @@ def in_module(module_name: str) -> ConfigItemP:
 _REGISTRY: ty.Dict[str, ConfigItem] = dict()
 
 
-def config_by_name(name: str) -> ty.Any:
-    """This is a dynamic interface - in general, prefer accessing the ConfigItem directly."""
-    return _REGISTRY[name]()
+def config_by_name(name: str) -> ConfigItem:
+    """This is a dynamic interface - in general, prefer accessing the ConfigItem object directly."""
+    return _REGISTRY[name]
 
 
 def set_global_defaults(config: ty.Dict[str, ty.Any]):
