@@ -1,9 +1,4 @@
-## 1.10
-
-- Add `config` system to `core` that enables a broad range of functionality that
-  can be non-invasively integrated into existing applications as desired.
-
-## 1.9
+### 1.9
 
 - Added the beginnings of `concurrency.py`, which will be a collection
   of utilities for sprinkling concurrency into our systems with a

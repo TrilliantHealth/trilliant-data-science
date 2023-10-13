@@ -27,14 +27,14 @@ import contextlib
 import logging
 import logging.config
 import os
+import typing as ty
 from copy import copy
 from typing import Any, Dict, Iterator, MutableMapping, Optional, Tuple
 
-from . import config
 from .stack_context import StackContext
 
-_LOGLEVEL = config.item("level", logging.INFO, parse=logging.getLevelName)
-_LOGLEVELS_FILEPATH = config.item("levels_file", "", parse=lambda s: s.strip())
+_LOGLEVEL = logging.INFO
+_LOGLEVELS_FILEPATH = os.environ.get("THDS_LOGLEVELS", "").strip()
 # see _parse_thds_loglevels_file for format of this file.
 
 _LOGGING_KWARGS = ("exc_info", "stack_info", "stacklevel", "extra")
@@ -123,14 +123,14 @@ _BASE_LOG_CONFIG = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
     "root": {
         "handlers": ["console"],
-        "level": _LOGLEVEL(),
+        "level": _LOGLEVEL,
     },
 }
 
 
 def set_logger_to_console_level(config: dict, logger_name: str, level: int) -> dict:
     if logger_name == "*":
-        if level != _LOGLEVEL():
+        if level != _LOGLEVEL:
             getLogger(__name__).warning(f"Setting root logger to {logging.getLevelName(level)}")
         return dict(config, root=dict(config["root"], level=level))
     loggers = config.get("loggers") or dict()
@@ -163,7 +163,7 @@ def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
     The last value encountered for any given logger (or the root) will
     override any previous values.
     """
-    current_level = _LOGLEVEL()
+    current_level = _LOGLEVEL
     if not os.path.exists(filepath):
         return
     with open(filepath) as f:
@@ -186,11 +186,11 @@ class DuplicateFilter:
     Taken from @erb's answer on SO: https://stackoverflow.com/questions/31953272/logging-print-message-only-once
     """
 
-    def __init__(self, logger):
-        self.msgs = set()
-        self.logger = logger
+    def __init__(self, logger: ty.Union[logging.Logger, logging.LoggerAdapter]):
+        self.msgs: ty.Set[str] = set()
+        self.logger = logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord):
         msg = str(record.msg)
         is_duplicate = msg in self.msgs
         if not is_duplicate:
@@ -205,10 +205,10 @@ class DuplicateFilter:
 
 
 if not logging.getLogger().hasHandlers():
-    live_config = _BASE_LOG_CONFIG
-    for logger_name, level in _parse_thds_loglevels_file(_LOGLEVELS_FILEPATH()):
-        live_config = set_logger_to_console_level(live_config, logger_name, level)
-    logging.config.dictConfig(live_config)
+    config = _BASE_LOG_CONFIG
+    for logger_name, level in _parse_thds_loglevels_file(_LOGLEVELS_FILEPATH):
+        config = set_logger_to_console_level(config, logger_name, level)
+    logging.config.dictConfig(config)
     make_th_formatters_safe(logging.getLogger())
 
     class StartsWithFilter(logging.Filter):
