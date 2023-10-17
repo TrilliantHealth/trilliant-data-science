@@ -27,6 +27,7 @@ import contextlib
 import logging
 import logging.config
 import os
+import typing as ty
 from copy import copy
 from typing import Any, Dict, Iterator, MutableMapping, Optional, Tuple
 
@@ -186,11 +187,11 @@ class DuplicateFilter:
     Taken from @erb's answer on SO: https://stackoverflow.com/questions/31953272/logging-print-message-only-once
     """
 
-    def __init__(self, logger):
-        self.msgs = set()
-        self.logger = logger
+    def __init__(self, logger: ty.Union[logging.Logger, logging.LoggerAdapter]):
+        self.msgs: ty.Set[str] = set()
+        self.logger = logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord):
         msg = str(record.msg)
         is_duplicate = msg in self.msgs
         if not is_duplicate:
