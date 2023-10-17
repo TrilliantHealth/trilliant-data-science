@@ -72,7 +72,7 @@ def _sanitize_env(env_var_name: str) -> str:
     return env_var_name.replace("-", "_").replace(".", "_")
 
 
-def _getenv(name: str) -> ty.Optional[str]:
+def _getenv(name: str, secret: bool) -> ty.Optional[str]:
     """We want to support a variety of naming conventions for env
     vars, without requiring people to actually name their config using
     all caps and underscores only.
@@ -84,8 +84,9 @@ def _getenv(name: str) -> ty.Optional[str]:
         for envvar in envvars:
             raw_value = getenv(envvar)
             if raw_value is not None:
+                lvalue = "***SECRET***" if secret else raw_value
                 getLogger(__name__).info(
-                    f"Loaded config '{name}' with raw value '{raw_value}' from environment variable '{envvar}'"
+                    f"Loaded config '{name}' with raw value '{lvalue}' from environment variable '{envvar}'"
                 )
                 return raw_value
         return None
@@ -128,14 +129,16 @@ class ConfigItem(ty.Generic[T]):
         default: T = ty.cast(T, _NOT_CONFIGURED),
         *,
         parse: ty.Callable[[ty.Any], T] = lambda x: x,
+        secret: bool = False,
     ):
+        self.secret = secret
         name = _fullname(name)
         if name in _REGISTRY:
             raise ConfigNameCollisionError(f"Config item {name} has already been registered!")
         _REGISTRY[name] = self
         self.name = name
         self.parse = parse
-        raw_resolved_global = _getenv(name)
+        raw_resolved_global = _getenv(name, secret=secret)
         if raw_resolved_global:
             # external global values are only resolved at initial
             # creation.  if you want to set this value globally after
@@ -219,7 +222,7 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
 
 
 def show_all_config() -> ty.Dict[str, ty.Any]:
-    return {k: v() for k, v in _REGISTRY.items()}
+    return {k: v() if not v.secret else "***SECRET***" for k, v in _REGISTRY.items()}
 
 
 def show_config_cli():
