@@ -1,10 +1,9 @@
 import os
-import platform
 import stat
 import typing as ty
 from pathlib import Path
 
-from thds.core import log
+from thds.core import config, log
 from thds.core import types as ct
 
 from .fqn import AdlsFqn
@@ -18,11 +17,9 @@ if os.getenv("CI") and _RUNNER_WORK.exists() and _RUNNER_WORK.is_dir():
     __home = _RUNNER_WORK
 else:
     __home = Path.home()
-_GLOBAL = __home / ".adls-md5-ro-cache"
-
-_MAX_CACHE_KEY_LEN = 255  # safe on most local filesystems?
+GLOBAL_CACHE_PATH = config.item("global-cache-path", __home / ".adls-md5-ro-cache", parse=Path)
+MAX_CACHE_KEY_LEN = config.item("max-cache-key-len", 255, parse=int)  # safe on most local filesystems?
 logger = log.getLogger(__name__)
-_IS_MAC = platform.system() == "Darwin"
 
 LinkOpts = ty.Union[bool, ty.Tuple[LinkType, ...]]
 # if True, order is reflink, hardlink, softlink, copy
@@ -45,21 +42,21 @@ class Cache(ty.NamedTuple):
 
 def global_cache(link: LinkOpts = ("ref", "hard")) -> Cache:
     """This is the recommended caching configuration."""
-    return Cache(_GLOBAL, link)
+    return Cache(GLOBAL_CACHE_PATH(), link)
 
 
 def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
     fqn_str = str(cache.root.resolve() / f"{fqn.sa}/{fqn.container}/{fqn.path}")
     fqn_bytes = fqn_str.encode()
-    if len(fqn_bytes) > _MAX_CACHE_KEY_LEN:
+    if len(fqn_bytes) > MAX_CACHE_KEY_LEN():
         # we now hash the fqn itself, and overwrite the last N bytes
         # of the filename bytes with the hash. this gets us
         # consistency even across cache directories, such that the
         # cache directory is basically relocatable. It also makes testing easier.
         md5_of_key = b"-md5-" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode()
-        fqn_bytes = fqn_bytes[: _MAX_CACHE_KEY_LEN - len(md5_of_key)] + md5_of_key
+        fqn_bytes = fqn_bytes[: MAX_CACHE_KEY_LEN() - len(md5_of_key)] + md5_of_key
         fqn_str = fqn_bytes.decode()
-        assert len(fqn_bytes) <= _MAX_CACHE_KEY_LEN, (fqn_str, len(fqn_bytes))
+        assert len(fqn_bytes) <= MAX_CACHE_KEY_LEN(), (fqn_str, len(fqn_bytes))
     return Path(fqn_str).absolute()
 
 

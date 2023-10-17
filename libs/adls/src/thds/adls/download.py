@@ -21,8 +21,8 @@ from thds.core import log, scope
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
-from ._env import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from ._progress import report_download_progress
+from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from .errors import translate_blob_not_found
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_readable
@@ -332,8 +332,8 @@ def download_or_use_verified(
                 co_request = co.send(file_properties)
             else:  # needs file object
                 dl_file_client.download_file(
-                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY,
-                    connection_timeout=CONNECTION_TIMEOUT,
+                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY(),
+                    connection_timeout=CONNECTION_TIMEOUT(),
                 ).readinto(co_request)
                 co_request = co.send(None)
     except StopIteration as si:
@@ -368,8 +368,8 @@ async def async_download_or_use_verified(
                 co_request = co.send(file_properties)
             else:  # needs file object
                 reader = await dl_file_client.download_file(
-                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY,
-                    connection_timeout=CONNECTION_TIMEOUT,
+                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY(),
+                    connection_timeout=CONNECTION_TIMEOUT(),
                 )
                 await reader.readinto(co_request)
                 co_request = co.send(None)

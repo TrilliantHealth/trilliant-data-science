@@ -1,11 +1,10 @@
 """Defaults for Data Science"""
-
 from thds.core.env import Env, active_env
 
 from .fqn import AdlsRoot
 
-PROD_DATASETS = AdlsRoot.parse("adls://thdsdatasets/prod-datasets")
-TMP = AdlsRoot.parse("adls://thdsscratch/tmp")
+_PROD_DATASETS = AdlsRoot.parse("adls://thdsdatasets/prod-datasets")
+_TMP = AdlsRoot.parse("adls://thdsscratch/tmp")
 
 
 def env_root(env: Env = "") -> AdlsRoot:
@@ -14,10 +13,10 @@ def env_root(env: Env = "") -> AdlsRoot:
     """
     env = active_env(env)
     if env == "prod":
-        return PROD_DATASETS
+        return _PROD_DATASETS
     if env == "dev":
-        return TMP
-    return TMP
+        return _TMP
+    return _TMP
 
 
 def env_root_uri(env: Env = "") -> str:
