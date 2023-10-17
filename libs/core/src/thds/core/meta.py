@@ -443,13 +443,13 @@ def write_metadata(
         )
         metadata_path = os.path.join(
             "src" if layout == "src" else "",
-            namespace.replace("-", "/").replace(".", "/"),
+            namespace.replace(".", "/"),
             pkg.replace("-", "_").replace(".", "/"),
             META_FILE,
         )
 
-        LOGGER.info(f"Writing metadata for {pkg} to {wdir_ / metadata_path}")
         with open(wdir_ / metadata_path, "w") as f:
+            LOGGER.info(f"Writing metadata for {pkg} to {wdir_ / metadata_path}")
             metadata_dict = meta_converter.unstructure(metadata)
             if for_docker_tools_build:
                 _sanitize_metadata_for_docker_tools(metadata_dict)
