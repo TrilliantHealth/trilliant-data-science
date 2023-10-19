@@ -10,7 +10,46 @@ Highlights:
 - Config can be set by combining one or more configuration objects - these may be loaded from files,
   but this system remains agnostic as to the format of those files or how and when they are actually loaded.
 
-Please see thds/core/CONFIG.md for more details.
+The basic usage is as follows:
+
+* in module foo:
+
+from thds.core import config
+
+BAR = config.item('bar', 42, parse=int)
+
+def barbarbar() -> int:
+    return BAR() * 3
+
+* in module baz:
+
+import foo
+
+assert foo.barbarbar() == 126
+foo.BAR.set_global(100)
+with foo.BAR.set_local(200):
+    assert foo.barbarbar() == 600
+assert foo.barbarbar() == 300
+
+* as an environment variable:
+
+export FOO_BAR=27
+python -c "from foo import BAR; assert BAR() == 27"
+
+* discoverability:
+
+from thds.core import config
+
+print(config.show_all_config())
+# {'foo.bar': 42}
+
+* loading config from a TOML file:
+
+from thds.core import config
+
+# supports multiple configuration files. Later files override earlier ones.
+config.set_global_defaults(tomli.load(open('config_a.toml', 'rb')))
+config.set_global_defaults(json.load(open('config_b.json')))
 """
 import typing as ty
 from logging import getLogger
@@ -138,11 +177,6 @@ class ConfigItem(ty.Generic[T]):
         return self.global_value
 
 
-def tobool(s_or_b: ty.Union[str, bool]) -> bool:
-    """A reasonable implementation that we could expand in the future."""
-    return s_or_b if isinstance(s_or_b, bool) else s_or_b.lower() not in ("0", "false", "no", "off", "")
-
-
 item = ConfigItem
 # a short alias
 
@@ -187,7 +221,7 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
             set_global_defaults({f"{name}.{key}": val for key, val in value.items()})
 
 
-def get_all_config() -> ty.Dict[str, ty.Any]:
+def show_all_config() -> ty.Dict[str, ty.Any]:
     return {k: v() if not v.secret else "***SECRET***" for k, v in _REGISTRY.items()}
 
 
@@ -203,17 +237,4 @@ def show_config_cli():
     for module in args.via_modules:
         importlib.import_module(module)
 
-    print()
-    print("thds.core.config")
-    print("----------------")
-    print("The following keys are fully-qualified module paths by default.")
-    print(
-        "A given item can be capitalized and set via environment variable"
-        ", e.g. export THDS_CORE_LOG_LEVEL='DEBUG'"
-    )
-    print(
-        "These can also be set programatically, by importing the"
-        " ConfigItem object from the module where it is defined."
-    )
-    print()
-    pprint(get_all_config())
+    pprint(show_all_config())
