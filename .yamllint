@@ -1,4 +1,0 @@
-rules:
-  line-length:
-    ignore:
-      - /.github/workflows/libs-reference-data.yml
