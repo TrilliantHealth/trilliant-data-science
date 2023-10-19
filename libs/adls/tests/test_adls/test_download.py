@@ -186,7 +186,7 @@ async def test_file_missing_md5_gets_one_assigned_after_download():
 
 def test_file_with_md5_doesnt_try_to_set_it(caplog):
     fs = ADLSFileSystem("thdsscratch", "tmp")
-    key = uuid4().hex
+    key = f"test/thds.adls/file_with_md5_doesnt_try_to_set_it/{uuid4().hex}"
     fs.put_file(Path(__file__).parent.parent / "data" / "hello_world.txt", key)
 
     with caplog.at_level(logging.INFO):
