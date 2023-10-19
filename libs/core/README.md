@@ -7,11 +7,6 @@ The monorepo successor to `core`
 If making changes to the library please add an entry to `CHANGES.md`, and if the change is more than a patch,
 please bump the version in `pyproject.toml` accordingly.
 
-## Config
-
-`thds.core.config` provides a general-purpose config system designed
-to regularize how we implement configuration both for libraries and
-applications. Please see its [README here](src/thds/core/CONFIG.md)!
 
 ## Logging config
 
@@ -22,6 +17,7 @@ INFO-and-above messages are written (to `stderr`).
 
 To customize what level different modules are logged at, you should
 create a file that looks like this:
+
 
 ```
 [debug]
@@ -47,9 +43,9 @@ You may also/instead add an `*` to change the global default log level, e.g.:
 > under `[debug]` and all otherwise-unconfigured loggers under
 > `thds.adls` will now log at the DEBUG level.
 
-### `THDS_CORE_LOG_LEVELS_FILE` environment variable
+### `THDS_LOGLEVELS` environment variable
 
 Provide the path to the above-formatted file to `thds.core` via the
-`THDS_CORE_LOG_LEVELS_FILE` environment variable. You may wish to create this
+`THDS_LOGLEVELS` environment variable. You may wish to create this
 file and then set its path via exported envvar in your `.bash/zshrc`
 so that you can permanently tune our logging to meet your preferences.
