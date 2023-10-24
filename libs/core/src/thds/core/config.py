@@ -212,8 +212,8 @@ def show_config_cli():
         ", e.g. export THDS_CORE_LOG_LEVEL='DEBUG'"
     )
     print(
-        "These can also be set programatically, by importing the"
-        " ConfigItem object from the module where it is defined."
+        "An item can also be set globally or locally, after importing the"
+        " ConfigItem object from the Python module where it is defined."
     )
     print()
     pprint(get_all_config())
