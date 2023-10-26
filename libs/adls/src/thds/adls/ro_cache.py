@@ -5,9 +5,9 @@ from pathlib import Path
 
 from thds.core import config, log
 from thds.core import types as ct
+from thds.core.link import LinkType, link_or_copy
 
 from .fqn import AdlsFqn
-from .link import LinkType, link_or_copy
 from .md5 import hash_using, hashlib
 
 # On our GitHub runners, we can't make hardlinks from /runner/home to where our stuff actually goes.

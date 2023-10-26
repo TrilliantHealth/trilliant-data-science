@@ -3,7 +3,7 @@ from pathlib import Path
 
 from thds.adls import abfss, fqn
 from thds.adls.cached_up_down import download_to_cache
-from thds.adls.link import link
+from thds.core.link import link
 
 
 def parse(uri: str) -> fqn.AdlsFqn:
