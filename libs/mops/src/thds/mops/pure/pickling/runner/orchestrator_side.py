@@ -55,6 +55,7 @@ def _mk_builder(shell: ty.Union[Shell, ShellBuilder]) -> ShellBuilder:
 logger = log.getLogger(__name__)
 RUNNER_SUFFIX = f"mops{backward_compatible_with()}-mpf"
 Redirect = ty.Callable[[F, Args, Kwargs], F]
+NO_REDIRECT = lambda f, _args, _kwargs: f  # noqa: E731
 
 
 def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
@@ -71,7 +72,7 @@ class MemoizingPicklingRunner:
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
-        redirect: Redirect = lambda f, _args, _kwargs: f,
+        redirect: Redirect = NO_REDIRECT,
     ):
         """Construct a memoizing shell runner.
 
