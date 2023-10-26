@@ -9,7 +9,7 @@ from ...core.entry import register_entry_handler, route_result_or_exception
 from ...core.pipeline_id_mask import pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
-from ...core.types import BlobStore, T
+from ...core.types import Args, BlobStore, Kwargs, T
 from .._pickle import Dumper, gimme_bytes, make_read_object, unfreeze_args_kwargs
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
@@ -36,17 +36,23 @@ class _ResultExcChannel(ty.NamedTuple):
         )
 
 
+def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
+    fs = uris.lookup_blob_store(memo_uri)
+    nested = ty.cast(
+        NestedFunctionPickle,
+        make_read_object(INVOCATION)(fs.join(memo_uri, INVOCATION)),
+    )
+    args, kwargs = mark_as_remote(unfreeze_args_kwargs(nested.args_kwargs_pickle))
+    return nested.f, args, kwargs
+
+
 def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     """The arguments are those supplied by MemoizingPicklingFunctionRunner."""
     fs = uris.lookup_blob_store(memo_uri)
 
     def do_work_return_result() -> object:
-        nested = ty.cast(
-            NestedFunctionPickle,
-            make_read_object(INVOCATION)(fs.join(memo_uri, INVOCATION)),
-        )
-        args, kwargs = mark_as_remote(unfreeze_args_kwargs(nested.args_kwargs_pickle))
-        return pipeline_id_mask(pipeline_id)(nested.f)(*args, **kwargs)
+        func, args, kwargs = _unpickle_invocation(memo_uri)
+        return pipeline_id_mask(pipeline_id)(func)(*args, **kwargs)
 
     def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
         parts = fs.split(memo_uri)
