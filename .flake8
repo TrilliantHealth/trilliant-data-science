@@ -1,0 +1,23 @@
+[flake8]
+# B = bugbear
+# B9 = bugbear opinions
+# C = mccabe code complexity
+# E = pycodestyle errors
+# F = pyflakes errors
+# W = pycodestyle warnings
+select = B,B9,C,E,F,W
+# B008 = Do not perform function calls in argument defaults - this should be removed after UA addresses this
+# B904 = Within an `except` clause, raise exceptions  with `raise ... from err` - only Python >= 3.9
+# B905 = `zip` should have explicit `strict=bool` - only Python >= 3.10
+# B950 = bugbear opinions line-length tolerance - 120 permissive enough
+# E203 = Slice notation whitespace, invalid
+# E266 = Too many leading '#' for block comment
+# E501 = This gets handled by black
+# W503 = Bin op line break, invalid
+ignore = B008, B904, B905, B950, E203, E266, E501, W503
+max-line-length = 120
+max-complexity = 18
+# flake8 . will complain about cookiecutter templates if run on them - this is expected
+exclude = .git, .venv, __pycache__, build, dist, libs/unified-datamodel
+per-file-ignores =
+    libs/reference-data/src/thds/reference_data/loaders/pandas.py:E501
