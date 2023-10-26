@@ -94,7 +94,7 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
     fretry.expo(retries=2),
 )
 def upload(
-    fqn: AdlsFqn, data: UploadSrc, write_through_cache: ty.Optional[Cache] = None
+    dest: ty.Union[AdlsFqn, str], src: UploadSrc, write_through_cache: ty.Optional[Cache] = None
 ) -> ty.Optional[AdlsHashedResource]:
     """Uploads only if the remote does not exist or does not match
     md5.
@@ -106,23 +106,24 @@ def upload(
 
     Can write through a local cache, which may save you a download later.
     """
+    dest_ = AdlsFqn.parse(dest) if isinstance(dest, str) else dest
     if write_through_cache:
-        data = _write_through_local_cache(write_through_cache.path(fqn), data) or data
+        src = _write_through_local_cache(write_through_cache.path(dest_), src) or src
         # we can now upload from the local cache Path;
         # Paths have the advantage (over some kinds of readable byte iterables)
         # of guaranteeing that we can extract an MD5.
 
-    fs_client = get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path)
-    decision = upload_decision_and_settings(fs_client, data)
+    fs_client = get_global_client(dest_.sa, dest_.container).get_file_client(dest_.path)
+    decision = upload_decision_and_settings(fs_client, src)
     if decision.upload_required:
         # set up some bookkeeping
         n_bytes = 0
-        if isinstance(data, Path):
-            n_bytes = data.stat().st_size
-            data = scope.enter(open(data, "rb"))
+        if isinstance(src, Path):
+            n_bytes = src.stat().st_size
+            src = scope.enter(open(src, "rb"))
 
         fs_client.upload_data(
-            report_upload_progress(ty.cast(ty.IO, data), str(fqn), n_bytes),
+            report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes),
             overwrite=True,
             content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
@@ -132,7 +133,7 @@ def upload(
 
     # if at all possible (if the md5 is known), return a resource containing it.
     if decision.content_settings and decision.content_settings.content_md5:
-        return AdlsHashedResource.of(fqn, hashing.b64(decision.content_settings.content_md5))
+        return AdlsHashedResource.of(dest_, hashing.b64(decision.content_settings.content_md5))
     return None
 
 

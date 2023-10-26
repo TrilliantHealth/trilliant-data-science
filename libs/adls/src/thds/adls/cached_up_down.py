@@ -1,3 +1,4 @@
+import typing as ty
 from pathlib import Path
 
 from .download import download_or_use_verified
@@ -22,11 +23,11 @@ def download_to_cache(fqn: AdlsFqn, md5b64: str = "") -> Path:
     return cache_path
 
 
-def upload_through_cache(fqn: AdlsFqn, local_path: Path) -> AdlsHashedResource:
+def upload_through_cache(dest: ty.Union[AdlsFqn, str], src_path: Path) -> AdlsHashedResource:
     """Return an AdlsHashedResource, since by definition an upload through the cache must have a known checksum.
 
     Uses global client, which is pretty much always what you want.
     """
-    resource = upload(fqn, local_path, write_through_cache=global_cache())
+    resource = upload(dest, src_path, write_through_cache=global_cache())
     assert resource, "MD5 should always be calculable for a local path."
     return resource
