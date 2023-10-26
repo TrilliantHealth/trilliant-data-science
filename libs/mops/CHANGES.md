@@ -1,3 +1,9 @@
+## 2.2
+
+- `invocation_output_fqn` now uses the active storage root
+  (corresponding to the memoization root) by default, rather than
+  requiring an argument.
+
 ### 2.1.20230920
 
 - Enable memoization of functions inside the module named `__main__`

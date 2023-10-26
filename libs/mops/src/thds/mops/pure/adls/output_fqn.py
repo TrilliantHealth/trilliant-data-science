@@ -1,10 +1,10 @@
 from thds.adls import AdlsFqn
 
+from ..core import uris
 from ..core.output_naming import pipeline_function_invocation_unique_key
-from ..core.uris import UriIsh
 
 
-def invocation_output_fqn(storage_root: UriIsh, name: str = "") -> AdlsFqn:
+def invocation_output_fqn(storage_root: uris.UriIsh = "", name: str = "") -> AdlsFqn:
     """If your function only outputs a single blob to ADLS, you can safely
     use this without providing a name.  However, if you have multiple outputs
     from the same invocation, you must provide a meaningful name for each one.
@@ -14,6 +14,7 @@ def invocation_output_fqn(storage_root: UriIsh, name: str = "") -> AdlsFqn:
     <pipeline> <function mod/name  > <your name     > <args,kwargs hash                                   >
     nppes/2023/thds.nppes.intake:run/<name goes here>/CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs
     """
+    storage_root = storage_root or uris.ACTIVE_STORAGE_ROOT()
     pf_fa = pipeline_function_invocation_unique_key()
     assert pf_fa, "`invocation_output_fqn` must be used in a `thds.mops.pure` context."
     pipeline_function_key, function_arguments_key = pf_fa

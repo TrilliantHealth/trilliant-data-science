@@ -13,12 +13,12 @@ from ...._utils.once import Once
 from ....config import max_concurrent_network_ops
 from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
+from ...core import uris
 from ...core.memo import args_kwargs_content_address, make_function_memospace
 from ...core.pipeline_id_mask import get_pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
-from ...core.uris import UriResolvable, get_root, lookup_blob_store, to_lazy_uri
 from .._pickle import Dumper, freeze_args_kwargs, gimme_bytes, make_read_object, wrap_f
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
@@ -57,7 +57,7 @@ RUNNER_SUFFIX = f"mops{backward_compatible_with()}-mpf"
 
 
 def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
-    return lookup_blob_store(storage_root).join(storage_root, RUNNER_SUFFIX)
+    return uris.lookup_blob_store(storage_root).join(storage_root, RUNNER_SUFFIX)
 
 
 class MemoizingPicklingRunner:
@@ -66,7 +66,7 @@ class MemoizingPicklingRunner:
     def __init__(
         self,
         shell: ty.Union[ShellBuilder, Shell],
-        blob_storage_root: UriResolvable,
+        blob_storage_root: uris.UriResolvable,
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
@@ -97,7 +97,7 @@ class MemoizingPicklingRunner:
         behavior, turn it off.
         """
         self._shell_builder = _mk_builder(shell)
-        self._get_storage_root = to_lazy_uri(blob_storage_root)
+        self._get_storage_root = uris.to_lazy_uri(blob_storage_root)
         self._rerun_exceptions = rerun_exceptions
         self._by_id_registry = serialization_registry
 
@@ -168,7 +168,7 @@ def _pickle_func_and_run_via_shell(
     get_dumper: ty.Callable[[str], Dumper],
     f: ty.Callable[..., T],
 ) -> ty.Callable[[Shell, bool, Args, Kwargs], T]:
-    storage_root = get_root(function_memospace)
+    storage_root = uris.get_root(function_memospace)
 
     @scope.bound
     def run_shell_via_pickles_(
@@ -177,8 +177,8 @@ def _pickle_func_and_run_via_shell(
         args: Args,
         kwargs: Kwargs,
     ) -> T:
-        scope.enter(sha256_b64.DEFERRED_STORAGE_ROOT.set(storage_root))
-        fs = lookup_blob_store(function_memospace)
+        scope.enter(uris.ACTIVE_STORAGE_ROOT.set(storage_root))
+        fs = uris.lookup_blob_store(function_memospace)
         dumper = get_dumper(storage_root)
 
         # the network ops being grouped by _OUT include one or more

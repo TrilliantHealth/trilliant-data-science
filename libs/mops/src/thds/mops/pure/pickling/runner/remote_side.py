@@ -4,12 +4,12 @@ from thds.core import scope
 
 from ...._utils.once import Once
 from ....srcdest.mark_remote import mark_as_remote
+from ...core import uris
 from ...core.entry import register_entry_handler, route_result_or_exception
 from ...core.pipeline_id_mask import pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.types import BlobStore, T
-from ...core.uris import get_root, lookup_blob_store
 from .._pickle import Dumper, gimme_bytes, make_read_object, unfreeze_args_kwargs
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
@@ -38,7 +38,7 @@ class _ResultExcChannel(ty.NamedTuple):
 
 def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     """The arguments are those supplied by MemoizingPicklingFunctionRunner."""
-    fs = lookup_blob_store(memo_uri)
+    fs = uris.lookup_blob_store(memo_uri)
 
     def do_work_return_result() -> object:
         nested = ty.cast(
@@ -55,7 +55,7 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
         invocation_parts = parts[runner_idx + 1 :]
         return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
 
-    scope.enter(sha256_b64.DEFERRED_STORAGE_ROOT.set(get_root(memo_uri)))
+    scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
     route_result_or_exception(
         _ResultExcChannel(
             fs,

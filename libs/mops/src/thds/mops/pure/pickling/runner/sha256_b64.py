@@ -12,11 +12,10 @@ from pathlib import Path
 
 from thds.core.hashing import hash_using
 from thds.core.log import getLogger
-from thds.core.stack_context import StackContext
 
 from ...._utils.human_b64 import encode
 from ...core.serialize_paths import Downloader
-from ...core.uris import lookup_blob_store
+from ...core.uris import active_storage_root, lookup_blob_store
 from ..pickles import UnpicklePathFromUri, UnpickleSimplePickleFromUri
 
 logger = getLogger(__name__)
@@ -27,25 +26,9 @@ SHA256_B64_ADDRESSED = "sha256-b64-addressed"
 # we can save on storage and simplify lots of internals if we just
 # hash all blobs and upload them to a key that is their hash.
 
-# DEFERRED_STORAGE_ROOT is meant as a global, non-semantic URI prefix.
-# In other words, it should have nothing to do with your application
-DEFERRED_STORAGE_ROOT: StackContext[str] = StackContext("STORAGE_ROOT", default="")
-# We use StackContext in order to perform lazy dependency injection - it's possible
-# that various configurations may arise requiring the root location to need to be changed
-# for a specific function invocation, and this allows the configuration to take hold naturally
-# without lots of additional bookkeeping.
-
-# objects referencing this StackContext must be used in the same thread where they were created.
-
-
-def _get_storage_root() -> str:
-    storage_root = DEFERRED_STORAGE_ROOT()
-    assert storage_root, "STORAGE_ROOT must be set before SharedPickler is used."
-    return storage_root
-
 
 def _sha256_addressed(sha256_of_some_kind: str) -> str:
-    return f"{_get_storage_root()}/{SHA256_B64_ADDRESSED}/{sha256_of_some_kind}"
+    return f"{active_storage_root()}/{SHA256_B64_ADDRESSED}/{sha256_of_some_kind}"
 
 
 class Sha256B64PathStream:
@@ -92,4 +75,4 @@ class Sha256B64Pickler:
     def __call__(self, obj: ty.Any) -> UnpickleSimplePickleFromUri:
         # _get_storage_root is lazy because we may want to register the pickler somewhere
         # before settling on the final destination of objects pickled.
-        return _pickle_and_upload_to_content_addressed_path(_get_storage_root(), obj, self.name)
+        return _pickle_and_upload_to_content_addressed_path(active_storage_root(), obj, self.name)

@@ -2,6 +2,7 @@ import io
 from typing import Callable, Union
 
 from thds.adls import ADLS_SCHEME, AdlsFqn, AdlsRoot
+from thds.core.stack_context import StackContext
 
 # we import the ADLS blob store here even though this is the only place in core where we 'touch'
 # the ADLS implementation.
@@ -42,3 +43,14 @@ def get_bytes(remote_uri: str, type_hint: str) -> bytes:
         blob_store.readbytesinto(remote_uri, tb, type_hint=type_hint)
         tb.seek(0)
         return tb.read()
+
+
+# ACTIVE_STORAGE_ROOT is meant as a global, non-semantic URI prefix.
+# In other words, it should have nothing to do with your application
+ACTIVE_STORAGE_ROOT: StackContext[str] = StackContext("ACTIVE_STORAGE_ROOT", "")
+# objects referencing this StackContext must be used in the same thread where they were created.
+
+
+def active_storage_root() -> str:
+    assert ACTIVE_STORAGE_ROOT(), "ACTIVE_STORAGE_ROOT must be set before use."
+    return ACTIVE_STORAGE_ROOT()

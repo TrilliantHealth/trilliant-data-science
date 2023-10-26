@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 
 from ..._utils.once import Once
+from ..core import uris
 from ..core.serialize_paths import CoordinatingPathSerializer, human_sha256b64_file_at_paths
 from ..pickling.runner import sha256_b64
 
@@ -28,7 +29,7 @@ def main():
 
     if args.upload_root_uri:
         storage_root = args.upload_root_uri.rstrip("/") + "/"
-        with sha256_b64.DEFERRED_STORAGE_ROOT.set(storage_root):
+        with uris.ACTIVE_STORAGE_ROOT.set(storage_root):
             CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once())(the_path)
 
 
