@@ -15,6 +15,7 @@ from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
 from ...core import uris
 from ...core.memo import args_kwargs_content_address, make_function_memospace
+from ...core.partial import unwrap_partial
 from ...core.pipeline_id_mask import get_pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
@@ -200,8 +201,12 @@ def _pickle_func_and_run_via_shell(
         # download attempts (consider possible pickled Paths) plus
         # one or more uploads (embedded Paths, invocation).
         with _OUT_SEMAPHORE:
-            # TODO fix partial here. we need to essentially unwrap the partial
-            # object and combine its args, kwargs with the other args, kwargs.
+            # we need to unwrap the partial object and combine its
+            # args, kwargs with the other args, kwargs, otherwise the
+            # args and kwargs will not get properly considered in the
+            # memoization key.
+            nonlocal func
+            func, args, kwargs = unwrap_partial(func, args, kwargs)
             trigger_src_files_upload(args, kwargs)
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))

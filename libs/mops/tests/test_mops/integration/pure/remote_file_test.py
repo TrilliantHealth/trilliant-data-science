@@ -205,7 +205,7 @@ def test_from_serialized_sad_paths():
 
     with pytest.raises(errors.BlobNotFoundError):
         _srcfile_from_serialized(
-            Serialized(f'{"uri": "{TEST_TMP_URI}/this-path-should-never-exist.txt"}')
+            Serialized('{"uri": ' + f'"{TEST_TMP_URI}/this-path-should-never-exist.txt"' + "}")
         )
 
     sd_context = src_context()
