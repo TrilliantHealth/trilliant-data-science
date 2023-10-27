@@ -3,9 +3,10 @@ import typing as ty
 
 from thds.mops.parallel import Thunk, parallel_yield_results
 
+from ...config import TEST_TMP_URI
 from ._util import AdlsPickleRunner, _subprocess_remote, use_runner
 
-_our_runner = AdlsPickleRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
+_our_runner = AdlsPickleRunner(_subprocess_remote, TEST_TMP_URI)
 adls_remote = use_runner(_our_runner)
 
 

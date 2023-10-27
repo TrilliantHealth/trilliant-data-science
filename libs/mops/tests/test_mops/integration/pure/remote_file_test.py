@@ -17,6 +17,7 @@ from thds.mops.pure.adls.srcdest.srcf import _srcfile_from_serialized
 from thds.mops.pure.pickling._pickle import gimme_bytes
 from thds.mops.srcdest import DestFile, Serialized, SrcFile
 
+from ...config import TEST_TMP_URI
 from ._util import adls_shell, runner
 
 TEST_TIME = datetime.utcnow().isoformat()
@@ -204,7 +205,7 @@ def test_from_serialized_sad_paths():
 
     with pytest.raises(errors.BlobNotFoundError):
         _srcfile_from_serialized(
-            Serialized('{"uri": "adls://thdsscratch/tmp/this-path-should-never-exist.txt"}')
+            Serialized(f'{"uri": "{TEST_TMP_URI}/this-path-should-never-exist.txt"}')
         )
 
     sd_context = src_context()

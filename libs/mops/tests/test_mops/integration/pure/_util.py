@@ -6,6 +6,8 @@ from thds.core.log import getLogger
 from thds.mops.pure import AdlsPickleRunner, use_runner
 from thds.mops.pure.adls.srcdest import download as dl
 
+from ...config import TEST_TMP_URI
+
 logger = getLogger(__name__)
 
 # just set up a different global cache
@@ -19,7 +21,7 @@ def _subprocess_remote(args_list):
     logger.info("Completed shell runner")
 
 
-runner = AdlsPickleRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
+runner = AdlsPickleRunner(_subprocess_remote, TEST_TMP_URI)
 
 
 def clear_cache():

@@ -10,6 +10,7 @@ from thds.mops import tempdir
 from thds.mops.pure import AdlsPickleRunner, set_pipeline_id, use_runner
 from thds.mops.pure.pickling.runner import Shell
 
+from ...config import TEST_TMP_URI
 from ._util import _subprocess_remote, adls_shell, clear_cache
 
 # this hopefully keeps the tmp bucket easier to navigate/understand
@@ -97,7 +98,7 @@ def test_shell_builder(caplog):
 
         return _just_raise
 
-    a2 = use_runner(AdlsPickleRunner(build_shell, "adls://thdsscratch/tmp/"))(add2)  # type: ignore
+    a2 = use_runner(AdlsPickleRunner(build_shell, TEST_TMP_URI))(add2)  # type: ignore
 
     with pytest.raises(ValueError):
         assert a2(0) == 2

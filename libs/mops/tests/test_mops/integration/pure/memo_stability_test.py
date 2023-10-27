@@ -1,10 +1,11 @@
 from pathlib import Path
 
-from thds.adls import AdlsFqn
+from thds.adls import AdlsRoot
 from thds.mops.pure import adls
 from thds.mops.pure.core.output_naming import pipeline_function_invocation_unique_key
 from thds.mops.srcdest import DestFile, SrcFile
 
+from ...config import TEST_TMP_URI
 from ._util import adls_shell
 
 
@@ -47,7 +48,7 @@ def hello_world_src_dest_path(dfile: DestFile, sfile: SrcFile, path: Path) -> De
     return dfile
 
 
-test_root = AdlsFqn.of("thdsscratch", "tmp", "test-adls-src-dest-files")
+test_root = AdlsRoot.parse(TEST_TMP_URI) / "test-adls-src-dest-files"
 
 
 def test_hello_world_srcdestpath_memoization_is_stable():

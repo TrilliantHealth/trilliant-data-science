@@ -6,6 +6,7 @@ from thds.mops.pure.core.memo.function_memospace import (
 )
 from thds.mops.pure.pickling.runner.orchestrator_side import _pickle_func_and_run_via_shell
 
+from ...config import TEST_TMP_URI
 from ._util import _subprocess_remote, runner
 
 
@@ -23,7 +24,7 @@ _NO_REDIRECT = lambda f, _args, _kwargs: f  # noqa: E731
 
 def test_reuse_memoized_via_config():
     func_uri = (
-        "adls://thdsscratch/tmp/mops2-mpf/test/some-pipeline-id"
+        f"{TEST_TMP_URI}mops2-mpf/test/some-pipeline-id"
         f"/{make_unique_name_including_docstring_key(mul)}"
     )
 

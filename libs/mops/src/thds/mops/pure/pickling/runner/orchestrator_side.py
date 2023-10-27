@@ -98,6 +98,16 @@ class MemoizingPicklingRunner:
         are the result of transient errors and not an expected return
         value of a (simulated) pure function. If you do not want this
         behavior, turn it off.
+
+        `redirect` changes only the function that is actually invoked
+        on the remote side of the runner. It does not change the
+        computed memoization key, which is still based on the original
+        function and the args, kwargs pair passed in. A common use for
+        this would be allowing a contextually-aware function to be
+        invoked in the manner of initializer/initargs, without those
+        additional bits being part of the function invocation and
+        therefore the memoization key, especially where they're not
+        picklable at all.
         """
         self._shell_builder = _mk_builder(shell)
         self._get_storage_root = uris.to_lazy_uri(blob_storage_root)
@@ -190,6 +200,8 @@ def _pickle_func_and_run_via_shell(
         # download attempts (consider possible pickled Paths) plus
         # one or more uploads (embedded Paths, invocation).
         with _OUT_SEMAPHORE:
+            # TODO fix partial here. we need to essentially unwrap the partial
+            # object and combine its args, kwargs with the other args, kwargs.
             trigger_src_files_upload(args, kwargs)
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))

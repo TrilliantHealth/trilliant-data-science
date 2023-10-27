@@ -2,6 +2,8 @@ import threading
 
 from thds.mops.pure.pickling.intercept import InterceptingLocalThreadRunner
 
+from ...config import TEST_TMP_URI
+
 _A_LOCK_ISNT_PICKLABLE = threading.Lock()
 
 
@@ -17,7 +19,7 @@ def memo_key(func, num, lock):
 
 def test_intercepting_runner():
     num, _17 = InterceptingLocalThreadRunner(
-        "adls://thdsscratch/tmp/",
+        TEST_TMP_URI,
         memo_key,
     )(_func_whose_args_cant_be_pickled, (1,), dict(lock=_A_LOCK_ISNT_PICKLABLE))
 
