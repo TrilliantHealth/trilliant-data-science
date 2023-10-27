@@ -1,3 +1,7 @@
+## 1.11
+
+- 'Promote' `link` from the `thds.adls` library as it has no ADLS-specific functionality.
+
 ## 1.10
 
 - Add `config` system to `core` that enables a broad range of functionality that
