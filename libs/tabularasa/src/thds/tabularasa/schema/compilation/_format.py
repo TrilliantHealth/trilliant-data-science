@@ -1,10 +1,9 @@
 import logging
+import os.path
 import tempfile
 from functools import lru_cache
 from typing import Any, Callable, List, Optional, Tuple
 from warnings import warn
-
-_LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -29,6 +28,7 @@ def __autoformat_imports() -> Tuple[Optional[Any], Optional[Callable[[List[str]]
 
 
 def autoformat(py_code: str) -> str:
+    _LOGGER = logging.getLogger(__name__)
     try:
         black, isort_main = __autoformat_imports()
         if black is not None:
@@ -36,11 +36,13 @@ def autoformat(py_code: str) -> str:
             py_code = black.format_str(py_code, mode=black.FileMode())
         if isort_main is not None:
             _LOGGER.info("Applying `isort` formatting to auto-generated code")
-            with tempfile.NamedTemporaryFile("w+") as f:
-                f.write(py_code)
-                isort_main([f.name])
-                f.seek(0)
-                py_code = f.read()
+            with tempfile.TemporaryDirectory() as d:
+                outfile = os.path.join(d, "tmp.py")
+                with open(outfile, "w") as f:
+                    f.write(py_code)
+                isort_main([outfile])
+                with open(outfile, "r") as f_:
+                    py_code = f_.read()
         return py_code
     except Exception as ex:
         print(f"{repr(ex)} when attempting to format code:")
