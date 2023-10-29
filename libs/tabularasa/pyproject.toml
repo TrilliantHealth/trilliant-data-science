@@ -67,8 +67,9 @@ black = "*"
 # support for CLI operations - code and data generation
 cli = [
   "bourbaki.application",
-  "ruamel.yaml", "tabulate", "isort", "black", "typing-inspect"
+  "ruamel.yaml", "tabulate", "typing-inspect"
 ]
+autoformat = ["isort", "black"]
 # support for visualizing computational/dependency DAGs
 viz = ["pygraphviz"]
 

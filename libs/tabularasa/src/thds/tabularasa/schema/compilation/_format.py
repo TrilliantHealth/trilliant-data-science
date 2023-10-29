@@ -40,7 +40,7 @@ def autoformat(py_code: str) -> str:
                 outfile = os.path.join(d, "tmp.py")
                 with open(outfile, "w") as f:
                     f.write(py_code)
-                isort_main([outfile])
+                isort_main([outfile, "--profile", "black"])
                 with open(outfile, "r") as f_:
                     py_code = f_.read()
         return py_code
