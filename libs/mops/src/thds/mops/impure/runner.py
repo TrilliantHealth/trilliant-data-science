@@ -1,12 +1,16 @@
+"""Builds on top of the pure.MemoizingPicklingRunner to provide
+impure, customizable memoization.
+"""
 import typing as ty
 
 from thds.core import log
 from thds.core.stack_context import StackContext
 
-from ..core.types import Args, Kwargs
-from ..core.uris import UriResolvable
-from .memoize_only import _threadlocal_shell
-from .runner.orchestrator_side import NO_REDIRECT, MemoizingPicklingRunner, Redirect
+from ..pure.core.memo.keyfunc import ArgsOnlyKeyfunc, Keyfunc, autowrap_args_only_keyfunc
+from ..pure.core.types import Args, Kwargs
+from ..pure.core.uris import UriResolvable
+from ..pure.pickling.memoize_only import _threadlocal_shell
+from ..pure.pickling.runner.orchestrator_side import NO_REDIRECT, MemoizingPicklingRunner, Redirect
 
 logger = log.getLogger(__name__)
 
@@ -21,27 +25,10 @@ def _perform_original_invocation(*_args, **_kwargs) -> ty.Any:
         f_args_kwargs is not None
     ), "_perform_original_invocation() must be called from within a runner"
     f, args, kwargs = f_args_kwargs
-    print(f_args_kwargs)
     return f(*args, **kwargs)
 
 
-class ImpureKeyFunc(ty.Protocol):
-    """A function which, when called with (function, args, kwargs),
-    returns either the same or a different function, and the same or
-    different args and kwargs, such that the returned three-tuple is
-    what will get used to construct the full memoization key.
-
-    The identity function (lambda f, a, k: f, a k) is equivalent to
-    the unchanged default behavior from MemoizingPicklingRunner.
-    """
-
-    def __call__(
-        self, __func: ty.Callable, __args: Args, __kwargs: Kwargs
-    ) -> ty.Tuple[ty.Callable, Args, Kwargs]:
-        ...  # pragma: nocover
-
-
-class ImpureRunner(MemoizingPicklingRunner):
+class KeyedLocalRunner(MemoizingPicklingRunner):
     """The only purpose for using this is to reify/memoize your results.
 
     Allows changing the memoization key, at the expense of
@@ -63,10 +50,11 @@ class ImpureRunner(MemoizingPicklingRunner):
     def __init__(
         self,
         blob_storage_root: UriResolvable,
-        impure_key_func: ImpureKeyFunc,
+        *,
+        keyfunc: ty.Union[ArgsOnlyKeyfunc, Keyfunc],
         redirect: Redirect = NO_REDIRECT,
     ):
-        self._impure_key_func = impure_key_func
+        self._impure_keyfunc = autowrap_args_only_keyfunc(keyfunc)
         self._pre_pickle_redirect = redirect
         super().__init__(
             _threadlocal_shell,
@@ -77,4 +65,4 @@ class ImpureRunner(MemoizingPicklingRunner):
     def __call__(self, raw_func: ty.Callable, raw_args: Args, raw_kwargs: Kwargs):
         actual_function_to_call = self._pre_pickle_redirect(raw_func, raw_args, raw_kwargs)
         with _ORIGINAL_F_ARGS_KWARGS.set((actual_function_to_call, raw_args, raw_kwargs)):
-            return super().__call__(*self._impure_key_func(raw_func, *raw_args, **raw_kwargs))
+            return super().__call__(*self._impure_keyfunc(raw_func, raw_args, raw_kwargs))

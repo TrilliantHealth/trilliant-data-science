@@ -7,10 +7,15 @@ future call to that function, even from a different process on a
 different computer, should be able to return the previously-computed
 result rather than re-computing.
 
+One scenario where this might be useful would be in the case of some
+kind of failure of your long-running orchestrator process. Another
+scenario would be explicitly opting in to results that you know
+someone else has already computed.
+
 ## in `mops`:
 
-Each `use_runner`-decorated function using `mops` `PickleRunner` will
-combine the current[^1] `pipeline_id`, the fully-qualfied name
+Each `use_runner`-decorated function using `mops` `MemoizingPicklingRunner`
+will combine the current[^1] `pipeline_id`, the fully-qualfied name
 (including module) of the function, and the hash of the serialized
 arguments to the function, to produce a _deterministic_ remote storage
 location for the invocation and also for the eventual results.
@@ -20,18 +25,22 @@ location for the invocation and also for the eventual results.
 > means that without additional specification by the code author,
 > results will not get reused by default.
 
-_Before_ invoking the function remotely, the `PickleRunner` will check
-to see if a result already exists at the expected path, and if it
-does, that result will be returned _instead_ of running the remote
-computation.
+_Before_ invoking the function remotely, the `MemoizingPicklingRunner`
+will check to see if a result already exists at the expected path, and
+if it does, that result will be returned _instead_ of running the
+remote computation.
 
 This allows function results to be reused across time regardless of
 who calls the function or when they call it.
 
-One scenario where this might be useful would be in the case of some
-kind of failure of your long-running orchestrator process. Another
-scenario would be explicitly opting in to results that you know
-someone else has already computed.
+In cases where all you want is memoization (you don't care about
+transferring execution to a truly
+[remote execution environment](./remote.md)), you may be able to use
+`pure.memoize_in` as a shorthand, rather than needing to define a
+`MemoizingPicklingRunner` yourself.
+
+In [advanced use cases](./advanced_memoization.md), you may want to
+memoize on something other than the actual function arguments.
 
 ## Memoization specification
 
@@ -92,7 +101,7 @@ Therefore:
 
 If you want to call a function and get a result that you know already
 exists (was previously already run and therefore memoized by
-`AdlsPickleRunner`), you have three main options. These options are
+`MemoizingPicklingRunner`), you have three main options. These options are
 listed in reverse priority order - the more specific options (listed
 further down) will be checked first, and if configured, the
 less-specific options (listed earlier) will not be attempted.
@@ -158,12 +167,12 @@ will _not_ propagate to threads created in the current context.
 # The decorator will always apply regardless of threading.
 
 @pipeline_id_mask('2023-05-02')
-@use_runner(AdlsPickleRunner(...))
+@use_runner(MemoizingPicklingRunner(...))
 def generate_nppes(...):
     ...
 
 @pipeline_id_mask('other')
-@use_runner(AdlsPickleRunner(...))
+@use_runner(MemoizingPicklingRunner(...))
 def use_nppes(...):
     ...
 

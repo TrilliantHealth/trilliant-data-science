@@ -1,10 +1,10 @@
 import threading
 import typing as ty
 
+from thds.mops import impure
 from thds.mops.pure import Args, Kwargs
-from thds.mops.pure.pickling.impure_runner import ImpureRunner
 
-from ...config import TEST_TMP_URI
+from ..config import TEST_TMP_URI
 
 _A_LOCK_ISNT_PICKLABLE = threading.Lock()
 
@@ -24,9 +24,18 @@ def memo_key(func: ty.Callable, args: Args, kwargs: Kwargs) -> ty.Tuple[ty.Calla
 
 def test_impure_runner():
     num = 1
-    result = ImpureRunner(
+    result = impure.KeyedLocalRunner(
         TEST_TMP_URI,
-        memo_key,
+        keyfunc=memo_key,
     )(_func_whose_args_cant_be_pickled, (num,), dict(lock=_A_LOCK_ISNT_PICKLABLE))
 
+    assert result == (num, 17)
+
+
+def test_impure_runner_with_auto_memo_key():
+    """This is basically just a simpler way of approaching writing the keyfunc."""
+    num = 3
+    result = impure.KeyedLocalRunner(TEST_TMP_URI, keyfunc=impure.nil_args("lock"))(
+        _func_whose_args_cant_be_pickled, (num,), dict(lock=_A_LOCK_ISNT_PICKLABLE)
+    )
     assert result == (num, 17)
