@@ -11,8 +11,8 @@ from pathlib import Path
 
 from thds.core import log
 
+from ..core.script_support import add_main_module_function, get_main_module_function
 from ..core.uris import get_bytes, lookup_blob_store
-from .same_process import add_main_module_function, get_main_module_function
 
 logger = log.getLogger(__name__)
 

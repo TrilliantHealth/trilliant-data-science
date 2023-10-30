@@ -6,7 +6,7 @@
 from . import adls  # noqa
 from .core import get_pipeline_id, set_pipeline_id, use_runner  # noqa
 from .core.pipeline_id_mask import pipeline_id_mask, pipeline_id_mask_from_docstr  # noqa
-from .core.types import Runner  # noqa
+from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.runner import MemoizingPicklingRunner, Shell, ShellBuilder  # noqa

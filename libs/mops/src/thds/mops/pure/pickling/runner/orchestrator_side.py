@@ -181,7 +181,7 @@ _LogPrepareNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
 def _pickle_func_and_run_via_shell(
     function_memospace: str,
     get_dumper: ty.Callable[[str], Dumper],
-    func: ty.Callable[..., T],
+    func_: ty.Callable[..., T],
 ) -> ty.Callable[[Shell, bool, Redirect, Args, Kwargs], T]:
     storage_root = uris.get_root(function_memospace)
 
@@ -189,9 +189,9 @@ def _pickle_func_and_run_via_shell(
     def run_shell_via_pickles_(
         shell: Shell,
         rerun_exceptions: bool,
-        redirect: Redirect,
-        args: Args,
-        kwargs: Kwargs,
+        remote_redirect: Redirect,
+        args_: Args,
+        kwargs_: Kwargs,
     ) -> T:
         scope.enter(uris.ACTIVE_STORAGE_ROOT.set(storage_root))
         fs = uris.lookup_blob_store(function_memospace)
@@ -205,8 +205,7 @@ def _pickle_func_and_run_via_shell(
             # args, kwargs with the other args, kwargs, otherwise the
             # args and kwargs will not get properly considered in the
             # memoization key.
-            nonlocal func
-            func, args, kwargs = unwrap_partial(func, args, kwargs)
+            func, args, kwargs = unwrap_partial(func_, args_, kwargs_)
             trigger_src_files_upload(args, kwargs)
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
@@ -252,7 +251,7 @@ def _pickle_func_and_run_via_shell(
                 fs.join(memo_uri, INVOCATION),
                 gimme_bytes(
                     dumper,
-                    NestedFunctionPickle(wrap_f(redirect(func, args, kwargs)), args_kwargs_bytes),
+                    NestedFunctionPickle(wrap_f(remote_redirect(func, args, kwargs)), args_kwargs_bytes),
                 ),
                 type_hint=INVOCATION,
             )
