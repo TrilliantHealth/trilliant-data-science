@@ -26,7 +26,7 @@ create a file that looks like this:
 ```
 [debug]
 thds.adls.download
-thds.core.link
+thds.adls.link
 [warning]
 thds.mops.pure.pickle_runner
 thds.mops.k8s.watch
