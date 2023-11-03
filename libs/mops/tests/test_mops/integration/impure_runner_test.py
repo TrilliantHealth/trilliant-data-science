@@ -14,12 +14,12 @@ def _func_whose_args_cant_be_pickled(num: int, lock: threading.Lock):
     return (num, 17)
 
 
-def memo_key(func: ty.Callable, args: Args, kwargs: Kwargs) -> ty.Tuple[ty.Callable, Args, Kwargs]:
+def memo_key(c: ty.Callable, args: Args, kwargs: Kwargs) -> ty.Tuple[ty.Callable, Args, Kwargs]:
     def unwrap_ak(num: int, lock: threading.Lock) -> ty.Tuple[Args, Kwargs]:
         # does some stuff with num and removes lock so it doesn't get used.
         return (num, num + 1), dict()
 
-    return func, *unwrap_ak(*args, **kwargs)
+    return c, *unwrap_ak(*args, **kwargs)
 
 
 def test_impure_runner():
