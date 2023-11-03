@@ -11,8 +11,8 @@ class Keyfunc(ty.Protocol):
     different args and kwargs, such that the returned three-tuple is
     what will get used to construct the full memoization key.
 
-    The args, kwargs returned _must_ be bindable to the 4parameters
-    function returned.  However, since they will not get used to
+    The args, kwargs returned _must_ be bindable to the parameters of
+    the function returned.  However, since they will not get used to
     actually call the function, it is not important that they bind in
     a semantically meaningful way - if you're just trying to drop
     certain arguments that can't be pickled, your best bet will be to
@@ -20,6 +20,7 @@ class Keyfunc(ty.Protocol):
 
     The identity function (lambda f, a, k: f, a k) is equivalent to
     the unchanged default behavior from MemoizingPicklingRunner.
+
     """
 
     def __call__(

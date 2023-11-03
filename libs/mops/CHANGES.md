@@ -1,8 +1,15 @@
+## 2.3
+
+- `KeyedLocalRunner` provides a memoizing-only interface that acts
+  like a memo-key-selector over top of `MemoizingPicklingRunner`. See
+  [Advanced Memoization](docs/advanced_memoization.md) for details.
+
 ## 2.2
 
 - `invocation_output_fqn` now uses the active storage root
   (corresponding to the memoization root) by default, rather than
   requiring an argument.
+- (Not sure if this version was ever actually released as 2.2...)
 
 ### 2.1.20230920
 
