@@ -57,9 +57,10 @@ how `nil_args` is implemented and use some of the utilities provided
 to write your own keyfunc-creator.
 
 ```python
+from thds.adls.defaults import env_root
 from thds.mops import pure, impure
 
-@pure.use_runner(impure.KeyedLocalRunner("adls://thdsscratch/tmp/", keyfunc=impure.nil_args('conn')))
+@pure.use_runner(impure.KeyedLocalRunner(env_root, keyfunc=impure.nil_args('conn')))
 def run_limit_query_with_database_client(
     conn: sqlite3.Connection, tbl_name: str, limit: int = 3
 ) -> list:

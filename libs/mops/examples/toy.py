@@ -2,10 +2,10 @@
 from functools import partial
 from pathlib import Path
 
+from thds.adls.defaults import env_root
 from thds.mops import pure
 
-TMP = "adls://thdsscratch/tmp/"
-memo = pure.memoize_in(TMP)
+memo = pure.memoize_in(env_root)  # usually thdsscratch/tmp
 
 
 @memo
