@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "1.12"
+version = "1.10"
 authors = ["Trilliant Health"]
 description = "Core utilities."
 readme = "README.md"
@@ -21,7 +21,6 @@ pytest-cov = "^4.0"
 pytest-mock = "^3.10"
 
 [tool.poetry.scripts]
-thds-exit-after = "thds.core.exit_after:main"
 new-calgitver = "thds.core.meta:print_calgitver"
 show-thds-config = "thds.core.config:show_config_cli"
 

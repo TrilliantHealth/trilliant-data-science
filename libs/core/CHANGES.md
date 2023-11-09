@@ -1,7 +1,3 @@
-## 1.12
-
-- 'Promote' `exit-after` script from `mops` to `core`, as `thds-exit-after`.
-
 ## 1.11
 
 - 'Promote' `link` from the `thds.adls` library as it has no ADLS-specific functionality.
