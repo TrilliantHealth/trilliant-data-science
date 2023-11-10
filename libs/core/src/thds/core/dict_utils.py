@@ -1,11 +1,9 @@
 import re
 import warnings
 from collections import defaultdict
-from typing import Any, Dict, Generator, List, Mapping, MutableMapping, Optional, Tuple, TypeVar
+from typing import Any, Dict, Generator, List, Mapping, Tuple
 
 DEFAULT_SEP = "."
-KT = TypeVar("KT")
-VT = TypeVar("VT")
 
 
 def _get_valid_variable_name(var: str):
@@ -55,7 +53,7 @@ def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[st
     return dict(_flatten_gen(d, parent_key, sep))
 
 
-class DotDict(dict, MutableMapping[KT, VT]):
+class DotDict(dict):
     """A python dictionary that acts like an object."""
 
     _new_to_orig_keys: Dict[str, str] = dict()
@@ -114,7 +112,7 @@ class DotDict(dict, MutableMapping[KT, VT]):
                 d[self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k] = v
         return d
 
-    def get_value(self, dot_path: str) -> Optional[Any]:
+    def get_value(self, dot_path: str):
         """Get a value given a dotted path to the value.
 
         Example
@@ -130,7 +128,7 @@ class DotDict(dict, MutableMapping[KT, VT]):
                 ref = getattr(ref, k)
             return getattr(ref, path[-1])
         except AttributeError:
-            return None
+            raise KeyError(f"can't get path {dot_path} with parts {path}.")
 
     def set_value(self, dot_path: str, val):
         """Set a vlaue given a dotted path."""
