@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from thds.core.dict_utils import DotDict, flatten, merge_dicts, unflatten
@@ -37,23 +39,28 @@ def test_dotdict(convert):
     some_dict_converted = {
         "metrics": {"metric_1": 0.98, "metric_2": {"sub_metric_1": 0.5, "sub_metric_2": 1}}
     }
-    m = DotDict(some_dict, convert_keys_to_identifiers=convert)
+    m: DotDict[str, Any] = DotDict(some_dict, convert_keys_to_identifiers=convert)
     assert dict(**m) == some_dict if not convert else some_dict_converted
     assert m.to_dict(orig_keys=not convert) == some_dict if not convert else some_dict_converted
 
 
 def test_dotdict_get():
-    m = DotDict({"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True)
+    m: DotDict[str, Any] = DotDict(
+        {"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True
+    )
     assert m.a_key == 1
     assert m.b == 2
     assert m.c.d.e_key == 3
     assert m.c.d.f == 4
     assert m.get_value("a_key") == 1
     assert m.get_value("c.d.f") == 4
+    assert m.get_value("not.a.valid.path") is None
 
 
 def test_dotdict_set():
-    m = DotDict({"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True)
+    m: DotDict[str, Any] = DotDict(
+        {"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True
+    )
     m.a_key = 5
     assert m.a_key == 5
     m.c.d = DotDict({"new-data": 100}, convert_keys_to_identifiers=True)
