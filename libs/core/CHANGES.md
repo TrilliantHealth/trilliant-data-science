@@ -1,3 +1,13 @@
+## 1.13
+
+- Changed the behavior of `DotDict.get_value`. Now, if the path does not exist in the `DotDict` we will return `None` instead of raising a `KeyError`.
+
+   ```python
+   dd = DotDict({"a": 1, "b": {"c": 2}})
+   dd.get_value("b.c") == 2
+   dd.get_value("z") == None
+   ```
+
 ## 1.12
 
 - 'Promote' `exit-after` script from `mops` to `core`, as `thds-exit-after`.
