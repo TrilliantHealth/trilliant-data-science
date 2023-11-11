@@ -4,7 +4,11 @@ import typing as ty
 
 import pytest
 
-from thds.mops.testing.deferred_imports import assert_dev_deps_not_imported, module_name_re
+from thds.mops.testing.deferred_imports import (
+    assert_dev_deps_not_imported,
+    module_name_re,
+    module_names_from_import_statement,
+)
 
 
 @pytest.mark.parametrize(
@@ -55,6 +59,33 @@ def test_module_name_re(
         assert not re.match(name), name
 
 
+@pytest.mark.parametrize(
+    "import_statement, module_names",
+    [
+        pytest.param("import foo", {"foo"}, id="simple base module import"),
+        pytest.param("import foo.bar", {"foo", "foo.bar"}, id="simple nested module import"),
+        pytest.param("import foo.bar as baz", {"foo", "foo.bar"}, id="nested module import with alias"),
+        pytest.param(
+            "import foo.bar.baz as quux",
+            {"foo", "foo.bar", "foo.bar.baz"},
+            id="doubly nested module import with alias",
+        ),
+        pytest.param("from foo import bar, baz", {"foo"}, id="base module 'from' imports"),
+        pytest.param(
+            "from foo.bar import baz, quux", {"foo", "foo.bar"}, id="nested module 'from' imports"
+        ),
+        pytest.param(
+            "from foo.bar.baz import quux",
+            {"foo", "foo.bar", "foo.bar.baz"},
+            id="doubly nested module 'from' imports",
+        ),
+    ],
+)
+def test_module_names_from_import_statement(import_statement: str, module_names: ty.Set[str]):
+    extracted = module_names_from_import_statement(import_statement)
+    assert extracted == module_names, (import_statement, extracted, module_names)
+
+
 def assert_is_module(name: str):
     try:
         exec(f"import {name}", {}, {})
@@ -69,6 +100,18 @@ def assert_is_module(name: str):
     "import_statement, forbidden_modules, passing",
     [
         pytest.param("import os", ["os"], False, id="'import os' imports os"),
+        pytest.param(
+            "import os",
+            ["os"],
+            False,
+            id="'import os' imports os even when os has already been imported",
+        ),
+        pytest.param(
+            "from thds.core.log import getLogger",
+            ["logging"],
+            False,
+            id="importing getLogger from thds.core.log imports logging",
+        ),
         pytest.param("import typing", ["os"], True, id="'import typing' does not import os"),
         pytest.param(
             "from pathlib import Path",
@@ -86,7 +129,8 @@ def assert_is_module(name: str):
         pytest.param(
             "import thds.mops",
             ["thds.mops.config", "thds.mops.pure"],
-            "'import thds.mops' does not import submodules",
+            True,
+            id="'import thds.mops' does not import submodules",
         ),
     ],
 )
