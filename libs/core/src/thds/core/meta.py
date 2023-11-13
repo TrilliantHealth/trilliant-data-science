@@ -326,7 +326,7 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
         except EmptyMetadataException:
             pass
 
-        LOGGER.warning("`get_user` found no user data - getting system user.")
+        LOGGER.debug("`get_user` found no user data - getting system user.")
         return getuser()
 
     return format_name(_get_user(pkg), format)
