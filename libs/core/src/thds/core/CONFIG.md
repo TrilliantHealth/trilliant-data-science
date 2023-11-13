@@ -9,8 +9,8 @@ Highlights:
 - All active configuration is 'registered' and therefore discoverable.
 - Config can be temporarily overridden for the current thread.
 - Config can be set via a known environment variable.
-- Config can be set by combining one or more configuration objects - these may be loaded from files,
-  but this system remains agnostic as to the format of those files or how and when they are actually loaded.
+- Config can be set by combining one or more configuration objects - these may be loaded from files, but
+  this system remains agnostic as to the format of those files or how and when they are actually loaded.
 
 The basic usage is as follows:
 
@@ -49,12 +49,10 @@ export FOO_BAR=27
 python -c "from foo import BAR; assert BAR() == 27"
 ```
 
-The naming of environment variables depends on your shell. Some shells
-will support arbitrary var names, so you can use `export
-foo.bar=27`. Others have a more limited character set. To support
-this, we will 'search' for two alternative variable names, one that
-replaces `-` and `.` with `_`, and another that does those
-replacements and also force-uppercases the config item string.
+The naming of environment variables depends on your shell. Some shells will support arbitrary var names,
+so you can use `export foo.bar=27`. Others have a more limited character set. To support this, we will
+'search' for two alternative variable names, one that replaces `-` and `.` with `_`, and another that
+does those replacements and also force-uppercases the config item string.
 
 ### Discoverability
 
