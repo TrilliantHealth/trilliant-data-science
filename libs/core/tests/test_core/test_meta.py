@@ -254,7 +254,7 @@ def test_get_user_from_metadata_no_metadata(
 
 
 def test_get_user_no_user(caplog, mock_getuser: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.WARNING):
         assert meta.get_user() == USER_NAME
     assert mock_getuser.called
     assert "`get_user` found no user data - getting system user." in caplog.text
