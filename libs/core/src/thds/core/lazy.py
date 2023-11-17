@@ -29,3 +29,11 @@ class ThreadLocalLazy(Lazy[R]):
         # local() creates a brand new instance every time it is called,
         # so this does not cause issues with storage being shared across multiple TTLazies
         super().__init__(source, storage=local())
+
+
+def lazy(source: ty.Callable[[], R]) -> ty.Callable[[], R]:
+    return Lazy(source)
+
+
+def threadlocal_lazy(source: ty.Callable[[], R]) -> ty.Callable[[], R]:
+    return ThreadLocalLazy(source)
