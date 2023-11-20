@@ -12,15 +12,12 @@ class Lazy(ty.Generic[R]):
         self._lock = Lock()
 
     def __call__(self) -> R:
-        try:
+        if hasattr(self._storage, "cached"):
             return self._storage.cached
-        except AttributeError:
-            with self._lock:
-                try:
-                    return self._storage.cached
-                except AttributeError:
-                    self._storage.cached = self._source()
-
+        with self._lock:
+            if hasattr(self._storage, "cached"):
+                return self._storage.cached
+            self._storage.cached = self._source()
         return self._storage.cached
 
 
@@ -29,3 +26,11 @@ class ThreadLocalLazy(Lazy[R]):
         # local() creates a brand new instance every time it is called,
         # so this does not cause issues with storage being shared across multiple TTLazies
         super().__init__(source, storage=local())
+
+
+def lazy(source: ty.Callable[[], R]) -> ty.Callable[[], R]:
+    return Lazy(source)
+
+
+def threadlocal_lazy(source: ty.Callable[[], R]) -> ty.Callable[[], R]:
+    return ThreadLocalLazy(source)
