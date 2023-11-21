@@ -222,7 +222,7 @@ def get_repo_name() -> str:
     try:
         return _simple_run("git remote get-url origin").split("/")[-1].rstrip().split(".")[0]
     except (sp.CalledProcessError, FileNotFoundError):
-        LOGGER.debug("`get_repo_name` found no repo name.")
+        LOGGER.warning("`get_repo_name` found no repo name.")
         return ""
 
 
@@ -326,7 +326,7 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
         except EmptyMetadataException:
             pass
 
-        LOGGER.warning("`get_user` found no user data - getting system user.")
+        LOGGER.debug("`get_user` found no user data - getting system user.")
         return getuser()
 
     return format_name(_get_user(pkg), format)
