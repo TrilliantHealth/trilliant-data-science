@@ -1,8 +1,3 @@
-## 1.14
-
-- `meta.get_user` no longer logs at the `WARNING` level about pulling the system user as this is "normal"
-  behavior in many circumstances. It still logs a `DEBUG` statement.
-
 ## 1.13
 
 - Changed the behavior of `DotDict.get_value`. Now, if the path does not exist in the `DotDict` we will
