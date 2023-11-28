@@ -1,0 +1,84 @@
+[tool.poetry]
+name = "thds.attrs-utils"
+# Patch version is a datetime determined upon release
+version = "1.0"
+description = "Utilities for attrs record classes"
+authors = ["Trilliant Health"]
+readme = "README.md"
+packages = [{include = "thds", from="src"}]
+include = ["py.typed", "meta.json"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+#################
+# Runtime dependencies should have as low a bound as the library can
+# handle, and generally should have no upper bound unless actual
+# breakage is found, since that allows applications and other
+# libraries maximum flexibility.
+#################
+
+attrs = "^22.2.0"
+typing_inspect = "*"
+returns = "*"
+docstring_parser = {version = "*", optional = true}
+fastjsonschema = {version = "*", optional = true}
+thds-core = {path = "../../libs/core", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+#################
+# If you don't mind, please specify fairly strong bounds for dev dependencies.
+#
+# The reasoning is that we never want our tests/linting to break after `poetry lock`
+# because of a backward-incompatible change to something like mypy or pytest
+# that we didn't explicitly opt into by bumping a version.
+#################
+mypy = "^1.0"
+mypy-extensions = "^1.0"
+pytest = "^7.2"
+pytest-cov = "^4.0"
+pytest-mock = "^3.10"
+
+[tool.poetry.extras]
+docstrings = ["docstring_parser"]
+jsonschema = ["fastjsonschema"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.attrs_utils"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+python_version = 3.8
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    build/
+    | dist/
+    | \S+\.egg-info/
+)'''
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["fastjsonschema.*", "typing_inspect.*", "setuptools"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# do not run integration test by default, but CI will pick it up
+addopts = "-m 'not integration'"
+markers = ["integration"]
+testpaths = ["tests"]
