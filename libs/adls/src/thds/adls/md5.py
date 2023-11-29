@@ -10,11 +10,23 @@ if at all possible.
 """
 import hashlib
 import typing as ty
+from pathlib import Path
 
-from thds.core.hashing import SomehowReadable, hash_anything, hash_using
+from thds.core.hash_cache import hash_file
+from thds.core.hashing import SomehowReadable, hash_anything
+from thds.core.types import StrOrPath
 
 AnyStrSrc = ty.Union[SomehowReadable, ty.Iterable[ty.AnyStr]]
 # this type closely corresponds to what the underlying DataLakeStorageClient will accept for upload_data.
+
+
+def md5_file(file: StrOrPath) -> bytes:
+    """Raise exception if it cannot be read.
+
+    Safely caches the hash on your local filesystem (uses mtimes to
+    determine staleness).
+    """
+    return hash_file(file, hashlib.md5())
 
 
 def try_md5(data: AnyStrSrc) -> ty.Optional[bytes]:
@@ -23,15 +35,12 @@ def try_md5(data: AnyStrSrc) -> ty.Optional[bytes]:
     The only circumstances under which we cannot do this are if the
     stream does not exist in its entirety before the upload begins.
     """
+    if isinstance(data, Path):
+        return md5_file(data)
     res = hash_anything(data, hashlib.md5())
     if res:
         return res.digest()
     return None
-
-
-def md5_readable(data: SomehowReadable) -> bytes:
-    """Raise exception if it cannot be read."""
-    return hash_using(data, hashlib.md5()).digest()
 
 
 def is_reasonable_b64(md5: str):

@@ -5,19 +5,14 @@ from pathlib import Path
 
 from thds.core import config, log
 from thds.core import types as ct
+from thds.core.hashing import hash_using
+from thds.core.home import HOMEDIR
 from thds.core.link import LinkType, link_or_copy
 
 from .fqn import AdlsFqn
-from .md5 import hash_using, hashlib
+from .md5 import hashlib
 
-# On our GitHub runners, we can't make hardlinks from /runner/home to where our stuff actually goes.
-# So we special case this here for now; later we might move this general code to thds.core or something.
-_RUNNER_WORK = Path("/runner/_work")
-if os.getenv("CI") and _RUNNER_WORK.exists() and _RUNNER_WORK.is_dir():
-    __home = _RUNNER_WORK
-else:
-    __home = Path.home()
-GLOBAL_CACHE_PATH = config.item("global-cache-path", __home / ".adls-md5-ro-cache", parse=Path)
+GLOBAL_CACHE_PATH = config.item("global-cache-path", HOMEDIR() / ".adls-md5-ro-cache", parse=Path)
 MAX_CACHE_KEY_LEN = config.item("max-cache-key-len", 255, parse=int)  # safe on most local filesystems?
 logger = log.getLogger(__name__)
 

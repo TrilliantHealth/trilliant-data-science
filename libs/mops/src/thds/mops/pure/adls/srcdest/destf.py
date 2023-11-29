@@ -5,7 +5,7 @@ import typing as ty
 from pathlib import Path
 
 from thds.adls import AdlsFqn, AdlsRoot, resource
-from thds.adls.md5 import md5_readable
+from thds.adls.md5 import md5_file
 from thds.core.hashing import b64
 
 from ....srcdest.remote_file import DestFile, Serialized, SrcFile, StrOrPath
@@ -39,7 +39,7 @@ def _upload_and_represent_v2(uri: str, local_src: StrOrPath) -> Serialized:
         # We use md5 base64 so this is easy to verify against ADLS
         # without downloading the file.  we do not currently make use
         # of this validation but we could in the future.
-        return resource.of(fqn, md5b64=b64(md5_readable(file))).serialized  # type: ignore
+        return resource.of(fqn, md5b64=b64(md5_file(local_src))).serialized  # type: ignore
 
 
 _ADLS_URI_UPLOAD_V1 = "adls_uri_v1"  # do not ever change this key. it

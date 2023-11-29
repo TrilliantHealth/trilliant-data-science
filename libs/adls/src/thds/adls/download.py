@@ -25,7 +25,7 @@ from ._progress import report_download_progress
 from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from .errors import translate_blob_not_found
 from .fqn import AdlsFqn
-from .md5 import check_reasonable_md5b64, md5_readable
+from .md5 import check_reasonable_md5b64, md5_file
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
 logger = log.getLogger(__name__)
@@ -81,7 +81,7 @@ def _verify_md5s_before_and_after_download(
             " This may indicate that we need to update a hash in the codebase."
         )
     yield  # perform download
-    local_md5b64 = b64(md5_readable(local_dest))
+    local_md5b64 = b64(md5_file(local_dest))
     check_reasonable_md5b64(local_md5b64)  # must always exist
     if remote_md5b64 and remote_md5b64 != local_md5b64:
         raise MD5MismatchError(
@@ -105,8 +105,7 @@ def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
     psize = Path(path).stat().st_size
     if psize > _1GB:
         logger.info(f"Hashing existing {psize/_1GB:.2f} GB file at {path}...")
-    with open(path, "rb") as f:
-        return b64(md5_readable(f))
+    return b64(md5_file(path))
 
 
 def _remote_md5b64(file_properties: FileProperties) -> str:
@@ -261,7 +260,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
             yield tmpwriter
     if cache:
         from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
-    return _FileResult(md5b64 or b64(md5_readable(local_path)), hit=False)
+    return _FileResult(md5b64 or b64(md5_file(local_path)), hit=False)
 
 
 # So ends the crazy download caching coroutine.
