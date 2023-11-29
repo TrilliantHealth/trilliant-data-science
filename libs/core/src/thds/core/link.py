@@ -101,7 +101,7 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
-    with tempfile.TemporaryDirectory(suffix="-linkcopy") as dir:
+    with tempfile.TemporaryDirectory() as dir:
         tmpfile = os.path.join(dir, "tmp")
         shutil.copyfile(src, tmpfile)
         shutil.move(tmpfile, dest)
