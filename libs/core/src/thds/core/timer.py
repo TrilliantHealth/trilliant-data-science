@@ -1,14 +1,13 @@
 import functools
 import time
-from typing import Callable, TypeVar, cast
+from typing import Callable
 
 from thds.core.log import getLogger
 
-F = TypeVar("F", bound=Callable)
 # author: matt.eby
 
 
-def timer(func: F) -> F:
+def timer(func: Callable):
     """
     Decorator to add logging of timer information to a function invocation. Logs when entering a function and then logs
     with time information when exiting.
@@ -35,4 +34,4 @@ def timer(func: F) -> F:
         logger.info("Finished %r in %0.4f secs at %s", func.__name__, run_time, end_formatted)
         return value
 
-    return cast(F, wrapper_timer)
+    return wrapper_timer
