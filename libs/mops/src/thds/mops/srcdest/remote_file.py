@@ -287,6 +287,9 @@ class SrcFile:
                 suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
             )
             os.close(_fh)  # we don't want the file to be open
+            os.remove(self._temp_src_filepath)
+            # we also don't want it to exist - the downloader may or may not wish to
+            # overwrite an existing file.
             reify_downloader(self._downloader)(self._serialized_remote_pointer, self._temp_src_filepath)
             return Path(self._temp_src_filepath)
 

@@ -318,6 +318,11 @@ def download_or_use_verified(
     md5b64: str = "",
     cache: ty.Optional[Cache] = None,
 ) -> bool:
+    """Download a file or use the existing, cached copy if one exists in the cache and is verifiable.
+
+    Note that you will get a logged warning if `local_path` already exists when you call
+    this function.
+    """
     file_properties = None
     try:
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
