@@ -338,7 +338,7 @@ files = []
 develop = true
 
 [package.dependencies]
-attrs = "^22.2.0"
+attrs = ">=22.2.0"
 cattrs = ">=22.2.0"
 
 [package.source]
@@ -383,10 +383,11 @@ mypy-extensions = ">=0.3.0"
 typing-extensions = ">=3.7.4"
 
 [extras]
+cattrs = ["cattrs"]
 docstrings = ["docstring_parser"]
 jsonschema = ["fastjsonschema"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "ccd464808ed929e613a21885be54811b0a340bd0574e86c4ae27ba77128c955f"
+content-hash = "99f77ec718a5238dbde9ae486790eeb62b00819e6ead046a0740cf83a62d1551"
