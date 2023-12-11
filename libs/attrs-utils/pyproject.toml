@@ -18,9 +18,10 @@ python = "^3.8"
 # libraries maximum flexibility.
 #################
 
-attrs = "^22.2.0"
+attrs = ">=22.2.0"
 typing_inspect = "*"
 returns = "*"
+cattrs = {version = ">=22.2.0", optional = true}
 docstring_parser = {version = "*", optional = true}
 fastjsonschema = {version = "*", optional = true}
 thds-core = {path = "../../libs/core", develop = true}
@@ -40,6 +41,7 @@ pytest-cov = "^4.0"
 pytest-mock = "^3.10"
 
 [tool.poetry.extras]
+cattrs = ["cattrs"]
 docstrings = ["docstring_parser"]
 jsonschema = ["fastjsonschema"]
 

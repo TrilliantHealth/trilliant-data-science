@@ -10,7 +10,7 @@ include = ["py.typed", "meta.json"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-attrs = "^22.2.0"
+attrs = ">=22.2.0"
 cattrs = ">=22.2.0"
 
 [tool.poetry.group.dev.dependencies]
