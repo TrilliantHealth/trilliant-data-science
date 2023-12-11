@@ -45,7 +45,7 @@ def download_directory(fqn_or_uri: ty.Union[str, AdlsFqn]) -> Path:
     if not fqn:
         raise ValueError(f'Could not resolve "{fqn_or_uri}" to an ADLS FQN.')
     fs = ADLSFileSystem(fqn.sa, fqn.container)
-    fs.fetch_directory(fqn.path)
     cached_dir_root = global_cache().path(fqn)
+    fs.fetch_directory(fqn.path, cached_dir_root)
     assert cached_dir_root.is_dir(), "Directory should have been downloaded to the cache."
     return cached_dir_root
