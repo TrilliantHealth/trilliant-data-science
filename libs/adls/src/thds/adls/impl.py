@@ -36,6 +36,7 @@ from thds.core.log import getLogger
 from ._upload import async_upload_decision_and_settings
 from .conf import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
 from .download import async_download_or_use_verified
+from .file_properties import is_directory
 from .ro_cache import from_cache_path_to_local, global_cache
 
 LOGGER = getLogger(__name__)
@@ -149,9 +150,7 @@ class ADLSFileSystem:
             info = await self._get_file_info(file_system_client, path)
         except azure.core.exceptions.ResourceNotFoundError:
             return False
-        # from https://github.com/Azure/azure-sdk-for-python/issues/24814#issuecomment-1159280840
-        is_dir = str(info.metadata.get("hdi_isfolder", "")).lower() == "true"
-        return directory == is_dir
+        return directory == is_directory(info)
 
     @async_run
     async def _run(self, func: Callable[..., Awaitable], *args, **kwargs):

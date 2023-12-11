@@ -4,8 +4,10 @@ from pathlib import Path
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
 from .global_client import get_global_client
+from .impl import ADLSFileSystem
 from .resource.up_down import AdlsHashedResource, upload
 from .ro_cache import global_cache
+from .uri import resolve_any
 
 
 def download_to_cache(fqn: AdlsFqn, md5b64: str = "") -> Path:
@@ -28,6 +30,22 @@ def upload_through_cache(dest: ty.Union[AdlsFqn, str], src_path: Path) -> AdlsHa
 
     Uses global client, which is pretty much always what you want.
     """
+    assert src_path.is_file(), "src_path must be a file."
     resource = upload(dest, src_path, write_through_cache=global_cache())
     assert resource, "MD5 should always be calculable for a local path."
     return resource
+
+
+def download_directory(fqn_or_uri: ty.Union[str, AdlsFqn]) -> Path:
+    """Download a directory from an AdlsFqn or URI.
+
+    If you know you only need to download a single file, use download_to_cache.
+    """
+    fqn = resolve_any(fqn_or_uri)
+    if not fqn:
+        raise ValueError(f'Could not resolve "{fqn_or_uri}" to an ADLS FQN.')
+    fs = ADLSFileSystem(fqn.sa, fqn.container)
+    fs.fetch_directory(fqn.path)
+    cached_dir_root = global_cache().path(fqn)
+    assert cached_dir_root.is_dir(), "Directory should have been downloaded to the cache."
+    return cached_dir_root
