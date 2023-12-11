@@ -38,8 +38,11 @@ def link(
         return "same"
     assert os.path.exists(src), f"Source {src} does not exist"
     try:
+        log_volume = (
+            logger.warning if os.path.exists(dest) and os.path.getsize(dest) > 0 else logger.debug
+        )
         os.remove(dest)  # link will fail if the path already exists
-        logger.warning(f'Removed existing file at "{dest}"')
+        log_volume('Removed existing file at "%s"', dest)
     except FileNotFoundError:
         pass
     if _IS_MAC and "ref" in attempt_types:
