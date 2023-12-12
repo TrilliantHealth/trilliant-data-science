@@ -1,23 +1,14 @@
 import argparse
 from pathlib import Path
 
-from thds.adls import abfss, fqn
 from thds.adls.cached_up_down import download_to_cache
+from thds.adls.uri import resolve_uri
 from thds.core.link import link
-
-
-def parse(uri: str) -> fqn.AdlsFqn:
-    """Works with ABFSS and adls schemes."""
-    try:
-        return fqn.AdlsFqn.parse(uri)
-    except fqn.NotAdlsUri:
-        pass
-    return abfss.to_adls_fqn(uri)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("uri", type=parse)
+    parser.add_argument("uri", type=resolve_uri)
     parser.add_argument("--copy-to", "-c", type=Path)
 
     args = parser.parse_args()
@@ -28,3 +19,7 @@ def main():
         print(args.copy_to.resolve())
     else:
         print(cache_path.resolve())
+
+
+if __name__ == "__main__":
+    main()
