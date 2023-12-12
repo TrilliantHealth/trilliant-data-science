@@ -1,7 +1,8 @@
 import argparse
 from pathlib import Path
 
-from thds.adls.cached_up_down import download_to_cache
+from thds.adls.cached_up_down import download_directory, download_to_cache
+from thds.adls.file_properties import get_file_properties, is_directory
 from thds.adls.uri import resolve_uri
 from thds.core.link import link
 
@@ -13,7 +14,11 @@ def main():
 
     args = parser.parse_args()
 
-    cache_path = download_to_cache(args.uri)
+    if is_directory(get_file_properties(args.uri)):
+        cache_path = download_directory(args.uri)
+    else:
+        cache_path = download_to_cache(args.uri)
+
     if args.copy_to:
         link(cache_path, args.copy_to)
         print(args.copy_to.resolve())
