@@ -1,11 +1,10 @@
 # sometimes, you just want to cache hashes. Specifically, hashes of files.
-import hashlib
-import os
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
 from .config import ConfigItem
-from .hashing import Hash, hash_using
+from .hashing import hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
@@ -22,7 +21,7 @@ def _filecachekey(path: Path, hashtype: str) -> Path:
     # conditions, and the approach must remain stable over time for
     # the cache to provide a meaningful advantage.
     path_str = str(path)
-    path_hash = hash_using(path_str.encode(), hashlib.sha256()).hexdigest()
+    path_hash = hash_using(path_str.encode(), sha256()).hexdigest()
     # we use a compressed (hashed) version of the path because
     # filenames can get kind of long and we don't want to deal with
     # long filenames blowing up our system by being unwritable.
@@ -55,7 +54,3 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
     cached_hash_location.write_bytes(hash_bytes)
     return hash_bytes
-
-
-def filehash(algo: str, pathlike: os.PathLike) -> Hash:
-    return Hash(algo, hash_file(pathlike, hashlib.new(algo)))

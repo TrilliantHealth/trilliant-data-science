@@ -1,25 +1,3 @@
-## 1.17
-
-- New `tmp` module with utilities for getting a temporary Path on the same filesystem as a 'destination'
-  path, so that atomic moves from the temp location to your destination are possible.
-- Fix bug in `fretry` with interaction between `retry_sleep` and `expo`, which was getting consumed once
-  and never performing retries after that.
-
-## 1.16
-
-- New `Source` abstraction for read-only data which may or may not yet be local. Try it with
-  `source.from_path` and `source.from_uri`.
-
-## 1.15
-
-- Updated `DotDict` to convert `dict`s inside of `set`s, `list`s, and `tuple`s into `DotDict`s.
-
-  ```python
-  dd = DotDict({"letters": [{"a": 1}, {"b": 2}]})
-  dd.letters[0].a == 1
-  dd.letters[1].b == 2
-  ```
-
 ## 1.14
 
 - `meta.get_user` no longer logs at the `WARNING` level about pulling the system user as this is "normal"
