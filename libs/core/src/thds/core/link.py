@@ -38,11 +38,8 @@ def link(
         return "same"
     assert os.path.exists(src), f"Source {src} does not exist"
     try:
-        log_volume = (
-            logger.warning if os.path.exists(dest) and os.path.getsize(dest) > 0 else logger.debug
-        )
         os.remove(dest)  # link will fail if the path already exists
-        log_volume('Removed existing file at "%s"', dest)
+        logger.warning(f'Removed existing file at "{dest}"')
     except FileNotFoundError:
         pass
     if _IS_MAC and "ref" in attempt_types:
@@ -104,7 +101,7 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
-    with tempfile.TemporaryDirectory(suffix="-linkcopy") as dir:
+    with tempfile.TemporaryDirectory() as dir:
         tmpfile = os.path.join(dir, "tmp")
         shutil.copyfile(src, tmpfile)
         shutil.move(tmpfile, dest)
