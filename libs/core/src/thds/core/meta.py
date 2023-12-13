@@ -222,7 +222,7 @@ def get_repo_name() -> str:
     try:
         return _simple_run("git remote get-url origin").split("/")[-1].rstrip().split(".")[0]
     except (sp.CalledProcessError, FileNotFoundError):
-        LOGGER.warning("`get_repo_name` found no repo name.")
+        LOGGER.debug("`get_repo_name` found no repo name.")
         return ""
 
 
