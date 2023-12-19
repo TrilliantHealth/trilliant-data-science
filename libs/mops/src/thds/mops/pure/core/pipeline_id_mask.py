@@ -3,6 +3,7 @@
 import re
 import typing as ty
 from contextlib import contextmanager
+from functools import lru_cache
 from types import TracebackType
 
 from thds.core.stack_context import StackContext
@@ -52,17 +53,28 @@ F = ty.TypeVar("F", bound=ty.Callable)
 _DOCSTRING_MASK_RE = re.compile(r".*pipeline-id-mask:\s*(?P<mask>[^\s]+)\b", re.DOTALL)
 
 
-def extract_mask_from_docstr(func: F) -> str:
+@lru_cache(maxsize=32)
+def extract_mask_from_docstr(func: F, require: bool = True) -> str:
     if not func.__doc__:
+        if not require:
+            return ""
         raise ValueError(f"Function {func} must have a non-empty docstring to extract pipeline-id-mask")
     m = _DOCSTRING_MASK_RE.match(func.__doc__)
     if not m:
         if "pipeline-id-mask:" in func.__doc__:
             raise ValueError("pipeline-id-mask is present but empty - this is probably an accident")
+        if not require:
+            return ""
         raise ValueError(f"Cannot extract pipeline-id-mask from docstring for {func}")
     mask = m.group("mask")
     assert mask, "pipeline-id-mask should not have matched if it is empty"
     return mask
+
+
+@contextmanager
+def function_mask(f: F) -> ty.Iterator[str]:
+    with pipeline_id_mask(extract_mask_from_docstr(f, require=False)):
+        yield get_pipeline_id_mask()
 
 
 T_co = ty.TypeVar("T_co", covariant=True)

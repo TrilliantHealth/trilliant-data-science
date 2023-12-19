@@ -36,6 +36,7 @@ from thds.core.log import getLogger
 from ._upload import async_upload_decision_and_settings
 from .conf import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
 from .download import async_download_or_use_verified
+from .errors import translate_azure_error
 from .file_properties import is_directory
 from .ro_cache import from_cache_path_to_local, global_cache
 
@@ -134,8 +135,11 @@ class ADLSFileSystem:
         return self._run(self._exists)
 
     @staticmethod
-    async def _exists(file_system_client: FileSystemClient) -> Awaitable[bool]:
-        return await file_system_client.exists()
+    async def _exists(file_system_client: FileSystemClient) -> bool:
+        try:
+            return await file_system_client.exists()
+        except azure.core.exceptions.AzureError as err:
+            translate_azure_error(file_system_client, "", err)
 
     def file_exists(self, path: str) -> bool:
         return self._run(self._path_exists, path, False)
@@ -150,6 +154,8 @@ class ADLSFileSystem:
             info = await self._get_file_info(file_system_client, path)
         except azure.core.exceptions.ResourceNotFoundError:
             return False
+        except azure.core.exceptions.AzureError as err:
+            translate_azure_error(file_system_client, path, err)
         return directory == is_directory(info)
 
     @async_run

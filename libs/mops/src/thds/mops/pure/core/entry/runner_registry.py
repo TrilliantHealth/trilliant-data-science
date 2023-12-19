@@ -4,10 +4,7 @@ In practice we only have a single Runner type registered, the MemoizingPicklingR
 """
 import typing as ty
 
-from thds.core import log, stack_context
-
-from ...._utils.temp import _REMOTE_TMP
-from ..pipeline_id_mask import get_pipeline_id_mask
+from thds.core import stack_context
 
 RUNNER_ENTRY_COUNT = stack_context.StackContext("runner_entry_count", 0)
 
@@ -29,10 +26,5 @@ def register_entry_handler(name: str, mh: EntryHandler):
 
 
 def run_named_entry_handler(name: str, *args: str):
-    try:
-        with RUNNER_ENTRY_COUNT.set(RUNNER_ENTRY_COUNT() + 1), log.logger_context(
-            remote=get_pipeline_id_mask()
-        ):
-            ENTRY_HANDLERS[name](*args)
-    finally:
-        _REMOTE_TMP.cleanup()
+    with RUNNER_ENTRY_COUNT.set(RUNNER_ENTRY_COUNT() + 1):
+        ENTRY_HANDLERS[name](*args)

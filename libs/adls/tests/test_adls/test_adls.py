@@ -21,8 +21,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from azure.core.exceptions import AzureError
 
-from thds.adls import ADLSFileSystemCache
+from thds.adls import ADLSFileSystem, ADLSFileSystemCache
 
 TEST_PATHS = ["foo", "/bar", "foo/bar", "foo/", "bar/", "foo/bar/", "foo/bar/baz.txt"]
 TEST_FILE_PATHS = [p for p in TEST_PATHS if not p.endswith("/")]
@@ -143,3 +144,10 @@ def test_cache_valid(
     cache_file_properties_past: MockFileProperties,
 ):
     assert cache.is_valid_for(cache_file_properties_past)  # type: ignore
+
+
+@pytest.mark.integration
+def test_nicer_errors(caplog):
+    with pytest.raises(AzureError):
+        ADLSFileSystem("thisthing", "doesnt-exist-or-is-illegal")
+    assert "Failed when operating on adls://thisthing/doesnt-exist-or-is-illegal/" == caplog.messages[-1]

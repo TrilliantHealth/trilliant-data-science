@@ -2,7 +2,6 @@
 
 None of them are required and may not be suitable for a given Runner implementation.
 """
-import os
 import typing as ty
 
 from thds.core import log, scope
@@ -36,7 +35,7 @@ def route_result_or_exception(
 ):
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     set_pipeline_id(pipeline_id)
-    scope.enter(log.logger_context(remote=pipeline_id, pid=os.getpid()))
+    scope.enter(log.logger_context(remote=pipeline_id))
     try:
         if pipeline_function_and_arguments_unique_key:
             pf_key, args_key = pipeline_function_and_arguments_unique_key

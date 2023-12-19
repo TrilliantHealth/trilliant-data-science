@@ -41,6 +41,12 @@ class NoResultAfterInvocationError(Exception):
     """Runners should raise this if the remotely-invoked function does not provide any result."""
 
 
+class NotARunnerContext(Exception):
+    """Mops may raise this if some code intended to be run under a
+    Runner context is invoked outside that context.
+    """
+
+
 AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
 
 

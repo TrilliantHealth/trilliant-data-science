@@ -42,13 +42,23 @@ time of its call. This memospace is fundamentally a fully-qualified (atomic) nam
 implementation it is derived from 3 'logical' pieces:
 
 1. A storage root provided by your top-level configuration, plus a `mops`-specific suffix, making up a
-   runner prefix that is the global default for any `mops.use_runner` decorated function in your
+   runner prefix that is the global default for any `pure.use_runner` decorated function in your
    application.
 
 1. The `pipeline_id`. It can be set globally by the application, but a unique default is generated upon
    the first call to a `mops` `use_runner` function if one has not already been set. `pipeline_id` may
    also be masked via the `pipeline_id_mask` decorator and context manager, applied _over top_ of the
-   `use_runner` decorator.
+   `use_runner` decorator. Finally, it may be masked on a per-function by inserting a specific statement
+   somewhere in your remotely-run function docstring, like so:
+
+   ```
+   @pure.use_runner(...)
+   def foobar():
+       """some docs...
+       pipeline-id-mask: baz
+       """
+       ...
+   ```
 
    You may conceptualize the pipeline id as representing a static codebase; if your code does not change,
    there is no reason to change the pipeline id. A future version of `mops` may rename this concept to
@@ -61,6 +71,8 @@ The function author is fully (and trivially) in control of the `function id` com
 application that calls the function is encouraged to globally set and/or locally mask the `pipeline id`.
 Generally, the `storage root` will be set differently via configuration for production vs development,
 but will be shared across the application run.
+
+### Memospace parts
 
 This is an example full `memo_uri` with all its constituent parts labeled. You'll find most of these
 names directly [in the source code](../src/thds/mops/pure/core/memo/function_memospace.py). For
@@ -95,7 +107,7 @@ and if configured, the less-specific options (listed earlier) will not be attemp
 > **non-destructive** re-use of the namespace, because no existing results will be modified in any way -
 > but an existing namespace is never immune to **modification** if provided to `mops`.
 
-### global pipeline id with global storage root
+### Configure: global pipeline id with global storage root
 
 > Operation: global, via dict config or set globally by the application.
 
@@ -112,7 +124,7 @@ The simplest way to set the global pipeline id is by calling
 `thds.mops.pure:set_pipeline_id('yourpipeid')` in the CLI of your application. Be aware that this is a
 global call that must be performed before calling any `mops`-decorated functions.
 
-### pipeline id mask with global storage root
+### Configure: pipeline id mask with global storage root
 
 > Operation: global storage root, plus stack-local pipeline id mask set by the application or library via
 > decorator or context manager.
@@ -175,7 +187,45 @@ As seen above, this decorator or its underlying context manager may even be appl
 _only_ the outermost call to this decorator will be applied at the time of function invocation, providing
 the final say to the calling application.
 
-### function-scoped fully-qualified memospace
+### Configure: pipeline memospace with dynamic runtime matching
+
+> Operation: match a function or set of functions based on their fully-qualified `__module__:__name__`
+> using Python code registered as one of many in-order globally-registered handlers
+
+This is probably most appropriate for applications that wish to provide control over the pipeline id or
+overall pipeline memospace for their functions but only their functions; in other words, for applications
+that do _not_ wish to override the choices of other libraries using mops from which they consume outputs.
+
+A simple example would be something like the following:
+
+```python
+# in module `thds.bar.where.ever`
+
+@pure.use_runner(...)
+def thing1(...):
+    """pipeline-id-mask: BAR-STANDARD"""
+    ...
+
+# in module `thds.foo.stuff`
+@pure.use_runner(...)
+def thing2(...):
+    """pipeline-id-mask: FOO-STANDARD"""
+    ...
+
+# in module `thds.foo.main`
+pure.add_pipeline_memospace_handlers(
+    pure.matching_mask_pipeline_id('FOO-NON-STANDARD!!', r'thds\.foo')
+)
+```
+
+The above will mask the pipeline id for `thing2` in `thds.foo.stuff` (as well as any other functions
+underneath `thds.foo`) but will _not_ mask the pipeline id for `thds.bar.where.ever:thing1`, as its
+fully-qualified name will not match the `thds.foo` regex.
+
+> This _overrides_ the use of `pipeline_id_mask` in all respects if a match is found. It is up to the
+> application developers to have their handler respect existing `pipeline_id_mask`s if they so choose.
+
+### Configure: function-scoped fully-qualified memospace
 
 > Operation: per-function (referenced by function_id) memospace, set by application via global (TOML) or
 > stack-local (context manager) config.

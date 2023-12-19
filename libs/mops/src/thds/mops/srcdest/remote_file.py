@@ -128,7 +128,7 @@ class DestFile:
         """
         reify_uploader(self._uploader)
         _fh, self._temp_dest_filepath = tempfile.mkstemp(
-            suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
+            suffix="destf-" + os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
         )
         # we use mkstemp instead of TemporaryFile because we don't want it to auto-delete on close,
         os.close(_fh)  # and we specifically don't want this open ourselves.
@@ -263,6 +263,18 @@ class SrcFile:
     def _mark_as_remote(self) -> None:
         self._marked_remote = True
 
+    def __getstate__(self) -> dict:
+        # no matter what, there is no need to serialize the temp file path or the entrance
+        # count of an in-use SrcFile. Those bits are only relevant for the current process.
+        return dict(
+            _local_filename=self._local_filename,
+            _serialized_remote_pointer=self._serialized_remote_pointer,
+            _uploader=self._uploader,
+            _downloader=self._downloader,
+            _temp_src_filepath="",
+            _entrance_count=0,
+        )
+
     def _is_remote(self) -> bool:
         return hasattr(self, "_marked_remote")
 
@@ -284,7 +296,7 @@ class SrcFile:
 
         if self._is_remote() or self._serialized_remote_pointer:
             _fh, self._temp_src_filepath = tempfile.mkstemp(
-                suffix=os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
+                suffix="-srcf-" + os.path.basename(self._local_filename)[:MAX_FILENAME_LEN]
             )
             os.close(_fh)  # we don't want the file to be open
             os.remove(self._temp_src_filepath)

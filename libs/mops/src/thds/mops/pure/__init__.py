@@ -5,6 +5,11 @@
 
 from . import adls  # noqa
 from .core import get_pipeline_id, set_pipeline_id, use_runner  # noqa
+from .core.memo.function_memospace import (  # noqa
+    add_pipeline_memospace_handlers,
+    matching_mask_pipeline_id,
+)
+from .core.memo.results import require_all as require_all_results  # noqa
 from .core.pipeline_id_mask import pipeline_id_mask, pipeline_id_mask_from_docstr  # noqa
 from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable  # noqa

@@ -3,7 +3,6 @@ import typing as ty
 from threading import RLock
 
 from .._utils.recursive_visit import recursive_visit
-from ..pure.core.types import Args, Kwargs
 from .remote_file import SrcFile
 
 _GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
@@ -16,7 +15,7 @@ _GLOBAL_SRC_FILE_UPLOAD_LOCK = RLock()
 # to upload one after the other.
 
 
-def trigger_src_files_upload(args: Args, kwargs: Kwargs):
+def trigger_src_files_upload(args: ty.Sequence, kwargs: ty.Mapping):
     """Runner implementations making use of remote filesystems should
     call this before remote function execution.
     """

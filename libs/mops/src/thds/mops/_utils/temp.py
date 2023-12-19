@@ -4,6 +4,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
+from thds.core import log
+
+logger = log.getLogger(__name__)
+
 
 class TempDirPath:
     """Lazily creates a temporary directory and returns it as a Path.
@@ -33,6 +37,7 @@ class TempDirPath:
         """
         with self.lock:
             if self.tempdir:
+                logger.info(f"Cleaning up tempdir {self.tempdir.name}")
                 self.tempdir.cleanup()
                 self.tempdir = None
 

@@ -1,0 +1,68 @@
+"""Sometimes you want to require that a memoized result exists.
+
+A Runner should hook into this system to enforce that upon itself.
+"""
+
+import typing as ty
+from contextlib import contextmanager
+
+from thds.core import stack_context
+
+from ..uris import lookup_blob_store
+
+_REQUIRE_ALL_RESULTS = stack_context.StackContext("require_all_results", False)
+
+
+@contextmanager
+def require_all() -> ty.Iterator[None]:
+    with _REQUIRE_ALL_RESULTS.set(True):
+        yield
+
+
+# _REQUIRED_FUNC_NAMES = set()
+
+
+# def required(func: ty.Callable) -> None:
+#     pass
+
+
+def _require_result(memo_uri: str = "") -> bool:
+    return _REQUIRE_ALL_RESULTS()
+
+
+class Success(ty.NamedTuple):
+    value_uri: str
+
+
+class Error(ty.NamedTuple):
+    exception_uri: str
+
+
+RESULT = "result"
+EXCEPTION = "exception"
+
+
+class RequiredResultNotFound(Exception):
+    pass
+
+
+def check_if_result_exists(
+    memo_uri: str,
+    rerun_excs: bool = False,
+) -> ty.Union[None, Success, Error]:
+    fs = lookup_blob_store(memo_uri)
+    result_uri = fs.join(memo_uri, RESULT)
+    if fs.exists(result_uri):
+        return Success(result_uri)
+
+    if _require_result(memo_uri):
+        raise RequiredResultNotFound("Required a result for {memo_uri} but that result was not found")
+
+    if rerun_excs:
+        return None
+
+    error_uri = fs.join(memo_uri, EXCEPTION)
+    if fs.exists(error_uri):
+        return Error(error_uri)
+
+    return None

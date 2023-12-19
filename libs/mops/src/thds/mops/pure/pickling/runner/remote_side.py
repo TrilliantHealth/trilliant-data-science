@@ -4,8 +4,9 @@ from thds.core import scope
 
 from ...._utils.once import Once
 from ....srcdest.mark_remote import mark_as_remote
-from ...core import uris
+from ...core import set_pipeline_id, uris
 from ...core.entry import register_entry_handler, route_result_or_exception
+from ...core.memo import results
 from ...core.pipeline_id_mask import pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
@@ -13,7 +14,7 @@ from ...core.types import Args, BlobStore, Kwargs, T
 from .._pickle import Dumper, gimme_bytes, make_read_object, unfreeze_args_kwargs
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
-from .orchestrator_side import EXCEPTION, INVOCATION, RESULT, RUNNER_SUFFIX, MemoizingPicklingRunner
+from .orchestrator_side import INVOCATION, RUNNER_SUFFIX, MemoizingPicklingRunner
 
 
 class _ResultExcChannel(ty.NamedTuple):
@@ -23,14 +24,14 @@ class _ResultExcChannel(ty.NamedTuple):
 
     def result(self, r: T):
         self.fs.putbytes(
-            self.fs.join(self.call_id, RESULT),
+            self.fs.join(self.call_id, results.RESULT),
             gimme_bytes(self.dumper, r),
-            type_hint=RESULT,
+            type_hint="result",
         )
 
     def exception(self, exc: Exception):
         self.fs.putbytes(
-            self.fs.join(self.call_id, EXCEPTION),
+            self.fs.join(self.call_id, results.EXCEPTION),
             gimme_bytes(self.dumper, exc),
             type_hint="EXCEPTION",
         )
@@ -47,6 +48,7 @@ def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
 
 def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     """The arguments are those supplied by MemoizingPicklingRunner."""
+    set_pipeline_id(pipeline_id)
     fs = uris.lookup_blob_store(memo_uri)
 
     def do_work_return_result() -> object:

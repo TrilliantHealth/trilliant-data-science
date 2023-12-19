@@ -8,8 +8,7 @@ from base64 import b64decode
 from pathlib import Path
 from random import SystemRandom
 
-from azure.core import MatchConditions
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import AzureError, HttpResponseError
 from azure.storage.filedatalake import (
     ContentSettings,
     DataLakeFileClient,
@@ -23,7 +22,8 @@ from thds.core.types import StrOrPath
 
 from ._progress import report_download_progress
 from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
-from .errors import translate_blob_not_found
+from .errors import translate_azure_error
+from .etag import match_etag
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_file
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
@@ -46,12 +46,12 @@ def _atomic_download_and_move(
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[ty.IO[bytes]]:
     global _TEMPDIRS_ON_DIFFERENT_FILESYSTEM
-    with tempfile.TemporaryDirectory() as dir:
+    with tempfile.TemporaryDirectory(suffix="-thds-adls-download") as dir:
         # TODO lock dest
         if _TEMPDIRS_ON_DIFFERENT_FILESYSTEM:
-            dpath = str(Path(dest).parent / ("tmp" + str(SystemRandom().random())[2:]))
+            dpath = str(Path(dest).parent / ("atomic-lcl-tmp-" + str(SystemRandom().random())[2:]))
         else:
-            dpath = os.path.join(dir, "tmp")
+            dpath = os.path.join(dir, "atomic-tmp-")
 
         with open(dpath, "wb") as f:
             known_size = (properties.size or 0) if properties else 0
@@ -104,7 +104,7 @@ def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
         return None
     psize = Path(path).stat().st_size
     if psize > _1GB:
-        logger.info(f"Hashing existing {psize/_1GB:.2f} GB file at {path}...")
+        logger.info(f"Hashing downloaded {psize/_1GB:.2f} GB file at {path}...")
     return b64(md5_file(path))
 
 
@@ -293,10 +293,6 @@ def _prep_download_coroutine(
     return co, co.send(None), None, fs_client.get_file_client(remote_key)
 
 
-def _translate_blob_not_found(client, key: str, hre: HttpResponseError) -> ty.NoReturn:
-    translate_blob_not_found(hre, client.account_name, client.file_system_name, key)
-
-
 def _set_md5_if_missing(
     file_properties: ty.Optional[FileProperties], md5b64: str
 ) -> ty.Optional[ContentSettings]:
@@ -304,11 +300,6 @@ def _set_md5_if_missing(
         return None
     file_properties.content_settings.content_md5 = b64decode(md5b64)
     return file_properties.content_settings
-
-
-def _if_etag(file_properties: ty.Optional[FileProperties]) -> dict:
-    assert file_properties, "This is checked by the previous statement"
-    return dict(etag=file_properties.etag, match_condition=MatchConditions.IfNotModified)
 
 
 def download_or_use_verified(
@@ -344,12 +335,13 @@ def download_or_use_verified(
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
                 logger.info(f"Setting missing MD5 for {remote_key}")
-                dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+                assert file_properties
+                dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
                 logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
-    except HttpResponseError as hre:
-        _translate_blob_not_found(fs_client, remote_key, hre)
+    except AzureError as err:
+        translate_azure_error(fs_client, remote_key, err)
 
 
 async def async_download_or_use_verified(
@@ -381,9 +373,10 @@ async def async_download_or_use_verified(
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
                 logger.info(f"Setting missing MD5 for {remote_key}")
-                await dl_file_client.set_http_headers(cs, **_if_etag(file_properties))
+                assert file_properties
+                await dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
                 logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
-    except HttpResponseError as hre:
-        _translate_blob_not_found(fs_client, remote_key, hre)
+    except AzureError as err:
+        translate_azure_error(fs_client, remote_key, err)

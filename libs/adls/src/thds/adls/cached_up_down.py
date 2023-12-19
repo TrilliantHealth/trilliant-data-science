@@ -7,7 +7,6 @@ from .global_client import get_global_client
 from .impl import ADLSFileSystem
 from .resource.up_down import AdlsHashedResource, upload
 from .ro_cache import global_cache
-from .uri import resolve_any
 
 
 def download_to_cache(fqn: AdlsFqn, md5b64: str = "") -> Path:
@@ -36,14 +35,11 @@ def upload_through_cache(dest: ty.Union[AdlsFqn, str], src_path: Path) -> AdlsHa
     return resource
 
 
-def download_directory(fqn_or_uri: ty.Union[str, AdlsFqn]) -> Path:
-    """Download a directory from an AdlsFqn or URI.
+def download_directory(fqn: AdlsFqn) -> Path:
+    """Download a directory from an AdlsFqn.
 
     If you know you only need to download a single file, use download_to_cache.
     """
-    fqn = resolve_any(fqn_or_uri)
-    if not fqn:
-        raise ValueError(f'Could not resolve "{fqn_or_uri}" to an ADLS FQN.')
     fs = ADLSFileSystem(fqn.sa, fqn.container)
     cached_dir_root = global_cache().path(fqn)
     fs.fetch_directory(fqn.path, cached_dir_root)

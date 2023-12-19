@@ -10,7 +10,8 @@ from thds.core.hashing import b64
 
 from ....srcdest.remote_file import DestFile, Serialized, SrcFile, StrOrPath
 from ....srcdest.up_down import URI_UPLOADERS
-from ...core.uris import lookup_blob_store
+from ...core import types, uris
+from ..output_fqn import invocation_output_fqn
 from .parse_serialized import resource_from_serialized
 
 
@@ -29,7 +30,7 @@ def _upload_and_represent_v2(uri: str, local_src: StrOrPath) -> Serialized:
     fqn = AdlsFqn.parse(uri)
     with open(local_src, "rb") as file:
         uri = str(fqn)
-        lookup_blob_store(uri).putbytes(uri, file)
+        uris.lookup_blob_store(uri).putbytes(uri, file)
         file.seek(0)
         # The primary reason for representing the md5 inside the
         # serialized file pointer is to add greater confidence in
@@ -50,6 +51,27 @@ URI_UPLOADERS[_ADLS_URI_UPLOAD_V1] = _upload_and_represent_v2
 
 def dest(fqn: AdlsFqn, local_file: StrOrPath = "") -> DestFile:
     return DestFile((_ADLS_URI_UPLOAD_V1, str(fqn)), local_file)
+
+
+def rdest(
+    src_file: StrOrPath,  # its name will be used as the end of the remote path
+    storage_root: ty.Optional[ty.Union[AdlsFqn, AdlsRoot]] = None,
+) -> DestFile:
+    """Create a DestFile in a remote context, using the local file name."""
+    assert Path(src_file).exists()
+    local_name = Path(src_file).name
+    try:
+        df = dest(invocation_output_fqn(name=local_name), "")  # empty local filename marks as remote
+    except types.NotARunnerContext:
+        root = uris.ACTIVE_STORAGE_ROOT() or (str(storage_root) if storage_root else "")
+        if not root:
+            raise ValueError(
+                "You cannot call rdest unless you're in a remote context or provide a storage_root."
+            )
+        df = dest(AdlsFqn.parse(uris.lookup_blob_store(root).join(root, local_name)), src_file)
+    with df as dest_path:
+        Path(src_file).rename(dest_path)
+    return df
 
 
 class DestFileContext:

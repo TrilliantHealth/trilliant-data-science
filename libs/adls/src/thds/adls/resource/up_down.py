@@ -94,7 +94,10 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
     fretry.expo(retries=2),
 )
 def upload(
-    dest: ty.Union[AdlsFqn, str], src: UploadSrc, write_through_cache: ty.Optional[Cache] = None
+    dest: ty.Union[AdlsFqn, str],
+    src: UploadSrc,
+    write_through_cache: ty.Optional[Cache] = None,
+    **upload_data_kwargs: ty.Any,
 ) -> ty.Optional[AdlsHashedResource]:
     """Uploads only if the remote does not exist or does not match
     md5.
@@ -129,6 +132,7 @@ def upload(
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
             chunk_size=UPLOAD_CHUNK_SIZE(),
+            **upload_data_kwargs,
         )
 
     # if at all possible (if the md5 is known), return a resource containing it.

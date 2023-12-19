@@ -1,3 +1,25 @@
+## 2.4
+
+- Invocation-derived output AdlsFqns have changed to retain file extensions so they'll be more
+  user-friendly when downloaded. This is not backward-incompatible in general, but is an observable
+  change in existing behavior.
+- New `pure.adls.rdest` `DestFile` creator that builds on top of `invocation_output_fqn` with some "do
+  what I mean" behavior. This is in a working state but is not guaranteed to provide maximal
+  forward-memoizability (its serialized representations or automatic ADLS location determination could
+  change).
+- `src_from_dest` no longer forces upload if there was no Runner involved.
+- `pipeline-id-mask` in function docstrings will now get applied automatically as long as no other mask
+  has been defined. This reduces the boilerplate necessary to use the pipeline id mask concept.
+- You can globally register handlers that can modify the
+  [pipeline memospace](docs/memoization.md#memospace-parts) for a programatically-derived subset of
+  functions. See `pure.add_pipeline_memospace_handlers` and the provided default implementation,
+  `pure.matching_mask_pipeline_id`, which is meant to allow you to override/mask the pipeline id using
+  regexes that `re.match` (not `fullmatch`) the fully qualified module path for your functions, e.g.
+  `thds.myapp.thing_a`.
+- Fixed a bug where `SrcFile` would get serialized improperly the second time it was serialized within a
+  given application, because some of its local-only state was not properly being excluded from the
+  serialization.
+
 ## 2.3
 
 - `KeyedLocalRunner` provides a memoizing-only interface that acts like a memo-key-selector over top of

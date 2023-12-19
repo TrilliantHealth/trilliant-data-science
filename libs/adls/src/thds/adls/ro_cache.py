@@ -48,8 +48,10 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
         # of the filename bytes with the hash. this gets us
         # consistency even across cache directories, such that the
         # cache directory is basically relocatable. It also makes testing easier.
-        md5_of_key = b"-md5-" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode()
-        fqn_bytes = fqn_bytes[: MAX_CACHE_KEY_LEN() - len(md5_of_key)] + md5_of_key
+        md5_of_key = b"-md5-" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode() + b"-"
+        last_30 = fqn_bytes[-30:]
+        first_n = fqn_bytes[: MAX_CACHE_KEY_LEN() - len(md5_of_key) - len(last_30)]
+        fqn_bytes = first_n + md5_of_key + last_30
         fqn_str = fqn_bytes.decode()
         assert len(fqn_bytes) <= MAX_CACHE_KEY_LEN(), (fqn_str, len(fqn_bytes))
     return Path(fqn_str).absolute()
@@ -65,6 +67,7 @@ def _opts_to_types(opts: LinkOpts) -> ty.Tuple[LinkType, ...]:
 
 def set_read_only(fpath: ct.StrOrPath):
     # thank you https://stackoverflow.com/a/51262451
+    logger.debug("Setting '%s' to read-only", fpath)
     perms = stat.S_IMODE(os.lstat(fpath).st_mode)
     ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
     os.chmod(fpath, perms & ro_mask)

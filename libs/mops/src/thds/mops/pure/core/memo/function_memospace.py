@@ -133,27 +133,87 @@ would be and decline to prematurely implement such functionality.
 
 """
 import hashlib
+import re
 import typing as ty
 
 from ...._utils import human_b64
 from ....config import config_at_path
-from ..pipeline_id_mask import get_pipeline_id_mask
+from ..pipeline_id_mask import (
+    extract_mask_from_docstr,
+    get_pipeline_id,
+    get_pipeline_id_mask,
+    pipeline_id_mask,
+)
 from ..uris import lookup_blob_store
 from .unique_name_for_function import make_unique_name_including_docstring_key
 
 
-def _lookup_memospace(callable_name: str) -> ty.Optional[str]:
-    """The base URI is everything up until but not including the hash of the (args, kwargs) tuple."""
-    return config_at_path(None, "mops", "memo", callable_name, "memospace")
+class _PipelineMemospaceHandler(ty.Protocol):
+    def __call__(self, __callable_name: str, __runner_prefix: str) -> ty.Optional[str]:
+        ...
 
 
-def make_function_memospace(storage_root: str, f: ty.Callable) -> str:
+_PIPELINE_MEMOSPACE_HANDLERS: ty.List[_PipelineMemospaceHandler] = list()
+
+
+def add_pipeline_memospace_handlers(*handlers: _PipelineMemospaceHandler) -> None:
+    """Add one or more handlers that will be tested in order to determine whether an
+    application wishes to override all or part of the "pipeline memospace" (the runner
+    prefix plus the pipeline id) for a given fully-qualified function name.
+
+    Does _not_ provide access to the invocation-specific `function_id` information; this
+    capability is not offered by mops.
+    """
+    _PIPELINE_MEMOSPACE_HANDLERS.extend(handlers)
+
+
+def matching_mask_pipeline_id(pipeline_id: str, callable_regex: str) -> _PipelineMemospaceHandler:
+    """Set the function memospace to be:
+
+    the current runner prefix
+    + the supplied pipeline_id, OR the set pipeline_id (not the
+      pipeline_id_mask!) if the supplied pipeline_id is empty
+      (thus allowing for this to fall back to an auto-generated pipeline_id if you want to force a run)
+    + the callable name (including docstring key).
+
+    Note this uses re.match, which means your regex must match the _beginning_ of the
+    callable name. If you want fullmatch, write your own. :)
+
+    """
+
+    def _handler(callable_name: str, runner_prefix: str) -> ty.Optional[str]:
+        if re.match(callable_regex, callable_name):
+            return lookup_blob_store(runner_prefix).join(
+                runner_prefix, pipeline_id or get_pipeline_id(), callable_name
+            )
+        return None
+
+    return _handler
+
+
+def _lookup_pipeline_memospace(runner_prefix: str, callable_name: str) -> ty.Optional[str]:
+    """The pipeline memospace is everything up until but not including the hash of the (args, kwargs) tuple."""
+    config_memospace = config_at_path(None, "mops", "memo", callable_name, "memospace")
+    if config_memospace:
+        return config_memospace
+    for handler in _PIPELINE_MEMOSPACE_HANDLERS:
+        pipeline_memospace = handler(callable_name, runner_prefix)
+        if pipeline_memospace:
+            return pipeline_memospace
+    return None
+
+
+def make_function_memospace(runner_prefix: str, f: ty.Callable) -> str:
     callable_name = make_unique_name_including_docstring_key(f)
-    return _lookup_memospace(callable_name) or lookup_blob_store(storage_root).join(
-        storage_root,
-        get_pipeline_id_mask(),
-        callable_name,
-    )
+    # always default to the function docstring if no other mask is currently provided.
+    with pipeline_id_mask(extract_mask_from_docstr(f, require=False)):
+        return _lookup_pipeline_memospace(runner_prefix, callable_name) or lookup_blob_store(
+            runner_prefix
+        ).join(
+            runner_prefix,
+            get_pipeline_id_mask(),
+            callable_name,
+        )
 
 
 def args_kwargs_content_address(args_kwargs_bytes: bytes) -> str:

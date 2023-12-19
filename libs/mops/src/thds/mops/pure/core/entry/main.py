@@ -11,6 +11,7 @@ Ask me how long it took to figure out what was going on there...
 """
 import argparse
 import os
+from timeit import default_timer
 
 from thds.core.log import getLogger
 
@@ -30,7 +31,9 @@ def main():
     )
     # TODO potentially allow things like logger context to be passed in as -- arguments
     args, unknown = parser.parse_known_args()
+    start = default_timer()
     run_named_entry_handler(args.entry_handler, *unknown)
+    logger.info(f"Exiting remote process {os.getpid()} after {(default_timer() - start)/60:.2f} minutes")
 
 
 if __name__ == "__main__":

@@ -54,12 +54,30 @@ def _srcfile_from_serialized(serialized: Serialized) -> SrcFile:
 def src_from_dest(destfile: DestFile) -> SrcFile:
     """Directly translate a DestFile into a SrcFile.
 
-    If the DestFile has not been uploaded, we will force its upload.
+    If the DestFile has not been uploaded and we are remote, we will
+    force its upload.
 
     Skips writing a serialized pointer locally.
     """
-    destfile._force_serialization()
-    return _srcfile_from_serialized(destfile._serialized_remote_pointer)
+    if destfile._is_remote():
+        destfile._force_serialization()
+        return _srcfile_from_serialized(destfile._serialized_remote_pointer)
+    assert destfile._local_filename, "When we aren't remote, we expect to find an existing local path."
+    # this (directly accessing various private members of destfile)
+    # absolutely breaks encapsulation and is a sign that the Src/Dest
+    # abstraction is quite leaky.
+    #
+    # A V2 would probably prioritize ensuring that both containers had
+    # an uploader and a downloader, and/or that they used URIs rather
+    # than the completely opaque uploader/downloader concept.  This
+    # way, we could have a proper abstraction that treats these things
+    # as "blobs that might need to be uploaded and/or downloaded at
+    # some future point in time".  It would also help us resolve the
+    # awkwardness of how DestFiles cannot be converted to SrcFiles
+    # until they return from the remote, which is not at all a
+    # pleasant user experience, since as soon as the DestFile has been
+    # closed, it should no longer be writable, even by the remote.
+    return SrcFile(ADLS_DOWNLOAD_V1, local_path=destfile._local_filename, uploader=destfile._uploader)
 
 
 def src(fqn: AdlsFqn, md5b64: str = "") -> SrcFile:
@@ -109,6 +127,7 @@ def fqn_relative_to_src(
     up: int = 0,
 ) -> AdlsFqn:
     assert path_parts, "Must specify a relative path"
+    srcfile._upload_if_not_already_remote()
     fqn = resource_from_serialized(srcfile._serialized_remote_pointer).fqn
     while up > 0:
         fqn = fqn.parent

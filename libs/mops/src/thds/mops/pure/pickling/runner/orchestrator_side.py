@@ -14,9 +14,9 @@ from ....config import max_concurrent_network_ops
 from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
 from ...core import uris
-from ...core.memo import args_kwargs_content_address, make_function_memospace
+from ...core.memo import args_kwargs_content_address, make_function_memospace, results
 from ...core.partial import unwrap_partial
-from ...core.pipeline_id_mask import get_pipeline_id_mask
+from ...core.pipeline_id_mask import function_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
@@ -170,8 +170,6 @@ _IN_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
 # _IN prioritizes retrieving the result of a Shell that has completed.
 
 INVOCATION = "invocation"
-RESULT = "result"
-EXCEPTION = "exception"
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
@@ -206,40 +204,22 @@ def _pickle_func_and_run_via_shell(
             # args and kwargs will not get properly considered in the
             # memoization key.
             func, args, kwargs = unwrap_partial(func_, args_, kwargs_)
+            pipeline_id = scope.enter(function_mask(func))
             trigger_src_files_upload(args, kwargs)
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
 
-            class _success(ty.NamedTuple):
-                success_uri: str
-
-            class _error(ty.NamedTuple):
-                exception_uri: str
-
-            def fetch_result_if_exists(
-                rerun_excs: bool = False,
-            ) -> ty.Union[None, _success, _error]:
-                result_uri = fs.join(memo_uri, RESULT)
-                if fs.exists(result_uri):
-                    return _success(result_uri)
-                if rerun_excs:
-                    return None
-                error_uri = fs.join(memo_uri, EXCEPTION)
-                if fs.exists(error_uri):
-                    return _error(error_uri)
-                return None
-
-            def unwrap_remote_result(result: ty.Union[_success, _error]) -> T:
-                if isinstance(result, _success):
-                    success = ty.cast(T, make_read_object(RESULT)(result.success_uri))
+            def unwrap_remote_result(result: ty.Union[results.Success, results.Error]) -> T:
+                if isinstance(result, results.Success):
+                    success = ty.cast(T, make_read_object("result")(result.value_uri))
                     trigger_dest_files_placeholder_write(success)
                     return success
-                assert isinstance(result, _error), "Must be _error or _success"
+                assert isinstance(result, results.Error), "Must be _error or _success"
                 raise make_read_object("EXCEPTION")(result.exception_uri)
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            result = fetch_result_if_exists(rerun_excs=rerun_exceptions)
+            result = results.check_if_result_exists(memo_uri, rerun_excs=rerun_exceptions)
             if result:
                 _LogKnownResult(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
@@ -262,7 +242,7 @@ def _pickle_func_and_run_via_shell(
                 (
                     MemoizingPicklingRunner.__name__,
                     memo_uri,
-                    get_pipeline_id_mask(),  # for debugging only
+                    pipeline_id,  # for debugging only
                 )
             )
         except Exception as ex:
@@ -276,7 +256,7 @@ def _pickle_func_and_run_via_shell(
 
         # the network ops being grouped by _IN include one or more downloads.
         with _IN_SEMAPHORE:
-            result = fetch_result_if_exists()
+            result = results.check_if_result_exists(memo_uri)
             if not result:
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
