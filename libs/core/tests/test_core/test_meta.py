@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockFixture
 
-from thds.core import meta
+from thds.core import git, meta
 
 PACKAGE_NAME = "thds.test"
 MODULE_NAME = "thds.test.module"
@@ -80,21 +80,21 @@ def mock_getuser(mocker: MockFixture) -> MagicMock:
 
 @pytest.fixture
 def mock_git_commit(mocker: MockFixture) -> MagicMock:
-    mock = mocker.patch.object(meta, "_simple_run", autospec=True)
+    mock = mocker.patch.object(git, "_simple_run", autospec=True)
     mock.return_value = COMMIT_HASH
     return mock
 
 
 @pytest.fixture
 def mock_git_is_clean(mocker: MockFixture) -> MagicMock:
-    mock = mocker.patch.object(meta, "_simple_run", autospec=True)
+    mock = mocker.patch.object(git, "_simple_run", autospec=True)
     mock.return_value = True
     return mock
 
 
 @pytest.fixture
 def mock_git_branch(mocker: MockFixture) -> MagicMock:
-    mock = mocker.patch.object(meta, "_simple_run", autospec=True)
+    mock = mocker.patch.object(git, "_simple_run", autospec=True)
     mock.return_value = BRANCH_NAME
     return mock
 
