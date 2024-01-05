@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import subprocess as sp
 import typing as ty
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -14,6 +13,7 @@ from types import MappingProxyType
 import attrs
 from cattrs import Converter
 
+from . import git
 from .log import getLogger
 from .types import StrOrPath
 
@@ -21,7 +21,6 @@ LayoutType = ty.Literal["flat", "src"]
 NameFormatType = ty.Literal["git", "docker", "hive"]
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
-CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
 
 DOCKER_EXCLUSION_REGEX = r"[^\w\-.]+"
 DOCKER_SUB_CHARACTER = "-"
@@ -91,13 +90,24 @@ def make_calgitver() -> str:
     We use only dots as separators to be compatible with both Container Registry
     formats and PEP440.
     """
-    return "-".join(
-        [
-            datetime.now(tz=timezone.utc).strftime(CALGITVER_NO_SECONDS_FORMAT),
+    dirty = "" if is_clean() else "dirty"
+    base_components: ty.Tuple[str, ...] = tuple()
+    if not dirty:
+        # we only attempt this 'determinstic' datetime if the repo is clean, because if
+        # it's not clean then this isn't deterministic anyway, and so we'd rather just
+        # have an up-to-date timestamp
+        try:
+            commit_datetime, commit_hash = git.get_commit_datetime_and_hash()
+            base_components = (commit_datetime, commit_hash[:7])
+        except git.NO_GIT:
+            pass
+    if not base_components:
+        base_components = (
+            datetime.now(tz=timezone.utc).strftime(git.CALGITVER_NO_SECONDS_FORMAT),
             get_commit()[:7],
-            "" if is_clean() else "dirty",
-        ]
-    ).rstrip("-")
+        )
+
+    return "-".join((*base_components, dirty)).rstrip("-")
 
 
 def print_calgitver():
@@ -148,7 +158,7 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     # narrow format. Failing that, we'll try SemCalVer.
     if parse_calgitver(version):
         try:
-            return to_result(datetime.strptime(version[:13], CALGITVER_NO_SECONDS_FORMAT))
+            return to_result(datetime.strptime(version[:13], git.CALGITVER_NO_SECONDS_FORMAT))
         except ValueError:
             pass
 
@@ -163,11 +173,6 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     raise ValueError(
         f"`version`: {version} is not a timestamp-containing version string (SemCalVer or CalGitVer)."
     )
-
-
-def _simple_run(s_or_l_cmd: ty.Union[str, ty.List[str]]) -> str:
-    cmd = s_or_l_cmd.split() if isinstance(s_or_l_cmd, str) else s_or_l_cmd
-    return sp.check_output(cmd, text=True).rstrip("\n")
 
 
 def norm_name(pkg: str) -> str:
@@ -220,22 +225,21 @@ def get_base_package(pkg: Package) -> str:
 
 def get_repo_name() -> str:
     try:
-        return _simple_run("git remote get-url origin").split("/")[-1].rstrip().split(".")[0]
-    except (sp.CalledProcessError, FileNotFoundError):
+        return git.get_repo_name()
+    except git.NO_GIT:
         LOGGER.debug("`get_repo_name` found no repo name.")
         return ""
 
 
-def get_commit(pkg: Package = "") -> str:
+def get_commit(pkg: Package = "") -> str:  # should really be named get_commit_hash
     if GIT_COMMIT in os.environ:
         LOGGER.debug("`get_commit` reading from env var.")
         return os.environ[GIT_COMMIT]
 
     try:
-        LOGGER.debug("`get_commit` reading from Git repo.")
-        return _simple_run("git rev-parse --verify HEAD")
-    except (sp.CalledProcessError, FileNotFoundError):
-        pass  # FileNotFoundError can happen if git is not installed at all.
+        return git.get_commit_hash()
+    except git.NO_GIT:
+        pass
 
     try:
         if pkg:
@@ -262,11 +266,9 @@ def is_clean(pkg: Package = "") -> bool:
         return not bool(os.getenv(GIT_IS_DIRTY))
 
     try:
-        LOGGER.debug("`is_clean` reading from Git repo.")
-        # command will print an empty string if the repo is clean
-        return "" == _simple_run("git diff --name-status")
-    except (sp.CalledProcessError, FileNotFoundError):
-        pass  # FileNotFoundError can happen if git is not installed at all.
+        return git.is_clean()
+    except git.NO_GIT:
+        pass
 
     try:
         if pkg:
@@ -289,10 +291,9 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
             return os.environ[GIT_BRANCH]
 
         try:
-            LOGGER.debug("`get_branch` reading from Git repo.")
-            return _simple_run("git branch --show-current")
-        except (sp.CalledProcessError, FileNotFoundError):
-            pass  # FileNotFoundError can happen if git is not installed at all.
+            return git.get_branch()
+        except git.NO_GIT:
+            pass
 
         try:
             if pkg:
