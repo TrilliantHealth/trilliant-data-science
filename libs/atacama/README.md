@@ -345,7 +345,7 @@ your_mapping = DynamicLeafTypeMapping(AtacamaBaseLeafTypeMapping, [handler_1, ha
 
 ## Minor Features
 
-### `require_all`
+#### `require_all`
 
 You may specify at generation time that you wish to make all fields (recursively) `required` at the time
 of load. This may be useful on its own, but is also the only way of accurately describing an 'output'
@@ -358,7 +358,7 @@ Example:
 
 `atacama.neo(Foo, config(require_all=True))`
 
-### Schema name suffix
+#### Schema name suffix
 
 You may specify a suffix for the name of the Schema generated. This may be useful when you are trying to
 generate an output JSON schema and have multiple Schemas derived from the same `attrs` class.
