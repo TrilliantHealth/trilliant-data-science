@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import json
 import logging
@@ -144,12 +145,53 @@ def nonnull_type_of(t: Type) -> Type:
     return ty.Union[nonnull_types]  # type: ignore
 
 
+def set_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
+    logger = logging.getLogger(__name__)
+    logger.debug("Setting pragmas for bulk write optimization")
+    # https://www.sqlite.org/pragma.html#pragma_synchronous
+    _log_exec_sql(logger, con, "PRAGMA synchronous = 0")  # OFF
+    # https://www.sqlite.org/pragma.html#pragma_journal_mode
+    if not DISABLE_WAL_MODE:
+        _log_exec_sql(logger, con, "PRAGMA journal_mode = WAL")
+    # https://www.sqlite.org/pragma.html#pragma_locking_mode
+    _log_exec_sql(logger, con, "PRAGMA locking_mode = EXCLUSIVE")
+
+    return con
+
+
+def unset_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
+    logger = logging.getLogger(__name__)
+    logger.debug("Setting pragmas for bulk write optimization")
+    # https://www.sqlite.org/pragma.html#pragma_journal_mode
+    # resetting this to the default. This is a property of the database, rather than the connection.
+    # the other settings are connection-specific.
+    # according to the docs, the WAL journal mode should be disabled before the locking mode is restored,
+    # else any attempt to do so is a no-op.
+    _log_exec_sql(logger, con, "PRAGMA journal_mode = DELETE")
+    # https://www.sqlite.org/pragma.html#pragma_synchronous
+    _log_exec_sql(logger, con, "PRAGMA synchronous = 2")  # FULL (default)
+    # https://www.sqlite.org/pragma.html#pragma_locking_mode
+    _log_exec_sql(logger, con, "PRAGMA locking_mode = NORMAL")
+
+    return con
+
+
+@contextlib.contextmanager
+def bulk_write_context(con: sqlite3.Connection, close: bool):
+    set_bulk_write_mode(con)
+    try:
+        yield con
+    finally:
+        unset_bulk_write_mode(con)
+        if close:
+            con.close()
+
+
 def sqlite_connection(
     db_path: StrOrPath,
     package: Optional[str] = None,
     *,
     mmap_size: Optional[int] = None,
-    bulk_write_mode: bool = False,
 ):
     if package is None:
         db_filename = db_path
@@ -165,15 +207,6 @@ def sqlite_connection(
     if mmap_size is not None:
         logger.info(f"Setting sqlite mmap size to {mmap_size}")
         _log_exec_sql(logger, con, f"PRAGMA mmap_size={mmap_size};")
-    if bulk_write_mode:
-        logger.debug("Setting pragmas for bulk write optimization")
-        # https://www.sqlite.org/pragma.html#pragma_synchronous
-        _log_exec_sql(logger, con, "PRAGMA synchronous = OFF")
-        # https://www.sqlite.org/pragma.html#pragma_journal_mode
-        if not DISABLE_WAL_MODE:
-            _log_exec_sql(logger, con, "PRAGMA journal_mode = WAL")
-        # https://www.sqlite.org/pragma.html#pragma_locking_mode
-        _log_exec_sql(logger, con, "PRAGMA locking_mode = EXCLUSIVE")
 
     return con
 
@@ -215,7 +248,9 @@ class AttrsSQLiteDatabase:
             self.sqlite_index_query = lru_cache(cache_size)(self.sqlite_index_query)  # type: ignore
 
         self._sqlite_con = sqlite_connection(
-            db_path, package, mmap_size=mmap_size, bulk_write_mode=False
+            db_path,
+            package,
+            mmap_size=mmap_size,
         )
 
     def sqlite_index_query(
