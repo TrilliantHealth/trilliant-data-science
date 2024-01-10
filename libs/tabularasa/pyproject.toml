@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.tabularasa"
 # Patch version is a datetime determined upon release
-version = "0.0"
+version = "0.1"
 authors = ["Trilliant Health"]
 description = "Trillant Health reference data build system."
 readme = "README.md"
@@ -9,30 +9,33 @@ packages = [{include = "thds", from = "src"}]
 include = ["meta.json", "py.typed"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
+
 attrs = ">=22.2.0"
 cattrs = ">=22.2.0"
 networkx = ">=3.0"
 numpy = "*"
 pandas = "^1.4"
+pandera = "~0.7.1"  # 0.8 breaks us
 pydantic = "^1.10.0"  # V2 introduces breaking changes
 pyarrow = ">=10.0.0"
 pyyaml = ">=6.0.1"
 setuptools = ">=66.1.1"
-pandera = "~0.7.1"  # 0.8 breaks us
 typing-extensions = "*"
+
 thds-adls = {path = "../../libs/adls", develop = true}
 thds-core = {path = "../../libs/core", develop = true}
 
 # optional/extras dependencies
 "bourbaki.application" = {version = ">=0.10.12", optional = true}
-typing-inspect = {version = ">=0.9.0", optional = true}
-# `bourbaki.application` and `typing-inspect` has issues with Python>=3.9 prior to these versions
+# `bourbaki.application` has issues with Python>=3.9 prior to these versions
+black = {version="*",optional=true}
+isort = {version="*",optional=true}
+pygraphviz = {version="*",optional=true}
 "ruamel.yaml" = {version="*",optional=true}
 tabulate = {version="*",optional=true}
-isort = {version="*",optional=true}
-black = {version="*",optional=true}
-pygraphviz = {version="*",optional=true}
+typing-inspect = {version = ">=0.9.0", optional = true}
+# `typing-inspect` has issues with Python>=3.9 prior to these versions
 
 [tool.poetry.group.dev.dependencies]
 # type checks
@@ -58,18 +61,15 @@ sphinx-rtd-theme = "*"
 # data build
 # CLI/code generation ("cli" extra)
 "bourbaki.application" = "*"
+black = "*"
+isort = "*"
 "ruamel.yaml" = "*"
 tabulate = "*"
-isort = "*"
-black = "*"
 
 [tool.poetry.extras]
 # support for CLI operations - code and data generation
-cli = [
-  "bourbaki.application",
-  "ruamel.yaml", "tabulate", "typing-inspect"
-]
-autoformat = ["isort", "black"]
+cli = ["bourbaki.application", "ruamel.yaml", "tabulate", "typing-inspect"]
+autoformat = ["black", "isort"]
 # support for visualizing computational/dependency DAGs
 viz = ["pygraphviz"]
 
@@ -101,15 +101,15 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-  "setuptools", "networkx", "pyarrow.*", "bourbaki.*", "ruamel.*", "pygraphviz",
-  "pysqlite3", "typing_inspect",
+  "azure", "bourbaki.*", "networkx", "pyarrow.*", "pygraphviz", "pysqlite3",
+  "ruamel.*", "setuptools", "typing_inspect",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # temporary fix for mypy error: Function has duplicate type signatures
 # related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
-module = ["azure.*"]
+module = ["azure.storage.filedatalake.*"]
 follow_imports = "skip"
 
 [tool.pytest.ini_options]

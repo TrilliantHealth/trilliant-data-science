@@ -44,7 +44,7 @@ def gen_attrs(random_gen, type_: Type[attr.AttrsInstance]) -> Gen[attr.AttrsInst
 
 def gen_namedtuple(random_gen, type_: Type[T]) -> Gen[T]:
     field_names = type_._fields  # type: ignore [attr-defined]
-    field_types = (type_._field_types[name] for name in field_names)  # type: ignore [attr-defined]
+    field_types = (type_.__annotations__[name] for name in field_names)  # type: ignore [attr-defined]
     overrides = attrs.CUSTOM_ATTRS_BY_FIELD_REGISTRY.get(type_)
     if overrides:
         return tuple.random_namedtuple_gen(

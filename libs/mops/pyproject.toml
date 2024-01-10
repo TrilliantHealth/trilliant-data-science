@@ -16,17 +16,17 @@ include = [
 
 # PROJECT ENTRY POINTS
 [tool.poetry.scripts]
-mops-exit-after = "thds.core.exit_after:main"
 krsync = "thds.mops.k8s.orchestrator.krsync:main"
+mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
 
+ansicolors = "*"
 azure-core = "*"
 azure-identity = "*"
 azure-storage-file-datalake = "*"
-ansicolors = "*"
 cachetools = "*"
 tomli = "*"
 
@@ -47,11 +47,11 @@ mypy-extensions = "^1.0"
 pytest = "^7.2"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
+pytest-xdist = "^3.3.1"
 types-cachetools = "*"
 types-urllib3 = "*"
 
 # BUILD CONFIG
-pytest-xdist = "^3.3.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -83,7 +83,7 @@ check_untyped_defs = true
 
 
 [[tool.mypy.overrides]]
-module = ["azure.*", "colors", "kubernetes.*", "lazy_object_proxy", "setuptools"]
+module = ["azure.*", "colors", "kubernetes.*", "setuptools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -1,3 +1,8 @@
+# 2.0
+
+- Removing `lazy-object-proxy` from dependencies in favor of native lazy methods.
+- `impl.adls_filesystem` is now `impl.make_adls_filesystem_getter` which lazily returns a closure.
+
 ## 1.7
 
 - Add an environment variable `THDS_ADLS_UPLOAD_CHUNK_SIZE` (100MB by default) for more configurable

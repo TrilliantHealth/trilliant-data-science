@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "thds.adls"
-version = "1.7"
+version = "2.0"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 authors = ["Trilliant Health"]
@@ -10,20 +10,21 @@ include = ["py.typed", "meta.json"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+
 aiohttp = ">=3.8.1"
 aiostream = ">=0.4.5"
 azure-identity = ">=1.9"
 azure-storage-file-datalake = ">=12.6"
-lazy-object-proxy = ">=1.7.1"
+
 thds-core = {path = "../../libs/core", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.0"
 mypy-extensions = "^1.0"
 pytest = "^7.2"
+pytest-asyncio = "^0.21.0"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
-pytest-asyncio = "^0.21.0"
 pytest-xdist = "^3.3.1"
 
 [tool.poetry.scripts]
@@ -60,13 +61,13 @@ check_untyped_defs = true
 
 
 [[tool.mypy.overrides]]
-module = ["aiostream", "lazy_object_proxy", "setuptools"]
+module = ["aiostream", "setuptools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # temporary fix for mypy error: Function has duplicate type signatures
 # related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
-module = ["azure.*"]
+module = ["azure.storage.filedatalake.*"]
 follow_imports = "skip"
 
 [tool.pytest.ini_options]

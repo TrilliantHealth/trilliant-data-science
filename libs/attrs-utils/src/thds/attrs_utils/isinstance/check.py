@@ -37,7 +37,7 @@ def check_attrs(instancecheck, type_: Type[attrs.AttrsInstance]):
 
 
 def check_namedtuple(instancecheck, type_: Type[NamedTuple]):
-    field_types = tuple(type_._field_types[name] for name in type_._fields)
+    field_types = tuple(type_.__annotations__[name] for name in type_._fields)
     return util.check_typed_tuple(util.simple_isinstance(type_), *map(instancecheck, field_types))
 
 

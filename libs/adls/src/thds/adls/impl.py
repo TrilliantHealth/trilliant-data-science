@@ -25,13 +25,12 @@ from typing import (
 
 import attr
 import azure.core.exceptions
-import lazy_object_proxy
 from aiostream import stream
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, PathProperties
 from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClient
 
-from thds.core.log import getLogger
+from thds.core import lazy, log
 
 from ._upload import async_upload_decision_and_settings
 from .conf import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
@@ -40,9 +39,9 @@ from .errors import translate_azure_error
 from .file_properties import is_directory
 from .ro_cache import from_cache_path_to_local, global_cache
 
-LOGGER = getLogger(__name__)
-getLogger("azure.core").setLevel(logging.WARNING)
-getLogger("azure.identity").setLevel(logging.WARNING)
+LOGGER = log.getLogger(__name__)
+log.getLogger("azure.core").setLevel(logging.WARNING)
+log.getLogger("azure.identity").setLevel(logging.WARNING)
 
 DEFAULT_HIVE_PREFIX = os.getenv("CORE_HIVE_PREFIX", "")
 WEST_HIVE_PREFIX = "hive/warehouse"  # For easy access while we may need backwards compatibility
@@ -1080,20 +1079,16 @@ class ADLSFileSystemCache:
         )
 
 
-def adls_filesystem(
+def make_adls_filesystem_getter(
     account_name: str,
     file_system: str,
     default_batch_size: int = 64,
     cache_dir: Optional[Union[Path, str]] = None,
-) -> ADLSFileSystem:
+) -> Callable[[], ADLSFileSystem]:
     """Wrapper for returning a :py:class:`core.adls.ADLSFileSystem` lazily."""
 
-    def _adls_filesystem(
-        account_name: str = account_name,
-        file_system: str = file_system,
-        default_batch_size: int = default_batch_size,
-        cache_dir: Optional[Union[Path, str]] = cache_dir,
-    ) -> ADLSFileSystem:
+    @lazy.lazy
+    def get_adls_filesystem() -> ADLSFileSystem:
         return ADLSFileSystem(account_name, file_system, default_batch_size, cache_dir)
 
-    return lazy_object_proxy.Proxy(_adls_filesystem)
+    return get_adls_filesystem
