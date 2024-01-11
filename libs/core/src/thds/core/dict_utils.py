@@ -72,6 +72,8 @@ class DotDict(dict, MutableMapping[KT, VT]):
                 self._new_to_orig_keys[new_key] = k
             if isinstance(v, dict):
                 self[new_key] = DotDict(v)
+            elif isinstance(v, (list, tuple, set)):
+                self[new_key] = v.__class__([DotDict(iv) if isinstance(iv, dict) else iv for iv in v])
             else:
                 self[new_key] = v
 

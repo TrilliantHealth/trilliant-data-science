@@ -1,3 +1,13 @@
+## 1.15
+
+- Updated `DotDict` to convert `dict`s inside of `set`s, `list`s, and `tuple`s into `DotDict`s.
+
+  ```python
+  dd = DotDict({"letters": [{"a": 1}, {"b": 2}]})
+  dd.letters[0].a == 1
+  dd.letters[1].b == 2
+  ```
+
 ## 1.14
 
 - `meta.get_user` no longer logs at the `WARNING` level about pulling the system user as this is "normal"
