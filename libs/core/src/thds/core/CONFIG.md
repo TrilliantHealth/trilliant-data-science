@@ -14,7 +14,7 @@ Highlights:
 
 The basic usage is as follows:
 
-## Defining the ConfigItem in module `foo` (and its associated usage)
+### Defining the ConfigItem in module `foo` (and its associated usage)
 
 ```python
 from thds.core import config
@@ -29,7 +29,7 @@ def barbarbar() -> int:  # just a random function that uses the config
     return BAR() * 3
 ```
 
-## Setting the value from module `baz` (programmatically)
+### Setting the value from module `baz` (programmatically)
 
 ```python
 import foo
@@ -42,7 +42,7 @@ with foo.BAR.set_local(200):
 assert foo.barbarbar() == 300  # back to the global value
 ```
 
-## Setting the value with an environment variable
+### Setting the value with an environment variable
 
 ```bash
 export FOO_BAR=27
@@ -54,7 +54,7 @@ so you can use `export foo.bar=27`. Others have a more limited character set. To
 'search' for two alternative variable names, one that replaces `-` and `.` with `_`, and another that
 does those replacements and also force-uppercases the config item string.
 
-## Discoverability
+### Discoverability
 
 ```python
 from thds.core import config
@@ -70,7 +70,7 @@ poetry install  # to ensure that the CLI is properly installed
 poetry run show-thds-config your.root.module
 ```
 
-## Loading config from a file programmatically
+### Loading config from a file programmatically
 
 ```python
 from thds.core import config
