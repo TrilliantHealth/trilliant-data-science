@@ -1,5 +1,5 @@
 from thds.adls import defaults
-from thds.mops.config import set_config
+from thds.core import config
 from thds.mops.pure.core.memo.function_memospace import (
     make_function_memospace,
     make_unique_name_including_docstring_key,
@@ -44,7 +44,11 @@ def test_reuse_memoized_via_config():
 
 def test_actual_config_is_used():
     val = "adls://foobar/quuxbaz/blah"
-    with set_config("mops", "memo", make_unique_name_including_docstring_key(mul), "memospace")(val):
+    config_name = f"mops.memo.{make_unique_name_including_docstring_key(mul)}.memospace"
+    config.set_global_defaults({config_name: ""})
+    config_item = config.config_by_name(config_name)
+
+    with config_item.set_local(val):
         assert val == make_function_memospace(defaults.env_root_uri("dev"), mul)
 
     assert val != make_function_memospace(defaults.env_root_uri("dev"), mul)

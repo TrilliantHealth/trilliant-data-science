@@ -9,8 +9,8 @@ from kubernetes import client
 from thds.core import scope
 from thds.core.log import logger_context
 
-from .. import config
 from .._utils.colorize import colorized
+from . import config
 from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .logging import JobLogWatcher

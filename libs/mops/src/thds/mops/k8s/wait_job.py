@@ -6,8 +6,8 @@ from timeit import default_timer
 from thds.core import scope
 from thds.core.log import logger_context
 
-from .. import config
 from .._utils.colorize import colorized
+from . import config
 from ._shared import logger
 from .jobs import get_job
 

@@ -5,8 +5,7 @@ from functools import wraps
 import urllib3.exceptions
 from kubernetes import client
 
-from .. import config
-from . import auth
+from . import auth, config
 from ._shared import logger
 
 F = ty.TypeVar("F", bound=ty.Callable)

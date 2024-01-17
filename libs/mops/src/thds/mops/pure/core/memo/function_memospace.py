@@ -136,8 +136,9 @@ import hashlib
 import re
 import typing as ty
 
+from thds.core import config
+
 from ...._utils import human_b64
-from ....config import config_at_path
 from ..pipeline_id_mask import (
     extract_mask_from_docstr,
     get_pipeline_id,
@@ -193,7 +194,10 @@ def matching_mask_pipeline_id(pipeline_id: str, callable_regex: str) -> _Pipelin
 
 def _lookup_pipeline_memospace(runner_prefix: str, callable_name: str) -> ty.Optional[str]:
     """The pipeline memospace is everything up until but not including the hash of the (args, kwargs) tuple."""
-    config_memospace = config_at_path(None, "mops", "memo", callable_name, "memospace")
+    try:
+        config_memospace = config.config_by_name(f"mops.memo.{callable_name}.memospace")()
+    except KeyError:
+        config_memospace = ""
     if config_memospace:
         return config_memospace
     for handler in _PIPELINE_MEMOSPACE_HANDLERS:

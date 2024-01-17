@@ -6,8 +6,8 @@ from kubernetes import client
 
 from thds.core.log import getLogger
 
-from .. import config
 from .._utils.colorize import colorized
+from . import config
 from .watch import K8sList, OneShotLimiter, yield_objects_from_list
 
 logger = getLogger(__name__)

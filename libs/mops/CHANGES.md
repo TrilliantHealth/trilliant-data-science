@@ -1,3 +1,9 @@
+### 2.4.20241217
+
+- Fixed a bug where a username including capital letters or underscores would result in an error when the
+  Kubernetes namespace was chosen.
+- Refactored the `mops.config` system to use `thds.core.config`.
+
 ## 2.4
 
 - Invocation-derived output AdlsFqns have changed to retain file extensions so they'll be more

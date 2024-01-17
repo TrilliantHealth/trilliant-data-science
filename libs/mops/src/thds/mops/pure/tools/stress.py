@@ -48,7 +48,7 @@ def stress(max_clients: int, n: int, sleep: int):
     length of the task decreases relative to the number of total tasks.
     """
     start = default_timer()
-    with max_concurrent_network_ops.set(max_clients):
+    with max_concurrent_network_ops.set_local(max_clients):
         tasks = [Thunk(run_and_sleep, i, list(range(i * n, (i + 1) * n)), sleep) for i in range(n)]
 
         assert len(list(parallel_yield_results(tasks))) == n
