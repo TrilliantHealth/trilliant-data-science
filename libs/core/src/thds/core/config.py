@@ -181,7 +181,12 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
                             " Please double-check your configuration."
                         ) from kerr
                 except ModuleNotFoundError:
-                    pass
+                    # create a new, dynamic config item that will only be accessible via
+                    # its name.
+                    ConfigItem(name, value)  # return value not needed since it self-registers.
+                    getLogger(__name__).debug(
+                        "Created dynamic config item '%s' with value '%s'", name, value
+                    )
 
         else:  # recurse
             set_global_defaults({f"{name}.{key}": val for key, val in value.items()})
