@@ -417,9 +417,10 @@ class ReferenceDataManager:
         )
 
     @output_handler(print_list)
-    def dependent_tables(self, tables: Collection[str] = ()) -> Set[str]:
+    def dependent_tables(self, tables: Optional[Collection[str]] = ()) -> Set[str]:
         """Compute the set of tables reachable from a set of tables in the computational DAG,
         (upstream and downstream), including the original tables"""
+        tables = tables or ()
         unknown_tables = {t for t in tables if t not in self.schema.tables}
         if unknown_tables:
             raise KeyError(f"Unknown tables: {','.join(unknown_tables)}")
@@ -430,7 +431,7 @@ class ReferenceDataManager:
     @output_handler(write_dependency_dag)
     def dag(
         self,
-        tables: Collection[str] = (),
+        tables: Optional[Collection[str]] = (),
         *,
         upstream: bool = True,
         downstream: bool = True,
@@ -595,7 +596,7 @@ class ReferenceDataManager:
             with open(source_docs_path, "w") as f:
                 f.write(source_doc)
 
-    def datagen(self, tables: Collection[str] = (), *, update_hashes: bool = True):
+    def datagen(self, tables: Optional[Collection[str]] = (), *, update_hashes: bool = True):
         """Re-generate package data, optionally skipping files with hashes matching those in the schema
         :param tables: names of the specific tables to build. If not passed, all tables will be built
         :param update_hashes: Should hashes be updated for all tables regenerated at the end of the
@@ -645,7 +646,7 @@ class ReferenceDataManager:
             if run_hash_update:
                 self.update_hashes(tables_to_update_hashes, codegen=True)
 
-    def update_hashes(self, tables: Collection[str] = (), *, codegen: bool = True):
+    def update_hashes(self, tables: Optional[Collection[str]] = (), *, codegen: bool = True):
         """Update package data hashes in schema YAML to match the actual hashes of package data files as
         currently present in the file tree (or as recomputed when specified)
 
