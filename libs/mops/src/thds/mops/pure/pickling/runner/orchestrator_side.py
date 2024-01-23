@@ -64,7 +64,10 @@ def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
 
 
 class MemoizingPicklingRunner:
-    """Runs callables in a remote process as defined by the Shell."""
+    """
+    Runs callables in a process as defined by the Shell.
+    This is often a remote process, however a local shell may be provided.
+    """
 
     def __init__(
         self,
