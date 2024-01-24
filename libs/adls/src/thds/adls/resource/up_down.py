@@ -91,7 +91,7 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
     # hit a race condition and error.  this will detect that scenario
     # and avoid re-uploading as well.
     fretry.is_exc(ResourceModifiedError),
-    fretry.expo(retries=2),
+    fretry.expo(retries=5),
 )
 def upload(
     dest: ty.Union[AdlsFqn, str],
