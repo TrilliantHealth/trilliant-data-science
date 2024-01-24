@@ -2,6 +2,7 @@
 of progress reports using either a time delay or by using fancy
 progress bars.
 """
+import os
 import typing as ty
 from functools import reduce
 from timeit import default_timer
@@ -11,6 +12,9 @@ from thds.core import log
 logger = log.getLogger(__name__)
 _1MB = 2**20
 _UPDATE_INTERVAL_S = 5
+_SUPPORTS_CR = not bool(os.getenv("CI"))
+# CI does not support carriage returns.
+# if we find other cases that don't, we can add them here.
 
 
 class ProgressState(ty.NamedTuple):
@@ -76,15 +80,24 @@ class TqdmReporter:
             bar = self._bar
             state = _sum_ps(states)
             if not bar and state.total > 0:
-                bar = tqdm(total=state.total, delay=_UPDATE_INTERVAL_S, initial=state.n, unit="byte", unit_scale=True)  # type: ignore
+                bar = tqdm(
+                    total=state.total,
+                    delay=_UPDATE_INTERVAL_S,
+                    mininterval=_UPDATE_INTERVAL_S,
+                    initial=state.n,
+                    unit="byte",
+                    unit_scale=True,
+                )  # type: ignore
             if bar:
                 # if there are zero active states (which is possible),
                 # n and total will be zero after sum, and we don't
                 # want to set zeros on an existing non-zero bar.
                 bar.total == state.total or bar.total
-                bar.n = state.n or bar.n
+                new_n = state.n or bar.n
+                bar.update(new_n - bar.n)
                 bar.desc = f"{self._desc}{_blobs(states)}"
-                bar.refresh()
+                if _SUPPORTS_CR:
+                    bar.refresh()
 
                 if bar.n >= bar.total:
                     bar.close()
@@ -116,8 +129,8 @@ class Tracker:
             self._reporter(list(self._progresses.values()))
 
 
-_GLOBAL_DN_TRACKER = Tracker(TqdmReporter("Downloading"))
-_GLOBAL_UP_TRACKER = Tracker(TqdmReporter("Uploading"))
+_GLOBAL_DN_TRACKER = Tracker(TqdmReporter("thds.adls downloading"))
+_GLOBAL_UP_TRACKER = Tracker(TqdmReporter("thds.adls uploading"))
 T = ty.TypeVar("T", bound=ty.IO)
 
 

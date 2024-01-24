@@ -1,8 +1,10 @@
 import logging
 import os
 import threading
+from typing import Dict
 
 from azure.identity import DefaultAzureCredential
+from azure.identity._constants import EnvironmentVariables
 
 from thds.core.lazy import Lazy
 
@@ -32,14 +34,26 @@ class ThreadSafeAzureCredential(DefaultAzureCredential):
             return super().close()
 
 
-def _SharedCredential() -> DefaultAzureCredential:
-    if "KUBERNETES_SERVICE_HOST" in os.environ:
+def _has_workload_identity_creds() -> bool:
+    workload_identity_vars = [
+        EnvironmentVariables.AZURE_TENANT_ID,
+        EnvironmentVariables.AZURE_CLIENT_ID,
+        EnvironmentVariables.AZURE_FEDERATED_TOKEN_FILE,
+    ]
+    return all(var in os.environ for var in workload_identity_vars)
+
+
+def get_credential_kwargs() -> Dict[str, bool]:
+    if _has_workload_identity_creds():
         # in K8s, we use various forms of credentials, but not the EnvironmentCredential,
         # and that one gets tried early and then warns us about something we don't care about.
-        return ThreadSafeAzureCredential(exclude_environment_credential=True)
-
+        return dict(exclude_environment_credential=True)
     # exclusion due to storage explorer credentials issue when trying to hit East SAs
-    return ThreadSafeAzureCredential(exclude_shared_token_cache_credential=True)
+    return dict(exclude_shared_token_cache_credential=True)
+
+
+def _SharedCredential() -> DefaultAzureCredential:
+    return ThreadSafeAzureCredential(**get_credential_kwargs())
 
 
 SharedCredential = Lazy(_SharedCredential)

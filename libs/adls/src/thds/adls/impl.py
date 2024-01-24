@@ -38,6 +38,7 @@ from .download import async_download_or_use_verified
 from .errors import translate_azure_error
 from .file_properties import is_directory
 from .ro_cache import from_cache_path_to_local, global_cache
+from .shared_credential import get_credential_kwargs
 
 LOGGER = log.getLogger(__name__)
 log.getLogger("azure.core").setLevel(logging.WARNING)
@@ -166,8 +167,7 @@ class ADLSFileSystem:
         :param args: additional args for func
         :param kwargs: addditional kwargs for func
         """
-        # exlcusion due to storage explorer credentials issue when trying to hit East SAs
-        async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as credential:
+        async with DefaultAzureCredential(**get_credential_kwargs()) as credential:
             service_client = DataLakeServiceClient(
                 account_url="{}://{}.dfs.core.windows.net".format("https", self.account_name),
                 credential=credential,
