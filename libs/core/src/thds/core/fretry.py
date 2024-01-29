@@ -2,7 +2,6 @@
 import time
 import typing as ty
 from functools import wraps
-from logging import getLogger
 
 F = ty.TypeVar("F", bound=ty.Callable)
 
@@ -55,7 +54,6 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
                 except Exception as ex:
                     if not is_retryable(ex):
                         raise ex
-                    getLogger(__name__).info(f"Retrying {func} due to {ex}")
             return func(*args, **kwargs)
 
         return ty.cast(F, retry_wrapper)
