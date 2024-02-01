@@ -81,14 +81,3 @@ def b64(digest: bytes) -> str:
     ADLS will have in UTF-8 string (instead of bytes) format.
     """
     return base64.b64encode(digest).decode()
-
-
-class Hash(ty.NamedTuple):
-    """Algorithm name needs to match something supported by hashlib.
-
-    A good choice would be sha256. Use md5 if you have to.
-    """
-
-    algo: str
-    # valid algorithm names listed here: https://docs.python.org/3/library/hashlib.html#constructors
-    bytes: bytes
