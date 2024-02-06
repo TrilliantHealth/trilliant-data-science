@@ -172,7 +172,7 @@ class FromUri(ty.Protocol):
 
 class FromUriHandler(ty.Protocol):
     def __call__(self, uri: str) -> ty.Optional[FromUri]:
-        """Returns a From_Uri object containing the URI if this URI can be handled.  Returns
+        """Returns a FromUri object containing the URI if this URI can be handled.  Returns
         None if this URI cannot be handled.
         """
 
