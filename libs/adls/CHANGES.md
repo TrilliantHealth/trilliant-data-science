@@ -1,3 +1,10 @@
+## 2.1
+
+- Register handlers with `thds.core.source` so that `from_uri` will generate ADLS Source objects without
+  hashes.
+- Provide `thds.adls.source.from_adls`, which also supports `AdlsHashedResource` conversion into the more
+  abstract and optimizable `Source` representation.
+
 # 2.0
 
 - Removing `lazy-object-proxy` from dependencies in favor of native lazy methods.

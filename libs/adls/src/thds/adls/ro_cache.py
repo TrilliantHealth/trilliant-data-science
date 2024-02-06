@@ -1,10 +1,10 @@
 import os
-import stat
 import typing as ty
 from pathlib import Path
 
 from thds.core import config, log
 from thds.core import types as ct
+from thds.core.files import set_read_only
 from thds.core.hashing import hash_using
 from thds.core.home import HOMEDIR
 from thds.core.link import LinkType, link_or_copy
@@ -63,14 +63,6 @@ def _opts_to_types(opts: LinkOpts) -> ty.Tuple[LinkType, ...]:
     elif opts is False:
         return tuple()
     return opts
-
-
-def set_read_only(fpath: ct.StrOrPath):
-    # thank you https://stackoverflow.com/a/51262451
-    logger.debug("Setting '%s' to read-only", fpath)
-    perms = stat.S_IMODE(os.lstat(fpath).st_mode)
-    ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
-    os.chmod(fpath, perms & ro_mask)
 
 
 def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath, link_opts: LinkOpts):

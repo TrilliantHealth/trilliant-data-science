@@ -1,3 +1,11 @@
+## 2.5
+
+- Support new hash-based `Source` representation from `thds.core`, intended to replace both Paths and
+  SrcFile/DestFile for future representation of read-only data across remote function boundaries in
+  `mops`. Fully optimized to avoid unnecessary uploads (unlike `Path`), requires no temp files (unlike
+  `SrcFile`), and avoids ceremony associated with context managers (unlike both `SrcFile` and
+  `DestFile`).
+
 ### 2.4.20241217
 
 - Fixed a bug where a username including capital letters or underscores would result in an error when the

@@ -11,7 +11,7 @@ from ...core.pipeline_id_mask import pipeline_id_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.types import Args, BlobStore, Kwargs, T
-from .._pickle import Dumper, gimme_bytes, make_read_object, unfreeze_args_kwargs
+from .._pickle import Dumper, SourceResultPickler, gimme_bytes, make_read_object, unfreeze_args_kwargs
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
 from .orchestrator_side import INVOCATION, RUNNER_SUFFIX, MemoizingPicklingRunner
@@ -69,6 +69,7 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
             Dumper(
                 ByIdSerializer(ByIdRegistry()),
                 CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once()),
+                SourceResultPickler(),
             ),
             memo_uri,
         ),

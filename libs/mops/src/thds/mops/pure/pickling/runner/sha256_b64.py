@@ -10,61 +10,55 @@ import pickle
 import typing as ty
 from pathlib import Path
 
-from thds.core.hashing import hash_using
-from thds.core.log import getLogger
+from thds.core import hashing, log
 
-from ...._utils.human_b64 import encode
+from ...core.content_addressed import storage_content_addressed, wordybin_content_addressed
 from ...core.serialize_paths import Downloader
 from ...core.uris import active_storage_root, lookup_blob_store
 from ..pickles import UnpicklePathFromUri, UnpickleSimplePickleFromUri
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 T = ty.TypeVar("T")
 
 
-SHA256_B64_ADDRESSED = "sha256-b64-addressed"
-# we can save on storage and simplify lots of internals if we just
-# hash all blobs and upload them to a key that is their hash.
-
-
-def _sha256_addressed(sha256_of_some_kind: str) -> str:
-    return f"{active_storage_root()}/{SHA256_B64_ADDRESSED}/{sha256_of_some_kind}"
-
-
 class Sha256B64PathStream:
-    def local_to_remote(self, path: Path, key: str):
+    def local_to_remote(self, path: Path, sha256: str):
         """Return fully qualified remote information after put."""
-        full_remote_key = _sha256_addressed(key)
-        lookup_blob_store(full_remote_key).putfile(path, full_remote_key)
+        # lazily fetches the active storage root.
+        full_remote_sha256 = storage_content_addressed(sha256, "sha256")
+        lookup_blob_store(full_remote_sha256).putfile(path, full_remote_sha256)
 
-    def get_downloader(self, remote_key: str) -> Downloader:
-        return UnpicklePathFromUri(_sha256_addressed(remote_key))  # type: ignore # NamedTuple silliness
+    def get_downloader(self, remote_sha256: str) -> Downloader:
+        return UnpicklePathFromUri(storage_content_addressed(remote_sha256, "sha256"))  # type: ignore # NamedTuple silliness
 
 
-def _pickle_and_upload_to_content_addressed_path(
-    storage_root: str, obj, debug_name: str = ""
+def _pickle_obj_and_upload_to_content_addressed_path(
+    obj, debug_name: str = ""
 ) -> UnpickleSimplePickleFromUri:
+    # active_storage_root is lazily fetched because we may want to register the pickler
+    # somewhere before settling on the final destination of objects pickled.
+    storage_root = active_storage_root()
     with io.BytesIO() as bio:
         pickle.dump(obj, bio)
         bio.seek(0)
         fs = lookup_blob_store(storage_root)
-        base_uri = fs.join(
+        bytes_uri, debug_uri = wordybin_content_addressed(
+            hashing.Hash("sha256", hashing.hash_using(bio, hashlib.sha256()).digest()),
             storage_root,
-            SHA256_B64_ADDRESSED,
-            encode(hash_using(bio, hashlib.sha256()).digest()),
+            debug_name=f"objname_{debug_name}" if debug_name else "",
         )
-        bytes_uri = fs.join(base_uri, "_bytes")
-        # corresponds with '_bytes' as used in `serialize_paths.py`
         fs.putbytes(bytes_uri, bio)
-        if debug_name:
+        if debug_uri:
             # this name is purely for debugging and affects no part of the runtime.
-            fs.putbytes(fs.join(base_uri, f"objname_{debug_name}"), "goodbeef".encode())
+            fs.putbytes(debug_uri, "goodbeef".encode())
 
     return UnpickleSimplePickleFromUri(bytes_uri)
 
 
 class Sha256B64Pickler:
-    """A type of CallbackPickler.
+    """A type of CallbackPickler, intended for picklable objects that should be serialized
+    as pure bytes and stored at a content-addressed URI. Only used (currently) by the
+    ById/shared object serializer, most likely for something like a large dataframe.
 
     Name exists solely for debugging purposes.
     """
@@ -73,6 +67,4 @@ class Sha256B64Pickler:
         self.name = name
 
     def __call__(self, obj: ty.Any) -> UnpickleSimplePickleFromUri:
-        # _get_storage_root is lazy because we may want to register the pickler somewhere
-        # before settling on the final destination of objects pickled.
-        return _pickle_and_upload_to_content_addressed_path(active_storage_root(), obj, self.name)
+        return _pickle_obj_and_upload_to_content_addressed_path(obj, self.name)

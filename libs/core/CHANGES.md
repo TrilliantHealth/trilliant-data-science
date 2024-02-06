@@ -1,3 +1,8 @@
+## 1.16
+
+- New `Source` abstraction for read-only data which may or may not yet be local. Try it with
+  `source.from_path` and `source.from_uri`.
+
 ## 1.15
 
 - Updated `DotDict` to convert `dict`s inside of `set`s, `list`s, and `tuple`s into `DotDict`s.

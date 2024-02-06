@@ -11,6 +11,7 @@ from .core.memo.function_memospace import (  # noqa
 )
 from .core.memo.results import require_all as require_all_results  # noqa
 from .core.pipeline_id_mask import pipeline_id_mask, pipeline_id_mask_from_docstr  # noqa
+from .core.source import create_source_at_uri  # noqa
 from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable  # noqa
 from .pickling.memoize_only import memoize_in  # noqa

@@ -19,8 +19,16 @@ from ...core.partial import unwrap_partial
 from ...core.pipeline_id_mask import function_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
+from ...core.source import source_argument_buffering
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
-from .._pickle import Dumper, freeze_args_kwargs, gimme_bytes, make_read_object, wrap_f
+from .._pickle import (
+    Dumper,
+    SourceArgumentPickler,
+    freeze_args_kwargs,
+    gimme_bytes,
+    make_read_object,
+    wrap_f,
+)
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
 
@@ -38,7 +46,7 @@ immediately after its return.
 
 class ShellBuilder(ty.Protocol):
     def __call__(self, __f: F, __args: Args, __kwargs: Kwargs) -> Shell:
-        ...
+        ...  # pragma: no cover
 
 
 def _mk_builder(shell: ty.Union[Shell, ShellBuilder]) -> ShellBuilder:
@@ -142,6 +150,7 @@ class MemoizingPicklingRunner:
         return Dumper(
             ByIdSerializer(self._by_id_registry),
             CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once()),
+            SourceArgumentPickler(),
         )
 
     def __call__(self, f: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:
@@ -208,8 +217,12 @@ def _pickle_func_and_run_via_shell(
             # memoization key.
             func, args, kwargs = unwrap_partial(func_, args_, kwargs_)
             pipeline_id = scope.enter(function_mask(func))
+
             trigger_src_files_upload(args, kwargs)
-            args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)
+            # eagerly upload (deprecated) SrcFiles prior to serialization
+            scope.enter(source_argument_buffering())
+            # prepare to optimize Source objects during serialization
+            args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)  # serialize!
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
 
             def unwrap_remote_result(result: ty.Union[results.Success, results.Error]) -> T:

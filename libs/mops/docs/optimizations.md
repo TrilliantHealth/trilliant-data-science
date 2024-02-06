@@ -42,74 +42,127 @@ meaningless and there is no risk of collision.
 
 ## File transfer
 
-\*\*(Simple large-file sources and sinks via `pathlib.Path`)
-
 There are lots of Python objects that take up significantly more space in memory than on disk. A
 parquet-ified DataFrame is a pretty common example. Your existing parallel code may even pass local paths
 to separate processes so that you can avoid transferring large amounts of memory when it can more easily
 be read from disk. This makes your functions impure, but can certainly save time and occasionally
 resources.
 
-We provide two different optimizations for files, with different use cases. Both will dramatically reduce
-peak memory pressure on the orchestrator process, because the data gets streamed from/to disk rather than
-being held in memory all at once. If you have concerns about memory pressure during the 'reduce' step of
-your application (i.e. as you are collecting large quantities of results from many remote tasks), you
-should consider using one of these two approaches rather than transferring in-memory bytes objects.
-
-- Both abstractions require your files to be used **_either_** as a **immutable read-only source** file
-  **_or_** as a **write-only, write-once destination**. This is _not_ a general purpose remote filesystem
-  abstraction, because that would not be compatible with the high-level map/reduce paradigm we are
-  attempting to provide.
+We provide several different optimizations for files, with different use cases. All will dramatically
+reduce peak memory pressure on the orchestrator process, because the data gets streamed from/to disk
+rather than being held in memory all at once. If you have concerns about memory pressure during the
+'reduce' step of your application (i.e. as you are collecting large quantities of results from many
+remote tasks), you should consider using one of these approaches rather than transferring in-memory bytes
+objects.
 
 - _ADLS required for remote use_ - Remote use of these abstractions both depend on using the included
   `AdlsPickleRunner` with the `use_runner` decorator factory. Any future runner implementations will not
   exhibit this behavior by default.
 
-- _Local computation supported_ - However, both of these abstractions are also _usable_ with no
+- _Local computation supported_ - However, all of these abstractions are also _usable_ with no
   `AdlsPickleRunner`. This means that your pipeline can be expressed in terms of these file abstractions
   without actually requiring ADLS or AdlsPickleRunner or K8s, etc.
 
-### Paths
+### thds.core.source
 
-Use `pathlib.Path` and get files (but not directories) transferred automagically.
+`thds.core.source` provides a maximally abstract wrapper for read-only data which allows `mops` to
+provide significant optimizations over other options listed below.
 
-- _The primary use case here is one-way transfer from an orchestrator to remote runners, with the added
-  advantage that it requires no modification to existing code._
+> 📢 The TL;DR of this section is that you should:
+>
+> - replace function parameters representing readable/input data (e.g. `Path`, `SrcFile`, `AdlsFqn`,
+>   etc.) with `Source`.
+> - replace function return values (e.g. `Path`, `DestFile`, `AdlsFqn`) with `Source`.
+> - remove input parameter `DestFiles` (which represent output locations) from the function signature
+>   entirely if at all possible (preferring the automatic naming behavior provided by `from_file`), and
+>   if not, you should replace them with an input parameter URI or AdlsFqn, and then return `Source`.
+>
+> These changes will, in general, incur minor changes for the calling code, and, if switching away from
+> `SrcFile`, probably provide some code simplification (removing the need for `with` statements or
+> `scope.enter` on the `SrcFile`) within the functions themselves.
 
-Any `pathlib.Path` found (even recursively) while pickling your function arguments will be streamed in a
-memory-efficient manner to ADLS, and then on the 'other side' it will be streamed to a **read-only** file
-and given to you as a `Path` object. The file is immutable, and even if written to, those effects will
-not be visible to the orchestrator.
+On a basic level, `Source` represents two conceptually different possibilities for the availability of
+your data. Data is either:
 
-> The file must already exist; a Path pointing to a directory or to nothing at all will cause subclass of
-> ValueError to be raised.
+- available on the local filesystem
+- available remotely, but able to be downloaded to the local filesystem when the data is opened for
+  reading.[^1]
 
-Separately, any `Path` found in the return value will similarly be streamed to a **read-only** file on
-the local orchestrator. This is semantically meaningful as a *write-once destination* - writing to this
-Path will transfer its bytes to the orchestrator as a temporary file.
+By using this abstraction, functions can obey
+[Postel's law](https://en.wikipedia.org/wiki/Robustness_principle), and take advantage of the
+[Liskov substitution principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle), such that
+the function's code does not need to change depending on where the data is coming from (local file or
+remote URI), and such that the caller of the function has maximum control over where it sources the data,
+as well as what is received (it can choose to download the data if necessary, or to not download the data
+and pass it by reference to some later consumer).
 
-Both of these actions happen automatically across `use_runner` function invocations using the
-`AdlsPickleRunner`, without further changes to the code. And within a given `pipeline_id`, a unique set
-of local bytes referenced by a `Path` will only be transferred up to remote workers a single time.
+`Source` objects should generally be created via `thds.core.source.from_file` or
+`thds.core.source.from_uri`, though if you have an `AdlsFqn` or `AdlsHashedResource` you may use
+`thds.adls.source.from_adls` directly to avoid needing to convert the `AdlsFqn` into a string.
 
-Your Python code simply deals with these Paths like normal. **However**, if you want `Path`s transferred
-back to an orchestrator to live in a particular directory, you'll have to write the code on the
-orchestrator side to make sure the files get moved to the appropriate destination, since the `Path`
-crossing the `use_runner` function boundary back into the orchestrator process will point to a temporary
-location.
+Functions consuming read-only data should define their parameter types as `Source`, and functions
+returning read-only data should use `Source` in the return type as well. The function code may operate
+using `Path` or whatever else is convenient when creating new files, but prior to return, any file being
+returned should be converted into a `Source`, usually via `from_file`.
 
-See `tests.integration.remote.shell_test.func_with_paths` to see examples of both of these usages in
-action.
+- `source.from_file` will automagically assign a remote URI name for your returned Source(s), based on
+  the invocation output URI plus the base name of the file (e.g.
+  `/var/tmp/t4/9__2bhc914s58rs3gdf3d4t00000gr/snow_white.txt` ->
+  `adls://ds/tmp/foobar/pipeline/thds.my_function/snow_white.txt/VaultAskBrain.hPUok14h4T8BYy1oGgoaJu9LxNV6yVM154sFaP8--snow_white.txt`).
+  This is standard practice and recommended, to avoid name collisions on a shared remote blob store.
+- To skip the automagic remote naming behavior, you may instead use `mops.pure.create_source_at_uri`.
+  Note that this risks name collisions, in particular the possibility of overwriting data that was meant
+  to be read-only for the benefit of a downstream process. You have been warned...
 
-#### Path must exist and be a regular file!
+An example:
 
-Currently, these `Path` optimizations do not handle directories, nor can they 'represent' a destination
-Path (where something should be placed by the callee) - they may only be regular files. If you need to
-upload a directory full of files, you can construct a List of Paths yourselves and they will each be
-individually transferred. However, this is an implementation limitation that could be lifted in the
-future if it would be advantageous.
+```python
+from pathlib import Path
 
-### Src/DestFiles
+from thds.core.source import Source, from_file
+from thds.mops import tempdir
 
-See [Src/DestFiles](./src_dest_files.md) - this is not a pure optimization, since its interface will
-bleed through into the remote function itself.
+def remote_func(src_a: Source, src_b: Source) -> Source:
+    outf = Path.cwd() / 'c.txt'
+    with open(outf, 'w') as wf:
+        # you can `open` a src object directly
+        wf.write(open(src_a).read() + '\n' + open(src_b).read())
+    return from_file(outf)
+
+
+def orchestrator():
+    src_a = from_file('a.txt')
+    src_b = from_file(Path('b.txt'))  # works with Path, too
+    src_c = remote_func(src_a, src_b)
+    assert open(src_c).read() == open(src_a).read() + '\n' + src_b.path().read_text()
+    # sources can be opened; they can also be turned into Path objects.
+```
+
+The above code will work whether or not `mops` is in play at all, and it will produce exactly the same
+results in either case, with the exception that if your `remote_func` actually runs on a different
+machine, there will not be a `c.txt` in your current working directory when the function returns (since
+side-effects are not propagated by `mops`). In fact, if you use `mops` but still execute locally (e.g.
+with `memoize_in`), `c.txt` _will_ exist in your current working directory, and only a single upload of
+the result data will take place (and no downloads of any kind), as all input data is available locally,
+and the output data is already present locally after return.
+
+> Again, `Source` is now the standard recommendation for how to pass file-like read-only data into your
+> functions, and pass it back to other consumers after creation. As long as your data can be treated as
+> read-only after the time of initial write, you can safely stop reading this document and use `Source`
+> everywhere.
+
+### pathlib.Path (deprecated)
+
+See [paths](./paths.md) for documentation on this still-supported but no longer recommended
+functionality.
+
+### Src/DestFiles (deprecated)
+
+See [Src/DestFiles](./src_dest_files.md) for documentation on another deprecated approach to naming and
+sourcing read-only data.
+
+[^1]: The current implementation does not provide for efficiently 'seeking' to a byte range within the
+    Source - the entire file must first be downloaded. This is not a fundamental limitation, and could in
+    theory be lifted by further technical work, but not all remote file stores would necessarily support
+    this type of access anyway, and we have not previously supported anything like this with Paths or the
+    Src/DestFile abstractions.

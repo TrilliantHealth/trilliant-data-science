@@ -3,7 +3,7 @@ import typing as ty
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from thds.core.hashing import hash_using
+from thds.core.hash_cache import hash_file
 from thds.core.log import getLogger
 
 from ..._utils import human_b64, once
@@ -16,7 +16,7 @@ _1_MB = 2**20
 def human_sha256b64_file_at_paths(path: Path) -> str:
     """Return a human-readable hash of the file at the given path."""
     assert path.exists(), path
-    return human_b64.encode(hash_using(path, hashlib.sha256()).digest())
+    return human_b64.encode(hash_file(path, hashlib.sha256()))
 
 
 class _ProcessLockingPathContentAddresser:
@@ -40,7 +40,7 @@ class _ProcessLockingPathContentAddresser:
         self.paths_to_keys: ty.Dict[str, str] = dict()
 
     def __call__(self, path: Path) -> str:
-        """Return a remote key for a path."""
+        """Return a remote key (sha256 hash in human-base64) for a path."""
         resolved = str(path.resolve())
         # we now put all paths at the hash of their own contents which
         # allows us to avoid uploading duplicated data even from two

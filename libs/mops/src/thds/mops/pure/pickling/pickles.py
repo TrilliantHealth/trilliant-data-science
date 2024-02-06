@@ -9,9 +9,10 @@ import pickle
 import typing as ty
 from pathlib import Path
 
-from thds.core import log
+from thds.core import hashing, log, source
 
 from ..core.script_support import add_main_module_function, get_main_module_function
+from ..core.source import source_from_hashref, source_from_source_result
 from ..core.uris import get_bytes, lookup_blob_store
 
 logger = log.getLogger(__name__)
@@ -72,3 +73,42 @@ class UnpicklePathFromUri(ty.NamedTuple):
 
     def __call__(self) -> Path:
         return lookup_blob_store(self.uri).getfile(self.uri)
+
+
+class UnpickleSourceUriArgument(ty.NamedTuple):
+    """The URI fully specifies this type of source. Nothing fancy happens here.  We just
+    return a new Source object that represents the URI.
+    """
+
+    uri: str
+
+    def __call__(self) -> source.Source:
+        return source.from_uri(self.uri)
+
+
+class UnpickleSourceHashrefArgument(ty.NamedTuple):
+    """Represents the root for a single file hashref. May be either local or remote.
+
+    For stability, the module name and the class name must not change.
+
+    This only applies to arguments _into_ a function. Results _from_ a function should
+    have a different form.
+    """
+
+    hash: hashing.Hash
+
+    def __call__(self) -> source.Source:
+        return source_from_hashref(self.hash)
+
+
+class UnpickleSourceResult(ty.NamedTuple):
+    """Stability for this is not critical, as it will only ever exist in the result
+    payload, which does not participate in memoization.
+    """
+
+    remote_uri: str
+    hash: ty.Optional[hashing.Hash]
+    file_uri: str
+
+    def __call__(self) -> source.Source:
+        return source_from_source_result(*self)

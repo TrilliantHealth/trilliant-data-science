@@ -1,4 +1,5 @@
-"""Utilities built around pickle for the purpose of transferring large amounts of on-disk data and also functions."""
+"""Utilities built around pickle for the purpose of transferring large amounts of on-disk
+data and also functions."""
 import inspect
 import io
 import pickle
@@ -7,13 +8,19 @@ import typing as ty
 # so we can pickle and re-raise exceptions with remote tracebacks
 from tblib import pickling_support  # type: ignore
 
-from thds.core.log import getLogger
+from thds.core import hashing, log, source
 
+from ..core.source import prepare_source_argument, prepare_source_result
 from ..core.types import Args, Kwargs, SerializerHandler, T
 from ..core.uris import get_bytes
-from .pickles import PicklableFunction
+from .pickles import (
+    PicklableFunction,
+    UnpickleSourceHashrefArgument,
+    UnpickleSourceResult,
+    UnpickleSourceUriArgument,
+)
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 def wrap_f(f):
@@ -92,3 +99,33 @@ def freeze_args_kwargs(dumper: Dumper, f, args: Args, kwargs: Kwargs) -> bytes:
 def unfreeze_args_kwargs(args_kwargs_pickle: bytes) -> ty.Tuple[Args, Kwargs]:
     """Undoes a freeze_args_kwargs call."""
     return CallableUnpickler(io.BytesIO(args_kwargs_pickle)).load()
+
+
+# SerializerHandlers for Source objects:
+_DeserSource = ty.Callable[[], source.Source]
+
+
+class SourceArgumentPickler:
+    """Only for use on the orchestrator side, when serializing the arguments."""
+
+    def __call__(self, maybe_source: ty.Any) -> ty.Optional[_DeserSource]:
+        if isinstance(maybe_source, source.Source):
+            uri_or_hash = prepare_source_argument(maybe_source)
+            if isinstance(uri_or_hash, hashing.Hash):
+                return ty.cast(_DeserSource, UnpickleSourceHashrefArgument(uri_or_hash))
+            return ty.cast(_DeserSource, UnpickleSourceUriArgument(uri_or_hash))
+            # I do not understand why these casts are necessary to avoid mypy errors.
+            # I think it has something to do with NamedTuples being the underlying
+            # object type that is expected to support __call__(self) -> Foo,
+            # but I haven't recently located a relevant Issue anywhere.
+        return None
+
+
+class SourceResultPickler:
+    """Only for use on the remote side, when serializing the result."""
+
+    def __call__(self, maybe_source: ty.Any) -> ty.Optional[_DeserSource]:
+        if isinstance(maybe_source, source.Source):
+            return ty.cast(_DeserSource, UnpickleSourceResult(*prepare_source_result(maybe_source)))
+
+        return None

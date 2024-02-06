@@ -8,6 +8,7 @@ from kubernetes import client
 
 from thds.core import scope
 from thds.core.log import logger_context
+from thds.mops.pure.core.source import perform_source_uploads
 
 from .._utils.colorize import colorized
 from . import config
@@ -234,6 +235,8 @@ def mops_shell(
         get_container_image = container_image
 
     def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
+        perform_source_uploads()  # we're transferring to a remote context,
+        # so we should upload any Source that was waiting to find out if we'd stay local.
         assert "args" not in inner_kwargs
         launch(
             get_container_image(),
