@@ -1,4 +1,5 @@
 """A more composable retry decorator."""
+import random
 import time
 import typing as ty
 from functools import wraps
@@ -12,7 +13,9 @@ RetryStrategy = ty.Iterable[IsRetryable]
 RetryStrategyFactory = ty.Callable[[], RetryStrategy]
 
 
-def expo(*, retries: int, delay: float = 1.0, backoff: int = 2) -> ty.Callable[[], ty.Iterator[float]]:
+def expo(
+    *, retries: int, delay: float = 1.0, backoff: int = 2, jitter: bool = True
+) -> ty.Callable[[], ty.Iterator[float]]:
     """End iteration after yielding 'retries' times.
 
     If you want infinite exponential values, pass a negative number for 'retries'.
@@ -21,7 +24,10 @@ def expo(*, retries: int, delay: float = 1.0, backoff: int = 2) -> ty.Callable[[
     def expo_() -> ty.Iterator[float]:
         count = 0
         while retries < 0 or count < retries:
-            yield backoff**count * delay
+            expo_delay = backoff**count * delay
+            if jitter:
+                expo_delay *= random.uniform(0.5, 1.5)
+            yield expo_delay
             count += 1
 
     return expo_
