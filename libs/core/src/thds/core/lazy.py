@@ -21,7 +21,11 @@ class Lazy(ty.Generic[R]):
     def __init__(self, source: ty.Callable[[], R], storage=None):
         self._source = source
         self._storage = storage if storage is not None else lambda: 0
-        self._lock = Lock()
+        self._storage.lock = Lock()
+        # we store the Lock on the storage, because in some cases the storage may be
+        # thread-local, and we need a separate lock per thread. However, we also create
+        # the first lock in the constructor so that in most cases, we never need to use
+        # the global _LOCK_LOCK, which will cause some very minor contention.
 
     def __call__(self) -> R:
         if hasattr(self._storage, "cached"):
