@@ -169,7 +169,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # we cannot optimize this one for memoization - just return the URI.
         return source_.uri
 
-    local_path = source_._local_path
+    local_path = source_.cached_path
     if local_path and local_path.exists():
         # create local hashref...
         _write_hashref(_hashref_uri(source_.hash, "local"), str(local_path))
@@ -231,8 +231,8 @@ def prepare_source_result(source_: Source) -> SourceResult:
     where we can safely place any named output.
     """
     if not is_file_uri(source_.uri):
-        if source_._local_path:
-            file_uri = to_uri(source_._local_path)
+        if source_.cached_path:
+            file_uri = to_uri(source_.cached_path)
         else:
             file_uri = ""
         logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
@@ -281,7 +281,6 @@ def create_source_at_uri(filename: StrOrPath, destination_uri: str) -> Source:
     _Only_ use this if you are willing to immediately upload your data.
 
     """
-    source_ = source.from_file(filename)
-    source_.uri = destination_uri
+    source_ = source.from_file(filename, uri=destination_uri)
     lookup_blob_store(destination_uri).putfile(Path(filename), destination_uri)
     return source_

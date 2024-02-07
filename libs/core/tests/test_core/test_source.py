@@ -1,25 +1,17 @@
-import tempfile
-import typing as ty
-import uuid
+import dataclasses
 from pathlib import Path
 
 import pytest
 
 from thds.core.hashing import Hash
-from thds.core.source import SourceHashMismatchError, _get_download_handler, from_file, from_uri
-
-
-@pytest.fixture
-def temp_file() -> ty.Iterator[ty.Callable[[str], Path]]:
-    with tempfile.TemporaryDirectory() as tempdir:
-
-        def make_temp_file(some_text: str) -> Path:
-            p = Path(tempdir) / ("cfile-" + uuid.uuid4().hex)
-            with open(p, "w") as f:
-                f.write(some_text)
-            return p
-
-        yield make_temp_file
+from thds.core.source import (
+    Source,
+    SourceHashMismatchError,
+    _get_download_handler,
+    from_file,
+    from_uri,
+    to_uri,
+)
 
 
 def test_source_from_file_is_openable(temp_file):
@@ -37,12 +29,13 @@ def test_source_from_file_gives_path(temp_file):
 def test_resolve_local_source(temp_file):
     tfile = temp_file("YO")
 
-    source = from_file(tfile)
-    source._local_path = None
+    source = from_file(tfile, None, to_uri(tfile))
+    assert source.hash
+    object.__setattr__(source, "__cached_path", None)  # hack necessary to test caching
 
     assert open(source).read() == "YO"
     assert open(source).read() == "YO"
-    # running this twice makes sure we cover the optimized path.
+    # running this twice makes sure we cover the optimized reuse of the cached path.
 
 
 def test_from_file_fails_if_path_not_exists():
@@ -74,11 +67,26 @@ def test_local_file_downloader_raises_file_not_found():
 
 
 def test_hash_not_checked_if_not_present(temp_file):
-    source = from_file(temp_file("foobar"))
-    source.hash = None
-    source._local_path = None
+    source = Source(to_uri(temp_file("foobar")))
     assert open(source).read() == "foobar"
 
 
 def test_from_uri_works():
     assert from_uri("foo://bar/baz").uri == "foo://bar/baz"
+
+
+def test_source_is_hashable():
+    assert hash(from_uri("foo://bar/baz")) == hash(from_uri("foo://bar/baz"))
+    assert from_uri("foo://bar/baz") == from_uri("foo://bar/baz")
+
+
+def test_source_is_immutable(temp_file):
+    s = from_file(temp_file("car"))
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        s.uri = "not allowed"  # type: ignore
+
+
+def test_set_cached_path_does_not_error_if_none(temp_file):
+    s = from_file(temp_file("dog"))
+    s._set_cached_path(None)
+    assert not s.cached_path
