@@ -3,6 +3,18 @@ import typing as ty
 from threading import Lock, local
 
 R = ty.TypeVar("R")
+_LOCK_LOCK = Lock()  # for thread local storage, you need to create the lock on each thread.
+
+
+def _get_lock(storage) -> Lock:
+    if hasattr(storage, "lock"):
+        return storage.lock
+    with _LOCK_LOCK:
+        if hasattr(storage, "lock"):
+            return storage.lock
+        # creating a lock is itself very fast, whereas the source() callable may be slow.
+        storage.lock = Lock()
+    return storage.lock
 
 
 class Lazy(ty.Generic[R]):
@@ -14,7 +26,7 @@ class Lazy(ty.Generic[R]):
     def __call__(self) -> R:
         if hasattr(self._storage, "cached"):
             return self._storage.cached
-        with self._lock:
+        with _get_lock(self._storage):
             if hasattr(self._storage, "cached"):
                 return self._storage.cached
             self._storage.cached = self._source()
