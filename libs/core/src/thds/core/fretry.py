@@ -12,24 +12,29 @@ RetryStrategy = ty.Iterable[IsRetryable]
 RetryStrategyFactory = ty.Callable[[], RetryStrategy]
 
 
-def expo(*, retries: int, delay: float = 1.0, backoff: int = 2) -> ty.Iterator[float]:
+def expo(*, retries: int, delay: float = 1.0, backoff: int = 2) -> ty.Callable[[], ty.Iterator[float]]:
     """End iteration after yielding 'retries' times.
 
     If you want infinite exponential values, pass a negative number for 'retries'.
     """
-    count = 0
-    while retries < 0 or count < retries:
-        yield backoff**count * delay
-        count += 1
+
+    def expo_() -> ty.Iterator[float]:
+        count = 0
+        while retries < 0 or count < retries:
+            yield backoff**count * delay
+            count += 1
+
+    return expo_
 
 
 def sleep(
-    seconds_iter: ty.Iterable[float], sleeper: ty.Callable[[float], ty.Any] = time.sleep
+    mk_seconds_iter: ty.Callable[[], ty.Iterable[float]],
+    sleeper: ty.Callable[[float], ty.Any] = time.sleep,
 ) -> ty.Callable[[], ty.Iterator]:
     """A common base strategy for separating retries by sleeps."""
 
     def sleep_() -> ty.Iterator:
-        for secs in seconds_iter:
+        for secs in mk_seconds_iter():
             yield
             sleeper(secs)
 
@@ -72,7 +77,7 @@ def retry_regular(
 
 def retry_sleep(
     is_retryable: IsRetryable,
-    seconds_iter: ty.Iterable[float],
+    seconds_iter: ty.Callable[[], ty.Iterable[float]],
 ) -> ty.Callable[[F], F]:
     """E.g. retry_sleep(expo(retries=5))"""
     return retry_regular(is_retryable, sleep(seconds_iter))

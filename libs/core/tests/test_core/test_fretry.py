@@ -17,6 +17,10 @@ def test_retry_regular():
         broken()
 
     assert count == 5
+    with pytest.raises(ValueError):
+        broken()
+
+    assert count == 10  # a second attempt goes through the retry loop again.
 
 
 def test_retry_sleep():
