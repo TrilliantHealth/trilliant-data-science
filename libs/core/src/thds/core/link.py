@@ -4,11 +4,10 @@ import os
 import platform
 import shutil
 import subprocess
-import tempfile
 import typing as ty
 from pathlib import Path
 
-from . import log
+from . import log, tmp
 from . import types as ct
 
 _IS_MAC = platform.system() == "Darwin"
@@ -104,9 +103,8 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
-    with tempfile.TemporaryDirectory(suffix="-linkcopy") as dir:
-        tmpfile = os.path.join(dir, "tmp")
+    with tmp.temppath_same_fs(dest) as tmpfile:
+        # atomic to the final destination since we're on the same filesystem.
         shutil.copyfile(src, tmpfile)
-        shutil.move(tmpfile, dest)
-        # atomic to the final destination as long as we're on the same filesystem.
+        shutil.move(str(tmpfile), dest)
     return ""
