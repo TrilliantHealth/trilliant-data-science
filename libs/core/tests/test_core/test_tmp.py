@@ -1,16 +1,7 @@
-import os
 import unittest.mock
 from pathlib import Path
 
 from thds.core import tmp
-
-
-def test_if_on_ci_we_put_tempfiles_in_home_directory():
-    """Because if we don't, we have all kinds of weird linking race conditions that I don't want to deal with."""
-    if os.getenv("CI"):
-        assert tmp.tempdirs_on_different_filesystem()
-    else:
-        assert not tmp.tempdirs_on_different_filesystem()
 
 
 def test_mock_tempdir_when_not_on_same_fs():

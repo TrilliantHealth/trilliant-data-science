@@ -19,18 +19,6 @@ def _are_same_fs(path1: Path, path2: Path) -> bool:
     return path1.stat().st_dev == path2.stat().st_dev
 
 
-def _detect_tempdirs_on_different_filesystem_than_home() -> bool:
-    with tempfile.TemporaryDirectory() as tdir:
-        return _are_same_fs(Path(tdir), Path.home())
-
-
-_TEMPDIRS_ON_DIFFERENT_FILESYSTEM = _detect_tempdirs_on_different_filesystem_than_home()
-
-
-def tempdirs_on_different_filesystem() -> bool:
-    return _TEMPDIRS_ON_DIFFERENT_FILESYSTEM
-
-
 def _walk_up_to_existing_dir(path: Path) -> Path:
     existing_dir = path
     while not existing_dir.exists() or not existing_dir.is_dir():
