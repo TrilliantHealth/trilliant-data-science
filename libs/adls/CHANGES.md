@@ -1,3 +1,8 @@
+### 2.1.20240208
+
+- Fix longstanding bug where ResourceModifiedError could result during use of `resource.upload` because
+  of a bug in the underlying `thds.core` library having to do with retries.
+
 ## 2.1
 
 - Register handlers with `thds.core.source` so that `from_uri` will generate ADLS Source objects without

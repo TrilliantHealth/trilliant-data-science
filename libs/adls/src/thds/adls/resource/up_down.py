@@ -1,11 +1,10 @@
 """Tools for using and creating locally-cached resources."""
-import shutil
 import typing as ty
 from pathlib import Path
 
 from azure.core.exceptions import HttpResponseError, ResourceModifiedError
 
-from thds.core import fretry, hashing, log, scope
+from thds.core import files, fretry, hashing, link, log, scope, tmp
 
 from .._progress import report_upload_progress
 from .._upload import upload_decision_and_settings
@@ -14,8 +13,7 @@ from ..download import download_or_use_verified
 from ..errors import BlobNotFoundError
 from ..fqn import AdlsFqn
 from ..global_client import get_global_client
-from ..link import link
-from ..ro_cache import Cache, global_cache, set_read_only
+from ..ro_cache import Cache, global_cache
 from .file_pointers import AdlsHashedResource, resource_from_path, resource_to_path
 
 logger = log.getLogger(__name__)
@@ -54,34 +52,35 @@ UploadSrc = ty.Union[Path, bytes, ty.IO[ty.AnyStr], ty.Iterable[bytes]]
 
 
 def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Optional[Path]:
+    @scope.bound
     def _try_write_through() -> bool:
         if isinstance(data, Path) and data.exists():
-            link_type = link(data, local_cache_path, "ref")
-            assert link_type in {"ref", "", "same"}, link_type
-            if not link_type:
-                shutil.copyfile(data, local_cache_path)
+            link.link_or_copy(data, local_cache_path, "ref")
             return True
+        out = scope.enter(tmp.temppath_same_fs(local_cache_path))
         if hasattr(data, "read") and hasattr(data, "seek"):
-            if local_cache_path.exists():
-                local_cache_path.unlink()
-            with local_cache_path.open("wb") as f:
+            with open(out, "wb") as f:
                 f.write(data.read())  # type: ignore
-                data.seek(0)  # type: ignore
+            data.seek(0)  # type: ignore
+            link.link_or_copy(out, local_cache_path)
             return True
         if isinstance(data, bytes):
-            if local_cache_path.exists():
-                local_cache_path.unlink()
-            with local_cache_path.open("wb") as f:
+            with open(out, "wb") as f:
                 f.write(data)
+            link.link_or_copy(out, local_cache_path)
             return True
         return False
 
     if _try_write_through():
-        assert local_cache_path.exists(), local_cache_path
-        # it's a reflink or a copy, so the cache now owns its copy
-        # and we don't want to allow anyone to write to its copy.
-        set_read_only(local_cache_path)
-        return local_cache_path
+        try:
+            # it's a reflink or a copy, so the cache now owns its copy
+            # and we don't want to allow anyone to write to its copy.
+            files.set_read_only(local_cache_path)
+            return local_cache_path
+        except FileNotFoundError:
+            # may have hit a race condition.
+            # don't fail upload just because we couldn't write through the cache.
+            pass
     return None
 
 
@@ -111,10 +110,9 @@ def upload(
     """
     dest_ = AdlsFqn.parse(dest) if isinstance(dest, str) else dest
     if write_through_cache:
-        src = _write_through_local_cache(write_through_cache.path(dest_), src) or src
-        # we can now upload from the local cache Path;
-        # Paths have the advantage (over some kinds of readable byte iterables)
-        # of guaranteeing that we can extract an MD5.
+        _write_through_local_cache(write_through_cache.path(dest_), src)
+        # we always use the original source file to upload, not the cached path,
+        # because uploading from a shared location risks race conditions.
 
     fs_client = get_global_client(dest_.sa, dest_.container).get_file_client(dest_.path)
     decision = upload_decision_and_settings(fs_client, src)

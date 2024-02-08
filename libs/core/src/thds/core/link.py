@@ -4,11 +4,10 @@ import os
 import platform
 import shutil
 import subprocess
-import tempfile
 import typing as ty
 from pathlib import Path
 
-from . import log
+from . import log, tmp
 from . import types as ct
 
 _IS_MAC = platform.system() == "Darwin"
@@ -89,13 +88,17 @@ def reify_if_link(path: Path):
 
 
 def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -> LinkType:
-    if Path(src).exists() and Path(dest).exists() and filecmp.cmp(src, dest, shallow=False):
-        # this filecmp operation may be somewhat expensive for large
-        # files when they _are_ identical, but it's still better than
-        # the race condition that exists with a file copy or a link
-        # where the destination already exists.
-        logger.debug("Destination %s for link is identical to source", dest)
-        return "same"
+    try:
+        if filecmp.cmp(src, dest, shallow=False):
+            # this filecmp operation may be somewhat expensive for large
+            # files when they _are_ identical, but it's still better than
+            # the race condition that exists with a file copy or a link
+            # where the destination already exists.
+            logger.debug("Destination %s for link is identical to source", dest)
+            return "same"
+    except FileNotFoundError:
+        # handle race conditions where a file may get deleted while we're comparing it
+        pass
 
     if link_types:
         link_success_type = link(src, dest, *link_types)
@@ -104,9 +107,8 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
-    with tempfile.TemporaryDirectory(suffix="-linkcopy") as dir:
-        tmpfile = os.path.join(dir, "tmp")
+    with tmp.temppath_same_fs(dest) as tmpfile:
+        # atomic to the final destination since we're on the same filesystem.
         shutil.copyfile(src, tmpfile)
-        shutil.move(tmpfile, dest)
-        # atomic to the final destination as long as we're on the same filesystem.
+        shutil.move(str(tmpfile), dest)
     return ""

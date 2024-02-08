@@ -1,5 +1,6 @@
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -109,3 +110,29 @@ def test_in_ci_resource_to_path_fails():
             ),
             check_ci=True,
         )
+
+
+@pytest.mark.integration
+def test_simultaneous_uploads_dont_resource_modified_error():
+    dest = AdlsFqn.of("thdsscratch", "tmp", "test/thds.adls/resource-modified-error.txt")
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        results = list(
+            pool.map(
+                lambda i: upload(
+                    dest,
+                    HW,
+                    write_through_cache=global_cache(),
+                    # if this test fails in CI because of weird FileNotFoundErrors,
+                    # and if there isn't a good solution to the underlying race condition,
+                    # we may end up choosing to just remove the write_through_cache for this test,
+                    # because it is not central to the thing we're trying to test.
+                    # I've left it for now because this is a convenient place to observe
+                    # whether we have filesystem-related race conditions, but arguably
+                    # it would be better to write a specific test for those over in thds.core.
+                ),
+                range(30),
+            )
+        )
+
+    assert get_read_only(results[0]).exists()  # type: ignore

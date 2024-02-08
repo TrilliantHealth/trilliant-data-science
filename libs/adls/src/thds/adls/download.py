@@ -2,11 +2,9 @@ import contextlib
 import enum
 import os
 import shutil
-import tempfile
 import typing as ty
 from base64 import b64decode
 from pathlib import Path
-from random import SystemRandom
 
 from azure.core.exceptions import AzureError, HttpResponseError
 from azure.storage.filedatalake import (
@@ -16,7 +14,7 @@ from azure.storage.filedatalake import (
     FileSystemClient,
 )
 
-from thds.core import log, scope
+from thds.core import log, scope, tmp
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
@@ -31,7 +29,6 @@ from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 logger = log.getLogger(__name__)
 
 
-_TEMPDIRS_ON_DIFFERENT_FILESYSTEM = False
 _1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
 
 
@@ -45,24 +42,18 @@ def _atomic_download_and_move(
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[ty.IO[bytes]]:
-    global _TEMPDIRS_ON_DIFFERENT_FILESYSTEM
-    with tempfile.TemporaryDirectory(suffix="-thds-adls-download") as dir:
+    with tmp.temppath_same_fs(dest) as dpath:
         # TODO lock dest
-        if _TEMPDIRS_ON_DIFFERENT_FILESYSTEM:
-            dpath = str(Path(dest).parent / ("atomic-lcl-tmp-" + str(SystemRandom().random())[2:]))
-        else:
-            dpath = os.path.join(dir, "atomic-tmp-")
-
         with open(dpath, "wb") as f:
             known_size = (properties.size or 0) if properties else 0
             logger.debug("Downloading %s", fqn)
             yield report_download_progress(f, str(dest), known_size)
         try:
-            os.rename(dpath, dest)
+            os.rename(dpath, dest)  # will succeed even if dest is read-only
         except OSError as oserr:
             if "Invalid cross-device link" in str(oserr):
-                _TEMPDIRS_ON_DIFFERENT_FILESYSTEM = True  # don't make this mistake again
-                shutil.copyfile(dpath, str(dest))
+                # this shouldn't ever happen because of temppath_same_fs, but just in case...
+                shutil.copyfile(dpath, dest)
             else:
                 raise
 
