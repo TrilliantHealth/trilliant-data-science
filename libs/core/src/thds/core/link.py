@@ -1,5 +1,4 @@
 """Best-effort to link a destination to a source depending on file system support."""
-import filecmp
 import os
 import platform
 import shutil
@@ -24,7 +23,7 @@ def link(
 ) -> LinkType:
     """Attempt reflink, then hardlink, then softlink.
 
-    First removes any existing file at dest.
+    The destination directory must already exist.
 
     Return a non-empty string of type LinkType if a link was successful.
 
@@ -36,36 +35,43 @@ def link(
     if src == Path(dest).resolve():
         return "same"
     assert os.path.exists(src), f"Source {src} does not exist"
-    try:
-        log_volume = (
-            logger.warning if os.path.exists(dest) and os.path.getsize(dest) > 0 else logger.debug
-        )
-        os.remove(dest)  # link will fail if the path already exists
-        log_volume('Removed existing file at "%s"', dest)
-    except FileNotFoundError:
-        pass
-    if _IS_MAC and "ref" in attempt_types:
-        try:
-            subprocess.check_output(["cp", "-c", str(src), str(dest)])
-            logger.info(f"Created a copy-on-write reflink from {src} to {dest}")
-            return "ref"
-        except subprocess.CalledProcessError:
-            pass
-    if "hard" in attempt_types:
-        try:
-            os.link(src, dest)
-            logger.info(f"Created a hardlink from {src} to {dest}")
-            return "hard"
-        except OSError as oserr:
-            logger.warning(f"Unable to hard-link {src} to {dest} ({oserr})")
-    if "soft" in attempt_types:
-        try:
-            os.symlink(src, dest)
-            assert os.path.exists(dest), dest
-            logger.info(f"Created a softlink from {src} to {dest}")
-            return "soft"
-        except OSError as oserr:
-            logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
+
+    dest_parent = Path(dest).parent
+    if not os.path.exists(dest_parent):
+        raise FileNotFoundError(f"Destination directory {dest_parent} does not exist")
+
+    with tmp.temppath_same_fs(dest_parent) as tmp_link_dest:
+        # links will _fail_ if the destination already exists.
+        # Therefore, instead of linking directly to the destination,
+        # we always create the link at a temporary file on the same filesystem
+        # as the true destination. Then, we take advantage of atomic moves
+        # within the same filesystem, because moves of links are themselves atomic!
+        # https://unix.stackexchange.com/a/81900
+        assert not tmp_link_dest.exists(), tmp_link_dest
+        if _IS_MAC and "ref" in attempt_types:
+            try:
+                subprocess.check_output(["cp", "-c", str(src), str(tmp_link_dest)])
+                os.rename(tmp_link_dest, dest)
+                logger.info(f"Created a copy-on-write reflink from {src} to {dest}")
+                return "ref"
+            except subprocess.CalledProcessError:
+                pass
+        if "hard" in attempt_types:
+            try:
+                os.link(src, tmp_link_dest)
+                os.rename(tmp_link_dest, dest)
+                logger.info(f"Created a hardlink from {src} to {dest}")
+                return "hard"
+            except OSError as oserr:
+                logger.warning(f"Unable to hard-link {src} to {dest} ({oserr})")
+        if "soft" in attempt_types:
+            try:
+                os.symlink(src, tmp_link_dest)
+                os.rename(tmp_link_dest, dest)
+                logger.info(f"Created a softlink from {src} to {dest}")
+                return "soft"
+            except OSError as oserr:
+                logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
 
     return ""
 
@@ -88,18 +94,9 @@ def reify_if_link(path: Path):
 
 
 def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -> LinkType:
-    try:
-        if filecmp.cmp(src, dest, shallow=False):
-            # this filecmp operation may be somewhat expensive for large
-            # files when they _are_ identical, but it's still better than
-            # the race condition that exists with a file copy or a link
-            # where the destination already exists.
-            logger.debug("Destination %s for link is identical to source", dest)
-            return "same"
-    except FileNotFoundError:
-        # handle race conditions where a file may get deleted while we're comparing it
-        pass
-
+    """If you absolutely have to get your file to its destination, you should use this
+    over link(), which could theoretically fail under certain conditions.
+    """
     if link_types:
         link_success_type = link(src, dest, *link_types)
         if link_success_type:
