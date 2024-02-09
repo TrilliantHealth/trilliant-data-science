@@ -1,3 +1,9 @@
+### 1.17.20240209
+
+- Remove remaining race conditions in `core.link:link` - there was a simple solution all along, which is
+  to create a temporary link at a random file on the same filesystem as the true destination, and then
+  perform `os.rename` on the link!
+
 ## 1.17
 
 - New `tmp` module with utilities for getting a temporary Path on the same filesystem as a 'destination'
