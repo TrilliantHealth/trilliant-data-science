@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import AbstractSet, List, Optional, Sequence, Set, Type
 
 import pytest
@@ -64,6 +65,7 @@ def test_structure_ambiguous_type_conversion_is_forbidden(
         pytest.param(True, int, 1, id="bool as int"),
         pytest.param(1234, int, 1234, id="int as int"),
         pytest.param("123", str, "123", id="str as str"),
+        pytest.param(Decimal(1.23), float, 1.23, id="decimal as float"),
         pytest.param(123, Optional[float], 123.0, id="int as optional float"),
         pytest.param("1e3", Optional[float], 1000.0, id="str as optional float"),
         pytest.param(1e3, Optional[float], 1000.0, id="float as optional float"),
@@ -77,9 +79,16 @@ def test_structure_ambiguous_type_conversion_is_forbidden(
         pytest.param(123, conftest.NewNewType, "123", id="int as nested newtype(str)"),
         pytest.param(345, Optional[str], "345", id="int as optional str"),
         pytest.param(0, Optional[str], "0", id="int(0) as optional str"),
+        pytest.param(Decimal(0.0), Optional[float], 0.0, id="decimal as optional float"),
         pytest.param([1, "two", 3], List[str], ["1", "two", "3"], id="mixed list as list[str]"),
         pytest.param([0, True, "2"], List[int], [0, 1, 2], id="mixed list as list[int]"),
         pytest.param([1.0, 2, "3.4"], List[float], [1.0, 2.0, 3.4], id="mixed list as list[float]"),
+        pytest.param(
+            [1.0, 2, Decimal("3.4")],
+            List[float],
+            [1.0, 2.0, 3.4],
+            id="mixed list with decimals as list[float]",
+        ),
     ],
 )
 def test_structure_unambiguous_type_conversion_is_allowed(

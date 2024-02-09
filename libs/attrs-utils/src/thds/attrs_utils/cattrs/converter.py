@@ -1,4 +1,5 @@
 import datetime
+import decimal
 import typing as ty
 from typing import Any, Callable, Sequence, Tuple, Type
 
@@ -88,7 +89,7 @@ DEFAULT_UNSTRUCTURE_HOOKS_JSON: Sequence[Tuple[Type, UnStruct]] = (
 )
 DEFAULT_RESTRICTED_CONVERSIONS: Sequence[Tuple[Tuple[Type, ...], Type, UnStruct]] = (
     ((int, str), str, str),
-    ((int, str, float), float, float),
+    ((int, str, float, decimal.Decimal), float, float),
     ((bool, str, int), int, int),
     ((bool,), bool, bool),
 )
