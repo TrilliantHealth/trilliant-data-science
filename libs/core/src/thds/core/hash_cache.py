@@ -1,4 +1,15 @@
-# sometimes, you just want to cache hashes. Specifically, hashes of files.
+"""Sometimes, you just want to cache hashes. Specifically, hashes of files.
+
+We cache these hashes as files themselves, and the default location is under the user's
+home directory.
+
+The name of the file is an implementation detail that includes the hash of the file path,
+the directory it lives in is the hashlib name of the hash algorithm, and the contents of
+the file are the raw bytes of the hash. However, none of these details is guaranteed to
+remain stable over time, and the only stable interface is the `hash_file` and `filehash`
+functions themselves.
+"""
+
 import hashlib
 import os
 from pathlib import Path
@@ -34,10 +45,9 @@ def _filecachekey(path: Path, hashtype: str) -> Path:
 
 
 def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
-    """Hashes a file with the given hashlib hasher. If we've already
-    previously computed the given hash for the file and the file
-    hasn't changed since we stored that hash, we'll just return the
-    cached hash.
+    """Hashes a file with the given hashlib hasher. If we've already previously computed
+    the given hash for the file and the file hasn't changed (according to filesystem
+    mtime) since we stored that hash, we'll just return the cached hash.
 
     File must exist and respond positively to stat().
     """
@@ -58,4 +68,6 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
 
 
 def filehash(algo: str, pathlike: os.PathLike) -> Hash:
+    """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
+    of the hash algorithm used."""
     return Hash(algo, hash_file(pathlike, hashlib.new(algo)))
