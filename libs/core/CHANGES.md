@@ -1,16 +1,3 @@
-### 1.17.20240209
-
-- Remove remaining race conditions in `core.link:link` - there was a simple solution all along, which is
-  to create a temporary link at a random file on the same filesystem as the true destination, and then
-  perform `os.rename` on the link!
-
-## 1.17
-
-- New `tmp` module with utilities for getting a temporary Path on the same filesystem as a 'destination'
-  path, so that atomic moves from the temp location to your destination are possible.
-- Fix bug in `fretry` with interaction between `retry_sleep` and `expo`, which was getting consumed once
-  and never performing retries after that.
-
 ## 1.16
 
 - New `Source` abstraction for read-only data which may or may not yet be local. Try it with

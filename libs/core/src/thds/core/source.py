@@ -2,6 +2,7 @@
 
 yet will not be downloaded (if non-local) until it is actually opened or unwrapped.
 """
+import hashlib
 import os
 import typing as ty
 from dataclasses import dataclass
@@ -9,7 +10,7 @@ from functools import partial
 from pathlib import Path
 
 from .files import is_file_uri, path_from_uri, set_read_only, to_uri
-from .hash_cache import filehash
+from .hash_cache import hash_file
 from .hashing import Hash
 from .types import StrOrPath
 
@@ -73,7 +74,10 @@ class SourceHashMismatchError(ValueError):
 
 
 def _check_hash(expected_hash: ty.Optional[Hash], path: Path) -> Hash:
-    computed_hash = filehash(expected_hash.algo if expected_hash else "sha256", path)
+    def _hash_file(algo: str) -> Hash:
+        return Hash(algo, hash_file(path, hashlib.new(algo)))
+
+    computed_hash = _hash_file(expected_hash.algo if expected_hash else "sha256")
     if expected_hash and expected_hash != computed_hash:
         raise SourceHashMismatchError(
             f"{expected_hash.algo} mismatch for {path};"
@@ -82,7 +86,7 @@ def _check_hash(expected_hash: ty.Optional[Hash], path: Path) -> Hash:
     return computed_hash
 
 
-@dataclass(frozen=True)
+@dataclass
 class Source(os.PathLike):
     """Source is meant to be a consistent in-memory representation for an abstract,
     **read-only** source of data that may not be present locally when an application
@@ -119,25 +123,7 @@ class Source(os.PathLike):
 
     uri: str
     hash: ty.Optional[Hash] = None
-    # hash and equality are based only on the _identity_ of the object,
-    # not on the other properties that provide some caching functionality.
-
-    @property
-    def cached_path(self) -> ty.Optional[Path]:
-        """This is part of the public interface as far as checking to see whether a file
-        is already present locally, but its existence and value is not part of equality or
-        the hash for this class - it exists purely as an optimization.
-        """
-        return getattr(self, "__cached_path", None)
-
-    def _set_cached_path(self, lpath: ty.Optional[Path]):
-        """protected interface for setting a cached Path since the attribute is not
-        available via the constructor.
-        """
-        if lpath:
-            set_read_only(lpath)
-        super().__setattr__("__cached_path", lpath)  # this works around dataclass.frozen.
-        # https://noklam.github.io/blog/posts/2022-04-22-python-dataclass-partiala-immutable.html
+    _local_path: ty.Optional[Path] = None
 
     def path(self) -> Path:
         """Any Source can be turned into a local file path.
@@ -147,39 +133,30 @@ class Source(os.PathLike):
 
         If not already present locally, this will incur a one-time download.
         """
-        if self.cached_path is None or not self.cached_path.exists():
-            lpath = _get_download_handler(self.uri)(self.hash)
+        if self._local_path is None or not self._local_path.exists():
+            self._local_path = _get_download_handler(self.uri)(self.hash)
             if self.hash:
-                _check_hash(self.hash, lpath)
-            self._set_cached_path(lpath)
+                _check_hash(self.hash, self._local_path)
+            set_read_only(self._local_path)
 
-        assert self.cached_path and self.cached_path.exists()
-        return self.cached_path
+        assert self._local_path
+        return self._local_path
 
     def __fspath__(self) -> str:
         return os.fspath(self.path())
 
 
-# Creation from local Files or from remote URIs
+# Creation from Paths or from URIs
 
 
-def from_file(filename: StrOrPath, hash: ty.Optional[Hash] = None, uri: str = "") -> Source:
-    """Create a read-only Source from a local file that already exists.
-
-    If URI is passed, the local file will be read and hashed, but the final URI in the
-    Source will be the one provided explicitly.
-    """
+def from_file(filename: StrOrPath, hash: ty.Optional[Hash] = None) -> Source:
+    """Create a read-only Source from a local file that already exists."""
     path = path_from_uri(filename) if isinstance(filename, str) else filename
     assert isinstance(path, Path)
     if not path.exists():
         raise FileNotFoundError(path)
 
-    if uri:
-        src = from_uri(uri, _check_hash(hash, path))
-    else:
-        src = Source(to_uri(path), _check_hash(hash, path))
-    src._set_cached_path(path)  # internally, it's okay to hack around immutability.
-    return src
+    return Source(to_uri(path), _check_hash(hash, path), path)
 
 
 class FromUri(ty.Protocol):
