@@ -1,10 +1,22 @@
-# sometimes, you just want to cache hashes. Specifically, hashes of files.
-from hashlib import sha256
+"""Sometimes, you just want to cache hashes. Specifically, hashes of files.
+
+We cache these hashes as files themselves, and the default location is under the user's
+home directory.
+
+The name of the file is an implementation detail that includes the hash of the file path,
+the directory it lives in is the hashlib name of the hash algorithm, and the contents of
+the file are the raw bytes of the hash. However, none of these details is guaranteed to
+remain stable over time, and the only stable interface is the `hash_file` and `filehash`
+functions themselves.
+"""
+
+import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
 from .config import ConfigItem
-from .hashing import hash_using
+from .hashing import Hash, hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
@@ -21,7 +33,7 @@ def _filecachekey(path: Path, hashtype: str) -> Path:
     # conditions, and the approach must remain stable over time for
     # the cache to provide a meaningful advantage.
     path_str = str(path)
-    path_hash = hash_using(path_str.encode(), sha256()).hexdigest()
+    path_hash = hash_using(path_str.encode(), hashlib.sha256()).hexdigest()
     # we use a compressed (hashed) version of the path because
     # filenames can get kind of long and we don't want to deal with
     # long filenames blowing up our system by being unwritable.
@@ -33,10 +45,9 @@ def _filecachekey(path: Path, hashtype: str) -> Path:
 
 
 def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
-    """Hashes a file with the given hashlib hasher. If we've already
-    previously computed the given hash for the file and the file
-    hasn't changed since we stored that hash, we'll just return the
-    cached hash.
+    """Hashes a file with the given hashlib hasher. If we've already previously computed
+    the given hash for the file and the file hasn't changed (according to filesystem
+    mtime) since we stored that hash, we'll just return the cached hash.
 
     File must exist and respond positively to stat().
     """
@@ -54,3 +65,9 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
     cached_hash_location.write_bytes(hash_bytes)
     return hash_bytes
+
+
+def filehash(algo: str, pathlike: os.PathLike) -> Hash:
+    """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
+    of the hash algorithm used."""
+    return Hash(algo, hash_file(pathlike, hashlib.new(algo)))
