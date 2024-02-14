@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from typing_extensions import ParamSpec
 
-from thds.core.log import getLogger
+from thds.core import concurrency, log
 
 from ._utils.colorize import colorized
 from ._utils.file_limits import bump_limits
@@ -27,7 +27,7 @@ T_co = ty.TypeVar("T_co", covariant=True)
 ERROR = colorized(fg="white", bg="red")
 DONE = colorized(fg="white", bg="blue")
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 class IterableWithLen(ty.Protocol[T_co]):
@@ -138,7 +138,9 @@ def parallel_yield_results(
         num_tasks = None  # use system default
         num_tasks_log = ""
 
-    executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(max_workers=num_tasks)
+    executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
+        max_workers=num_tasks, **concurrency.initcontext()
+    )
     exceptions: ty.List[Exception] = list()
     with executor_cm as executor:
         futures = [executor.submit(thunk) for thunk in thunks]

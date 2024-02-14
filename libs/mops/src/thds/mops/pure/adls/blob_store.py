@@ -10,7 +10,8 @@ from thds.adls import AdlsFqn, join, resource
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_client
-from thds.core import fretry, log, scope
+from thds.adls.ro_cache import Cache
+from thds.core import config, fretry, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
 from ..core.types import AnyStrSrc, BlobStore
@@ -96,3 +97,49 @@ class AdlsBlobStore(BlobStore):
 
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
+
+
+class DangerouslyCachingStore(AdlsBlobStore):
+    """This BlobStore will cache _everything_ locally
+    and anything it finds locally it will return without question.
+
+    This maximally avoids network operations if for some reason you feel the need
+    to do that, but it will 100% lead to false positive cache hits.
+
+    It should only be used 'under supervision', e.g. during development, and never in any
+    automated context.
+    """
+
+    def __init__(self, root: str):
+        self._cache = Cache(Path(root).resolve(), ("ref", "hard"))
+
+    def exists(self, remote_uri: str) -> bool:
+        cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
+        if cache_path.exists():
+            return True
+        return super().exists(remote_uri)
+
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+        fqn = AdlsFqn.parse(remote_uri)
+        cache_path = self._cache.path(fqn)
+        if not cache_path.exists():
+            link.link(download_to_cache(fqn), cache_path)
+        with cache_path.open("rb") as f:
+            stream.write(f.read())
+
+    def getfile(self, remote_uri: str) -> Path:
+        cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
+        if cache_path.exists():
+            return cache_path
+        outpath = super().getfile(remote_uri)
+        link.link(outpath, cache_path)
+        return outpath
+
+
+DANGEROUSLY_CACHING_ROOT = config.item("cache-dangerously-root", default="")
+
+
+def get_store() -> BlobStore:
+    if root := DANGEROUSLY_CACHING_ROOT():
+        return DangerouslyCachingStore(root)
+    return AdlsBlobStore()

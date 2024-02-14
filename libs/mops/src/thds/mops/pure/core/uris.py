@@ -11,14 +11,14 @@ from thds.core.stack_context import StackContext
 #
 # In theory this could be abstracted via a registration process instead,
 # but that seems like over-engineering at this point.
-from ..adls.blob_store import AdlsBlobStore
+from ..adls.blob_store import get_store
 from .file_blob_store import FileBlobStore
 from .types import BlobStore
 
 
 def lookup_blob_store(uri: str) -> BlobStore:
     if uri.startswith(ADLS_SCHEME):
-        return AdlsBlobStore()
+        return get_store()
     if is_file_uri(uri):
         return FileBlobStore()
     raise ValueError(f"Unsupported URI: {uri}")
