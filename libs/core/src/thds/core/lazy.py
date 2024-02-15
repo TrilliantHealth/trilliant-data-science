@@ -51,6 +51,9 @@ class Lazy(ty.Generic[R]):
             self._storage.cached = self._source()
         return self._storage.cached
 
+    def __repr__(self) -> str:
+        return f"Lazy({self._source})"
+
 
 class ThreadLocalLazy(Lazy[R]):
     """A Lazy (see docs above), but with thread-local storage."""
