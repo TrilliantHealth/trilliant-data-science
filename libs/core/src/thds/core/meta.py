@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import re
@@ -182,8 +183,25 @@ def norm_name(pkg: str) -> str:
     return pkg.replace(".", "_")
 
 
+def _get_pkg_root_filename(pkg: Package) -> str:
+    if not isinstance(pkg, str):
+        return pkg.__file__ or ""
+    try:
+        pkg_spec = importlib.util.find_spec(pkg)  # type: ignore
+        return pkg_spec and pkg_spec.origin or ""
+    except ModuleNotFoundError:
+        return ""
+
+
 @lru_cache(None)
 def get_version(pkg: Package, orig: str = "") -> str:
+    # first try direct lookup from the pyproject.toml, if one can be found,
+    # because poetry frequently has outdated info in the venv it creates.
+    pkg_root_file = _get_pkg_root_filename(pkg)
+    if pkg_root_file:
+        version_ = find_pyproject_toml_version(Path(pkg_root_file), str(pkg))
+        if version_:
+            return version_
     try:
         version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
@@ -339,14 +357,41 @@ def is_deployed(pkg: Package) -> bool:
 
 
 def _hacky_get_pyproject_toml_version(pkg: Package, wdir: Path) -> str:
+    # it will be a good day when Python packages a toml reader by default.
     ppt = wdir / "pyproject.toml"
     if ppt.exists():
         with open(ppt) as f:
             toml = f.read()
-        # it will be a good day when Python packages a toml reader by default.
+        # check name for sanity - we don't want to pull a version
+        # out of, say, the root project when that doesn't match our project name.
+        # TODO: extract name and version more nicely.
+        # TODO: normalize the name here more robustly.
+        if not re.search(rf"name\s*=\s*[\"']({pkg.replace('_', '-')})[\"']", toml):
+            LOGGER.warning(f"The package name in pyproject.toml does not match the package name ({pkg})")
         for line in toml.splitlines():
             if m := re.match(r"version\s*=\s*[\"'](?P<version>[a-zA-Z0-9.]+)[\"']", line):
                 return m.group("version")
+    return ""
+
+
+def find_pyproject_toml_version(starting_path: Path, pkg: Package) -> str:
+    """A way of looking to see if there's a pyproject.toml that defines our package's
+    version. Only really useful in a monorepo context.
+    """
+    while starting_path != starting_path.parent:
+        directory = starting_path.parent
+        ppt = directory / "pyproject.toml"
+        if ppt.exists():
+            # the first one we find is the only one we'll try.
+            # anything above that can't possibly be the appropriate
+            # pyproject.toml.
+            try:
+                return _hacky_get_pyproject_toml_version(pkg, directory)
+            except ValueError as ve:
+                LOGGER.info(str(ve))
+                return ""
+        starting_path = directory
+
     return ""
 
 
