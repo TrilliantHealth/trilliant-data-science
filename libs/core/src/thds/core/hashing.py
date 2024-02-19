@@ -75,21 +75,12 @@ def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
 
 
 def b64(digest: bytes) -> str:
-    """The string representation commonly used by Azure utilities.
+    """This is the string representation used by ADLS.
 
     We use it in cases where we want to represent the same hash that
     ADLS will have in UTF-8 string (instead of bytes) format.
     """
     return base64.b64encode(digest).decode()
-
-
-def db64(s: str) -> bytes:
-    """Shorthand for the inverse of b64."""
-    return base64.b64decode(s)
-
-
-def _repr_bytes(bs: bytes) -> str:
-    return f"db64('{b64(bs)}')"
 
 
 class Hash(ty.NamedTuple):
@@ -101,6 +92,3 @@ class Hash(ty.NamedTuple):
     algo: str
     # valid algorithm names listed here: https://docs.python.org/3/library/hashlib.html#constructors
     bytes: bytes
-
-    def __repr__(self) -> str:
-        return f"Hash(algo='{self.algo}', bytes={_repr_bytes(self.bytes)})"

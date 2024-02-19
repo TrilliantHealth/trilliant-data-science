@@ -143,6 +143,11 @@ def tobool(s_or_b: ty.Union[str, bool]) -> bool:
     return s_or_b if isinstance(s_or_b, bool) else s_or_b.lower() not in ("0", "false", "no", "off", "")
 
 
+def maybe(parser: ty.Callable[[ty.Any], T]) -> ty.Callable[[ty.Optional[ty.Any]], ty.Optional[T]]:
+    """A helper for when you want to parse a value that might be nil."""
+    return lambda x: parser(x) if x is not None else None
+
+
 item = ConfigItem
 # a short alias
 
