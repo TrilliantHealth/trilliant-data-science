@@ -14,7 +14,7 @@ not be visible to the orchestrator.
 > ValueError to be raised.
 
 Separately, any `Path` found in the return value will similarly be streamed to a **read-only** file on
-the local orchestrator. This is semantically meaningful as a *write-once destination* - writing to this
+the local orchestrator. This is semantically meaningful as a _write-once destination_ - writing to this
 Path will transfer its bytes to the orchestrator as a temporary file.
 
 Both of these actions happen automatically across `use_runner` function invocations using the

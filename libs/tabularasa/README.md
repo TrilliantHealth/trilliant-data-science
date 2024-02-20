@@ -209,7 +209,7 @@ in order to enable run-time integrity checks on fetch from the blob store, if yo
 Under the section `remote_blob_store` in [the schema file](#the-schema-file), you may optionally specify
 a remote cloud storage location where built package data artifacts are stored. In case
 `build_options.package_data_file_size_limit` is set, the package in question will not come with any
-package data files exceeding that limit in size. These *will* be available in the remote blob store, and
+package data files exceeding that limit in size. These _will_ be available in the remote blob store, and
 in case they are not present when one of the [data loaders](#the-data-interfaces) is invoked, will be
 downloaded into the package.
 
