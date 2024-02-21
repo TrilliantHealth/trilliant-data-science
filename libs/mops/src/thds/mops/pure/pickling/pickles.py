@@ -46,6 +46,10 @@ class PicklableFunction:
     def __repr__(self) -> str:
         return str(self)
 
+    @property
+    def __name__(self) -> str:
+        return self.fname
+
     def __call__(self, *args, **kwargs):
         logger.debug(f"Dynamically importing function {str(self)}")
         if self.fmod == "__main__":

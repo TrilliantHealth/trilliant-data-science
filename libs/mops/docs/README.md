@@ -30,3 +30,5 @@ It optionally integrates with:
 - [`joblib`](https://joblib.readthedocs.io/en/latest/)
 
 It has some [limitations](./limitations.md).
+
+Here are some notes on [debugging](./debugging.md) your `mops` functions.

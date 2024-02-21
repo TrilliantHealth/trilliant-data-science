@@ -19,6 +19,7 @@ include = [
 krsync = "thds.mops.k8s.orchestrator.krsync:main"
 mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
+mops-inspect = 'thds.mops.pure.tools.inspect:main'
 
 [tool.poetry.dependencies]
 python = "^3.8"

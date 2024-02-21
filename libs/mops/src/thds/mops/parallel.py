@@ -99,7 +99,10 @@ class Thunk(ty.Generic[R]):
         self.kwargs = kwargs
 
     def __str__(self) -> str:
-        return f"Thunk({self.func.__name__}, {self.args}, {self.kwargs})"
+        return f"Thunk(func={self.func}, args=*{self.args}, kwargs=**{self.kwargs})"
+
+    def __repr__(self) -> str:
+        return str(self)
 
     def __call__(self) -> R:
         return ty.cast(R, self.func(*self.args, **self.kwargs))

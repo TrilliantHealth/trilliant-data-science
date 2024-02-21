@@ -56,7 +56,7 @@ def check_if_result_exists(
         return Success(result_uri)
 
     if _require_result(memo_uri):
-        raise RequiredResultNotFound("Required a result for {memo_uri} but that result was not found")
+        raise RequiredResultNotFound(f"Required a result for {memo_uri} but that result was not found")
 
     if rerun_excs:
         return None
