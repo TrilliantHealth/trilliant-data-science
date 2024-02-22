@@ -1,8 +1,10 @@
 from thds.mops import pure, tempdir
 from thds.mops.srcdest import DestFile
 
+from ....config import TEST_TMP_URI
 
-@pure.memoize_in("adls://thdsscratch/tmp")
+
+@pure.memoize_in(TEST_TMP_URI)
 def remote_func(i: int) -> DestFile:
     outfile = tempdir() / "foo.txt"
     with open(outfile, "w") as wf:

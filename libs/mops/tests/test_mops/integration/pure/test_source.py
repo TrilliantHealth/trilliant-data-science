@@ -7,6 +7,8 @@ from thds.core.source import Source, from_file
 from thds.mops import tempdir
 from thds.mops.pure import memoize_in, pipeline_id_mask
 
+from ...config import TEST_TMP_URI
+
 
 def a_function_that_combines_two_sources(both: ty.Tuple[Source, Source]) -> ty.Dict[str, Source]:
     """pipeline-id-mask: test/mops/combine-sources"""
@@ -27,9 +29,7 @@ def test_that_sources_get_transferred_both_directions_via_local_hashrefs(temp_fi
 
     mask = f"test/mops-combine-sources/{randint(0, 99999)}"
     with pipeline_id_mask(mask):
-        cp = memoize_in("adls://thdsscratch/tmp")(a_function_that_combines_two_sources)((src_a, src_b))[
-            "yes"
-        ]
+        cp = memoize_in(TEST_TMP_URI)(a_function_that_combines_two_sources)((src_a, src_b))["yes"]
     assert cp.uri.endswith("by_your_sources_combined.txt")
     assert cp.uri.startswith("file://")
     assert open(cp).read() == "Captain Planet"

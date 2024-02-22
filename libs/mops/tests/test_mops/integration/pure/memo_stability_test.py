@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from thds.adls import AdlsRoot
+from thds.adls import AdlsFqn
 from thds.mops.pure import adls
 from thds.mops.pure.core.output_naming import pipeline_function_invocation_unique_key
 from thds.mops.srcdest import DestFile, SrcFile
 
-from ...config import TEST_TMP_URI
+from ...config import TEST_DATA_TMP_URI
 from ._util import adls_shell
 
 
@@ -34,7 +34,8 @@ def hello_world_src_dest_path(dfile: DestFile, sfile: SrcFile, path: Path) -> De
     memo_key = pipeline_function_invocation_unique_key()
     assert memo_key
     pf, fa = memo_key
-    assert fa == "ClimbFewPushy.-FCkuTcpoYtmnNUm8YXnjnDV9ply3VxjHi5v4_0", memo_key
+    assert fa == "BasicVowPizza.M4V0FqRRoYV1k51VdF5LGRwOIt1w4j0uNOusvBw", memo_key
+    # this is changing because I changed the ADLS location of the test data.
     print("Confirmed that serialization remains stable for SrcFile, DestFile, and Path")
     # this depends on lots of things not changing, including the URIs
     # we use for content addressing.
@@ -48,7 +49,7 @@ def hello_world_src_dest_path(dfile: DestFile, sfile: SrcFile, path: Path) -> De
     return dfile
 
 
-test_root = AdlsRoot.parse(TEST_TMP_URI) / "test-adls-src-dest-files"
+test_root = AdlsFqn.parse(TEST_DATA_TMP_URI) / "test-adls-src-dest-files"
 
 
 def test_hello_world_srcdestpath_memoization_is_stable():

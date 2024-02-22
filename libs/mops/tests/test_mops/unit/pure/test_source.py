@@ -20,6 +20,8 @@ from thds.mops.pure.core.source import (
 )
 from thds.mops.pure.core.uris import ACTIVE_STORAGE_ROOT
 
+from ...config import TEST_DATA_TMP_URI
+
 _TEST_DIR = tempdir() / "mops-test-source"
 _TEST_DIR.mkdir(exist_ok=True)
 
@@ -142,7 +144,7 @@ def test_remote_source_returned_to_remote(prep, temp_file):  # 3
 @pytest.mark.integration
 def test_create_source_from_local(prep, temp_file):
     test_file = temp_file("create source from local")
-    dest_uri = f"adls://thdsscratch/tmp/pure-core-source/{uuid.uuid4().hex}"
+    dest_uri = f"{TEST_DATA_TMP_URI}pure-core-source/{uuid.uuid4().hex}"
     source = create_source_at_uri(test_file, dest_uri)
 
     assert source.path().resolve() == test_file.resolve()
@@ -155,7 +157,7 @@ def test_create_source_from_local(prep, temp_file):
 @pytest.mark.integration
 def test_local_source_with_remote(prep, temp_file):
     test_file = temp_file("local source with remote")
-    dest_uri = f"adls://thdsscratch/tmp/pure-core-source-result/{uuid.uuid4().hex}"
+    dest_uri = f"{TEST_DATA_TMP_URI}pure-core-source-result/{uuid.uuid4().hex}"
     source = create_source_at_uri(test_file, dest_uri)
 
     orig_text = test_file.read_text()
