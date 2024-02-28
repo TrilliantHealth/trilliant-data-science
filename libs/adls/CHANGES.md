@@ -1,3 +1,7 @@
+## 2.2
+
+- Adding a `UriIsh` union type and a `parse_any` function to the `uri` module.
+
 ### 2.1.20240208
 
 - Fix longstanding bug where ResourceModifiedError could result during use of `resource.upload` because
