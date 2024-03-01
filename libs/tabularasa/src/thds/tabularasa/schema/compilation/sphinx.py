@@ -51,6 +51,25 @@ MISSING_BADGE_MSG = (
 # Helper Classes/Functions
 
 
+def split_long_fields(table_data: Iterable, words_per_line: int = 15) -> List[List[Any]]:
+    """Splits long row fields into multiple lines."""
+    data = []
+    for row in table_data:
+        new_row = []
+        for field in row:
+            words = str(field).split()
+            new_row.append(
+                "\n\n".join(
+                    [
+                        " ".join(words[start : start + words_per_line])
+                        for start in range(0, len(words), words_per_line)
+                    ]
+                )
+            )
+        data.append(new_row)
+    return data
+
+
 def join_blocks(blocks: Iterable[str], sep: str) -> str:
     return sep.join(filter(bool, blocks))
 
@@ -110,7 +129,7 @@ def __tabulate() -> Optional[Any]:
 def render_table(header: Tuple[str, ...], rows: Iterable[Iterable[Any]]) -> str:
     tabulate = __tabulate()
     assert tabulate is not None, "can't render tables in rst without `tabulate` dependency"
-    return tabulate(rows, headers=header, tablefmt="rst")
+    return tabulate(split_long_fields(rows), headers=header, tablefmt="grid")
 
 
 def render_figure(img_path: Path) -> str:
