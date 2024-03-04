@@ -490,7 +490,7 @@ def write_metadata(
         metadata_path = os.path.join(
             "src" if layout == "src" else "",
             namespace.replace("-", "/").replace(".", "/"),
-            pkg.translate(str.maketrans("-._", "///")),
+            pkg.replace("-", "/").replace(".", "/"),
             META_FILE,
         )
 
