@@ -211,11 +211,19 @@ def get_version(pkg: Package, orig: str = "") -> str:
             # 'recurse' upward, assuming that the package name is overly-specified
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
-                # we're just about to give up. Before we do, check to see if there's a
+                # Check to see if there's a
                 # meta.json file hanging around, and if so, see if it contains a pyproject_version.
                 metadata = read_metadata(orig or pkg)
                 if metadata and metadata.pyproject_version:
                     return metadata.pyproject_version
+
+                git_commit_hash = os.getenv(GIT_COMMIT)
+                if git_commit_hash:
+                    LOGGER.info(
+                        f"Using GIT_COMMIT {git_commit_hash} as fallback version for {orig or pkg}"
+                    )
+                    return git_commit_hash
+
                 LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
                 return ""
             return get_version(".".join(pkg_[:-1]), orig or pkg)
