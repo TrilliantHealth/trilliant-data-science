@@ -45,13 +45,11 @@ def temppath_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
         # we would prefer _not_ to reinvent the wheel here, but if the tempfiles are
         # getting created on a different volume, then moves are no longer atomic, and
         # that's a huge pain for lots of reasons.
-        fname_parts = [
-            ".thds-core-tmp-home-fs",
-            str(SystemRandom().random())[2:],  # makes a float look like a numeric string
-        ]
-        if basename:
-            fname_parts.append(basename)
-        dpath = parent_dir / "-".join(fname_parts)
+        dpath = parent_dir / (
+            ".thds-core-tmp-home-fs-"
+            + str(SystemRandom().random())[2:]  # makes a float look like a numeric string
+            + basename
+        )
         try:
             yield dpath
         finally:
@@ -64,6 +62,6 @@ def temppath_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
     with tempfile.TemporaryDirectory() as tdir:
         # actually check whether we're on the same filesystem.
         if _are_same_fs(parent_dir, Path(tdir)):
-            yield Path(tdir) / "-".join(filter(None, ["thds-core-tmp-def-fs", basename]))
+            yield Path(tdir) / ("thds-core-tmp-def-fs-" + basename)
         else:
             yield from _tempdir_same_filesystem()

@@ -1,3 +1,7 @@
+## 1.18
+
+- `link.cheap_copy` affords a way to make an atomic copy of a file with known permissions.
+
 ### 1.17.20240209
 
 - Remove remaining race conditions in `core.link:link` - there was a simple solution all along, which is
