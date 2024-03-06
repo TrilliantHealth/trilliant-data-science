@@ -16,6 +16,19 @@ logger = log.getLogger(__name__)
 LinkType = ty.Literal["same", "ref", "hard", "soft", ""]
 
 
+def _dest_parent(dest: ct.StrOrPath) -> Path:
+    """Returns the parent directory that exists.
+
+    If it does not exist, raises an exception.
+    """
+    dest_parent = Path(dest).parent
+    if not dest_parent.exists():
+        raise FileNotFoundError(f"Destination directory {dest_parent} does not exist")
+    if not dest_parent.is_dir():
+        raise NotADirectoryError(f"Destination {dest_parent} is not a directory")
+    return dest_parent
+
+
 def link(
     src: ct.StrOrPath,
     dest: ct.StrOrPath,
@@ -36,10 +49,7 @@ def link(
         return "same"
     assert os.path.exists(src), f"Source {src} does not exist"
 
-    dest_parent = Path(dest).parent
-    if not os.path.exists(dest_parent):
-        raise FileNotFoundError(f"Destination directory {dest_parent} does not exist")
-
+    dest_parent = _dest_parent(dest)
     with tmp.temppath_same_fs(dest_parent) as tmp_link_dest:
         # links will _fail_ if the destination already exists.
         # Therefore, instead of linking directly to the destination,
@@ -109,3 +119,33 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         shutil.copyfile(src, tmpfile)
         shutil.move(str(tmpfile), dest)
     return ""
+
+
+def cheap_copy(
+    src: ct.StrOrPath,
+    dest: ct.StrOrPath,
+    *,
+    permissions: ty.Optional[int] = None,
+) -> None:
+    """Make a copy of the file, but first attempt Mac COW semantics if available.
+
+    The copy will be done via a temporary file on the same filesystem as the destination,
+    so it will 'appear' atomic at the destination.
+
+    If provided, the given permissions will be applied to the destination prior to the
+    atomic move.
+    """
+    dest_parent = _dest_parent(dest)
+    with tmp.temppath_same_fs(dest_parent) as tmp_link_dest:
+        cow_success = False
+        if _IS_MAC:
+            try:
+                subprocess.check_output(["cp", "-c", str(src), str(tmp_link_dest)])
+                cow_success = True
+            except subprocess.CalledProcessError:
+                pass
+        if not cow_success:
+            shutil.copyfile(src, tmp_link_dest)
+        if permissions is not None:
+            os.chmod(tmp_link_dest, permissions)
+        os.rename(tmp_link_dest, dest)

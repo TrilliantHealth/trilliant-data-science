@@ -72,7 +72,7 @@ def from_cache_path_to_local(cache_path: ct.StrOrPath, local_path: ct.StrOrPath,
     if link_type in {"ref", "", "same"}:
         # hard and soft links do not have their own permissions - they
         # share the read-only permissions of their target.  reflinks
-        # and copies will not, so those do not need to be marked as
+        # and copies will not, so those should not be marked as
         # read-only since edits to them will not affect the original,
         # cached copy.
         os.chmod(local_path, 0o644)  # 0o644 == rw-r--r-- (user, group, all)
