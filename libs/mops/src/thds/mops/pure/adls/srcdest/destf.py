@@ -1,6 +1,7 @@
 """This is an experimental, 'v2', API for mops that I feel like I
 might like better than what we have.
 """
+import shutil
 import typing as ty
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def rdest(
             )
         df = dest(AdlsFqn.parse(uris.lookup_blob_store(root).join(root, local_name)), src_file)
     with df as dest_path:
-        Path(src_file).rename(dest_path)
+        shutil.move(str(src_file), dest_path)
     return df
 
 
