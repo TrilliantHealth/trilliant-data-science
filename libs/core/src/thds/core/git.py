@@ -35,7 +35,7 @@ def get_commit_hash() -> str:
 def is_clean() -> bool:
     LOGGER.debug("`is_clean` reading from Git repo.")
     # command will print an empty string if the repo is clean
-    return "" == _simple_run("git diff --name-status")
+    return "" == _simple_run("git diff --name-status HEAD")
 
 
 def get_branch() -> str:
