@@ -34,8 +34,10 @@ def get_commit_hash() -> str:
 
 def is_clean() -> bool:
     LOGGER.debug("`is_clean` reading from Git repo.")
-    # command will print an empty string if the repo is clean
-    return "" == _simple_run("git diff --name-status HEAD")
+    # command will show changes (staged and unstaged) in the working tree since the last commit.
+    # if there are none (i.e the repo is clean), an empty string will be printed
+    # https://git-scm.com/docs/git-diff#Documentation/git-diff.txt-Variouswaystocheckyourworkingtree
+    return "" == _simple_run("git diff HEAD")
 
 
 def get_branch() -> str:
