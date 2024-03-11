@@ -242,7 +242,7 @@ def prepare_source_result(source_: Source) -> SourceResult:
     # be transferring back to an orchestrator on a different machine, but also because a
     # future caller on a different machine could try to use this memoized result.
     local_path = source.path_from_uri(source_.uri)
-    assert local_path.exists()
+    assert local_path.exists(), f"{local_path} does not exist"
     logger.debug("Automatically selecting a remote URI for a Source being returned.")
     remote_uri = invocation_output_uri(name=local_path.name)
     # the line above is a bit of opinionated magic. it uses the 'end' of the filename
