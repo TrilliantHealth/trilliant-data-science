@@ -42,6 +42,7 @@ import inspect
 import sys
 import typing as ty
 from functools import wraps
+from logging import getLogger
 from uuid import uuid4
 
 from .stack_context import StackContext
@@ -70,7 +71,10 @@ def _init_sc(key: str, val: contextlib.ExitStack):
     # normally you shouldn't create a StackContext except as a
     # global.  in this case, we're dynamically storing _in_ a
     # global dict, which is equivalent.
-    assert key not in _KEYED_SCOPE_CONTEXTS, f"Scope {key} already exists!"
+    if key in _KEYED_SCOPE_CONTEXTS:
+        getLogger(__name__).warning(
+            f"Scope {key} already exists! If this is not importlib.reload, you have a problem."
+        )
     _KEYED_SCOPE_CONTEXTS[key] = StackContext(key, val)
 
 
