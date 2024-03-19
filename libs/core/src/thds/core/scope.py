@@ -45,6 +45,7 @@ from functools import wraps
 from logging import getLogger
 from uuid import uuid4
 
+from .inspect import get_caller_info
 from .stack_context import StackContext
 
 _KEYED_SCOPE_CONTEXTS: ty.Dict[str, StackContext[contextlib.ExitStack]] = dict()
@@ -150,7 +151,8 @@ class Scope:
     """
 
     def __init__(self, key: str = ""):
-        self.key = key or uuid4().hex
+        caller_info = get_caller_info(skip=1)
+        self.key = caller_info.module + "+" + (key or uuid4().hex)
         _init_sc(self.key, contextlib.ExitStack())  # add root boundary
 
     def bound(self, func: F) -> F:
