@@ -1,4 +1,4 @@
-from thds.mops.parallel import Thunk, YieldingMapWithLen, parallel_yield_results
+from thds.mops.parallel import IteratorWithLen, Thunk, YieldingMapWithLen, parallel_yield_results
 
 
 def mult_2p2(f: float) -> float:
@@ -27,3 +27,21 @@ def test_yielding_map_with_len():
     results = set(parallel_yield_results(YieldingMapWithLen(thunkify, range(20))))
     for i in range(20):
         assert mult_2p2(inc_and_float(i)) in results
+
+
+def test_iterator_with_len():
+    a = IteratorWithLen(5, range(5))
+    b = IteratorWithLen(3, [5, 6, 7])
+
+    assert len(a) == 5
+    assert len(b) == 3
+    ab = IteratorWithLen.chain(a, b)
+    assert len(ab) == 8
+    assert list(range(8)) == list(ab)
+
+
+def test_can_compose_with_sequence():
+    a = IteratorWithLen(5, range(5))
+    b = (5, 6, 7)
+
+    assert list(range(8)) == list(IteratorWithLen.chain(a, b))

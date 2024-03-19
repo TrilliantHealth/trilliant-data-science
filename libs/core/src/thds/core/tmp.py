@@ -67,3 +67,19 @@ def temppath_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
             yield Path(tdir) / "-".join(filter(None, ["thds-core-tmp-def-fs", basename]))
         else:
             yield from _tempdir_same_filesystem()
+
+
+@contextlib.contextmanager
+def tempdir_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
+    """Builds a temporary directory on the same filesystem as the
+    provided local path.
+
+    Useful for making sure that you can do atomic moves from tempfiles to your final
+    location.
+
+    If you have no need for the above uses, teh built-in `tempfile.tmpdir` is a functionally
+    equivalent substitute.
+    """
+    with temppath_same_fs(lcl_path) as tpath:
+        tpath.mkdir(parents=True, exist_ok=True)
+        yield tpath

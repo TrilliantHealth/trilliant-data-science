@@ -86,5 +86,5 @@ class DestFileContext:
         self.local_root = Path(local_root)
 
     def __call__(self, rel: str) -> DestFile:
-        self.local_root.mkdir(exist_ok=True, parents=True)
+        (self.local_root / rel).parent.mkdir(exist_ok=True, parents=True)
         return dest(self.storage_root / rel, self.local_root / rel)

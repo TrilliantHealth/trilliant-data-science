@@ -1,3 +1,7 @@
+## 1.19
+
+- Added `tmp.tempdir_same_fs`.
+
 ## 1.18
 
 - `link.cheap_copy` affords a way to make an atomic copy of a file with known permissions.
