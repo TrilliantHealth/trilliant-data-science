@@ -2,7 +2,6 @@
 import contextvars
 import typing as ty
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
 
 
 def copy_context():
@@ -56,23 +55,3 @@ def contextful_threadpool_executor(
         thread_name_prefix="contextful_threadpool_executor",
         **initcontext(),
     )
-
-
-_NAMED_LOCKS: ty.Dict[str, Lock] = dict()
-_MASTER_LOCK = Lock()
-
-
-def named_lock(name: str) -> Lock:
-    """Get a process-global lock by name, or create it (atomically) if it does not exist.
-
-    Handy if you have things you want to be able to do inside a process, but you don't want
-    to completely rule out the possibility of pickling the object that would otherwise hold the Lock object.
-
-    This does mean your locks are not shared across processes, but that's a Python limitation anyway.
-    """
-    if name not in _NAMED_LOCKS:
-        with _MASTER_LOCK:
-            if name not in _NAMED_LOCKS:
-                _NAMED_LOCKS[name] = Lock()
-    assert name in _NAMED_LOCKS
-    return _NAMED_LOCKS[name]
