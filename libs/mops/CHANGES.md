@@ -1,3 +1,9 @@
+## 2.6
+
+- `ImageFileRef` (and the `default_config` constructor for it) now default to ensuring that there is an
+  up-to-date Docker image built for your `k8s`-enabled `mops` functions. It even builds the Docker image
+  remotely, so that you don't have to use `docker` or push large layers to Azure Container Registry.
+
 ## 2.5
 
 - Support new hash-based `Source` representation from `thds.core`, intended to replace both Paths and

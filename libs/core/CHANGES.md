@@ -1,3 +1,7 @@
+## 1.20
+
+- Added `concurrency.named_lock`.
+
 ## 1.19
 
 - Added `tmp.tempdir_same_fs`.
