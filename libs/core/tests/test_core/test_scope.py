@@ -1,5 +1,7 @@
 import contextlib as cl
 
+import pytest
+
 from thds.core import scope
 
 
@@ -75,15 +77,10 @@ def test_scopes_dont_have_to_be_at_every_function():
     ]
 
 
-# TODO someday build better detection into core.scope
-# so that we can tell whether you're reloading a scope, or
-# if this is unintentional interference between modules.
-def test_recreating_scopes_gives_warning(caplog):
+def test_keys_for_scopes_must_be_unique():
     scope.Scope("peter")
-    assert not caplog.records
-    scope.Scope("peter")
-    assert caplog.records[0].levelname == "WARNING"
-    assert "already exists!" in caplog.records[0].message
+    with pytest.raises(AssertionError):
+        scope.Scope("peter")
 
 
 def test_there_is_a_default_scope_that_doesnt_exit_until_program_ends():
