@@ -10,17 +10,17 @@ but not once it has been exited.
 Observe:
 ```
 logger = getLogger("FooF")
-logger.info("testing")
-# 2022-02-18 10:01:16,825 - FooF - INFO - testing 1
+logger.warning("testing")
+# 2022-02-18 10:01:16,825 WARNING  FooF () testing 1
 logger.info("testing 2", two=3, eight="nine")
-# 2022-02-18 10:01:16,826 - FooF - INFO - (two=3),(eight=nine) - testing 2
+# 2022-02-18 10:01:16,826 info     FooF (two=3,eight=nine) testing 2
 with logger_context(App='bat', override='me'):
     logger.info("testing 3", yes='no')
-# 2022-02-18 10:01:16,827 - FooF - INFO - (App=bat),(override=me),(yes=no) - testing 3
+# 2022-02-18 10:01:16,827 info     FooF (App=bat,override=me,yes=no) testing 3
     logger.info("testing 4", override='you')
-# 2022-02-18 10:01:16,828 - FooF - INFO - (App=bat),(override=you) - testing 4
+# 2022-02-18 10:01:16,828 info     FooF (App=bat,override=you) testing 4
 logger.info("testing 5")
-# 2022-02-18 10:01:16,829 - FooF - INFO - testing 5
+# 2022-02-18 10:01:16,829 info     FooF () testing 5
 ```
 """
 import contextlib
@@ -48,9 +48,48 @@ _TH_REC_CTXT = "th_context"
 # this names a nested dict on some LogRecords that contains things we
 # want to log. It is usable as a field specifier in log format strings
 
-TH_DEFAULT_LOG_FORMAT = f"%(asctime)s - %(name)s - %(levelname)s - %({_TH_REC_CTXT})s - %(message)s"
-# Default log format used when not configuring one's own logging,
-# including the th_context key-value pairs
+MAX_MODULE_NAME_LEN = config.item("max_module_name_len", 40, parse=int)
+_MODULE_NAME_FMT_STR = "{compressed_name:" + str(MAX_MODULE_NAME_LEN()) + "}"
+
+
+class ThdsCompactFormatter(logging.Formatter):
+    """This new formatter is more compact than what we had before, and hopefully makes logs a bit more readable overall."""
+
+    @staticmethod
+    def format_module_name(name: str) -> str:
+        max_module_name_len = MAX_MODULE_NAME_LEN()
+        compressed_name = (
+            name
+            if len(name) <= max_module_name_len
+            else name[: max_module_name_len // 2 - 2] + "..." + name[-max_module_name_len // 2 + 1 :]
+        )
+        assert len(compressed_name) <= max_module_name_len
+        return _MODULE_NAME_FMT_STR.format(compressed_name=compressed_name)
+
+    def _format_exception_and_trace(self, record: logging.LogRecord):
+        # without the following boilerplate, we would not see exceptions or stack traces
+        # get formatted as part of the log output at all.
+        formatted = ""
+        if record.exc_info:
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            formatted += "\n" + record.exc_text
+        if record.stack_info:
+            formatted += "\n" + self.formatStack(record.stack_info)
+        return formatted
+
+    def format(self, record: logging.LogRecord):
+        record.message = record.getMessage()
+        levelname = record.levelname
+        if record.levelno < logging.WARNING:
+            levelname = levelname.lower()
+        th_ctx = getattr(record, _TH_REC_CTXT, None) or tuple()
+        short_name = self.format_module_name(record.name)
+        formatted = f"{self.formatTime(record)} {levelname:7}  {short_name} {th_ctx} {record.message}"
+        if exc_text := self._format_exception_and_trace(record):
+            formatted += exc_text
+        return formatted
 
 
 class _THContext(Dict[str, Any]):
@@ -120,7 +159,7 @@ def make_th_formatters_safe(logger: logging.Logger):
 _BASE_LOG_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"default": {"format": TH_DEFAULT_LOG_FORMAT}},
+    "formatters": {"default": {"()": ThdsCompactFormatter}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
     "root": {
         "handlers": ["console"],
