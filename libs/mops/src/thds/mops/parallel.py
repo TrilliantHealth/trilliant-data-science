@@ -11,14 +11,15 @@ import itertools
 import typing as ty
 from collections import defaultdict
 
-from typing_extensions import ParamSpec
-
 from thds.core import concurrency, log
+from thds.core.thunks import (  # noqa: F401; for backward-compatibility, since these came from here originally.
+    Thunk,
+    thunking,
+)
 
 from ._utils.colorize import colorized
 from ._utils.file_limits import bump_limits
 
-P = ParamSpec("P")
 R = ty.TypeVar("R")
 T = ty.TypeVar("T")
 T_co = ty.TypeVar("T_co", covariant=True)
@@ -85,27 +86,6 @@ class YieldingMapWithLen(ty.Generic[R]):
         if self.i == len(self.base_coll):
             raise StopIteration
         return self.f(self.base_coll[self.i])
-
-
-class Thunk(ty.Generic[R]):
-    """Result-typed callable with arguments partially applied beforehand.
-
-    Unused here but provided for the caller's use if desired.
-    """
-
-    def __init__(self, func: ty.Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def __str__(self) -> str:
-        return f"Thunk(func={self.func}, args=*{self.args}, kwargs=**{self.kwargs})"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __call__(self) -> R:
-        return ty.cast(R, self.func(*self.args, **self.kwargs))
 
 
 def parallel_yield_results(
@@ -181,15 +161,3 @@ def _summarize_exceptions(exceptions: ty.List[Exception]):
 
     logger.info("Raising one of the most common exception type.")
     raise by_type[most_common_type][0]  # type: ignore
-
-
-def thunking(func: ty.Callable[P, R]) -> ty.Callable[P, Thunk[R]]:
-    """Converts a standard function into a function that accepts the
-    exact same arguments but returns a Thunk - something ready to be
-    executed but the execution itself is deferred.
-    """
-
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Thunk[R]:
-        return Thunk(func, *args, **kwargs)
-
-    return wrapper

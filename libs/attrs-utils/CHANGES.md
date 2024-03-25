@@ -1,3 +1,7 @@
+## 1.2
+
+- `attrs_value_defaults` helper function for extracting single-valued defaults from an `attrs` class.
+
 ## 1.1
 
 - `NamedTuple.__field_types` was deprecated in favor of `NamedTuple.__annotations__` in Python 3.9.
