@@ -42,8 +42,10 @@ import inspect
 import sys
 import typing as ty
 from functools import wraps
+from logging import getLogger
 from uuid import uuid4
 
+from .inspect import get_caller_info
 from .stack_context import StackContext
 
 _KEYED_SCOPE_CONTEXTS: ty.Dict[str, StackContext[contextlib.ExitStack]] = dict()
@@ -70,7 +72,10 @@ def _init_sc(key: str, val: contextlib.ExitStack):
     # normally you shouldn't create a StackContext except as a
     # global.  in this case, we're dynamically storing _in_ a
     # global dict, which is equivalent.
-    assert key not in _KEYED_SCOPE_CONTEXTS, f"Scope {key} already exists!"
+    if key in _KEYED_SCOPE_CONTEXTS:
+        getLogger(__name__).warning(
+            f"Scope {key} already exists! If this is not importlib.reload, you have a problem."
+        )
     _KEYED_SCOPE_CONTEXTS[key] = StackContext(key, val)
 
 
@@ -146,7 +151,8 @@ class Scope:
     """
 
     def __init__(self, key: str = ""):
-        self.key = key or uuid4().hex
+        caller_info = get_caller_info(skip=1)
+        self.key = caller_info.module + "+" + (key or uuid4().hex)
         _init_sc(self.key, contextlib.ExitStack())  # add root boundary
 
     def bound(self, func: F) -> F:
