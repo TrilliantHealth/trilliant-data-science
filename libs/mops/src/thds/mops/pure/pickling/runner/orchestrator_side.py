@@ -235,7 +235,9 @@ def _pickle_func_and_run_via_shell(
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            result = results.check_if_result_exists(memo_uri, rerun_excs=rerun_exceptions)
+            result = results.check_if_result_exists(
+                memo_uri, rerun_excs=rerun_exceptions, debug_printable=(func, args, kwargs)
+            )
             if result:
                 _LogKnownResult(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"

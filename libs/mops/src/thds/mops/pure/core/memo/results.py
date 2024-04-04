@@ -6,12 +6,13 @@ A Runner should hook into this system to enforce that upon itself.
 import typing as ty
 from contextlib import contextmanager
 
-from thds.core import config
+from thds.core import config, log
 
 from ..uris import lookup_blob_store
 
 _REQUIRE_ALL_RESULTS = config.item("require_all_results", default=False, parse=config.tobool)
 # please do not set the above globally unless you really, truly know what you're doing.
+logger = log.getLogger(__name__)
 
 
 @contextmanager
@@ -54,6 +55,7 @@ class RequiredResultNotFound(Exception):
 def check_if_result_exists(
     memo_uri: str,
     rerun_excs: bool = False,
+    debug_printable: ty.Any = None,
 ) -> ty.Union[None, Success, Error]:
     fs = lookup_blob_store(memo_uri)
     result_uri = fs.join(memo_uri, RESULT)
@@ -61,6 +63,8 @@ def check_if_result_exists(
         return Success(result_uri)
 
     if _require_result(memo_uri):
+        if debug_printable:
+            logger.error("required result debug_printable", printable=debug_printable)
         raise RequiredResultNotFound(f"Required a result for {memo_uri} but that result was not found")
 
     if rerun_excs:
