@@ -6,17 +6,22 @@ A Runner should hook into this system to enforce that upon itself.
 import typing as ty
 from contextlib import contextmanager
 
-from thds.core import stack_context
+from thds.core import config
 
 from ..uris import lookup_blob_store
 
-_REQUIRE_ALL_RESULTS = stack_context.StackContext("require_all_results", False)
+_REQUIRE_ALL_RESULTS = config.item("require_all_results", default=False, parse=config.tobool)
+# please do not set the above globally unless you really, truly know what you're doing.
 
 
 @contextmanager
 def require_all() -> ty.Iterator[None]:
-    with _REQUIRE_ALL_RESULTS.set(True):
+    with _REQUIRE_ALL_RESULTS.set_local(True):
         yield
+
+
+def all_required() -> bool:
+    return _REQUIRE_ALL_RESULTS()
 
 
 # _REQUIRED_FUNC_NAMES = set()
@@ -27,7 +32,7 @@ def require_all() -> ty.Iterator[None]:
 
 
 def _require_result(memo_uri: str = "") -> bool:
-    return _REQUIRE_ALL_RESULTS()
+    return all_required()
 
 
 class Success(ty.NamedTuple):

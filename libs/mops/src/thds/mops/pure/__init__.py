@@ -5,6 +5,7 @@
 
 from . import adls  # noqa
 from .core import get_pipeline_id, set_pipeline_id, use_runner  # noqa
+from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa
     add_pipeline_memospace_handlers,
     matching_mask_pipeline_id,
