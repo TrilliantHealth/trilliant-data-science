@@ -1,3 +1,4 @@
+import concurrent.futures
 import io
 import logging
 from pathlib import Path
@@ -9,6 +10,7 @@ from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, aio
 
 from thds.adls import ADLSFileSystem, AdlsFqn
+from thds.adls.cached_up_down import download_to_cache
 from thds.adls.download import (
     MD5MismatchError,
     _download_or_use_verified_cached_coroutine,
@@ -18,8 +20,9 @@ from thds.adls.download import (
     b64,
     download_or_use_verified,
 )
+from thds.adls.download_lock import _clean_download_locks
 from thds.adls.global_client import get_global_client
-from thds.adls.ro_cache import Cache
+from thds.adls.ro_cache import Cache, global_cache
 
 __TMPCACHEDIR = TemporaryDirectory(prefix="cache-for-adls-tests--")
 _TEST_CACHE = Cache(Path(__TMPCACHEDIR.name) / ".adls-md5-ro-cache", True)
@@ -197,3 +200,45 @@ def test_file_with_md5_doesnt_try_to_set_it(caplog):
 
     for record in caplog.records:
         assert "missing MD5" not in record.getMessage()
+
+
+def test_parallel_downloads_only_perform_a_single_download(caplog):
+    fs = ADLSFileSystem("thdsscratch", "tmp")
+    key = "test/thds.adls/parallel_downloads_only_perform_a_single_download.txt"
+    fqn = AdlsFqn(fs.account_name, fs.file_system, key)
+
+    random_file = __TMPDIR.name + "/random.txt"
+    with open(random_file, "w") as f:
+        f.write(uuid4().hex)
+
+    fs.put_file(random_file, key)  # non-cached upload
+
+    with caplog.at_level(logging.DEBUG):
+        # we're not actually coordinating via shared memory,
+        # but the easiest way to be able to configure the logs
+        # so that we can see them in the test is to use threads
+        # so that everything shares the same logging config.
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            list(executor.map(download_to_cache, [fqn] * 10))
+
+    download_count = 0
+    reuse_count = 0
+    for record in caplog.records:
+        if "Downloading" in record.getMessage():
+            download_count += 1
+        elif "Local path matches MD5" in record.getMessage():
+            reuse_count += 1
+
+    global_cache().path(fqn).unlink()
+    # don't need the cached file itself, so delete it before we assert
+
+    assert download_count == 1
+    assert reuse_count == 9
+
+
+def test_clean_download_locks(caplog):
+    num_deleted = _clean_download_locks()
+    print("deleted num lockfiles: ", num_deleted)
+
+    for record in caplog.records:
+        assert not record.getMessage().startswith("Failed to clean download locks directory.")

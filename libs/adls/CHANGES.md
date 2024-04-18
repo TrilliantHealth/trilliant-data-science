@@ -1,3 +1,8 @@
+## 2.3
+
+- Add global filelock to downloads so that multiple processes on the same machine do not try to download
+  the same file in parallel.
+
 ## 2.2
 
 - Adding a `UriIsh` union type and a `parse_any` function to the `uri` module.

@@ -13,7 +13,7 @@ import typing as ty
 from pathlib import Path
 
 from thds.core.hash_cache import hash_file
-from thds.core.hashing import SomehowReadable, hash_anything
+from thds.core.hashing import SomehowReadable, hash_anything, hash_using
 from thds.core.types import StrOrPath
 
 AnyStrSrc = ty.Union[SomehowReadable, ty.Iterable[ty.AnyStr]]
@@ -27,6 +27,10 @@ def md5_file(file: StrOrPath) -> bytes:
     determine staleness).
     """
     return hash_file(file, hashlib.md5())
+
+
+def hex_md5_str(string: str) -> str:
+    return hash_using(string.encode(), hashlib.md5()).hexdigest()
 
 
 def try_md5(data: AnyStrSrc) -> ty.Optional[bytes]:

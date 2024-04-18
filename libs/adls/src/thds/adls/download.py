@@ -20,6 +20,7 @@ from thds.core.types import StrOrPath
 
 from ._progress import report_download_progress
 from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
+from .download_lock import download_lock
 from .errors import translate_azure_error
 from .etag import match_etag
 from .fqn import AdlsFqn
@@ -43,7 +44,6 @@ def _atomic_download_and_move(
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[ty.IO[bytes]]:
     with tmp.temppath_same_fs(dest) as dpath:
-        # TODO lock dest
         with open(dpath, "wb") as f:
             known_size = (properties.size or 0) if properties else 0
             logger.debug("Downloading %s", fqn)
@@ -217,26 +217,48 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         file_properties = yield _IoRequest.FILE_PROPERTIES
         md5b64 = _remote_md5b64(file_properties)
 
-    if md5b64:
-        # attempt cache hit
+    def attempt_cache_hit() -> ty.Optional[_FileResult]:
+        if not md5b64:
+            return None
+
         check_reasonable_md5b64(md5b64)
         local_md5b64 = _md5b64_path_if_exists(local_path)
         if local_md5b64 == md5b64:
             logger.debug("Local path matches MD5 - no need to look further")
             if cache:
                 cache_path = cache.path(fqn)
-                from_local_path_to_cache(local_path, cache_path, cache.link)
-            return _FileResult(local_md5b64, hit=True)  # noqa: B901
+                if local_md5b64 != _md5b64_path_if_exists(cache_path):
+                    # only copy if the cache is out of date
+                    from_local_path_to_cache(local_path, cache_path, cache.link)
+            return _FileResult(local_md5b64, hit=True)
+
         if local_md5b64:
-            logger.debug("Local path exists but does not match expected md5 %", md5b64)
+            logger.debug("Local path exists but does not match expected md5 %s", md5b64)
         if cache:
             cache_path = cache.path(fqn)
             cache_md5b64 = _md5b64_path_if_exists(cache_path)
             if cache_md5b64 == md5b64:  # file in cache matches!
                 from_cache_path_to_local(cache_path, local_path, cache.link)
-                return _FileResult(cache_md5b64, hit=True)  # noqa: B901
+                return _FileResult(cache_md5b64, hit=True)
+
             if cache_md5b64:
-                logger.debug("Cache path exists but does not match expected md5 %", md5b64)
+                logger.debug("Cache path exists but does not match expected md5 %s", md5b64)
+        return None
+
+    # attempt cache hit before taking a lock, to avoid contention for existing files.
+    if file_result := attempt_cache_hit():
+        return file_result  # noqa: B901
+
+    _dl_scope.enter(download_lock(str(cache.path(fqn) if cache else local_path)))
+    # create lockfile name from the (shared) cache path if present, otherwise the final
+    # destination.  Non-cache users may then still incur multiple downloads in parallel,
+    # but if you wanted to coordinate then you should probably have been using the global
+    # cache in the first place.
+
+    # re-attempt cache hit - we may have gotten the lock after somebody else downloaded
+    if file_result := attempt_cache_hit():
+        logger.debug("Got cache hit on the second attempt, after acquiring lock for %s", fqn)
+        return file_result  # noqa: B901
 
     logger.debug("Unable to find a cached version anywhere that we looked...")
     file_properties = yield _IoRequest.FILE_PROPERTIES
@@ -278,7 +300,7 @@ def _prep_download_coroutine(
     co = _download_or_use_verified_cached_coroutine(
         AdlsFqn(fs_client.account_name, fs_client.file_system_name, remote_key),
         local_path,
-        md5b64,
+        md5b64=md5b64,
         cache=cache,
     )
     return co, co.send(None), None, fs_client.get_file_client(remote_key)

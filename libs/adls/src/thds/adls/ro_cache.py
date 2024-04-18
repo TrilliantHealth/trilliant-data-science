@@ -5,12 +5,11 @@ from pathlib import Path
 from thds.core import config, log
 from thds.core import types as ct
 from thds.core.files import set_read_only
-from thds.core.hashing import hash_using
 from thds.core.home import HOMEDIR
 from thds.core.link import LinkType, link_or_copy
 
 from .fqn import AdlsFqn
-from .md5 import hashlib
+from .md5 import hex_md5_str
 
 GLOBAL_CACHE_PATH = config.item("global-cache-path", HOMEDIR() / ".adls-md5-ro-cache", parse=Path)
 MAX_CACHE_KEY_LEN = config.item("max-cache-key-len", 255, parse=int)  # safe on most local filesystems?
@@ -48,7 +47,7 @@ def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
         # of the filename bytes with the hash. this gets us
         # consistency even across cache directories, such that the
         # cache directory is basically relocatable. It also makes testing easier.
-        md5_of_key = b"-md5-" + hash_using(str(fqn).encode(), hashlib.md5()).hexdigest().encode() + b"-"
+        md5_of_key = b"-md5-" + hex_md5_str(str(fqn)).encode() + b"-"
         last_30 = fqn_bytes[-30:]
         first_n = fqn_bytes[: MAX_CACHE_KEY_LEN() - len(md5_of_key) - len(last_30)]
         fqn_bytes = first_n + md5_of_key + last_30

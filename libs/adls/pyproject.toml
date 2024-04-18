@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "thds.adls"
-version = "2.2"
+version = "2.3"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 authors = ["Trilliant Health"]
@@ -15,6 +15,7 @@ aiohttp = ">=3.8.1"
 aiostream = ">=0.4.5"
 azure-identity = ">=1.9"
 azure-storage-file-datalake = ">=12.6"
+filelock = ">=3.0"
 
 thds-core = {path = "../../libs/core", develop = true}
 
