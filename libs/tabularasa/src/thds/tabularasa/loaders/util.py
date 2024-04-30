@@ -27,7 +27,7 @@ import pyarrow
 import pyarrow.parquet as pq
 
 from thds.tabularasa.data_dependencies.adls import sync_adls_data
-from thds.tabularasa.data_dependencies.util import hash_file
+from thds.tabularasa.data_dependencies.util import check_categorical_values, hash_file
 from thds.tabularasa.schema.dtypes import PyType
 from thds.tabularasa.schema.metaschema import RemoteBlobStoreSpec, Table
 from thds.tabularasa.schema.util import snake_case
@@ -412,6 +412,16 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
                     for b in pq_file.iter_batches(batch_size, columns=self.columns)
                 )
 
+            categorical_dtypes = (
+                [
+                    (name, dtype)
+                    for name, dtype in self.casts.items()
+                    if isinstance(dtype, pd.CategoricalDtype)
+                ]
+                if self.casts
+                else []
+            )
+
             for table in batches:
                 if cast:
                     assert self.pyarrow_schema is not None  # make mypy happy; this condition is checked
@@ -426,6 +436,9 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
                 df = table.to_pandas(date_as_object=False, ignore_metadata=True)
 
                 if self.casts:
+                    for name, dtype in categorical_dtypes:
+                        check_categorical_values(df[name], dtype)
+
                     df = df.astype(self.casts, copy=False)
 
                 if postprocess:

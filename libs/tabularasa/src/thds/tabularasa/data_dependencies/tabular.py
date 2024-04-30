@@ -8,6 +8,8 @@ from thds.tabularasa.schema import metaschema
 from thds.tabularasa.schema.dtypes import DType, PyType
 from thds.tabularasa.schema.files import TabularFileSource
 
+from .util import check_categorical_values
+
 T = TypeVar("T")
 K = TypeVar("K", bound=PyType)
 V = TypeVar("V", bound=PyType)
@@ -128,14 +130,7 @@ class PandasCSVLoader:
             name = col.name
             dtype = self.dtypes[name]
             if isinstance(dtype, pd.CategoricalDtype):
-                if not (df[name].isin(dtype.categories) | df[name].isna()).all():
-                    categories = (
-                        df.loc[~df[name].isin(dtype.categories), name].dropna().unique().tolist()
-                    )
-                    raise ValueError(
-                        f"Column {name} of table {self.table.name} should have categorical type with values "
-                        f"{dtype.categories.tolist()}; values {categories} are present in source file"
-                    )
+                check_categorical_values(df[name], dtype)
 
         df = df.astype(self.dtypes, copy=False)
         if self.index_cols:

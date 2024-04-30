@@ -2,6 +2,7 @@ import hashlib
 import multiprocessing
 import multiprocessing.connection
 import os
+import warnings
 from functools import partial, wraps
 from logging import getLogger
 from pathlib import Path
@@ -144,6 +145,14 @@ def arrow_table_for_parquet_write(df: pd.DataFrame, table: Table) -> pyarrow.Tab
                 pproc = pandas_maybe(pproc)
             df[name] = df[name].apply(pproc)
 
+        if (enum_constraint := column.dtype.enum) is not None:
+            try:
+                check_categorical_values(df[name], pd.CategoricalDtype(enum_constraint.enum))
+            except ValueError as e:
+                # only warn on write since the data may in fact be correct while only the schema needs
+                # updating, potentially saving the developer an expensive derivation
+                warnings.warn(str(e))
+
     if table.primary_key:
         df.sort_values(list(table.primary_key), inplace=True)
 
@@ -156,3 +165,45 @@ def arrow_table_for_parquet_write(df: pd.DataFrame, table: Table) -> pyarrow.Tab
     meta = arrow.schema.metadata
     meta.pop(b"pandas")
     return arrow.replace_schema_metadata(meta)
+
+
+def check_categorical_values(col: pd.Series, dtype: pd.CategoricalDtype):
+    """Check that values in a column match an expected categorical dtype prior to a write or cast operation.
+    This exists to preempt the unfortunate behavior of pandas wherein a cast silently nullifies any values
+    which are not in the categories of the target `CategoricalDtype`, resulting in confusing errors (or
+    worse - no errors in case null values are tolerated) downstream.
+
+    :raises TypeError: when the underlying data type of the `series` has a different kind than the categories of the `dtype`
+    :raises ValueError: when any values in the `series` are outside the expected set of categories of the `dtype`
+    """
+    current_dtype = col.dtype
+    expected_dtype = dtype.categories.dtype
+
+    if isinstance(current_dtype, pd.CategoricalDtype):
+        current_dtype_kind = current_dtype.categories.dtype.kind
+    else:
+        current_dtype_kind = current_dtype.kind
+
+    int_kinds = {"i", "u"}
+    if current_dtype_kind != expected_dtype.kind and not (
+        current_dtype_kind in int_kinds and expected_dtype.kind in int_kinds
+    ):
+        raise TypeError(
+            f"Column {col.name} is expected to be categorical with underlying data type "
+            f"{expected_dtype}, but has incompatible type {current_dtype}"
+        )
+
+    expected_values = dtype.categories
+    actual_values = pd.Series(col.dropna().unique())
+    bad_values = actual_values[~actual_values.isin(expected_values)]
+    if len(bad_values):
+        display_max_values = 20
+        addendum = (
+            f"(truncated to {display_max_values} unique values)"
+            if len(bad_values) > display_max_values
+            else ""
+        )
+        raise ValueError(
+            f"Column {col.name} is expected to have values in the set {expected_values.tolist()}, "
+            f"but also contains values {bad_values[:display_max_values].tolist()}{addendum}"
+        )

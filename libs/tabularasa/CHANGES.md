@@ -1,4 +1,10 @@
-## 0.2.1
+## 0.3.0
+
+- Added a helper function `check_categorical_dtype` to use consistently on all reads and writes when
+  dealing with `pandas.CategoricalDtype`s, to raise loud errors consistently everywhere when unexpected
+  values are present rather than allow pandas' usual behavior of nulling those values out on cast.
+
+### 0.2.1
 
 - Added helper function that adds line breaks to long strings. The function is used when formatting
   Sphinx tables.
