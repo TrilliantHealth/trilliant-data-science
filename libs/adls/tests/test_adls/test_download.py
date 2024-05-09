@@ -1,6 +1,7 @@
 import concurrent.futures
 import io
 import logging
+import typing as ty
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
@@ -202,9 +203,11 @@ def test_file_with_md5_doesnt_try_to_set_it(caplog):
         assert "missing MD5" not in record.getMessage()
 
 
-def test_parallel_downloads_only_perform_a_single_download(caplog):
+@pytest.fixture
+def random_test_file_fqn() -> ty.Iterator[AdlsFqn]:
     fs = ADLSFileSystem("thdsscratch", "tmp")
-    key = "test/thds.adls/parallel_downloads_only_perform_a_single_download.txt"
+    random_part = "random-test-file-fqn-" + uuid4().hex
+    key = f"test/thds.adls/{random_part}"
     fqn = AdlsFqn(fs.account_name, fs.file_system, key)
 
     random_file = __TMPDIR.name + "/random.txt"
@@ -213,13 +216,19 @@ def test_parallel_downloads_only_perform_a_single_download(caplog):
 
     fs.put_file(random_file, key)  # non-cached upload
 
+    yield fqn
+
+    fs.delete_file(key)  # clean up remote
+
+
+def test_parallel_downloads_only_perform_a_single_download(caplog, random_test_file_fqn: AdlsFqn):
     with caplog.at_level(logging.DEBUG):
         # we're not actually coordinating via shared memory,
         # but the easiest way to be able to configure the logs
         # so that we can see them in the test is to use threads
         # so that everything shares the same logging config.
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            list(executor.map(download_to_cache, [fqn] * 10))
+            list(executor.map(download_to_cache, [random_test_file_fqn] * 10))
 
     download_count = 0
     reuse_count = 0
@@ -229,7 +238,7 @@ def test_parallel_downloads_only_perform_a_single_download(caplog):
         elif "Local path matches MD5" in record.getMessage():
             reuse_count += 1
 
-    global_cache().path(fqn).unlink()
+    global_cache().path(random_test_file_fqn).unlink()
     # don't need the cached file itself, so delete it before we assert
 
     assert download_count == 1
