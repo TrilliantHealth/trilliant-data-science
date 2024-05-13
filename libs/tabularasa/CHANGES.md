@@ -1,3 +1,7 @@
+## 0.3.1
+
+- More verbose logging of sqlite db path when populating db.
+
 ## 0.3.0
 
 - Added a helper function `check_categorical_dtype` to use consistently on all reads and writes when

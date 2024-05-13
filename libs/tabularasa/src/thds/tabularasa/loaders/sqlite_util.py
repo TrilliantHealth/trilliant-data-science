@@ -201,7 +201,7 @@ def sqlite_connection(
     db_full_path = str(Path(db_filename).absolute())
 
     logger = logging.getLogger(__name__)
-    logger.debug(f"Connecting to sqlite database: {db_filename}")
+    logger.info(f"Connecting to sqlite database: {db_filename}")
     # sqlite3.PARSE_DECLTYPES will cover parsing dates/datetimes from the db
     con = sqlite3.connect(db_full_path, detect_types=sqlite3.PARSE_DECLTYPES)
     if mmap_size is not None:
