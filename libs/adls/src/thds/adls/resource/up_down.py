@@ -7,7 +7,7 @@ from azure.core.exceptions import HttpResponseError, ResourceModifiedError
 from thds.core import files, fretry, hashing, link, log, scope, tmp
 
 from .._progress import report_upload_progress
-from .._upload import upload_decision_and_settings
+from .._upload import metadata_for_upload, upload_decision_and_settings
 from ..conf import UPLOAD_CHUNK_SIZE, UPLOAD_FILE_MAX_CONCURRENCY
 from ..download import download_or_use_verified
 from ..errors import BlobNotFoundError
@@ -123,6 +123,10 @@ def upload(
             n_bytes = src.stat().st_size
             src = scope.enter(open(src, "rb"))
 
+        adls_meta = metadata_for_upload()
+        if "metadata" in upload_data_kwargs:
+            adls_meta.update(upload_data_kwargs.pop("metadata"))
+
         fs_client.upload_data(
             report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes),
             overwrite=True,
@@ -130,6 +134,7 @@ def upload(
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
             chunk_size=UPLOAD_CHUNK_SIZE(),
+            metadata=adls_meta,
             **upload_data_kwargs,
         )
 

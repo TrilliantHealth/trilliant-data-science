@@ -9,7 +9,7 @@ import azure.core.exceptions
 from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties
 
-from thds.core import log
+from thds.core import hostname, log
 
 from .md5 import AnyStrSrc, try_md5
 
@@ -117,3 +117,7 @@ def upload_decision_and_settings(
 
 async_upload_decision_and_settings.__doc__ = doc
 upload_decision_and_settings.__doc__ = doc
+
+
+def metadata_for_upload() -> ty.Dict[str, str]:
+    return {"upload_wrapper_sw": "thds.adls", "upload_hostname": hostname.friendly()}

@@ -1,22 +1,11 @@
 # This file must not import anything else from `remote.core` - it is a 'leaf' of our tree
 # because it is depended upon by so many other things.
 import os
-import socket
 from datetime import datetime
 
-from thds.core import log, meta
+from thds.core import hostname, log, meta
 
 from ..._utils.colorize import colorized
-
-
-def _simple_host() -> str:
-    hn = socket.gethostname()
-    if hn.endswith(".local"):
-        hn = hn[: -len(".local")]
-    if hn.startswith("MBP-"):
-        hn = hn[len("MBP-") :]
-    return hn
-
 
 # this is a global instead of a StackContext because we _do_ want it
 # to spill over automatically into new threads.
@@ -33,7 +22,7 @@ def __set_or_generate_pipeline_id_if_empty():
 
     def gen_pipeline_id() -> str:
         pipeline_id = (
-            _simple_host()  # host name can be a group/directory now
+            hostname.friendly()  # host name can be a group/directory now
             + "/"
             + "-".join(
                 [
