@@ -192,6 +192,7 @@ def sqlite_connection(
     package: Optional[str] = None,
     *,
     mmap_size: Optional[int] = None,
+    read_only: bool = False,
 ):
     if package is None:
         db_filename = db_path
@@ -203,7 +204,9 @@ def sqlite_connection(
     logger = logging.getLogger(__name__)
     logger.info(f"Connecting to sqlite database: {db_filename}")
     # sqlite3.PARSE_DECLTYPES will cover parsing dates/datetimes from the db
-    con = sqlite3.connect(db_full_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = sqlite3.connect(
+        db_full_path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=not read_only
+    )
     if mmap_size is not None:
         logger.info(f"Setting sqlite mmap size to {mmap_size}")
         _log_exec_sql(logger, con, f"PRAGMA mmap_size={mmap_size};")
@@ -251,6 +254,7 @@ class AttrsSQLiteDatabase:
             db_path,
             package,
             mmap_size=mmap_size,
+            read_only=True,
         )
 
     def sqlite_index_query(

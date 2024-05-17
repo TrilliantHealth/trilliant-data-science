@@ -263,7 +263,7 @@ def populate_sqlite_db(
     # gather all tables before executing any I/O
     insert_tables = [table for table in schema.filter_tables(table_predicate) if table.has_indexes]
 
-    with bulk_write_context(sqlite_connection(db_path, db_package), close=True) as con:
+    with bulk_write_context(sqlite_connection(db_path, db_package, read_only=False), close=True) as con:
         for table in insert_tables:
             table_filename: Optional[str]
             table_package: Optional[str]

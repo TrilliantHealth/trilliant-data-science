@@ -1,3 +1,9 @@
+### 0.3.2
+
+- Added a `read_only` flag to the `sqlite_connection` routine, `False` by default but set to `True` in
+  `AttrsSQLiteDatabase`. This prevents errors when multiple threads share a connection in read-only
+  workflows.
+
 ## 0.3.1
 
 - More verbose logging of sqlite db path when populating db.
