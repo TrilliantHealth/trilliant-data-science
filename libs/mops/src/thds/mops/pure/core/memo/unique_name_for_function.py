@@ -29,6 +29,16 @@ from functools import lru_cache
 _DOCSTRING_VERSION_RE = re.compile(r".*function-logic-key:\s+(?P<version>[^\s]+)\b", re.DOTALL)
 
 
+def _parse_logic_key(doc: str) -> str:
+    m = _DOCSTRING_VERSION_RE.match(doc)
+    return m.group("version") if m else ""
+
+
+def extract_logic_key_from_docstr(obj) -> str:
+    doc = getattr(obj, "__doc__", "")
+    return _parse_logic_key(doc)
+
+
 @lru_cache(maxsize=None)
 def make_unique_name_including_docstring_key(f) -> str:
     module = ""
@@ -36,9 +46,7 @@ def make_unique_name_including_docstring_key(f) -> str:
     version = ""
     for attr, value in inspect.getmembers(f):
         if attr == "__doc__" and value:
-            m = _DOCSTRING_VERSION_RE.match(value)
-            if m:
-                version = m.group("version")
+            version = _parse_logic_key(value)
         elif attr == "__module__":
             module = value
         elif not name and attr == "__name__":
