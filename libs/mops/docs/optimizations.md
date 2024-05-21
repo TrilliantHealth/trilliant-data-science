@@ -146,6 +146,9 @@ with `memoize_in`), `c.txt` _will_ exist in your current working directory, and 
 the result data will take place (and no downloads of any kind), as all input data is available locally,
 and the output data is already present locally after return.
 
+*Note: the `source.uri` for a file that **does** exist locally will be a file URI (`file://...`), whereas
+the `source.uri` for a file that **does not** exist locally will be the remote URI (ex `adls://...`).*
+
 > Again, `Source` is now the standard recommendation for how to pass file-like read-only data into your
 > functions, and pass it back to other consumers after creation. As long as your data can be treated as
 > read-only after the time of initial write, you can safely stop reading this document and use `Source`
