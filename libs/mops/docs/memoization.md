@@ -36,7 +36,7 @@ actual function arguments.
 
 ## Memoization specification
 
-At a conceptual level, memoized results are stored under a determinstic hash of the function
+At a conceptual level, memoized results are stored under a deterministic hash of the function
 `(args, kwargs)`, within a _memospace_ that is derived from the application context and function at the
 time of its call. This memospace is fundamentally a fully-qualified (atomic) namespace, but in
 implementation it is derived from 3 'logical' pieces:

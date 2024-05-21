@@ -43,17 +43,16 @@ your application config will likely not carry over to the remote, and this will 
 [impure](./pure_functions.md).
 
 A good general pattern to use is to construct the DestFile on the remote, but to construct a URI based on
-`invocation_output_fqn`, like so: \`\`\` destf =
-adls.dest(invocation_output_fqn(storage_root_passed_to_function, name='a-meaningful-name'))
+`invocation_output_fqn`, like so:
 
-````
+```python
+destf = adls.dest(invocation_output_fqn(storage_root_passed_to_function, name='a-meaningful-name'))
+```
 
-The populated `DestFile` can then be 'converted' on the local
-orchestrator (either from the remote pointer on the local filesystem,
-or the `DestFile` object already in memory) into a `SrcFile` and
-passed directly to future remote functions, where, when accessed via
-its Context Manager, the backing remote file will be downloaded and
-made available for read-only access.
+The populated `DestFile` can then be 'converted' on the local orchestrator (either from the remote
+pointer on the local filesystem, or the `DestFile` object already in memory) into a `SrcFile` and passed
+directly to future remote functions, where, when accessed via its Context Manager, the backing remote
+file will be downloaded and made available for read-only access.
 
 As an example of this flow, you might do something like the following:
 
@@ -92,7 +91,7 @@ def remote_processor(dest: srcdest.DestFile, src: srcdest.SrcFile, *args, **kwar
         with dest as dest_path:
             result_df.to_parquet(dest_path)
             return dest_path
-````
+```
 
 The Context Managers are a bit ugly, so you may wish to use `thds.core.scope.enter` to avoid the extra
 nesting.

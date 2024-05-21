@@ -11,7 +11,7 @@ This library has improved over time, but over many runs we have observed that wh
 small-to-medium workloads against ADLS just fine, large workloads (tens of thousands of `use_runner`
 calls simultaneously) may be difficult to manage over a network connection between your laptop and the
 Azure datacenters, causing spurious authentication, connection timeout, and other network errors. If you
-start running into these issues you can running your orchestrator process on the 'inside' of an Azure
+start running into these issues you can run your orchestrator process on the 'inside' of an Azure
 datacenter on a [pod inside](./kubernetes.md#orchestrator-pods) our Kubernetes cluster.
 
 ### No specific semantics for DAGs

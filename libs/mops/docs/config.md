@@ -52,6 +52,6 @@ use_original_config()  # and this will not see the configured value from above
 # Production runs
 
 The default `mops` configuration file ships with "development-appropriate defaults." To provide the
-`AdlsPickleRunner` with config that will save your mops memoization files in a production SA/container,
-make sure to pass `thds.adls.defaults.env_root` as the second argument to the pickle runner, and then
-enable the `prod` environment as per the `thds.core.env` configuration system.
+`MemoizingPicklingRunner` with config that will save your mops memoization files in a production
+SA/container, make sure to pass `thds.adls.defaults.env_root` as the second argument to the pickle
+runner, and then enable the `prod` environment as per the `thds.core.env` configuration system.

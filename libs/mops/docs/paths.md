@@ -18,8 +18,9 @@ the local orchestrator. This is semantically meaningful as a _write-once destina
 Path will transfer its bytes to the orchestrator as a temporary file.
 
 Both of these actions happen automatically across `use_runner` function invocations using the
-`AdlsPickleRunner`, without further changes to the code. And within a given `pipeline_id`, a unique set
-of local bytes referenced by a `Path` will only be transferred up to remote workers a single time.
+`MemoizingPicklingRunner`, without further changes to the code. And within a given `pipeline_id`, a
+unique set of local bytes referenced by a `Path` will only be transferred up to remote workers a single
+time.
 
 Your Python code simply deals with these Paths like normal. **However**, if you want `Path`s transferred
 back to an orchestrator to live in a particular directory, you'll have to write the code on the

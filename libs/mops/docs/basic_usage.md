@@ -35,7 +35,7 @@ from thds.adls import defaults
 from thds.mops import pure
 from .k8s_shell import df_k8s_spot_11g_shell
 
-run_on_k8s = pure.use_runner(AdlsPickleRunner(df_k8s_spot_11g_shell, defaults.env_root))
+run_on_k8s = pure.use_runner(MemoizingPicklingRunner(df_k8s_spot_11g_shell, defaults.env_root))
 # ^ a decorator that can now cause any pure function to be run remotely on K8s...
 
 @run_on_k8s

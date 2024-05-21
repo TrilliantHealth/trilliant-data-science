@@ -22,7 +22,7 @@ subclassing can wrap them to make them weak-referenceable. Consult the Python
 This is a feature of the `PickleRunner`, and usage will look something like this:
 
 ```python
-runner = AdlsPickleRunner(...)
+runner = MemoizingPicklingRunner(...)
 
 def your_orchestrator(...):
     ...
@@ -56,12 +56,12 @@ remote tasks), you should consider using one of these approaches rather than tra
 objects.
 
 - _ADLS required for remote use_ - Remote use of these abstractions both depend on using the included
-  `AdlsPickleRunner` with the `use_runner` decorator factory. Any future runner implementations will not
-  exhibit this behavior by default.
+  `MemoizingPicklingRunner` with the `use_runner` decorator factory. Any future runner implementations
+  will not exhibit this behavior by default.
 
 - _Local computation supported_ - However, all of these abstractions are also _usable_ with no
-  `AdlsPickleRunner`. This means that your pipeline can be expressed in terms of these file abstractions
-  without actually requiring ADLS or AdlsPickleRunner or K8s, etc.
+  `MemoizingPicklingRunner`. This means that your pipeline can be expressed in terms of these file
+  abstractions without actually requiring ADLS or MemoizingPicklingRunner or K8s, etc.
 
 ### thds.core.source
 

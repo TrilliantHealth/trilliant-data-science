@@ -4,7 +4,7 @@ The default for `MemoizingPicklingRunner` is to transfer your wrapped computatio
 environment, which means that memoization happens correctly and by default. Since the arguments to your
 wrapped computation are converted directly into a memoization key, there's no work left for you to do.
 
-The default appproach is _strongly_ preferable, since it dramatically reduces the possible scope for
+The default approach is _strongly_ preferable, since it dramatically reduces the possible scope for
 hidden impurity and therefore receiving incorrect cached results.
 
 Nevertheless, there are some cases where it may be impractical to refactor your code such that the

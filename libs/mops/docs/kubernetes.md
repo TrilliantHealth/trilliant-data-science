@@ -80,7 +80,7 @@ Container Registry. Additionally, that image must somehow be provided with read 
 since all data will be transferred back and forth from your local environment via ADLS. All Data Science
 K8s clusters will provide read/write access to a set of ADLS Storage Accounts by default.
 
-Once you have contructed an appropriate Shell, you need only pass it to the `AdlsPickleRunner`
+Once you have constructed an appropriate Shell, you need only pass it to the `MemoizingPicklingRunner`
 constructor, and then use `use_runner` plus that runner to construct a decorator that will transmit
 computation for any pure function to the remote K8s environment, and inject its result right back into
 the local/orchestrator context.
