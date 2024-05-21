@@ -243,7 +243,7 @@ def _pickle_func_and_run_via_shell(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
                 )
                 return unwrap_remote_result(result)
-            _LogPrepareNewInvocation(f"Preparing new remote invocation for {memo_uri}")
+            _LogPrepareNewInvocation(f"Preparing new invocation for {memo_uri}")
             # but if it does not exist, we need to upload the invocation and then run the shell.
             fs.putbytes(
                 fs.join(memo_uri, INVOCATION),

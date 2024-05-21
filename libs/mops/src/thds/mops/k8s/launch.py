@@ -9,6 +9,7 @@ from kubernetes import client
 from thds.core import scope
 from thds.core.log import logger_context
 from thds.mops.pure.core.source import perform_source_uploads
+from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
 
 from .._utils.colorize import colorized
 from . import config
@@ -216,6 +217,7 @@ def launch(
 
 def mops_shell(
     container_image: ty.Union[str, ty.Callable[[], str]],
+    disable_remote: ty.Callable[[], bool] = lambda: False,
     **outer_kwargs,
 ) -> ty.Callable[[ty.Sequence[str]], None]:
     """Return a closure that can launch the given configuration and run a mops pure function.
@@ -225,10 +227,16 @@ def mops_shell(
     first actual use of the k8s shell. The passed callable will be
     called each time, so if you want it to be called only once, you'll
     need to wrap it yourself.
+
+    Supports an optional callable argument `disable_remote` which when evaluated to True
+    causes the mops pure function to be run in a local shell.
     """
     assert (
         "args" not in outer_kwargs
     ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
+
+    if disable_remote():
+        return _threadlocal_shell
 
     if isinstance(container_image, str):
         get_container_image = lambda: container_image  # noqa: E731
