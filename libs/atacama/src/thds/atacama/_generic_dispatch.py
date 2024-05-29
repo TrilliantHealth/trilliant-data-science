@@ -18,9 +18,8 @@ def generic_types_dispatch(
     fallthrough_handler,
 ):
     def type_discriminator(typ: ty.Type):
-        if origin := typing_inspect.get_origin(typ) or ty.get_origin(
-            typ
-        ):  # in case typing_inspect fails
+        origin = typing_inspect.get_origin(typ)
+        if origin:
             # each of these internal calls to field_for_schema for a Generic is recursive
             arguments = typing_inspect.get_args(typ, True)
 
