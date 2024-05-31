@@ -86,14 +86,21 @@ class FileBlobStore(BlobStore):
         return os.path.join(*parts)
 
     def split(self, uri: str) -> ty.List[str]:
+        """Splits a given URI into its constituent parts"""
         assert uri.startswith(FILE_SCHEME)
-        head, tail = os.path.split(remove_file_scheme(uri))
-        parts = [tail]
-        while head:
-            head, tail = os.path.split(head)
-            parts.append(tail)
-        parts = list(reversed(parts))
-        return [f"{FILE_SCHEME}{parts[0]}", *parts[1:]]
+
+        path = remove_file_scheme(uri)
+        # normalize the path to handle redundant slashes
+        normalized_path = os.path.normpath(path)
+
+        parts = normalized_path.split(os.sep)
+
+        # remove any empty parts that might be created due to leading slashes
+        parts = [part for part in parts if part]
+
+        parts = [f"{FILE_SCHEME}/"] + parts
+
+        return parts
 
     def is_blob_not_found(self, exc: Exception) -> bool:
         return isinstance(exc, FileNotFoundError)
