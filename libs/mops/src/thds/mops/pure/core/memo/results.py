@@ -64,7 +64,7 @@ def check_if_result_exists(
 
     if _require_result(memo_uri):
         if debug_printable:
-            logger.error("required result debug_printable", printable=debug_printable)
+            logger.error(f"required result {debug_printable}")
         raise RequiredResultNotFound(f"Required a result for {memo_uri} but that result was not found")
 
     if rerun_excs:
