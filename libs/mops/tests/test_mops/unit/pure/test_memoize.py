@@ -1,6 +1,9 @@
+from pathlib import Path
+from typing import Dict, List
+
 import pytest
 
-from thds.mops.pure import pipeline_id_mask, pipeline_id_mask_from_docstr
+from thds.mops.pure import memoize_in, pipeline_id_mask, pipeline_id_mask_from_docstr
 from thds.mops.pure.core.memo import make_function_memospace
 from thds.mops.pure.core.pipeline_id_mask import extract_mask_from_docstr, get_pipeline_id_mask
 
@@ -66,3 +69,45 @@ def test_extract_failure_is_not_an_option():
 
     with pytest.raises(ValueError, match="pipeline-id-mask is present but empty"):
         extract_mask_from_docstr(empty)
+
+
+def get_storage_root() -> str:
+    script_dir = Path(__file__).parent.resolve()
+    return f"file:///{script_dir}"
+
+
+# use memoization for simple functions
+memo = memoize_in(get_storage_root())
+
+
+@memo
+def add_numbers(a: int, b: int) -> int:
+    return a + b
+
+
+@memo
+def multiply_numbers(a: int, b: int) -> int:
+    return a * b
+
+
+def process_numbers(numbers: List[Dict[str, int]]) -> List[Dict[str, int]]:
+    for item in numbers:
+        item["sum"] = add_numbers(item["A"], item["B"])
+        item["product"] = multiply_numbers(item["A"], item["B"])
+    return numbers
+
+
+# Main function to run the pipeline
+def run_pipeline() -> List[Dict[str, int]]:
+    data: List[Dict[str, int]] = [{"A": 1, "B": 2}, {"A": 3, "B": 4}, {"A": 5, "B": 6}]
+    return process_numbers(data)
+
+
+def test_integration_local_filesystem() -> None:
+    processed_data = run_pipeline()
+    expected_data = [
+        {"A": 1, "B": 2, "sum": 3, "product": 2},
+        {"A": 3, "B": 4, "sum": 7, "product": 12},
+        {"A": 5, "B": 6, "sum": 11, "product": 30},
+    ]
+    assert processed_data == expected_data
