@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import typing
 from collections import defaultdict
@@ -26,6 +27,8 @@ import pyarrow
 import typing_extensions
 from pandas.core.dtypes import base as pd_dtypes
 from pydantic import AnyUrl, BaseModel, Extra, Field
+
+from thds.tabularasa.schema.files import FileSourceMixin
 
 from .constraints import AnyColumnConstraint, EnumConstraint
 from .dtypes import AnyDtype, DType
@@ -630,9 +633,9 @@ class Table(_RawTable):
     def parquet_schema(self) -> pyarrow.Schema:
         metadata = dict(
             doc=self.doc.encode(),
-            primary_key=" ".join(map(snake_case, self.primary_key)).encode()
-            if self.primary_key
-            else b"",
+            primary_key=(
+                " ".join(map(snake_case, self.primary_key)).encode() if self.primary_key else b""
+            ),
         )
         return pyarrow.schema([column.parquet_field for column in self.columns], metadata=metadata)
 
@@ -811,6 +814,13 @@ def is_run_time_package_table(table: Table) -> bool:
     return table.run_time_installed and table.packaged
 
 
+class FileSourceMeta(NamedTuple):
+    # full path to the data source spec in the schema structure
+    schema_path: List[str]
+    name: str
+    source: FileSourceMixin
+
+
 class Schema(_RawSchema):
     """Processed version of a `_RawSchema` that's been passed through validation to ensure integrity of
     all references, and with names denormalized onto named objects (tables and types)"""
@@ -875,6 +885,22 @@ class Schema(_RawSchema):
             )
         )
         return modules
+
+    @property
+    def all_file_sources(self) -> Iterator[FileSourceMeta]:
+        for table_name, table in self.tables.items():
+            if isinstance(table.dependencies, FileSourceMixin):
+                yield FileSourceMeta(
+                    ["tables", table_name, "dependencies"], table_name, table.dependencies
+                )
+        sources: Mapping[str, FileSourceMixin]
+        for type_name, sources in [("local_data", self.local_data), ("remote_data", self.remote_data)]:
+            for source_name, source in sources.items():
+                yield FileSourceMeta([type_name, source_name], source_name, source)
+
+    def sources_needing_update(self, as_of: Optional[datetime.date] = None) -> List[FileSourceMeta]:
+        as_of_ = as_of or datetime.date.today()
+        return [meta for meta in self.all_file_sources if meta.source.needs_update(as_of_)]
 
     @property
     def external_type_imports(self) -> Dict[str, Set[str]]:

@@ -18,7 +18,19 @@ class CSVQuotingConvention(Enum):
     QUOTE_MINIMAL = "quote_minimal"
 
 
-UpdateFrequency = Literal["Yearly", "Quarterly"]
+UpdateFrequency = Literal["Yearly", "Quarterly", "Monthly"]
+
+
+def quarter(date: datetime.date):
+    return (date.month - 1) // 3 + 1
+
+
+def _date_tuple(date: datetime.date, freq: UpdateFrequency) -> tuple[int, ...]:
+    tail = () if freq == "Yearly" else (quarter(date),) if freq == "Quarterly" else (date.month,)
+    return (date.year, *tail)
+
+
+current_date = datetime.date.today()
 
 
 class FileSourceMixin(BaseModel, extra=Extra.forbid):
@@ -30,6 +42,15 @@ class FileSourceMixin(BaseModel, extra=Extra.forbid):
     update_frequency: Optional[UpdateFrequency] = None
     is_open_access: Optional[bool] = None
     doc: Optional[str] = None
+
+    def needs_update(self, current_date: datetime.date) -> bool:
+        if self.update_frequency is not None:
+            if self.last_updated is None:
+                return True
+            return _date_tuple(current_date, self.update_frequency) > _date_tuple(
+                self.last_updated, self.update_frequency
+            )
+        return False
 
 
 class LocalFileSourceMixin(FileSourceMixin):

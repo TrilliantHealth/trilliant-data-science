@@ -1,3 +1,7 @@
+### 0.3.3
+
+- Added logic in Schema to inform when a data source needs to be checked for updates.
+
 ### 0.3.2
 
 - Added a `read_only` flag to the `sqlite_connection` routine, `False` by default but set to `True` in
