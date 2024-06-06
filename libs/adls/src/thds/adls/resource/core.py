@@ -1,7 +1,7 @@
 import json
 import typing as ty
 
-from thds.core import log
+from thds.core import hashing, log, source
 from thds.core.hashing import b64
 
 from ..errors import blob_not_found_translation
@@ -35,6 +35,12 @@ def of(fqn_or_uri: ty.Union[AdlsFqn, str], md5b64: str) -> AdlsHashedResource:
     assert md5b64, "md5b64 must be non-empty"
     fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
     return AdlsHashedResource(fqn, md5b64)
+
+
+def from_source(source: source.Source) -> AdlsHashedResource:
+    assert source.hash, "Source must have a hash"
+    assert source.hash.algo == "md5", f"Source Hash type must be MD5! Got: {source.hash.algo}"
+    return of(source.uri, hashing.b64(source.hash.bytes))
 
 
 def serialize(resource: AdlsHashedResource) -> str:
