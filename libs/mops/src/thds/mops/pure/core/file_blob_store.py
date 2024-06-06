@@ -4,10 +4,9 @@ import typing as ty
 from contextlib import contextmanager
 from pathlib import Path
 
-from thds.core import log
+from thds.core import log, tmp
 from thds.core.files import FILE_SCHEME, path_from_uri, remove_file_scheme
 from thds.core.link import link
-from thds.mops import tempdir
 
 from ..core.types import AnyStrSrc, BlobStore
 
@@ -15,13 +14,13 @@ logger = log.getLogger(__name__)
 
 
 @contextmanager
-def temp_writable(desturi: str, mode: str = "wb"):
+def atomic_writable(desturi: str, mode: str = "wb"):
     destfile = path_from_uri(desturi)
-    temp_writable = tempdir() / destfile.name
-    with open(temp_writable, mode) as f:
-        yield f
-    destfile.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(temp_writable), destfile)
+    with tmp.temppath_same_fs(destfile) as temp_writable_path:
+        with open(temp_writable_path, mode) as f:
+            yield f
+            destfile.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(temp_writable_path), destfile)
 
 
 def _link(path: Path, remote_uri: str):
@@ -44,15 +43,15 @@ def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc):
     if path:
         _link(path, remote_uri)
     elif isinstance(data, bytes):
-        with temp_writable(remote_uri, "wb") as f:
+        with atomic_writable(remote_uri, "wb") as f:
             f.write(data)
     elif isinstance(data, str):
-        with temp_writable(remote_uri, "w") as f:
+        with atomic_writable(remote_uri, "w") as f:
             f.write(data)
     else:
         # if this fallback case fails, we may need to admit defeat for now,
         # and follow up by analyzing the failure and adding support for the input data type.
-        with temp_writable(remote_uri, "wb") as f:
+        with atomic_writable(remote_uri, "wb") as f:
             for block in data:  # type: ignore
                 f.write(block)
 
