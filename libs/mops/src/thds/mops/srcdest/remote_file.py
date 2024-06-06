@@ -175,6 +175,12 @@ class DestFile:
     def __str__(self) -> str:
         return self._local_filename
 
+    def __repr__(self) -> str:
+        return (
+            f"DestFile(local_filename={self._local_filename},"
+            f" serialized_remote_pointer={self._serialized_remote_pointer})"
+        )
+
     def __fspath__(self) -> str:
         return self._local_filename
 
@@ -322,3 +328,9 @@ class SrcFile:
             except FileNotFoundError:
                 pass
             self._temp_src_filepath = ""
+
+    def __repr__(self) -> str:
+        return (
+            f"SrcFile(local_filename={self._local_filename},"
+            f" serialized_remote_pointer={self._serialized_remote_pointer})"
+        )

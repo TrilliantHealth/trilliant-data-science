@@ -96,7 +96,7 @@ def _embed(o):
         code.interact(local=locals())
 
 
-def _inspect(uri: str, embed: bool = True):
+def inspect(uri: str, embed: bool = False):
     obj = get_control_file(uri)
     if obj is _NOTHING:
         return
@@ -116,13 +116,13 @@ def main():
     parser.add_argument("--loop", action="store_true", help="Keep prompting for URIs to inspect.")
     args = parser.parse_args()
 
-    _inspect(args.uri, args.embed)
+    inspect(args.uri, args.embed)
 
     if args.loop:
         prompt = "\nEnter another URI to inspect, or empty string to exit: "
         uri = input(prompt)
         while uri:
-            _inspect(uri, args.embed)
+            inspect(uri, args.embed)
             uri = input(prompt)
 
 

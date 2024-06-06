@@ -225,6 +225,19 @@ def _pickle_func_and_run_via_shell(
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)  # serialize!
             memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
 
+            # define some important 'chunks of work'
+            def upload_pickled_invocation():
+                fs.putbytes(
+                    fs.join(memo_uri, INVOCATION),
+                    gimme_bytes(
+                        dumper,
+                        NestedFunctionPickle(
+                            wrap_f(remote_redirect(func, args, kwargs)), args_kwargs_bytes
+                        ),
+                    ),
+                    type_hint=INVOCATION,
+                )
+
             def unwrap_remote_result(result: ty.Union[results.Success, results.Error]) -> T:
                 if isinstance(result, results.Success):
                     success = ty.cast(T, make_read_object("result")(result.value_uri))
@@ -233,26 +246,37 @@ def _pickle_func_and_run_via_shell(
                 assert isinstance(result, results.Error), "Must be _error or _success"
                 raise make_read_object("EXCEPTION")(result.exception_uri)
 
+            def debug_required_result_failure():
+                """This is entirely for the purpose of making debugging easier. It serves no internal functional purpose."""
+                # first, upload the invocation as an accessible marker of what was expected to exist.
+                upload_pickled_invocation()
+                # then use mops-inspect programmatically to print the IRE in the same format as usual.
+                from thds.mops.pure.tools.inspect import inspect
+
+                inspect(memo_uri)
+                logger.error(
+                    "A required result was not found."
+                    " You can compare the above output with other invocations"
+                    f" by running `mops-inspect {memo_uri}`"
+                    " in your local Python environment."
+                )
+
+            # now actually execute the ones we need:
+
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
             result = results.check_if_result_exists(
-                memo_uri, rerun_excs=rerun_exceptions, debug_printable=(func, args, kwargs)
+                memo_uri, rerun_excs=rerun_exceptions, before_raise=debug_required_result_failure
             )
             if result:
                 _LogKnownResult(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
                 )
                 return unwrap_remote_result(result)
-            _LogPrepareNewInvocation(f"Preparing new invocation for {memo_uri}")
+
             # but if it does not exist, we need to upload the invocation and then run the shell.
-            fs.putbytes(
-                fs.join(memo_uri, INVOCATION),
-                gimme_bytes(
-                    dumper,
-                    NestedFunctionPickle(wrap_f(remote_redirect(func, args, kwargs)), args_kwargs_bytes),
-                ),
-                type_hint=INVOCATION,
-            )
+            _LogPrepareNewInvocation(f"Preparing new invocation for {memo_uri}")
+            upload_pickled_invocation()
 
         try:
             shell_ex = None

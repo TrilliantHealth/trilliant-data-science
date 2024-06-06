@@ -55,7 +55,7 @@ class RequiredResultNotFound(Exception):
 def check_if_result_exists(
     memo_uri: str,
     rerun_excs: bool = False,
-    debug_printable: ty.Any = None,
+    before_raise: ty.Callable[[], ty.Any] = lambda: None,
 ) -> ty.Union[None, Success, Error]:
     fs = lookup_blob_store(memo_uri)
     result_uri = fs.join(memo_uri, RESULT)
@@ -63,8 +63,7 @@ def check_if_result_exists(
         return Success(result_uri)
 
     if _require_result(memo_uri):
-        if debug_printable:
-            logger.error(f"required result {debug_printable}")
+        before_raise()
         raise RequiredResultNotFound(f"Required a result for {memo_uri} but that result was not found")
 
     if rerun_excs:

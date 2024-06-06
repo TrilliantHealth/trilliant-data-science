@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
-from .files import is_file_uri, path_from_uri, set_read_only, to_uri
+from .files import is_file_uri, path_from_uri, to_uri
 from .hash_cache import filehash
 from .hashing import Hash
 from .types import StrOrPath
@@ -134,8 +134,6 @@ class Source(os.PathLike):
         """protected interface for setting a cached Path since the attribute is not
         available via the constructor.
         """
-        if lpath:
-            set_read_only(lpath)
         super().__setattr__("__cached_path", lpath)  # this works around dataclass.frozen.
         # https://noklam.github.io/blog/posts/2022-04-22-python-dataclass-partiala-immutable.html
 
