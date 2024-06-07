@@ -143,7 +143,9 @@ class Source(os.PathLike):
         Remember that the resulting data is meant to be read-only. If you want to mutate
         the data, you should first make a copy.
 
-        If not already present locally, this will incur a one-time download.
+        If not already present locally, this will incur a one-time download. Then, if the
+        Source has a Hash, the Hash will be validated against the downloaded file, and a
+        failure will raise SourceHashMismatchError.
         """
         if self.cached_path is None or not self.cached_path.exists():
             lpath = _get_download_handler(self.uri)(self.hash)
