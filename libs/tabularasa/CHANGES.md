@@ -1,3 +1,8 @@
+### 0.3.4
+
+- Lazily load some sqlite databases from the somewhat more flexible `core.Source`, rather than the
+  ADLS-specific `adls.AdlsHashedResource`.
+
 ### 0.3.3
 
 - Added logic in Schema to inform when a data source needs to be checked for updates.

@@ -6,16 +6,15 @@ SQLite connection, as is proper.
 import typing as ty
 from pathlib import Path
 
-from thds.adls import AdlsFqn
+from thds.core import source
 from thds.core.lazy import Lazy, ThreadLocalLazy
 
-from ..data_dependencies.cached_installer import make_caching_installer
 from .sqlite_util import AttrsSQLiteDatabase
 
 L = ty.TypeVar("L")
 
 
-def make_lazy_attrs_sqlite_loader(
+def _make_lazy_attrs_sqlite_loader(
     mk_loader: ty.Callable[[AttrsSQLiteDatabase], L],
     db_installer: ty.Callable[[], Path],
     mmap_size: int = 2**24,
@@ -33,12 +32,12 @@ def make_lazy_attrs_sqlite_loader(
 def lazy_attrs_sqlite_loader_maker(
     mk_loader: ty.Callable[[AttrsSQLiteDatabase], L],
     default_mmap_size: int = 2**24,
-) -> ty.Callable[[AdlsFqn, str], ThreadLocalLazy[L]]:
-    def make_loader(fqn: AdlsFqn, md5b64: str, mmap_size: int = -1) -> ThreadLocalLazy[L]:
-        return make_lazy_attrs_sqlite_loader(
+) -> ty.Callable[[source.Source], ThreadLocalLazy[L]]:
+    def make_loader(source: source.Source, mmap_size: int = -1) -> ThreadLocalLazy[L]:
+        return _make_lazy_attrs_sqlite_loader(
             mk_loader,
-            make_caching_installer(fqn, md5b64),
+            source.path,
             mmap_size if mmap_size > -1 else default_mmap_size,
         )
 
-    return make_loader
+    return make_loader  # type: ignore
