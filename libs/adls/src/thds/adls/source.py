@@ -20,8 +20,12 @@ def _adls_uri_source_download_handler(uri: str) -> ty.Optional[source.Downloader
     def download(hash: ty.Optional[Hash]) -> Path:
         assert fqn
         if hash and hash.algo == "md5":
+            # this 'extra' check just allows us to short-circuit a download
+            # where the hash at this URI is known not to match what we expect.
+            # It's no safer than the non-md5 hash check that Source performs after download.
             return download_to_cache(fqn, b64(hash.bytes))
 
+        # the hash will be validated by Source anyway, after download.
         return download_to_cache(fqn)
 
     return download

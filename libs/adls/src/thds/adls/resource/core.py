@@ -43,6 +43,13 @@ def from_source(source: source.Source) -> AdlsHashedResource:
     return of(source.uri, hashing.b64(source.hash.bytes))
 
 
+def to_source(resource: AdlsHashedResource) -> source.Source:
+    return source.from_uri(
+        str(resource.fqn),
+        hash=source.Hash("md5", hashing.db64(resource.md5b64)),
+    )
+
+
 def serialize(resource: AdlsHashedResource) -> str:
     d = resource._asdict()
     # we use uri instead of fqn in order to make these a more generic format
