@@ -4,7 +4,6 @@ import os
 import shutil
 import typing as ty
 from base64 import b64decode
-from pathlib import Path
 
 from azure.core.exceptions import AzureError, HttpResponseError
 from azure.storage.filedatalake import (
@@ -28,9 +27,6 @@ from .md5 import check_reasonable_md5b64, md5_file
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
 logger = log.getLogger(__name__)
-
-
-_1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
 
 
 class MD5MismatchError(Exception):
@@ -93,9 +89,6 @@ def _verify_md5s_before_and_after_download(
 def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
     if not path or not os.path.exists(path):  # does not exist if it's a symlink with a bad referent.
         return None
-    psize = Path(path).stat().st_size
-    if psize > _1GB:
-        logger.info(f"Hashing downloaded {psize/_1GB:.2f} GB file at {path}...")
     return b64(md5_file(path))
 
 

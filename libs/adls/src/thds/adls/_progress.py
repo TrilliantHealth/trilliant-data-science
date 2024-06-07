@@ -31,7 +31,7 @@ def _dumb_report_progress(desc: str, state: ProgressState):
     pct = 100 * (n_bytes / total)
     elapsed = default_timer() - start
     rate_s = f" at {int(n_bytes/_1MB/elapsed):,.1f} MiB/s"
-    logger.info(f"{desc}: {n_bytes:,} / {total:,} bytes ({pct:.1f}%){rate_s}")
+    logger.info(f"{desc}: {n_bytes:,} / {total:,} bytes ({pct:.1f}%){rate_s} in {elapsed:.1f}s")
 
 
 def _sum_ps(ps: ty.Iterable[ProgressState]) -> ProgressState:
@@ -56,13 +56,27 @@ class _Reporter(ty.Protocol):
 class DumbReporter:
     def __init__(self, desc: str):
         self._desc = desc
-        self._last_reported = default_timer()
+        self._started = default_timer()
+        self._last_reported = self._started
 
     def __call__(self, states: ty.List[ProgressState]):
         now = default_timer()
+        # two cases that require a report:
+        # 1. it's been a long enough time (update interval) since the last report.
         if now - self._last_reported > _UPDATE_INTERVAL_S:
             _dumb_report_progress(self._desc + f" {_blobs(states)}", _sum_ps(states))
             self._last_reported = now
+        # 2. a download finished _and_ that specific download took longer overall than our update interval.
+        else:
+            for state in states:
+                if (
+                    state.total
+                    and state.n >= state.total  # download finished
+                    and (now - state.start) > _UPDATE_INTERVAL_S  # and it took a while
+                ):
+                    # report individually for each download that finished.
+                    _dumb_report_progress(self._desc + f" {_blobs([state])}", state)
+            # notably, we do not delay the next 'standard' report because of downloads finishing.
 
 
 class TqdmReporter:
@@ -114,11 +128,14 @@ class Tracker:
         self._reporter = reporter
 
     def add(self, key: str, total: int) -> ty.Tuple["Tracker", str]:
+        if total < 0:
+            total = 0
         self._progresses[key] = ProgressState(default_timer(), total, 0)
         self._reporter(list(self._progresses.values()))
         return self, key
 
     def __call__(self, key: str, written: int):
+        assert written >= 0, "cannot write negative bytes: {written}"
         try:
             start, total, n = self._progresses[key]
             self._progresses[key] = ProgressState(start, total, n + written)

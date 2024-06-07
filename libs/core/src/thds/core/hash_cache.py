@@ -15,13 +15,16 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .config import ConfigItem
+from . import config
 from .hashing import Hash, hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
 
-CACHE_HASH_DIR = ConfigItem("directory", HOMEDIR() / ".hash-cache", parse=Path)
+CACHE_HASH_DIR = config.item("directory", HOMEDIR() / ".hash-cache", parse=Path)
+_1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
+
+
 logger = getLogger(__name__)
 
 
@@ -60,6 +63,10 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     ):
         logger.debug("Reusing known hash %s", resolved_path)
         return cached_hash_location.read_bytes()
+
+    psize = Path(resolved_path).stat().st_size
+    if psize > _1GB:
+        logger.info(f"Hashing downloaded {psize/_1GB:.2f} GB file at {resolved_path}...")
 
     hash_bytes = hash_using(resolved_path, hasher).digest()
     cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
