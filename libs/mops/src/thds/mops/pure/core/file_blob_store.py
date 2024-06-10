@@ -4,8 +4,8 @@ import typing as ty
 from contextlib import contextmanager
 from pathlib import Path
 
-from thds.core import log, tmp
-from thds.core.files import FILE_SCHEME, path_from_uri, remove_file_scheme
+from thds.core import log
+from thds.core.files import FILE_SCHEME, atomic_write_path, path_from_uri, remove_file_scheme
 from thds.core.link import link
 
 from ..core.types import AnyStrSrc, BlobStore
@@ -15,12 +15,9 @@ logger = log.getLogger(__name__)
 
 @contextmanager
 def atomic_writable(desturi: str, mode: str = "wb"):
-    destfile = path_from_uri(desturi)
-    with tmp.temppath_same_fs(destfile) as temp_writable_path:
-        with open(temp_writable_path, mode) as f:
+    with atomic_write_path(desturi) as temppath:
+        with open(temppath, mode) as f:
             yield f
-            destfile.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(temp_writable_path), destfile)
 
 
 def _link(path: Path, remote_uri: str):
