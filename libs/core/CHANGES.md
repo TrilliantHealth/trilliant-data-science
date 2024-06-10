@@ -1,3 +1,8 @@
+## 1.21
+
+- Add `atomic_binary_writer` helper context manager, for writing file output with a higher level of
+  concurrency safety.
+
 ## 1.20
 
 - Added `concurrency.named_lock`.

@@ -1,8 +1,13 @@
 import os
+import shutil
 import stat
+import typing as ty
+from contextlib import contextmanager
+from io import BufferedWriter
 from pathlib import Path
 
 from .log import getLogger
+from .tmp import temppath_same_fs
 from .types import StrOrPath
 
 FILE_SCHEME = "file://"
@@ -32,3 +37,26 @@ def to_uri(path: Path) -> str:
 
 def is_file_uri(uri: str) -> bool:
     return uri.startswith(FILE_SCHEME)
+
+
+@contextmanager
+def atomic_write_path(destination: StrOrPath) -> ty.Iterator[Path]:
+    """Shorthand context manager for doing an atomic write (i.e., write to a temporary file,
+    then atomically move that temporary file to your final destination.
+
+    You must open and then close the file within the provided context. Unclosed files
+    will likely result in data loss or other bugs.
+    """
+    destpath = path_from_uri(destination) if isinstance(destination, str) else Path(destination)
+    with temppath_same_fs(destpath) as temp_writable_path:
+        yield temp_writable_path
+        destpath.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(temp_writable_path), destpath)
+
+
+@contextmanager
+def atomic_binary_writer(destination: StrOrPath) -> ty.Iterator[BufferedWriter]:
+    """Even shorter shorthand for writing binary data to a file, atomically."""
+    with atomic_write_path(destination) as temp_writable_path:
+        with open(temp_writable_path, "wb") as f:
+            yield f
