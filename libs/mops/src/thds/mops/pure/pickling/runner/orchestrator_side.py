@@ -4,6 +4,7 @@ import inspect
 import threading
 import typing as ty
 from functools import lru_cache
+from pathlib import Path
 
 from thds.core import log, scope
 
@@ -21,6 +22,7 @@ from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.source import source_argument_buffering
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
+from ...tools.summarize import run_summary as rs
 from .._pickle import (
     Dumper,
     SourceArgumentPickler,
@@ -127,6 +129,8 @@ class MemoizingPicklingRunner:
         self._by_id_registry = serialization_registry
         self._redirect = redirect
 
+        self._run_directory = rs.create_mops_run_directory()
+
     def shared(self, *objs: ty.Any, **named_objs: ty.Any):
         """Set up memoizing pickle serialization for these objects.
 
@@ -169,6 +173,7 @@ class MemoizingPicklingRunner:
             make_function_memospace(_runner_prefix_for_pickled_functions(self._get_storage_root()), f),
             self._get_stateful_dumper,
             f,
+            self._run_directory,
         )(self._shell_builder(f, args, kwargs), self._rerun_exceptions, self._redirect, args, kwargs)
 
 
@@ -192,6 +197,7 @@ def _pickle_func_and_run_via_shell(
     function_memospace: str,
     get_dumper: ty.Callable[[str], Dumper],
     func_: ty.Callable[..., T],
+    run_directory: ty.Optional[Path] = None,
 ) -> ty.Callable[[Shell, bool, Redirect, Args, Kwargs], T]:
     storage_root = uris.get_root(function_memospace)
 
@@ -272,6 +278,8 @@ def _pickle_func_and_run_via_shell(
                 _LogKnownResult(
                     f"Result for {memo_uri} already exists and is being returned without invocation!"
                 )
+                if run_directory:
+                    rs.log_function_execution(run_directory, func_, memo_uri, status="memoized")
                 return unwrap_remote_result(result)
 
             # but if it does not exist, we need to upload the invocation and then run the shell.
@@ -303,6 +311,9 @@ def _pickle_func_and_run_via_shell(
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
                 raise NoResultAfterInvocationError(memo_uri)
+            if run_directory:
+                # Log that the function was executed
+                rs.log_function_execution(run_directory, func_, memo_uri, status="invoked")
             return unwrap_remote_result(result)
 
     return run_shell_via_pickles_

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "2.6"
+version = "2.7"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
 readme = "README.md"
@@ -20,6 +20,7 @@ krsync = "thds.mops.k8s.orchestrator.krsync:main"
 mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
 mops-inspect = 'thds.mops.pure.tools.inspect:main'
+mops-summarize = 'thds.mops.pure.tools.summarize.cli:main'
 
 [tool.poetry.dependencies]
 python = "^3.8"

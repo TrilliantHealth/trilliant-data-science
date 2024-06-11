@@ -1,3 +1,9 @@
+## 2.7
+
+- Introduced a `mops-summarize` CLI tool to generate function usage summary reports for pipeline runs.
+  The summarizer can aggregate logs from a given pipeline run directory and generate a concise report,
+  including function execution details and memoized functions cache hits.
+
 ## 2.6
 
 - `ImageFileRef` (and the `default_config` constructor for it) now default to ensuring that there is an
