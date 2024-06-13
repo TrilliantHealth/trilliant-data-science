@@ -264,7 +264,10 @@ def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], 
     local_path = source.path_from_uri(file_uri)
     if local_path.exists():
         try:
-            return source.from_file(local_path, hash=hash)
+            # since there's a remote URI, it's possible a specific consumer might want to
+            # get access to that directly, even though the default data access would still
+            # be to use the local file.
+            return source.from_file(local_path, hash=hash, uri=remote_uri)
         except Exception as e:
             logger.warning(f"Failed to use local path {local_path} for source {remote_uri}: {e}")
     return source.from_uri(remote_uri, hash=hash)

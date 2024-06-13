@@ -20,7 +20,7 @@ def _are_same_fs(path1: Path, path2: Path) -> bool:
 
 
 def _walk_up_to_existing_dir(path: Path) -> Path:
-    existing_dir = path
+    existing_dir = path.resolve()
     while not existing_dir.exists() or not existing_dir.is_dir():
         # this is guaranteed to terminate at the FS root
         existing_dir = existing_dir.parent

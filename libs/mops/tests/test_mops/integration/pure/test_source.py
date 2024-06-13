@@ -31,5 +31,6 @@ def test_that_sources_get_transferred_both_directions_via_local_hashrefs(temp_fi
     with pipeline_id_mask(mask):
         cp = memoize_in(TEST_TMP_URI)(a_function_that_combines_two_sources)((src_a, src_b))["yes"]
     assert cp.uri.endswith("by_your_sources_combined.txt")
-    assert cp.uri.startswith("file://")
+    assert cp.uri.startswith("adls://")
+    assert cp.cached_path and cp.cached_path.exists()
     assert open(cp).read() == "Captain Planet"
