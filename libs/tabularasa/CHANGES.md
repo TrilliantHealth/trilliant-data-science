@@ -1,3 +1,10 @@
+### 0.3.5
+
+- Set some reasonable defaults in schema `build_options`, specifically:
+  - `type_constraint_comments` is now `True` by default
+  - `validate_transient_tables` is now `True` by default
+  - `require_typing_extensions` is now `False` by default since python 3.7 is at end-of-life
+
 ### 0.3.4
 
 - Lazily load some sqlite databases from the somewhat more flexible `core.Source`, rather than the

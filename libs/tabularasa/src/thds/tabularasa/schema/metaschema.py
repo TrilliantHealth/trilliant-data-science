@@ -476,10 +476,10 @@ class BuildOptions(BaseModel, extra=Extra.forbid):
     pandas: bool
     pyarrow: bool
     # interface options
-    type_constraint_comments: bool
-    validate_transient_tables: bool
+    type_constraint_comments: bool = True
+    validate_transient_tables: bool = True
     # set this to true if you want to generate code that's compatible with python 3.7 and lower
-    require_typing_extensions: bool
+    require_typing_extensions: bool = False
     # import types from external schemas, or re-render them?
     import_external_types: bool = True
     # render custom types with constraints as typing.NewType instances?
