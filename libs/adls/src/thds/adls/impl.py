@@ -687,8 +687,9 @@ class ADLSFileSystem:
     ) -> AsyncIterator[List[T]]:
         """Async batch generator"""
         batch_size = size if size is not None else self.default_batch_size
-        async for chunk in stream.chunks(it, batch_size):
-            yield chunk
+        async with stream.chunks(it, batch_size).stream() as streamer:
+            async for chunk in streamer:
+                yield chunk
 
     def fetch_files(self, remote_paths: Union[Iterable[str], Mapping[str, Union[Path, str]]]):
         return self._run(self._fetch_files, remote_paths)
