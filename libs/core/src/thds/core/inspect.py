@@ -1,3 +1,5 @@
+# Credit: https://gist.github.com/lee-pai-long/d3004225e1847b84acb4fbba0c2aea91
+# I have made some small modifications to the code
 import inspect
 
 import attrs
@@ -12,8 +14,6 @@ class CallerInfo:
 
 
 def get_caller_info(skip: int = 2) -> CallerInfo:
-    # Credit: https://gist.github.com/lee-pai-long/d3004225e1847b84acb4fbba0c2aea91
-    # I have made some small modifications to the code
     """Get the name of a caller in the format module.class.method.
     Copied from: https://gist.github.com/techtonik/2151727
     :arguments:

@@ -1,9 +1,9 @@
 [tool.poetry]
-name = "thds.core"
+name = "thds.adls"
+version = "2.3"
 # Patch version is a datetime determined upon release
-version = "1.21"
+description = "ADLS tools"
 authors = ["Trilliant Health"]
-description = "Core utilities."
 readme = "README.md"
 packages = [{include = "thds", from="src"}]
 include = ["py.typed", "meta.json"]
@@ -11,31 +11,28 @@ include = ["py.typed", "meta.json"]
 [tool.poetry.dependencies]
 python = "^3.8"
 
-attrs = ">=22.2.0"
-cattrs = ">=22.2.0"
-setuptools = "*"
-# setuptools is no longer included in Python >= 3.12 venvs by default,
-# however most of the Python ecosystem (pycharm, various packages, etc.)
-# still expects setuptools to be in any given venv.
-# the Poetry team, in their infinite wisdom, decided that setuptools should be removed from all venvs
-# unless it is explicitly required.
-# this is the most central place to require setuptools even though `core` itself doesn't need it :/
-# at some point we will hopefully be able to remove this
+aiohttp = ">=3.8.1"
+aiostream = ">=0.4.5"
+azure-identity = ">=1.9"
+azure-storage-file-datalake = ">=12.6"
+filelock = ">=3.0"
+
+thds-core = {path = "../../libs/core", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.0"
 mypy-extensions = "^1.0"
 pytest = "^7.2"
+pytest-asyncio = "^0.21.0"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
+pytest-xdist = "^3.3.1"
 
 [tool.poetry.scripts]
-new-calgitver = "thds.core.meta:print_calgitver"
-show-thds-config = "thds.core.config:show_config_cli"
-thds-exit-after = "thds.core.exit_after:main"
+adls-download-uri = "thds.adls.tools.download:main"
 
 [build-system]
-requires = ["poetry-core", "attrs>=22.2.0", "cattrs>=22.2"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
@@ -47,7 +44,7 @@ source = ["src", "*/site-packages"]
 
 [tool.coverage.run]
 branch = true
-source = ["thds.core"]
+source = ["thds.adls"]
 
 [tool.coverage.report]
 show_missing = true
@@ -63,9 +60,16 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
+
 [[tool.mypy.overrides]]
-module = ["setuptools"]
+module = ["aiostream", "setuptools"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# temporary fix for mypy error: Function has duplicate type signatures
+# related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
+module = ["azure.storage.filedatalake.*"]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
