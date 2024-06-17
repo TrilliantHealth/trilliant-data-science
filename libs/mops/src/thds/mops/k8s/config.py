@@ -40,7 +40,7 @@ k8s_monitor_max_attempts = config.item("mops.k8s.monitor.max_attempts", 100, par
 # which provides access to a metadata endpoint that Azure clients know
 # how to access automatically.
 # https://docs.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity
-aad_pod_managed_identity = config.item("mops.k8s.aad_pod_managed_identity", "")
+aad_pod_managed_identity = config.item("mops.k8s.azure.aad_pod_managed_identity", "")
 
 # but there's an even newer, better type of auth called Workload
 # Identity, which unfortunately requires specific infrastructure

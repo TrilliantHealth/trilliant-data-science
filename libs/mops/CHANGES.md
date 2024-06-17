@@ -1,3 +1,8 @@
+### 2.7.20240617
+
+- Fix a bug where the old Azure Managed Identity (`aadpodidbinding=ds-standard`) was incorrectly not
+  being enabled for users not on The List.
+
 ## 2.7
 
 - Introduced a `mops-summarize` CLI tool to generate function usage summary reports for pipeline runs.
