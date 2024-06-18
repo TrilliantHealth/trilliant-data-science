@@ -8,7 +8,7 @@ def _slowish_hash_str_function(__string: str) -> int:
     # Raymond Hettinger says that little-endian is slightly faster, though that was 2021.
     # I have also tested this myself and found it to be true.
     # https://bugs.python.org/msg401661
-    return int.from_bytes(hashlib.md5(__string.encode()).digest()[:8], byteorder="little", signed=True)
+    return int.from_bytes(hashlib.md5(__string.encode()).digest()[:7], byteorder="little")
 
 
 _THE_HASH_FUNCTION = _slowish_hash_str_function
@@ -21,8 +21,15 @@ def set_hash_function(f: ty.Callable[[str], int]) -> None:
 
 
 def _pyhash_values(*args) -> int:
-    _args = (x if isinstance(x, str) else str(x) for x in args)
-    return _THE_HASH_FUNCTION("".join(_args))
+    try:
+        _args = (x if isinstance(x, str) else str(x) for x in args)
+        concatenated = "".join(_args)
+        hash_value = _THE_HASH_FUNCTION(concatenated)
+        print(f"_pyhash_values received: {args}, concatenated: {concatenated}, hash: {hash_value}")
+        return hash_value
+    except Exception as e:
+        print(f"_pyhash_values raised exception: {e}")
+        raise
 
 
 def _has_param_kind(signature, kind) -> bool:
