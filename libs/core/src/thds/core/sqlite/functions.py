@@ -21,15 +21,10 @@ def set_hash_function(f: ty.Callable[[str], int]) -> None:
 
 
 def _pyhash_values(*args) -> int:
-    try:
-        _args = (x if isinstance(x, str) else str(x) for x in args)
-        concatenated = "".join(_args)
-        hash_value = _THE_HASH_FUNCTION(concatenated)
-        print(f"_pyhash_values received: {args}, concatenated: {concatenated}, hash: {hash_value}")
-        return hash_value
-    except Exception as e:
-        print(f"_pyhash_values raised exception: {e}")
-        raise
+    _args = (x if isinstance(x, str) else str(x) for x in args)
+    concatenated = "".join(_args)
+    hash_value = _THE_HASH_FUNCTION(concatenated)
+    return hash_value
 
 
 def _has_param_kind(signature, kind) -> bool:
