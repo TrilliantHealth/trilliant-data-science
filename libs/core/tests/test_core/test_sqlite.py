@@ -97,6 +97,20 @@ def test_autometa(test_db: StructTable[TstItem]):
         assert table.get(id=1) == TstItem(1, "one")
 
 
+def test_function_registration(_base_test_db: sqlite3.Connection):
+    def _is_func_registered(conn: sqlite3.Connection, func_name: str) -> bool:
+        try:
+            # Attempt to use the function in a simple query
+            conn.execute(f"SELECT {func_name}('test')")
+            return True
+        except sqlite3.OperationalError:
+            return False
+
+    assert _is_func_registered(
+        _base_test_db, "_pyhash_values"
+    ), "Function _pyhash_values is not registered"
+
+
 @pytest.mark.parametrize(
     "columns",
     [
