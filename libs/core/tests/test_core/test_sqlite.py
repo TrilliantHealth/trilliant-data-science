@@ -114,8 +114,8 @@ def test_function_registration(_base_test_db: sqlite3.Connection):
 @pytest.mark.parametrize(
     "columns",
     [
-        (None),
-        ("name"),
+        None,
+        "name",
         (["id", "name"]),
     ],
 )
