@@ -9,8 +9,13 @@ from thds.core.link import link
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("uri", type=resolve_uri)
-    parser.add_argument("--copy-to", "-c", type=Path)
+    parser.add_argument("uri", type=resolve_uri, help="A fully qualified path to an ADLS location")
+    parser.add_argument(
+        "--copy-to",
+        "-c",
+        type=Path,
+        help="This will create a link to the cached download at the specified location",
+    )
 
     args = parser.parse_args()
 

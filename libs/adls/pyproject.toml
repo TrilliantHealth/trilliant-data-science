@@ -30,6 +30,7 @@ pytest-xdist = "^3.3.1"
 
 [tool.poetry.scripts]
 adls-download-uri = "thds.adls.tools.download:main"
+adls-ls-uri = "thds.adls.tools.ls:main"
 
 [build-system]
 requires = ["poetry-core"]
