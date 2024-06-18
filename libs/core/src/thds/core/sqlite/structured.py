@@ -3,15 +3,17 @@ import typing as ty
 from dataclasses import dataclass
 from sqlite3 import Connection, OperationalError
 
+from thds.core import config
 from thds.core.lazy import ThreadLocalLazy
 from thds.core.log import getLogger
-from thds.tabularasa.loaders.sqlite_util import DEFAULT_ATTR_SQLITE_CACHE_SIZE, DEFAULT_MMAP_BYTES
 
 from .connect import row_connect
 from .meta import column_names, primary_key_cols
 from .read import matching
 from .types import T, TableSource
 
+SQLITE_CACHE_SIZE = config.item("cache_size", 100_000)
+MMAP_BYTES = config.item("mmap_bytes", 8_589_934_592)
 _logger = getLogger(__name__)
 
 
@@ -46,9 +48,14 @@ class StructTable(ty.Generic[T]):
         self,
         from_item: ty.Callable[[ty.Mapping[str, ty.Any]], T],
         table_meta: ty.Callable[[ty.Optional[int]], ThreadLocalLazy[TableMeta]],
-        cache_size: ty.Optional[ty.Optional[int]] = DEFAULT_ATTR_SQLITE_CACHE_SIZE,
-        mmap_size: int = DEFAULT_MMAP_BYTES,
+        cache_size: ty.Optional[int] = None,
+        mmap_size: int = -1,
     ):
+        if cache_size is None:
+            cache_size = SQLITE_CACHE_SIZE()
+        if mmap_size < 0:
+            mmap_size = MMAP_BYTES()
+
         self._tbl = table_meta(mmap_size)
         self.from_item = from_item
         if cache_size:

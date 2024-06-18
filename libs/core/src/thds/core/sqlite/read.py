@@ -39,7 +39,11 @@ def partition(
     if columns is None:
         return {f"rowid % {n}": i}
     hash_cols = columns if isinstance(columns, str) else ", ".join(columns)
-    return {f"hash({hash_cols}) % {n}": i}
+    # when SQLite uses this in a WHERE clause, as "hash(foo, bar) % 5 = 3",
+    # it hashes the _values_ in the row for those columns.
+    # Note that if we do have to fall back to this, the partitioning will be
+    # quite a bit slower because of the necessity of calling back into Python.
+    return {f"_pyhash_values({hash_cols}) % {n}": i}
 
 
 def maybe(

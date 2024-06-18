@@ -1,10 +1,10 @@
 import math
 import sqlite3
 from dataclasses import dataclass
+from functools import partial
 from unittest import mock
 
 import pytest
-from returns.curry import partial
 
 from thds.core.sqlite import StructTable, connect, read, write_mappings
 from thds.core.sqlite.structured import BadPrimaryKey, TableMeta, UnknownColumns, autometa_factory
@@ -110,7 +110,7 @@ def test_partition_read(columns, _base_test_db: sqlite3.Connection, _base_test_d
     _partition = partial(read.partition, n, columns=columns)
     partitions = list(map(_partition, range(n)))
     _read_matching = partial(read.matching, "test", _base_test_db)
-    results = list(map(list, map(_read_matching, partitions)))
+    results = list(map(list, map(_read_matching, partitions)))  # type: ignore
     row_count = len(_base_test_db_rows)
     returned_row_count = sum(len(result) for result in results)
 
