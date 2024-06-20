@@ -1,9 +1,13 @@
 import functools
 import inspect
+import sys
+import threading
 import typing as ty
-from threading import Lock
 
-from typing_extensions import ParamSpec
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 
 
 class _HashedTuple(tuple):
@@ -51,6 +55,11 @@ def hashkey(*args, **kwargs) -> _HashedTuple:
 
 
 def make_bound_hashkey(f: ty.Callable) -> ty.Callable[..., _HashedTuple]:
+    """Makes a hashkey function that binds its `*args, **kwargs` to the function signature of `f`.
+
+    The resulting bound hashkey function makes cache keys that are robust to variations in how arguments are passed to
+    the cache-wrapped `f`. Note that `*args`, by definition, are order dependent.
+    """
     signature = inspect.signature(f)
 
     def bound_hashkey(*args, **kwargs) -> _HashedTuple:
@@ -71,67 +80,96 @@ class _CacheInfo(ty.NamedTuple):
 
 P = ParamSpec("P")
 R = ty.TypeVar("R")
+L = ty.TypeVar(
+    "L", bound=ty.Union[threading.Lock, threading.RLock, threading.Semaphore, threading.BoundedSemaphore]
+)
 
 
-def threadsafe_cache(f: ty.Callable[P, R]) -> ty.Callable[P, R]:
-    """A threadsafe, simple, unbounded cache.
+def _locking_cache_factory(
+    cache_lock: L,
+    make_func_lock: ty.Callable[[_HashedTuple], L],
+) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
+    def decorator(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
+        cache: ty.Dict[_HashedTuple, R] = {}
+        keys_to_func_locks: ty.Dict[_HashedTuple, L] = {}
+        hits = misses = 0
+        bound_hashkey = make_bound_hashkey(func)
+        sentinel = ty.cast(R, object())  # unique object used to signal cache misses
 
-    Unlike common cache implementations, such as `functools.cache` or `cachetools.cached({})`,
-    `threadsafe_cache` makes sure only one invocation of the wrapped function will occur per key across concurrent
-    threads.
+        @functools.wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            nonlocal hits, misses
 
-    When using `threadsafe_cache` to call the same function with the same args concurrently, care should be taken
-    that the wrapped function handles exceptions gracefully. A worst-case scenario exists where the wrapped function
-    *F* is long-running and deterministically errors towards the end of its run. If this exception raising *F* is
-    called with the same args *N* times, *F* will run (and error) in serial, *N* times.
-    """
-    cache: ty.Dict[_HashedTuple, R] = {}
-    cache_lock = Lock()
-    keys_to_func_locks: ty.Dict[_HashedTuple, Lock] = {}
-    hits = misses = 0
-    bound_hashkey = make_bound_hashkey(f)
-    sentinel = ty.cast(R, object())  # unique object used to signal cache misses
-
-    @functools.wraps(f)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        nonlocal hits, misses
-
-        key = bound_hashkey(*args, **kwargs)
-        maybe_value = cache.get(key, sentinel)
-        if maybe_value is not sentinel:
-            hits += 1
-            return maybe_value
-
-        if key not in keys_to_func_locks:
-            with cache_lock:
-                if key not in keys_to_func_locks:
-                    # just here to guard against a potential race condition
-                    keys_to_func_locks[key] = Lock()
-
-        with keys_to_func_locks[key]:
+            key = bound_hashkey(*args, **kwargs)
             maybe_value = cache.get(key, sentinel)
             if maybe_value is not sentinel:
                 hits += 1
                 return maybe_value
 
-            misses += 1
-            result = f(*args, **kwargs)
-            cache[key] = result
+            if key not in keys_to_func_locks:
+                with cache_lock:
+                    if key not in keys_to_func_locks:
+                        # just here to guard against a potential race condition
+                        keys_to_func_locks[key] = make_func_lock(key)
 
-            return result
+            with keys_to_func_locks[key]:
+                maybe_value = cache.get(key, sentinel)
+                if maybe_value is not sentinel:
+                    hits += 1
+                    return maybe_value
 
-    def cache_info() -> _CacheInfo:
-        with cache_lock:
-            return _CacheInfo(hits, misses, None, len(cache))
+                misses += 1
+                result = func(*args, **kwargs)
+                cache[key] = result
 
-    def clear_cache() -> None:
-        nonlocal hits, misses
-        with cache_lock:
-            cache.clear()
-            keys_to_func_locks.clear()
-            hits = misses = 0
+                return result
 
-    wrapper.cache_info = cache_info  # type: ignore[attr-defined]
-    wrapper.clear_cache = clear_cache  # type: ignore[attr-defined]
+        def cache_info() -> _CacheInfo:
+            with cache_lock:
+                return _CacheInfo(hits, misses, None, len(cache))
 
-    return wrapper
+        def clear_cache() -> None:
+            nonlocal hits, misses
+            with cache_lock:
+                cache.clear()
+                keys_to_func_locks.clear()
+                hits = misses = 0
+
+        wrapper.cache_info = cache_info  # type: ignore[attr-defined]
+        wrapper.clear_cache = clear_cache  # type: ignore[attr-defined]
+
+        return wrapper
+
+    return decorator
+
+
+def locking_cache(
+    func: ty.Optional[ty.Callable[P, R]] = None,
+    *,
+    cache_lock: ty.Optional[L] = None,
+    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], L]] = None,
+):
+    """A threadsafe, simple, unbounded cache.
+
+    Unlike common cache implementations, such as `functools.cache` or `cachetools.cached({})`,
+    `locking_cache` makes sure only one invocation of the wrapped function will occur per key across concurrent
+    threads.
+
+    When using `locking_cache` to call the same function with the same args concurrently, care should be taken
+    that the wrapped function handles exceptions gracefully. A worst-case scenario exists where the wrapped function
+    *F* is long-running and deterministically errors towards the end of its run. If this exception raising *F* is
+    called with the same args *N* times, *F* will run (and error) in serial, *N* times.
+
+    Users can optionally supply their own `cache_lock` and `make_func_lock` callable that returns a lock based on the
+    cache key. By default, the `cache_lock` is a `Lock` and each unique cache key gets a unique `Lock`.
+    """
+
+    def default_make_func_lock(_key: _HashedTuple) -> threading.Lock:
+        return threading.Lock()
+
+    decorator = _locking_cache_factory(
+        cache_lock or threading.Lock(), make_func_lock or default_make_func_lock
+    )
+    if func:
+        return decorator(func)
+    return decorator

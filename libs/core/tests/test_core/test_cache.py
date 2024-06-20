@@ -1,5 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
+from threading import RLock
 
 from thds.core import cache
 
@@ -28,8 +29,8 @@ def add_one(i: int) -> int:
     return i + 1
 
 
-def test_threadsafe_cache() -> None:
-    cached_add_one = cache.threadsafe_cache(add_one)
+def test_locking_cache() -> None:
+    cached_add_one = cache.locking_cache(add_one)
 
     assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
     cached_add_one(1)
@@ -41,9 +42,34 @@ def test_threadsafe_cache() -> None:
     assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
 
 
-def test_threadsafe_cache_calls_same_args_once() -> None:
-    cached_add_one = cache.threadsafe_cache(add_one)
+def test_parametrized_locking_cache() -> None:
+    cached_add_one = cache.locking_cache(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)
+
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().hits == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+
+
+def test_locking_cache_calls_same_args_once1() -> None:
+    cached_add_one = cache.locking_cache(add_one)
     lst = [1] * 256 + [2] * 256 + [3] * 256 + [4] * 256
+
+    with ThreadPoolExecutor() as exc:
+        exc.map(cached_add_one, lst, chunksize=32)
+
+    assert cached_add_one.cache_info().hits == 1020  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 4  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
+
+
+def test_locking_cache_calls_same_args_once2() -> None:
+    cached_add_one = cache.locking_cache(add_one)
+    lst = [1, 2, 3, 4] * 256
 
     with ThreadPoolExecutor() as exc:
         exc.map(cached_add_one, lst, chunksize=32)
@@ -58,8 +84,8 @@ def slow_add_one(i: int) -> int:
     return add_one(i)
 
 
-def test_thread_safe_cache_runs_diff_args_parallel() -> None:
-    cached_slow_add_one = cache.threadsafe_cache(slow_add_one)
+def test_locking_cache_runs_diff_args_parallel() -> None:
+    cached_slow_add_one = cache.locking_cache(slow_add_one)
 
     lst = [1, 2, 3, 4]
 
@@ -72,8 +98,8 @@ def test_thread_safe_cache_runs_diff_args_parallel() -> None:
     # concurrent runtime is _way_ less than serial runtime
 
 
-def test_cache_clear() -> None:
-    cached_add_one = cache.threadsafe_cache(add_one)
+def test_locking_cache_clear() -> None:
+    cached_add_one = cache.locking_cache(add_one)
 
     assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
     cached_add_one(1)
