@@ -1,4 +1,5 @@
 import functools
+import inspect
 import typing as ty
 from threading import Lock
 
@@ -36,7 +37,7 @@ class _HashedTuple(tuple):
 _kwmark = (_HashedTuple,)
 
 
-def hashkey(*args, **kwargs):
+def hashkey(*args, **kwargs) -> _HashedTuple:
     """Return a cache key for the specified hashable arguments."""
 
     if kwargs:
@@ -45,11 +46,23 @@ def hashkey(*args, **kwargs):
         return _HashedTuple(args)
 
 
-# keying code borrowed from `cachetools`: https://github.com/tkem/cachetools/tree/master
+# above keying code borrowed from `cachetools`: https://github.com/tkem/cachetools/tree/master
 # I have added some type information
 
 
+def make_bound_hashkey(f: ty.Callable) -> ty.Callable[..., _HashedTuple]:
+    signature = inspect.signature(f)
+
+    def bound_hashkey(*args, **kwargs) -> _HashedTuple:
+        bound_arguments = signature.bind(*args, **kwargs)
+        bound_arguments.apply_defaults()
+        return hashkey(*bound_arguments.args, **bound_arguments.kwargs)
+
+    return bound_hashkey
+
+
 class _CacheInfo(ty.NamedTuple):
+    # typed version of what is in `functools`
     hits: int
     misses: int
     maxsize: ty.Optional[int]
@@ -68,37 +81,43 @@ def threadsafe_cache(f: ty.Callable[P, R]) -> ty.Callable[P, R]:
     threads.
 
     When using `threadsafe_cache` to call the same function with the same args concurrently, care should be taken
-    so that the wrapped function handles exceptions gracefully. A worst-case scenario exists where the wrapped function
-    *F* is a long-running function that errors towards the end of its run. If this exception raising *F* is called
-    with the same args *N* times, *F* will run (and error) in serial, *N* times.
+    that the wrapped function handles exceptions gracefully. A worst-case scenario exists where the wrapped function
+    *F* is long-running and deterministically errors towards the end of its run. If this exception raising *F* is
+    called with the same args *N* times, *F* will run (and error) in serial, *N* times.
     """
     cache: ty.Dict[_HashedTuple, R] = {}
     cache_lock = Lock()
     keys_to_func_locks: ty.Dict[_HashedTuple, Lock] = {}
     hits = misses = 0
+    bound_hashkey = make_bound_hashkey(f)
+    sentinel = ty.cast(R, object())  # unique object used to signal cache misses
 
     @functools.wraps(f)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         nonlocal hits, misses
 
-        key = hashkey(*args, **kwargs)
-
-        if key in cache:
+        key = bound_hashkey(*args, **kwargs)
+        maybe_value = cache.get(key, sentinel)
+        if maybe_value is not sentinel:
             hits += 1
-            return cache[key]
+            return maybe_value
 
         if key not in keys_to_func_locks:
             with cache_lock:
                 if key not in keys_to_func_locks:
+                    # just here to guard against a potential race condition
                     keys_to_func_locks[key] = Lock()
 
         with keys_to_func_locks[key]:
-            if key in cache:
+            maybe_value = cache.get(key, sentinel)
+            if maybe_value is not sentinel:
                 hits += 1
-                return cache[key]
+                return maybe_value
+
             misses += 1
             result = f(*args, **kwargs)
             cache[key] = result
+
             return result
 
     def cache_info() -> _CacheInfo:

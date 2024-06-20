@@ -1,32 +1,56 @@
-import functools
 import time
-import typing as ty
 from concurrent.futures import ThreadPoolExecutor
-
-from typing_extensions import ParamSpec
 
 from thds.core import cache
 
-P = ParamSpec("P")
-R = ty.TypeVar("R")
+
+def crazy_signature_1(i1: int, i2: int, *args: int, a: str, b: str, **kwargs) -> None:
+    pass
 
 
-def count_calls(f: ty.Callable[P, R]) -> ty.Callable[P, R]:
-    calls = 0
+def test_bound_hashkey1() -> None:
+    bound_hashey = cache.make_bound_hashkey(crazy_signature_1)
+    assert bound_hashey(1, 2, 3, 4, a="a", b="b", c="c", d="d") == bound_hashey(
+        1, 2, 3, 4, b="b", a="a", d="d", c="c"
+    )
 
-    @functools.wraps(f)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        nonlocal calls
-        calls += 1
-        return f(*args, **kwargs)
 
-    wrapper.calls = calls  # type: ignore[attr-defined]
+def crazy_signature_2(i1: int, i2: int, *args: int, a: str = "a", b: str = "b") -> None:
+    pass
 
-    return wrapper
+
+def test_bound_hashkey2() -> None:
+    bound_hashey = cache.make_bound_hashkey(crazy_signature_2)
+    assert bound_hashey(1, 2, 3, 4, a="a", b="b") == bound_hashey(1, 2, 3, 4)
 
 
 def add_one(i: int) -> int:
     return i + 1
+
+
+def test_threadsafe_cache() -> None:
+    cached_add_one = cache.threadsafe_cache(add_one)
+
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().hits == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+
+
+def test_threadsafe_cache_calls_same_args_once() -> None:
+    cached_add_one = cache.threadsafe_cache(add_one)
+    lst = [1] * 256 + [2] * 256 + [3] * 256 + [4] * 256
+
+    with ThreadPoolExecutor() as exc:
+        exc.map(cached_add_one, lst, chunksize=32)
+
+    assert cached_add_one.cache_info().hits == 1020  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().misses == 4  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
 
 
 def slow_add_one(i: int) -> int:
@@ -34,28 +58,25 @@ def slow_add_one(i: int) -> int:
     return add_one(i)
 
 
-def test_threadsafe_cache_calls_same_args_once() -> None:
-    cached_add_one = cache.threadsafe_cache(count_calls(add_one))
-
-    lst = [1] * 500 + [2] * 500
-
-    with ThreadPoolExecutor() as exc:
-        exc.map(cached_add_one, lst)
-
-    assert cached_add_one.cache_info().hits == 998  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 2  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().currsize == 2  # type: ignore[attr-defined]
-
-
 def test_thread_safe_cache_runs_diff_args_parallel() -> None:
-    cached_slow_add_one = cache.threadsafe_cache(count_calls(slow_add_one))
+    cached_slow_add_one = cache.threadsafe_cache(slow_add_one)
 
-    lst = [1, 2]
+    lst = [1, 2, 3, 4]
 
     start = time.perf_counter()
     with ThreadPoolExecutor() as exc:
-        exc.map(cached_slow_add_one, lst)
+        exc.map(cached_slow_add_one, lst, chunksize=4)
     stop = time.perf_counter()
 
     assert stop - start < 2
-    # concurrent runtime is less than serial runtime
+    # concurrent runtime is _way_ less than serial runtime
+
+
+def test_cache_clear() -> None:
+    cached_add_one = cache.threadsafe_cache(add_one)
+
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    cached_add_one.clear_cache()  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
