@@ -1,7 +1,7 @@
 ## 1.22
 
-- Adds a `cache` module with a `threadsafe_cache` decorator that ensures only one invocation of a
-  cached-wrapped function runs for each `*args, **kwargs` key.
+- Adds a `cache` module with a `locking` decorator that ensures only one invocation of a cached-wrapped
+  function runs for each `*args, **kwargs` key.
 
 ## 1.21
 

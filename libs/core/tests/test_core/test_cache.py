@@ -1,3 +1,4 @@
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
@@ -11,8 +12,8 @@ def crazy_signature_1(i1: int, i2: int, *args: int, a: str, b: str, **kwargs) ->
 
 def test_bound_hashkey1() -> None:
     bound_hashey = cache.make_bound_hashkey(crazy_signature_1)
-    assert bound_hashey(1, 2, 3, 4, a="a", b="b", c="c", d="d") == bound_hashey(
-        1, 2, 3, 4, b="b", a="a", d="d", c="c"
+    assert bound_hashey((1, 2, 3, 4), dict(a="a", b="b", c="c", d="d")) == bound_hashey(
+        (1, 2, 3, 4), dict(b="b", a="a", d="d", c="c")
     )
 
 
@@ -22,15 +23,15 @@ def crazy_signature_2(i1: int, i2: int, *args: int, a: str = "a", b: str = "b") 
 
 def test_bound_hashkey2() -> None:
     bound_hashey = cache.make_bound_hashkey(crazy_signature_2)
-    assert bound_hashey(1, 2, 3, 4, a="a", b="b") == bound_hashey(1, 2, 3, 4)
+    assert bound_hashey((1, 2, 3, 4), dict(a="a", b="b")) == bound_hashey((1, 2, 3, 4), {})
 
 
 def add_one(i: int) -> int:
     return i + 1
 
 
-def test_locking_cache() -> None:
-    cached_add_one = cache.locking_cache(add_one)
+def test_locking() -> None:
+    cached_add_one = cache.locking(add_one)
 
     assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
     cached_add_one(1)
@@ -42,8 +43,8 @@ def test_locking_cache() -> None:
     assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
 
 
-def test_parametrized_locking_cache() -> None:
-    cached_add_one = cache.locking_cache(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)
+def test_parametrized_locking() -> None:
+    cached_add_one = cache.locking(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)
 
     assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
     cached_add_one(1)
@@ -55,28 +56,14 @@ def test_parametrized_locking_cache() -> None:
     assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
 
 
-def test_locking_cache_calls_same_args_once1() -> None:
-    cached_add_one = cache.locking_cache(add_one)
-    lst = [1] * 256 + [2] * 256 + [3] * 256 + [4] * 256
+def test_locking_clear_cache() -> None:
+    cached_add_one = cache.locking(add_one)
 
-    with ThreadPoolExecutor() as exc:
-        exc.map(cached_add_one, lst, chunksize=32)
-
-    assert cached_add_one.cache_info().hits == 1020  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 4  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
-
-
-def test_locking_cache_calls_same_args_once2() -> None:
-    cached_add_one = cache.locking_cache(add_one)
-    lst = [1, 2, 3, 4] * 256
-
-    with ThreadPoolExecutor() as exc:
-        exc.map(cached_add_one, lst, chunksize=32)
-
-    assert cached_add_one.cache_info().hits == 1020  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 4  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    cached_add_one(1)
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
+    cached_add_one.clear_cache()  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
 
 
 def slow_add_one(i: int) -> int:
@@ -84,25 +71,17 @@ def slow_add_one(i: int) -> int:
     return add_one(i)
 
 
-def test_locking_cache_runs_diff_args_parallel() -> None:
-    cached_slow_add_one = cache.locking_cache(slow_add_one)
-
-    lst = [1, 2, 3, 4]
+def test_locking_calls_same_args_once_diff_args_parallel() -> None:
+    cached_slow_add_one = cache.locking(slow_add_one)
+    lst = [1, 2, 3, 4] * 256
+    random.shuffle(lst)
 
     start = time.perf_counter()
     with ThreadPoolExecutor() as exc:
-        exc.map(cached_slow_add_one, lst, chunksize=4)
+        exc.map(cached_slow_add_one, lst)
     stop = time.perf_counter()
 
+    assert cached_slow_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
+    print(stop - start < 2)
     assert stop - start < 2
-    # concurrent runtime is _way_ less than serial runtime
-
-
-def test_locking_cache_clear() -> None:
-    cached_add_one = cache.locking_cache(add_one)
-
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
-    cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    cached_add_one.clear_cache()  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    # concurrent runtime is _way_ less than serial runtime of just the 4 actual invocations
