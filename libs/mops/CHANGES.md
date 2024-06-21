@@ -1,3 +1,8 @@
+## 2.8
+
+- `image.default_config` will now always attempt a local image build if a remote build is attempted and
+  does not happen because the repository is dirty.
+
 ### 2.7.20240617
 
 - Fix a bug where the old Azure Managed Identity (`aadpodidbinding=ds-standard`) was incorrectly not
