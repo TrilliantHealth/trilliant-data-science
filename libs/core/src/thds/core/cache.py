@@ -168,28 +168,8 @@ def locking(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
 def locking(
     func: None = ...,
     *,
-    cache_lock: ContextManagerP,
-    make_func_lock: None = ...,
-) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
-    ...
-
-
-@ty.overload
-def locking(
-    func: None = ...,
-    *,
-    cache_lock: None = ...,
-    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
-) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
-    ...
-
-
-@ty.overload
-def locking(
-    func: None = ...,
-    *,
-    cache_lock: ContextManagerP,
-    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
+    cache_lock: ty.Optional[ContextManagerP] = ...,
+    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], ContextManagerP]] = ...,
 ) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
     ...
 
