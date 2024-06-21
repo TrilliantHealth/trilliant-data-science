@@ -3,11 +3,12 @@ import inspect
 import sys
 import threading
 import typing as ty
-from types import TracebackType
 
-if sys.version_info >= (3, 10):
+from . import protocols as proto
+
+if sys.version_info >= (3, 10):  # pragma: no cover
     from typing import ParamSpec
-else:
+else:  # pragma: no cover
     from typing_extensions import ParamSpec
 
 
@@ -78,39 +79,23 @@ class _CacheInfo(ty.NamedTuple):
     currsize: int
 
 
-T_co = ty.TypeVar("T_co", covariant=True)
-
-
-class ContextManagerP(ty.Protocol[T_co]):
-    def __enter__(self) -> T_co:
-        ...
-
-    def __exit__(
-        self,
-        __exc_type: ty.Optional[ty.Type[BaseException]],
-        __exc_value: ty.Optional[BaseException],
-        __traceback: ty.Optional[TracebackType],
-    ) -> ty.Optional[bool]:
-        ...
-
-
-P = ParamSpec("P")
-R = ty.TypeVar("R")
+_P = ParamSpec("_P")
+_R = ty.TypeVar("_R")
 
 
 def _locking_factory(
-    cache_lock: ContextManagerP,
-    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
-) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
-    def decorator(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
-        cache: ty.Dict[_HashedTuple, R] = {}
-        keys_to_func_locks: ty.Dict[_HashedTuple, ContextManagerP] = {}
+    cache_lock: proto.ContextManager,
+    make_func_lock: ty.Callable[[_HashedTuple], proto.ContextManager],
+) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
+    def decorator(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]:
+        cache: ty.Dict[_HashedTuple, _R] = {}
+        keys_to_func_locks: ty.Dict[_HashedTuple, proto.ContextManager] = {}
         hits = misses = 0
         bound_hashkey = make_bound_hashkey(func)
-        sentinel = ty.cast(R, object())  # unique object used to signal cache misses
+        sentinel = ty.cast(_R, object())  # unique object used to signal cache misses
 
         @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             nonlocal hits, misses
 
             key = bound_hashkey(args, kwargs)
@@ -121,7 +106,7 @@ def _locking_factory(
 
             if key not in keys_to_func_locks:
                 with cache_lock:
-                    if key not in keys_to_func_locks:
+                    if key not in keys_to_func_locks:  # pragma: no cover
                         # just here to guard against a potential race condition
                         keys_to_func_locks[key] = make_func_lock(key)
 
@@ -160,18 +145,18 @@ def _locking_factory(
 
 
 @ty.overload
-def locking(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
-    ...
+def locking(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]:
+    ...  # pragma: no cover
 
 
 @ty.overload
 def locking(
     func: None = ...,
     *,
-    cache_lock: ty.Optional[ContextManagerP] = ...,
-    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], ContextManagerP]] = ...,
-) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
-    ...
+    cache_lock: ty.Optional[proto.ContextManager] = ...,
+    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], proto.ContextManager]] = ...,
+) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
+    ...  # pragma: no cover
 
 
 # overloads cover typical usage of `locking_cache` but aren't comprehensive
@@ -179,10 +164,10 @@ def locking(
 
 
 def locking(
-    func: ty.Optional[ty.Callable[P, R]] = None,
+    func: ty.Optional[ty.Callable[_P, _R]] = None,
     *,
-    cache_lock: ty.Optional[ContextManagerP] = None,
-    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], ContextManagerP]] = None,
+    cache_lock: ty.Optional[proto.ContextManager] = None,
+    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], proto.ContextManager]] = None,
 ):
     """A threadsafe, simple, unbounded cache.
 
