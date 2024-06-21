@@ -3,6 +3,7 @@ import inspect
 import sys
 import threading
 import typing as ty
+from types import TracebackType
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -11,11 +12,10 @@ else:
 
 
 class _HashedTuple(tuple):
-    """A tuple that ensures that hash() will be called no more than once
+    """A tuple that ensures that `hash` will be called no more than once
     per element, since cache decorators will hash the key multiple
-    times on a cache miss.  See also _HashedSeq in the standard
-    library functools implementation.
-
+    times on a cache miss.  See also `_HashedSeq` in the standard
+    library `functools` implementation.
     """
 
     __hashvalue: ty.Optional[int] = None
@@ -41,7 +41,7 @@ class _HashedTuple(tuple):
 _kwmark = (_HashedTuple,)
 
 
-def hashkey(*args, **kwargs) -> _HashedTuple:
+def hashkey(args: tuple, kwargs: ty.Mapping) -> _HashedTuple:
     """Return a cache key for the specified hashable arguments."""
 
     if kwargs:
@@ -54,18 +54,18 @@ def hashkey(*args, **kwargs) -> _HashedTuple:
 # I have added some type information
 
 
-def make_bound_hashkey(f: ty.Callable) -> ty.Callable[..., _HashedTuple]:
-    """Makes a hashkey function that binds its `*args, **kwargs` to the function signature of `f`.
+def make_bound_hashkey(func: ty.Callable) -> ty.Callable[..., _HashedTuple]:
+    """Makes a hashkey function that binds its `*args, **kwargs` to the function signature of `func`.
 
     The resulting bound hashkey function makes cache keys that are robust to variations in how arguments are passed to
-    the cache-wrapped `f`. Note that `*args`, by definition, are order dependent.
+    the cache-wrapped `func`. Note that `*args`, by definition, are order dependent.
     """
-    signature = inspect.signature(f)
+    signature = inspect.signature(func)
 
-    def bound_hashkey(*args, **kwargs) -> _HashedTuple:
+    def bound_hashkey(args: tuple, kwargs: ty.Mapping) -> _HashedTuple:
         bound_arguments = signature.bind(*args, **kwargs)
         bound_arguments.apply_defaults()
-        return hashkey(*bound_arguments.args, **bound_arguments.kwargs)
+        return hashkey(bound_arguments.args, bound_arguments.kwargs)
 
     return bound_hashkey
 
@@ -78,20 +78,33 @@ class _CacheInfo(ty.NamedTuple):
     currsize: int
 
 
+T_co = ty.TypeVar("T_co", covariant=True)
+
+
+class ContextManagerP(ty.Protocol[T_co]):
+    def __enter__(self) -> T_co:
+        ...
+
+    def __exit__(
+        self,
+        __exc_type: ty.Optional[ty.Type[BaseException]],
+        __exc_value: ty.Optional[BaseException],
+        __traceback: ty.Optional[TracebackType],
+    ) -> ty.Optional[bool]:
+        ...
+
+
 P = ParamSpec("P")
 R = ty.TypeVar("R")
-L = ty.TypeVar(
-    "L", bound=ty.Union[threading.Lock, threading.RLock, threading.Semaphore, threading.BoundedSemaphore]
-)
 
 
-def _locking_cache_factory(
-    cache_lock: L,
-    make_func_lock: ty.Callable[[_HashedTuple], L],
+def _locking_factory(
+    cache_lock: ContextManagerP,
+    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
 ) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
     def decorator(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
         cache: ty.Dict[_HashedTuple, R] = {}
-        keys_to_func_locks: ty.Dict[_HashedTuple, L] = {}
+        keys_to_func_locks: ty.Dict[_HashedTuple, ContextManagerP] = {}
         hits = misses = 0
         bound_hashkey = make_bound_hashkey(func)
         sentinel = ty.cast(R, object())  # unique object used to signal cache misses
@@ -100,7 +113,7 @@ def _locking_cache_factory(
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             nonlocal hits, misses
 
-            key = bound_hashkey(*args, **kwargs)
+            key = bound_hashkey(args, kwargs)
             maybe_value = cache.get(key, sentinel)
             if maybe_value is not sentinel:
                 hits += 1
@@ -122,9 +135,12 @@ def _locking_cache_factory(
                 result = func(*args, **kwargs)
                 cache[key] = result
 
-                return result
+            del keys_to_func_locks[key]
+            return result
 
         def cache_info() -> _CacheInfo:
+            # concurrent usage of cached function may result in incorrect hit and miss counts
+            # incrementing them is not threadsafe
             with cache_lock:
                 return _CacheInfo(hits, misses, None, len(cache))
 
@@ -143,33 +159,78 @@ def _locking_cache_factory(
     return decorator
 
 
-def locking_cache(
+@ty.overload
+def locking(func: ty.Callable[P, R]) -> ty.Callable[P, R]:
+    ...
+
+
+@ty.overload
+def locking(
+    func: None = ...,
+    *,
+    cache_lock: ContextManagerP,
+    make_func_lock: None = ...,
+) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
+    ...
+
+
+@ty.overload
+def locking(
+    func: None = ...,
+    *,
+    cache_lock: None = ...,
+    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
+) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
+    ...
+
+
+@ty.overload
+def locking(
+    func: None = ...,
+    *,
+    cache_lock: ContextManagerP,
+    make_func_lock: ty.Callable[[_HashedTuple], ContextManagerP],
+) -> ty.Callable[[ty.Callable[P, R]], ty.Callable[P, R]]:
+    ...
+
+
+# overloads cover typical usage of `locking_cache` but aren't comprehensive
+# if you need typing coverage of a usage that these overloads do not cover, feel free to add it
+
+
+def locking(
     func: ty.Optional[ty.Callable[P, R]] = None,
     *,
-    cache_lock: ty.Optional[L] = None,
-    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], L]] = None,
+    cache_lock: ty.Optional[ContextManagerP] = None,
+    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], ContextManagerP]] = None,
 ):
     """A threadsafe, simple, unbounded cache.
 
     Unlike common cache implementations, such as `functools.cache` or `cachetools.cached({})`,
-    `locking_cache` makes sure only one invocation of the wrapped function will occur per key across concurrent
+    `locking` makes sure only one invocation of the wrapped function will occur per key across concurrent
     threads.
 
-    When using `locking_cache` to call the same function with the same args concurrently, care should be taken
-    that the wrapped function handles exceptions gracefully. A worst-case scenario exists where the wrapped function
-    *F* is long-running and deterministically errors towards the end of its run. If this exception raising *F* is
-    called with the same args *N* times, *F* will run (and error) in serial, *N* times.
+    When using `locking` to call the same function with the same arguments concurrently, care should be taken
+    that the wrapped function, `func`, handles exceptions gracefully. A worst-case scenario exists where the wrapped
+    function *F* is long-running and deterministically errors towards the end of its run. If this exception raising *F*
+    is called with the same arguments *N* times, *F* will run (and error) in serial, *N* times.
 
-    Users can optionally supply their own `cache_lock` and `make_func_lock` callable that returns a lock based on the
-    cache key. By default, the `cache_lock` is a `Lock` and each unique cache key gets a unique `Lock`.
+    Users can optionally supply their own context manager supporting `cache_lock` and `make_func_lock` callable that
+    returns a context manager supporting lock based on the cache key. By default, the `cache_lock` is a `Lock` and
+    each unique cache key gets a unique `Lock`.
+
+    Please also note that `hits` and `misses` in `cache_info` may not be accurate as they are not incremented in
+    a threadsafe matter. Doing that incrementation in a threadsafe manner would incur a performance penalty on threaded
+    usage that is not worth the cost.
     """
 
     def default_make_func_lock(_key: _HashedTuple) -> threading.Lock:
         return threading.Lock()
 
-    decorator = _locking_cache_factory(
+    decorator = _locking_factory(
         cache_lock or threading.Lock(), make_func_lock or default_make_func_lock
     )
+
     if func:
         return decorator(func)
     return decorator

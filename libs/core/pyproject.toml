@@ -21,6 +21,7 @@ setuptools = "*"
 # unless it is explicitly required.
 # this is the most central place to require setuptools even though `core` itself doesn't need it :/
 # at some point we will hopefully be able to remove this
+typing-extensions = "*"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.0"
