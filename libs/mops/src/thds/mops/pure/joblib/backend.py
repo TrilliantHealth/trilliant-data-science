@@ -9,13 +9,12 @@ Joblib is installed, or you will get an ImportError.
 """
 from joblib._parallel_backends import LokyBackend, SequentialBackend, ThreadingBackend  # type: ignore
 
-from thds.core.log import getLogger
+from thds.core import files, log
 
-from ..._utils.file_limits import bump_limits
 from ..core.types import Runner
 from .batching import patch_joblib_parallel_batching  # noqa
 
-logger = getLogger(__name__)
+logger = log.getLogger(__name__)
 
 
 class NoMemmapLokyBackend(LokyBackend):
@@ -53,7 +52,7 @@ class TrillMlParallelJoblibBackend(ThreadingBackend):
         oversubscribe: int = 10,
     ):
         """number of cores should be the number of cores available on the remote system."""
-        bump_limits()
+        files.bump_limits()
         self.runner = runner
         self.n_cores = n_cores
         self._n_jobs = parallelism
