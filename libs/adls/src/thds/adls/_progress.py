@@ -27,6 +27,9 @@ def _dumb_report_progress(desc: str, state: ProgressState):
     if not state.total:
         logger.info(f"{desc} complete!")
         return
+    if not state.n:
+        return  # don't report when nothing has happened yet.
+
     start, total, n_bytes = state
     pct = 100 * (n_bytes / total)
     elapsed = default_timer() - start
@@ -151,13 +154,28 @@ _GLOBAL_UP_TRACKER = Tracker(TqdmReporter("thds.adls uploading"))
 T = ty.TypeVar("T", bound=ty.IO)
 
 
-def _proxy_io(io_type: str, stream: T, tracker: Tracker, key: str) -> T:
+def _proxy_io(io_type: str, stream: T, key: str, total_len: int) -> T:
     assert io_type in ("read", "write"), io_type
-    old_io = getattr(stream, io_type)
+
+    try:
+        old_io = getattr(stream, io_type)
+        total_len = total_len or len(stream)  # type: ignore
+    except (AttributeError, TypeError):
+        return stream
+
+    if io_type == "read":
+        tracker, _ = _GLOBAL_UP_TRACKER.add(key, total_len)
+    else:
+        tracker, _ = _GLOBAL_DN_TRACKER.add(key, total_len)
 
     def io(data_or_len: ty.Union[bytes, int]):
         r = old_io(data_or_len)
-        tracker(key, len(data_or_len) if isinstance(data_or_len, bytes) else data_or_len)
+        io_len = (
+            total_len
+            if data_or_len == -1
+            else (len(data_or_len) if isinstance(data_or_len, bytes) else data_or_len)
+        )
+        tracker(key, io_len)
         return r
 
     setattr(stream, io_type, io)
@@ -167,18 +185,8 @@ def _proxy_io(io_type: str, stream: T, tracker: Tracker, key: str) -> T:
 def report_download_progress(stream: T, key: str, total: int = 0) -> T:
     if not total:  # if we don't know how big a download is, we can't report progress.
         return stream
-    try:
-        return _proxy_io("write", stream, *_GLOBAL_DN_TRACKER.add(key, total))
-    except TypeError:
-        return stream
+    return _proxy_io("write", stream, key, total)
 
 
 def report_upload_progress(stream: T, key: str, total: int = 0) -> T:
-    try:
-        return _proxy_io(
-            "read",
-            stream,  # try to figure out length if not provided.
-            *_GLOBAL_UP_TRACKER.add(key, total or len(ty.cast(ty.Any, stream))),
-        )
-    except (TypeError, AttributeError):
-        return stream
+    return _proxy_io("read", stream, key, total)
