@@ -29,19 +29,16 @@ def to_resource(srcdest: ty.Union[SrcFile, DestFile]) -> resource.AHR:
 
 def _upload_and_represent_v2(uri: str, local_src: StrOrPath) -> Serialized:
     fqn = AdlsFqn.parse(uri)
-    with open(local_src, "rb") as file:
-        uri = str(fqn)
-        uris.lookup_blob_store(uri).putbytes(uri, file)
-        file.seek(0)
-        # The primary reason for representing the md5 inside the
-        # serialized file pointer is to add greater confidence in
-        # memoization. This prevents memoizing results that are based
-        # on a shared blob path but different blob contents.
-        #
-        # We use md5 base64 so this is easy to verify against ADLS
-        # without downloading the file.  we do not currently make use
-        # of this validation but we could in the future.
-        return resource.of(fqn, md5b64=b64(md5_file(local_src))).serialized  # type: ignore
+    uris.lookup_blob_store(uri).putfile(Path(local_src), str(fqn))
+    # The primary reason for representing the md5 inside the
+    # serialized file pointer is to add greater confidence in
+    # memoization. This prevents memoizing results that are based
+    # on a shared blob path but different blob contents.
+    #
+    # We use md5 base64 so this is easy to verify against ADLS
+    # without downloading the file.  we do not currently make use
+    # of this validation but we could in the future.
+    return resource.of(fqn, md5b64=b64(md5_file(local_src))).serialized  # type: ignore
 
 
 _ADLS_URI_UPLOAD_V1 = "adls_uri_v1"  # do not ever change this key. it

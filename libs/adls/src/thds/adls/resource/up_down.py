@@ -8,11 +8,11 @@ from thds.core import files, fretry, hashing, link, log, scope, tmp
 
 from .._progress import report_upload_progress
 from .._upload import metadata_for_upload, upload_decision_and_settings
-from ..conf import UPLOAD_CHUNK_SIZE, UPLOAD_FILE_MAX_CONCURRENCY
+from ..conf import UPLOAD_FILE_MAX_CONCURRENCY
 from ..download import download_or_use_verified
 from ..errors import BlobNotFoundError
 from ..fqn import AdlsFqn
-from ..global_client import get_global_client
+from ..global_client import get_global_blob_container_client, get_global_fs_client
 from ..ro_cache import Cache, global_cache
 from .file_pointers import AdlsHashedResource, resource_from_path, resource_to_path
 
@@ -38,7 +38,7 @@ def get_read_only(
     cache = cache or global_cache()
     local_path = local_path or cache.path(resource.fqn)
     download_or_use_verified(
-        get_global_client(resource.fqn.sa, resource.fqn.container),
+        get_global_fs_client(resource.fqn.sa, resource.fqn.container),
         resource.fqn.path,
         local_path,
         md5b64=resource.md5b64,
@@ -114,26 +114,35 @@ def upload(
         # we always use the original source file to upload, not the cached path,
         # because uploading from a shared location risks race conditions.
 
-    fs_client = get_global_client(dest_.sa, dest_.container).get_file_client(dest_.path)
-    decision = upload_decision_and_settings(fs_client, src)
+    blob_container_client = get_global_blob_container_client(dest_.sa, dest_.container)
+    blob_client = blob_container_client.get_blob_client(dest_.path)
+    decision = upload_decision_and_settings(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
     if decision.upload_required:
         # set up some bookkeeping
         n_bytes = 0
         if isinstance(src, Path):
             n_bytes = src.stat().st_size
             src = scope.enter(open(src, "rb"))
+        elif isinstance(src, bytes):
+            n_bytes = len(src)
 
         adls_meta = metadata_for_upload()
         if "metadata" in upload_data_kwargs:
             adls_meta.update(upload_data_kwargs.pop("metadata"))
 
-        fs_client.upload_data(
+        # we are now using blob_client instead of file system client
+        # because blob client (as of 2024-06-24) does actually do
+        # some one-step, atomic uploads, wherein there is not a separate
+        # create/truncate action associated with an overwrite.
+        # This is both faster, as well as simpler to reason about, and
+        # in fact was the behavior I had been assuming all along...
+        blob_client.upload_blob(
             report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes),
             overwrite=True,
+            length=n_bytes,
             content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
-            chunk_size=UPLOAD_CHUNK_SIZE(),
             metadata=adls_meta,
             **upload_data_kwargs,
         )
@@ -147,7 +156,7 @@ def upload(
 def verify_remote_md5(resource: AdlsHashedResource) -> bool:
     try:
         props = (
-            get_global_client(resource.fqn.sa, resource.fqn.container)
+            get_global_fs_client(resource.fqn.sa, resource.fqn.container)
             .get_file_client(resource.fqn.path)
             .get_file_properties()
         )

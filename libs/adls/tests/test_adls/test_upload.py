@@ -26,7 +26,7 @@ def test_basic_upload_without_cache(caplog):
         # async file not found, plus upload
         fs.put_file(HW, remote_path)
         assert "failed to get length" in caplog.text
-        assert "No remote file properties" in caplog.text
+        assert "No remote properties" in caplog.text
 
     # now assert that upload uploaded the correct bytes
     with tempfile.TemporaryDirectory() as dir:
@@ -43,7 +43,9 @@ def test_basic_upload_without_cache(caplog):
         with caplog.at_level(logging.DEBUG):
             # synchronous bytes don't match
             assert upload_decision_and_settings(
-                get_global_client(fs.account_name, fs.file_system).get_file_client(remote_path),
+                get_global_client(fs.account_name, fs.file_system)
+                .get_file_client(remote_path)
+                .get_file_properties,
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required

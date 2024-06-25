@@ -330,7 +330,7 @@ class ADLSFileSystem:
 
         async with file_system_client.get_file_client(remote_path) as file_client:
             with open(local_path, "rb") as fp:
-                decision = await async_upload_decision_and_settings(file_client, fp)
+                decision = await async_upload_decision_and_settings(file_client.get_file_properties, fp)
                 if decision.upload_required:
                     await file_client.upload_data(
                         fp,

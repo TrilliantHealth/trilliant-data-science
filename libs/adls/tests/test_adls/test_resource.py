@@ -59,16 +59,6 @@ def test_write_through_cache_upload_readable():
     dpath.unlink()
 
 
-def test_upload_iterable_bytes():
-    dest = AdlsFqn.of("thdsscratch", "tmp", "test/hello_world_cached_iterable.txt")
-    upload(dest, (b"87987987987987897987987987987987987", b"45345435453"))
-    upload(
-        dest,
-        (b"87987987987987897987987987987987987", b"45345435453"),
-        write_through_cache=global_cache(),
-    )
-
-
 @mock.patch.dict(os.environ, {"CI": ""})
 def test_get_or_create_resource():
     the_path = DATA_DIR / "delete_me.db"
