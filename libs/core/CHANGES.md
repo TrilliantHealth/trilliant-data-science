@@ -1,3 +1,8 @@
+## 1.22
+
+- Adds a `cache` module with a `locking` decorator that ensures only one invocation of a cached-wrapped
+  function runs for each `*args, **kwargs` key.
+
 ## 1.21
 
 - Add `atomic_binary_writer` helper context manager, for writing file output with a higher level of

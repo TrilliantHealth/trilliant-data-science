@@ -1,4 +1,6 @@
+"""Various assorted file-related utilities."""
 import os
+import resource
 import shutil
 import stat
 import typing as ty
@@ -6,6 +8,7 @@ from contextlib import contextmanager
 from io import BufferedWriter
 from pathlib import Path
 
+from . import config
 from .log import getLogger
 from .tmp import temppath_same_fs
 from .types import StrOrPath
@@ -60,3 +63,17 @@ def atomic_binary_writer(destination: StrOrPath) -> ty.Iterator[BufferedWriter]:
     with atomic_write_path(destination) as temp_writable_path:
         with open(temp_writable_path, "wb") as f:
             yield f
+
+
+OPEN_FILES_LIMIT = config.item("limit_open", 10000)
+
+
+def set_file_limit(n: int):
+    """Works like calling `ulimit -Sn <N>` on a Mac."""
+    resource.setrlimit(resource.RLIMIT_NOFILE, (n, n))
+    assert resource.getrlimit(resource.RLIMIT_NOFILE) == (n, n)
+
+
+def bump_limits():
+    """It was common to have to do this manually on our macs. Now that is no longer required."""
+    set_file_limit(OPEN_FILES_LIMIT())
