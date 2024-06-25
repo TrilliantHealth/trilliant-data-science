@@ -20,6 +20,9 @@ MAX_CHUNK_GET_SIZE = config.item("max_chunk_get_size", 2**20 * 64, parse=int)  #
 MAX_SINGLE_GET_SIZE = config.item(
     "max_single_get_size", 2**20 * 64, parse=lambda i: max(MAX_CHUNK_GET_SIZE(), int(i))
 )  # 64MB
+MAX_SINGLE_PUT_SIZE = config.item(
+    "max_single_put_size", 2**20 * 64, parse=lambda i: max(MAX_CHUNK_GET_SIZE(), int(i))
+)  # 64MB
 
 # these are for upload
 # these achieved 380 MB/sec on a 2 core machine on Kubernetes
