@@ -82,5 +82,6 @@ def test_locking_calls_same_args_once_diff_args_parallel() -> None:
     stop = time.perf_counter()
 
     assert cached_slow_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
-    assert stop - start < 4
-    # concurrent runtime is less than serial runtime of the 4 function invocations
+    print(stop - start < 2)
+    assert stop - start < 2
+    # concurrent runtime is _way_ less than serial runtime of just the 4 actual invocations
