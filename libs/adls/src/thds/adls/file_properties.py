@@ -1,7 +1,7 @@
 from azure.storage.filedatalake import FileProperties
 
 from .fqn import AdlsFqn
-from .global_client import get_global_client
+from .global_client import get_global_fs_client
 
 
 def is_directory(info: FileProperties) -> bool:
@@ -10,4 +10,4 @@ def is_directory(info: FileProperties) -> bool:
 
 
 def get_file_properties(fqn: AdlsFqn) -> FileProperties:
-    return get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
+    return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()

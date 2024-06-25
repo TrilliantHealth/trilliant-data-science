@@ -4,7 +4,7 @@ from pathlib import Path
 
 from thds.core.hashing import b64
 
-from ..global_client import get_global_client
+from ..global_client import get_global_fs_client
 from .core import AdlsHashedResource, parse, serialize
 
 _AZURE_PLACEHOLDER_SIZE_LIMIT = 4096
@@ -47,7 +47,7 @@ def resource_to_path(
 def validate_resource(srcfile: ty.Union[str, Path]) -> AdlsHashedResource:
     res = resource_from_path(srcfile)
     fqn, md5b64 = res
-    props = get_global_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
+    props = get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
     md5 = props.content_settings.content_md5
     assert md5, f"{fqn} was incorrectly uploaded to ADLS without an MD5 embedded."
     assert md5b64 == b64(md5), f"You probably need to update the MD5 in {srcfile}"

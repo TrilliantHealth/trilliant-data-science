@@ -3,7 +3,7 @@ from pathlib import Path
 
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
-from .global_client import get_global_client
+from .global_client import get_global_fs_client
 from .impl import ADLSFileSystem
 from .resource.up_down import AdlsHashedResource, upload
 from .ro_cache import global_cache
@@ -19,7 +19,7 @@ def download_to_cache(fqn: AdlsFqn, md5b64: str = "") -> Path:
     """
     cache_path = global_cache().path(fqn)
     download_or_use_verified(
-        get_global_client(fqn.sa, fqn.container), fqn.path, cache_path, md5b64, cache=global_cache()
+        get_global_fs_client(fqn.sa, fqn.container), fqn.path, cache_path, md5b64, cache=global_cache()
     )
     return cache_path
 
