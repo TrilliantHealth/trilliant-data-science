@@ -1,4 +1,3 @@
-import os
 import sqlite3
 import typing as ty
 from pathlib import Path
@@ -50,4 +49,4 @@ def maybe_t(
     return None
 
 
-Connectable = ty.Union[os.PathLike, sqlite3.Connection]
+Connectable = ty.Union[str, Path, sqlite3.Connection]

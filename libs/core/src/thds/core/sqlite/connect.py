@@ -1,7 +1,7 @@
-import contextlib
 import os
 import sqlite3
 import typing as ty
+from pathlib import Path
 
 from thds.core import scope
 
@@ -21,17 +21,7 @@ autoconn_scope = scope.Scope("sqlite3.autoconn")
 
 
 def autoconnect(connectable: Connectable) -> sqlite3.Connection:
-    """Will automatically commit when it hits the autoconn_scope.bound"""
-    if isinstance(connectable, sqlite3.Connection):
-        return connectable
-
-    return autoconn_scope.enter(
-        contextlib.closing(  # close the connection when we exit the scope
-            register_functions_on_connection(
-                sqlite3.connect(
-                    os.fspath(connectable),
-                    isolation_level=None,  # autocommit
-                )
-            )
-        )
-    )
+    if isinstance(connectable, (str, Path)):
+        return autoconn_scope.enter(register_functions_on_connection(sqlite3.connect(str(connectable))))
+    assert isinstance(connectable, sqlite3.Connection)
+    return connectable
