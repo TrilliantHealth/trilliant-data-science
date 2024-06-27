@@ -1,3 +1,10 @@
+## 1.23
+
+- Adds an optional `custom_merger` parameter to `sqlite.sqlmap.parallel_to_sqlite`, which defaults to
+  `sqlite.merge.merge_databases` with all of its defaults partially applied.
+- `sqlite.sqlmap.merge_sqlite_dirs` now requires a `merger` parameter.
+- These `[custom_]merger` parameters are typed as `ty.Callable[[ty.Iterable[types.StrOrPath]], Path]`.
+
 ## 1.22
 
 - Adds a `cache` module with a `locking` decorator that ensures only one invocation of a cached-wrapped
