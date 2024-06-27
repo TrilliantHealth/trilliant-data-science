@@ -44,7 +44,13 @@ def _write_partition(
 
 
 def merge_sqlite_dirs(
-    part_dirs: ty.Iterable[Path], output_dir: Path, max_cores: int = 2
+    part_dirs: ty.Iterable[Path],
+    output_dir: Path,
+    max_cores: int = 2,
+    *,
+    table_names: ty.Collection[str] = tuple(),
+    replace: bool = False,
+    copy_indexes: bool = True,
 ) -> ty.Dict[str, Path]:
     """Any file found in any of these directories is assumed to be a SQLite database, and
     will be merged into all the other SQLite databases that bear the same name in any of
@@ -71,7 +77,9 @@ def merge_sqlite_dirs(
 
     for merged_db in parallel.yield_results(
         [
-            thunks.thunking(merge_databases)(sqlite_db_paths)
+            thunks.thunking(merge_databases)(
+                sqlite_db_paths, table_names, replace=replace, copy_indexes=copy_indexes
+            )
             for filename, sqlite_db_paths in sqlite_dbs_by_filename.items()
         ],
         # SQLite merge is CPU-intensive, so we use a Process Pool.
@@ -97,6 +105,10 @@ def parallel_to_sqlite(
     partition_writer: ty.Callable[[Partition, Path], ty.Any],
     output_directory: Path,
     N: int = 8,
+    *,
+    table_names: ty.Collection[str] = tuple(),
+    replace: bool = False,
+    copy_indexes: bool = True,
 ) -> ty.Dict[str, Path]:
     """The partition_writer will be provided a partition number and a directory (as a Path).
 
@@ -126,4 +138,11 @@ def parallel_to_sqlite(
             # executor_cm=contextlib.nullcontext(loky.get_reusable_executor(max_workers=N)),
         )
     )
-    return merge_sqlite_dirs(part_directories, output_directory, max_cores=N)
+    return merge_sqlite_dirs(
+        part_directories,
+        output_directory,
+        max_cores=N,
+        table_names=table_names,
+        replace=replace,
+        copy_indexes=copy_indexes,
+    )
