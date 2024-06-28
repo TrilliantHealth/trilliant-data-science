@@ -174,7 +174,7 @@ class MemoizingPicklingRunner:
             self._get_stateful_dumper,
             f,
             self._run_directory,
-        )(self._shell_builder(f, args, kwargs), self._rerun_exceptions, self._redirect, args, kwargs)
+        )(self._shell_builder, self._rerun_exceptions, self._redirect, f, args, kwargs)
 
 
 # these two semaphores allow us to prioritize getting meaningful units
@@ -198,14 +198,15 @@ def _pickle_func_and_run_via_shell(
     get_dumper: ty.Callable[[str], Dumper],
     func_: ty.Callable[..., T],
     run_directory: ty.Optional[Path] = None,
-) -> ty.Callable[[Shell, bool, Redirect, Args, Kwargs], T]:
+) -> ty.Callable[[ShellBuilder, bool, Redirect, ty.Callable, Args, Kwargs], T]:
     storage_root = uris.get_root(function_memospace)
 
     @scope.bound
     def run_shell_via_pickles_(
-        shell: Shell,
+        shell_builder: ShellBuilder,
         rerun_exceptions: bool,
         remote_redirect: Redirect,
+        func: ty.Callable,
         args_: Args,
         kwargs_: Kwargs,
     ) -> T:
@@ -288,6 +289,7 @@ def _pickle_func_and_run_via_shell(
 
         try:
             shell_ex = None
+            shell = shell_builder(func, args_, kwargs_)
             shell(
                 (
                     MemoizingPicklingRunner.__name__,

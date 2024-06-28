@@ -28,18 +28,24 @@ def test_reuse_memoized_via_config():
         f"/{make_unique_name_including_docstring_key(mul)}"
     )
 
+    def shell_builder(f, _args, _kwargs):
+        return _subprocess_remote
+
+    def noop():
+        pass
+
     args, kwargs = (4,), dict(b=4.2)  # type: ignore
     assert 16.8 == _pickle_func_and_run_via_shell(
         func_uri,
         runner._get_stateful_dumper,
         mul,
-    )(_subprocess_remote, True, _NO_REDIRECT, args, kwargs)
+    )(shell_builder, True, _NO_REDIRECT, noop, args, kwargs)
 
     assert 16.8 == _pickle_func_and_run_via_shell(
         func_uri,
         runner._get_stateful_dumper,
         broken_mul,  # won't actually run broken_mul - will instead look up the results from mul
-    )(_subprocess_remote, True, _NO_REDIRECT, args, kwargs)
+    )(shell_builder, True, _NO_REDIRECT, noop, args, kwargs)
 
 
 def test_actual_config_is_used():
