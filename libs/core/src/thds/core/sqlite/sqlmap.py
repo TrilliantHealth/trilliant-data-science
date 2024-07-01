@@ -1,11 +1,13 @@
+import inspect
 import shutil
 import typing as ty
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
-from thds.core import log, parallel, scope, thunks, tmp
+from thds.core import log, parallel, scope, thunks, tmp, types
 
 from .merge import merge_databases
 
@@ -44,14 +46,16 @@ def _write_partition(
 
 
 def merge_sqlite_dirs(
-    part_dirs: ty.Iterable[Path], output_dir: Path, max_cores: int = 2
+    merger: ty.Callable[[ty.Iterable[types.StrOrPath]], Path],
+    part_dirs: ty.Iterable[Path],
+    output_dir: Path,
+    max_cores: int = 2,
 ) -> ty.Dict[str, Path]:
     """Any file found in any of these directories is assumed to be a SQLite database, and
-    will be merged into all the other SQLite databases that bear the same name in any of
+    will be merged, using `merger`, into all the other SQLite databases that bear the same name in any of
     the other directories.
 
-    The final, merged SQLite database will then be _moved_ into the output_dir provided,
-    keeping the same same.
+    The final, merged SQLite database will then be _moved_ into the output_dir provided.
     """
     sqlite_dbs_by_filename: ty.Dict[str, ty.List[Path]] = defaultdict(list)
     for partition_dir in part_dirs:
@@ -71,7 +75,7 @@ def merge_sqlite_dirs(
 
     for merged_db in parallel.yield_results(
         [
-            thunks.thunking(merge_databases)(sqlite_db_paths)
+            thunks.thunking(merger)(sqlite_db_paths)
             for filename, sqlite_db_paths in sqlite_dbs_by_filename.items()
         ],
         # SQLite merge is CPU-intensive, so we use a Process Pool.
@@ -92,11 +96,24 @@ def _ensure_output_dir(output_directory: Path):
     assert output_directory.is_dir()
 
 
+_default_merge_databases: ty.Callable[[ty.Iterable[types.StrOrPath]], Path] = partial(
+    merge_databases,
+    **{
+        k: v.default
+        for k, v in inspect.signature(merge_databases).parameters.items()
+        if v.default != inspect._empty
+    },
+)
+# TODO - feels like this suggests creating a general utility that creates partials where all the defaults are applied
+#   the typing seems a bit tricky though
+
+
 @_tmpdir_scope.bound
 def parallel_to_sqlite(
     partition_writer: ty.Callable[[Partition, Path], ty.Any],
     output_directory: Path,
     N: int = 8,
+    custom_merger: ty.Optional[ty.Callable[[ty.Iterable[types.StrOrPath]], Path]] = None,
 ) -> ty.Dict[str, Path]:
     """The partition_writer will be provided a partition number and a directory (as a Path).
 
@@ -126,4 +143,9 @@ def parallel_to_sqlite(
             # executor_cm=contextlib.nullcontext(loky.get_reusable_executor(max_workers=N)),
         )
     )
-    return merge_sqlite_dirs(part_directories, output_directory, max_cores=N)
+    return merge_sqlite_dirs(
+        custom_merger if custom_merger is not None else _default_merge_databases,
+        part_directories,
+        output_directory,
+        max_cores=N,
+    )
