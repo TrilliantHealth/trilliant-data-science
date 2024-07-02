@@ -12,7 +12,7 @@ from thds.mops.pure.core.types import T
 MOPS_SUMMARY_DIR = config.item("thds.mops.summary_dir", default=Path(".mops"), parse=Path)
 RUN_NAME_ENV_VAR: ty.Final = "__SECRET_THDS_MOPS_RUN_NAME"
 
-StatusType = ty.Literal["memoized", "invoked"]
+StatusType = ty.Literal["memoized", "invoked", "awaited"]
 
 logger = log.getLogger(__name__)
 

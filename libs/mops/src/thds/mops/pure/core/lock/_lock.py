@@ -65,6 +65,8 @@ class LockAcquired(ty.Protocol):
     def release(self) -> None:
         ...  # pragma: no cover
 
+    expire_s: float
+
 
 def utc_now() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -146,12 +148,14 @@ class LockfileWriter:
         self,
         lock_dir_uri: str,
         generate_lock: ty.Callable[[ty.Optional[datetime]], _LockContents],
+        expire_s: float,
         *,
         debug: bool = True,
     ):
         self.lock_dir_uri = lock_dir_uri
         self.blob_store, self.lock_uri = _store_and_lock_uri(lock_dir_uri)
         self.generate_lock = generate_lock
+        self.expire_s = expire_s
         self.debug = debug
         self.first_acquired_at: ty.Optional[datetime] = None
 
@@ -281,7 +285,7 @@ def acquire(  # noqa: C901
 
     generate_lock = make_lock_contents(my_lock_uuid, expire)
     read_lockfile = make_read_lockfile(lock_uri)
-    lockfile_writer = LockfileWriter(lock_dir_uri, generate_lock)
+    lockfile_writer = LockfileWriter(lock_dir_uri, generate_lock, expire.total_seconds(), debug=debug)
 
     def is_released(lock_contents: _LockContents) -> bool:
         return bool(lock_contents.get("released_at"))

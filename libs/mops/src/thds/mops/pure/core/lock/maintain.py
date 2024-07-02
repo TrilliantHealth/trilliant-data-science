@@ -15,12 +15,19 @@ from datetime import datetime, timedelta
 from functools import partial
 from threading import Thread
 
-from ._lock import LockfileWriter, make_lock_contents, make_lock_uri, make_read_lockfile
+from thds.core import log
+
+from ._lock import LockAcquired, LockfileWriter, make_lock_contents, make_lock_uri, make_read_lockfile
+
+logger = log.getLogger(__name__)
 
 
-class _Maintain(ty.NamedTuple):
+class _MaintainOnly(ty.NamedTuple):
+    """Matches the LockAcquired interface except that release() will do nothing."""
+
     maintain: ty.Callable[[], None]
     expire_s: float
+    release: ty.Callable[[], None]
 
 
 class _MaintainForever(ty.Protocol):
@@ -28,44 +35,90 @@ class _MaintainForever(ty.Protocol):
         ...  # pragma: no cover
 
 
-def _maintain_forever(maintain: ty.Callable[[], ty.Any], expire_s: float) -> None:
+def _maintain_forever(
+    maintain: ty.Callable[[], ty.Any], expire_s: float, should_exit: ty.Callable[[], bool]
+) -> None:
     while True:
-        maintain()
         # maintain the lock twice as often as necessary, to be safe
         time.sleep(expire_s / 2)
+        if should_exit():
+            return
+        maintain()
 
 
-def remote_lock_maintain(lock_dir_uri: str) -> _Maintain:
+class CannotMaintainLock(ValueError):
+    pass  # pragma: no cover
+
+
+def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
     """Only for use by remote side - does not _acquire_ the lock,
     but merely maintains it as unexpired. Does not allow for releasing,
     as it is not the responsibility of the remote side to release the lock.
 
     The return value is intended to be launched as the target of a Thread or Process.
     """
-    lock_uri = make_lock_uri(lock_dir_uri)
-    read_lockfile = make_read_lockfile(lock_uri)
 
-    lock_contents = read_lockfile()
+    try:
+        lock_uri = make_lock_uri(lock_dir_uri)
+        read_lockfile = make_read_lockfile(lock_uri)
+        lock_contents = read_lockfile()
+    except Exception:
+        logger.exception(f"Could not read lockfile: {lock_uri}")
+
     if not lock_contents:
-        raise ValueError(f"Should not be maintaining a lock that does not exist: {lock_uri}")
+        raise CannotMaintainLock(f"Lock does not exist: {lock_uri}")
 
     expire_s = lock_contents["expire_s"]
     if not expire_s or expire_s < 0:
-        raise ValueError(f"Lockfile is missing an expiry time: {lock_contents}")
+        raise CannotMaintainLock(f"Lock is missing an expiry time: {lock_contents}")
 
     first_acquired_at_s = lock_contents["first_acquired_at"]
     if not first_acquired_at_s:
-        raise ValueError(f"Should not be maintaining a lock that was never acquired: {lock_contents}")
+        raise CannotMaintainLock(f"Lock was never acquired: {lock_contents}")
 
     lockfile_writer = LockfileWriter(
-        lock_dir_uri, make_lock_contents(lock_uri, timedelta(seconds=expire_s))
+        lock_dir_uri,
+        make_lock_contents(lock_uri, timedelta(seconds=expire_s)),
+        expire_s,
     )
     lockfile_writer.first_acquired_at = datetime.fromisoformat(first_acquired_at_s)
+    # disable releasing from remote
+    lockfile_writer.release = lambda: None  # type: ignore # noqa: E731
+    return lockfile_writer
 
-    return _Maintain(lockfile_writer.maintain, expire_s)
 
+def launch_daemon_lock_maintainer(lock_acq: LockAcquired) -> ty.Callable[[], None]:
+    """Run lock maintenance until the process exits, or until the returned callable gets
+    returned.
 
-def launch_daemon_lock_maintainer(lock_dir_uri: str):
-    """Run lock maintenance until the process exits."""
-    maintain, expire_s = remote_lock_maintain(lock_dir_uri)
-    Thread(target=partial(_maintain_forever, maintain, expire_s), daemon=True).start()
+    Return a 'release wrapper' that stops maintenance of the lock and releases it.
+
+    A whole thread for this seems expensive, but the simplest alternative is having too
+    many lock maintainers trying to share time slices within some global lock maintainer,
+    and that runs a definite risk of overrunning the expiry time(s) for those locks.
+
+    If we were async all the way down, we could more plausibly make a bunch of async
+    network/filesystem calls here without taking into consideration how long they actually
+    take to execute.
+    """
+    should_exit = False
+
+    def should_stop_maintaining() -> bool:
+        return should_exit
+
+    Thread(
+        target=partial(
+            _maintain_forever,
+            lock_acq.maintain,
+            lock_acq.expire_s,
+            should_stop_maintaining,
+        ),
+        daemon=True,
+    ).start()
+
+    def stop_maintaining() -> None:
+        nonlocal should_exit
+        should_exit = True
+        lock_acq.release()
+
+    return stop_maintaining

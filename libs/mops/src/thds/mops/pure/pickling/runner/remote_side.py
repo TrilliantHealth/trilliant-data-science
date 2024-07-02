@@ -1,10 +1,10 @@
 import typing as ty
 
-from thds.core import scope
+from thds.core import log, scope
 
 from ...._utils.once import Once
 from ....srcdest.mark_remote import mark_as_remote
-from ...core import set_pipeline_id, uris
+from ...core import lock, set_pipeline_id, uris
 from ...core.entry import register_entry_handler, route_result_or_exception
 from ...core.memo import results
 from ...core.pipeline_id_mask import pipeline_id_mask
@@ -15,6 +15,8 @@ from .._pickle import Dumper, SourceResultPickler, gimme_bytes, make_read_object
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
 from .orchestrator_side import INVOCATION, RUNNER_SUFFIX, MemoizingPicklingRunner
+
+logger = log.getLogger(__name__)
 
 
 class _ResultExcChannel(ty.NamedTuple):
@@ -50,6 +52,11 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     """The arguments are those supplied by MemoizingPicklingRunner."""
     set_pipeline_id(pipeline_id)
     fs = uris.lookup_blob_store(memo_uri)
+
+    try:
+        lock.launch_daemon_lock_maintainer(lock.remote_lock_maintain(memo_uri))
+    except lock.CannotMaintainLock as e:
+        logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
 
     def do_work_return_result() -> object:
         func, args, kwargs = _unpickle_invocation(memo_uri)

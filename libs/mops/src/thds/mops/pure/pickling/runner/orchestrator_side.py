@@ -2,7 +2,9 @@
 """
 import inspect
 import threading
+import time
 import typing as ty
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from ...._utils.once import Once
 from ....config import max_concurrent_network_ops
 from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
-from ...core import uris
+from ...core import lock, uris
 from ...core.memo import args_kwargs_content_address, make_function_memospace, results
 from ...core.partial import unwrap_partial
 from ...core.pipeline_id_mask import function_mask
@@ -22,7 +24,7 @@ from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
 from ...core.source import source_argument_buffering
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
-from ...tools.summarize import run_summary as rs
+from ...tools.summarize import run_summary
 from .._pickle import (
     Dumper,
     SourceArgumentPickler,
@@ -129,7 +131,7 @@ class MemoizingPicklingRunner:
         self._by_id_registry = serialization_registry
         self._redirect = redirect
 
-        self._run_directory = rs.create_mops_run_directory()
+        self._run_directory = run_summary.create_mops_run_directory()
 
     def shared(self, *objs: ty.Any, **named_objs: ty.Any):
         """Set up memoizing pickle serialization for these objects.
@@ -189,8 +191,10 @@ _IN_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
 INVOCATION = "invocation"
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
+_Purple = colorized(fg="white", bg="#800080")
 _LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
-_LogPrepareNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
+_LogNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
+_LogAwaitedResult = lambda s: logger.info(_Purple(s))  # noqa: E731
 
 
 def _pickle_func_and_run_via_shell(
@@ -268,26 +272,58 @@ def _pickle_func_and_run_via_shell(
                     " in your local Python environment."
                 )
 
-            # now actually execute the ones we need:
+            def check_result(
+                status: run_summary.StatusType,
+            ) -> ty.Union[results.Success, results.Error, None]:
+                result = results.check_if_result_exists(
+                    memo_uri, rerun_excs=rerun_exceptions, before_raise=debug_required_result_failure
+                )
+                if not result:
+                    return None
+
+                _LogKnownResult(
+                    f"Result for {memo_uri} already exists ({status})"
+                    " and is being returned without invocation!"
+                )
+                if run_directory:
+                    run_summary.log_function_execution(run_directory, func_, memo_uri, status="memoized")
+                return result
+
+            # now actually execute the chunks of work that are required...
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            result = results.check_if_result_exists(
-                memo_uri, rerun_excs=rerun_exceptions, before_raise=debug_required_result_failure
-            )
+            result = check_result("memoized")
             if result:
-                _LogKnownResult(
-                    f"Result for {memo_uri} already exists and is being returned without invocation!"
-                )
-                if run_directory:
-                    rs.log_function_execution(run_directory, func_, memo_uri, status="memoized")
                 return unwrap_remote_result(result)
 
             # but if it does not exist, we need to upload the invocation and then run the shell.
-            _LogPrepareNewInvocation(f"Preparing new invocation for {memo_uri}")
             upload_pickled_invocation()
 
+        while not (result := check_result("awaited")):
+            # if the result ever 'appears' while we're waiting for the lock, just use it!
+            lock_owned = lock.acquire(memo_uri, expire=timedelta(seconds=88))
+            if lock_owned:
+                release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
+                break  # it is time to run this ourselves
+
+            _LogAwaitedResult(
+                f"Result for {memo_uri} does not yet exist but the lock is owned by another process."
+            )
+            time.sleep(22)
+
+        if result:
+            _LogAwaitedResult(f"Result for {memo_uri} was found after waiting for the lock.")
+            return unwrap_remote_result(result)
+
+        assert release_lock is not None
+        # if/when we acquire the lock, we move forever into
+        # 'run this ourselves mode' - if something about our invocation fails,
+        # we fail just as we would have previously, without any attempt to go
+        # 'back' to waiting for someone else to compute the result.
+
         try:
+            _LogNewInvocation(f"Triggering new invocation for {memo_uri}")
             shell_ex = None
             shell = shell_builder(func, args_, kwargs_)
             shell(
@@ -305,6 +341,8 @@ def _pickle_func_and_run_via_shell(
                 "Caught error when awaiting shell result. Optimistically checking for final result on ADLS."
             )
             shell_ex = ex
+        finally:
+            release_lock()
 
         # the network ops being grouped by _IN include one or more downloads.
         with _IN_SEMAPHORE:
@@ -315,7 +353,7 @@ def _pickle_func_and_run_via_shell(
                 raise NoResultAfterInvocationError(memo_uri)
             if run_directory:
                 # Log that the function was executed
-                rs.log_function_execution(run_directory, func_, memo_uri, status="invoked")
+                run_summary.log_function_execution(run_directory, func_, memo_uri, status="invoked")
             return unwrap_remote_result(result)
 
     return run_shell_via_pickles_

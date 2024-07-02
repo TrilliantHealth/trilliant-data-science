@@ -35,7 +35,7 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
                 "timestamps": [],
             }
         partial_summary[function_name]["total_calls"] += 1
-        if log_entry["status"] == "memoized":
+        if log_entry["status"] in ("memoized", "awaited"):
             partial_summary[function_name]["cache_hits"] += 1
         else:
             partial_summary[function_name]["executed"] += 1
