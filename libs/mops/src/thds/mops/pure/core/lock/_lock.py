@@ -244,7 +244,7 @@ def acquire(  # noqa: C901
     this at spaced intervals, not in a tight loop, in order to avoid performance issues.
 
     """
-    if acquire_margin * 2 >= expire:
+    if acquire_margin * 2 > expire:
         # You should not be waiting nearly as much time as it would take for the lock to
         # become expire to decide that you have acquired the lock.
         #
@@ -256,13 +256,14 @@ def acquire(  # noqa: C901
             f" must be less than half the expire time ({expire.total_seconds()})."
         )
 
+    acquire_margin_s = acquire_margin.total_seconds()
+    if acquire_margin_s < 0:
+        raise ValueError(f"Acquire margin may not be negative: {acquire_margin_s}")
+
     start = utc_now()
 
     blob_store, lock_uri = _store_and_lock_uri(lock_dir_uri)
     my_lock_uuid = uuid4().hex
-    acquire_margin_s = acquire_margin.total_seconds()
-    if acquire_margin_s < 0:
-        raise ValueError(f"Acquire margin may not be negative: {acquire_margin_s}")
 
     generate_lock = make_lock_contents(my_lock_uuid)
     read_lockfile = make_read_lockfile(lock_uri)
@@ -274,7 +275,8 @@ def acquire(  # noqa: C901
     def is_fresh(lock_contents: _LockContents) -> bool:
         last_updated_str = lock_contents.get("last_updated")
         if not last_updated_str:
-            return False
+            # this likely won't happen in practice b/c we check released first.
+            return False  # pragma: no cover
         return datetime.fromisoformat(last_updated_str) + expire >= utc_now()
 
     acquire_delay = 0.0
