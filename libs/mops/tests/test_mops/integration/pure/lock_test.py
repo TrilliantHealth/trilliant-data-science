@@ -9,8 +9,8 @@ import pytest
 
 from thds.core import tmp
 from thds.mops.pure.core.lock import acquire
-from thds.mops.pure.core.lock._lock import make_read_lockfile
 from thds.mops.pure.core.lock.maintain import remote_lock_maintain
+from thds.mops.pure.core.lock.read import make_read_lockfile
 
 SHORT = timedelta(seconds=0.3)
 

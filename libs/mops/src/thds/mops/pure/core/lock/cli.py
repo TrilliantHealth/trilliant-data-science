@@ -3,15 +3,15 @@ import time
 import typing as ty
 from pathlib import Path
 
-from . import _lock
+from . import _acquire
 
 
 def _writer(out_times_path: Path) -> ty.Callable[[float, float], None]:
-    _lock.logger.info(f"Will write Lock Times to {out_times_path}")
+    _acquire.logger.info(f"Will write Lock Times to {out_times_path}")
     out_times_path.parent.mkdir(parents=True, exist_ok=True)
 
     def write_times(after_acquired: float, before_released: float) -> None:
-        _lock.logger.info(f"..........appending {after_acquired},{before_released}")
+        _acquire.logger.info(f"..........appending {after_acquired},{before_released}")
         with out_times_path.open("a") as f:
             f.write(f"{after_acquired},{before_released}\n")
 
@@ -27,10 +27,10 @@ def acquire_and_hold_once(
         write_times = lambda x, y: None  # noqa: E731
 
     # we want more verbose logging when using the CLI.
-    _lock.logger.debug = _lock.logger.info  # type: ignore
+    _acquire.logger.debug = _acquire.logger.info  # type: ignore
 
-    _lock.logger.info(f"Beginning lock acquisition on {lock_uri}")
-    lock_owned = _lock.acquire(lock_uri, block=None)
+    _acquire.logger.info(f"Beginning lock acquisition on {lock_uri}")
+    lock_owned = _acquire.acquire(lock_uri, block=None)
     assert lock_owned
     when_lock_acquired = time.time()
     # we're using time, not timeit.default_timer, because we care about time

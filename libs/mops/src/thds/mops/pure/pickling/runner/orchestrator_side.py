@@ -282,11 +282,11 @@ def _pickle_func_and_run_via_shell(
                     return None
 
                 _LogKnownResult(
-                    f"Result for {memo_uri} already exists ({status})"
+                    f"{status} result for {memo_uri} already exists"
                     " and is being returned without invocation!"
                 )
                 if run_directory:
-                    run_summary.log_function_execution(run_directory, func_, memo_uri, status="memoized")
+                    run_summary.log_function_execution(run_directory, func_, memo_uri, status=status)
                 return result
 
             # now actually execute the chunks of work that are required...

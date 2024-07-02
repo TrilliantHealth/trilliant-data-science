@@ -17,7 +17,10 @@ from threading import Thread
 
 from thds.core import log
 
-from ._lock import LockAcquired, LockfileWriter, make_lock_contents, make_lock_uri, make_read_lockfile
+from ._funcs import make_lock_uri
+from .read import make_read_lockfile
+from .types import LockAcquired
+from .write import LockfileWriter, make_lock_contents
 
 logger = log.getLogger(__name__)
 

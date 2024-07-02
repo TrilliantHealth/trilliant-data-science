@@ -54,9 +54,10 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     fs = uris.lookup_blob_store(memo_uri)
 
     try:
-        lock.launch_daemon_lock_maintainer(lock.remote_lock_maintain(memo_uri))
+        stop_lock = lock.launch_daemon_lock_maintainer(lock.remote_lock_maintain(memo_uri))
     except lock.CannotMaintainLock as e:
         logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
+        stop_lock = lambda: None  # noqa: E731
 
     def do_work_return_result() -> object:
         func, args, kwargs = _unpickle_invocation(memo_uri)
@@ -84,6 +85,7 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
         pipeline_id,
         _extract_invocation_unique_key(memo_uri),
     )
+    stop_lock()  # not critical since we don't _own_ the lock, but keeps things cleaner
 
 
 register_entry_handler(
