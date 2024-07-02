@@ -1,12 +1,16 @@
 # very basic lock validation.
 import time
-from datetime import datetime, timedelta
+import typing as ty
+from datetime import timedelta
 from threading import Thread
 from timeit import default_timer
 
 import pytest
 
+from thds.core import tmp
 from thds.mops.pure.core.lock import acquire
+from thds.mops.pure.core.lock._lock import make_read_lockfile
+from thds.mops.pure.core.lock.maintain import remote_lock_maintain
 
 SHORT = timedelta(seconds=0.3)
 
@@ -20,15 +24,16 @@ def acquire_the_lock(uri: str, accum: list):
             locked.maintain()
         locked.release()
         accum.append(1)
-        print("got the lock")
     else:
         accum.append(0)
-        print("did not get the lock")
 
 
 @pytest.fixture
-def lock_uri() -> str:
-    return f"adls://thdsscratch/tmp/test/mops.pure.core.lock/lock-{datetime.now().isoformat()}"
+def lock_uri() -> ty.Iterator[str]:
+    """We can test these against the local filesystem to make things faster"""
+    with tmp.tempdir_same_fs() as lockdir:
+        lockdir.mkdir(exist_ok=True, parents=True)
+        yield f"file://{lockdir}"
 
 
 def test_many_acquirers_but_only_one_gets_it(lock_uri):
@@ -74,3 +79,19 @@ def test_not_fresh_lock(lock_uri):
     time.sleep(SHORT.total_seconds() * 2)
     # lock will now have expired
     assert acquire(lock_uri, acquire_margin=SHORT, expire=SHORT * 2)
+
+
+def test_maintain(lock_uri):
+    assert acquire(lock_uri, acquire_margin=SHORT, expire=timedelta(seconds=4))
+
+    maintainer = remote_lock_maintain(lock_uri)
+    assert maintainer.expire_s == 4.0
+
+    maintainer.maintain()  # just needs to not error
+
+    lock_contents = make_read_lockfile(lock_uri + "/lock.json")()
+    assert lock_contents
+    assert lock_contents["expire_s"] == maintainer.expire_s
+    assert lock_contents["first_acquired_at"]  # must always be acquired
+    assert lock_contents["write_count"] == 1
+    assert not lock_contents["released_at"]

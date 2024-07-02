@@ -37,12 +37,18 @@ logger = log.getLogger(__name__)
 
 
 class _LockContents(ty.TypedDict):
-    """Only lock_uuid and last_updated are technically required for the algorithm
+    """Only lock_uuid, written_at, and expire are technically required for the algorithm
     - everything else is debugging info.
+
+    In fact, expire_s would be 'optional' as well (this can be acquirer-only state), but
+    it is advantegous to embed this explicitly, partly so that we can have remote
+    'maintainers' that do not need to have any information other than the lock uri passed
+    to them in order to maintain the lock.
     """
 
     lock_uuid: str
-    last_updated: str  # ISO8601 string with timezone in UTC
+    written_at: str  # ISO8601 string with timezone in UTC
+    expire_s: float  # seconds after written_at to expire
 
     # just for debugging
     hostname: str
@@ -72,8 +78,10 @@ def _write(blob_store: BlobStore, lock_uri: str, lock_bytes: bytes) -> None:
         raise
 
 
-def make_lock_contents(lock_uuid: str) -> ty.Callable[[ty.Optional[datetime]], _LockContents]:
-    """Impure - Resets last_updated to 'right now' to keep the lock 'live'."""
+def make_lock_contents(
+    lock_uuid: str, expire: timedelta
+) -> ty.Callable[[ty.Optional[datetime]], _LockContents]:
+    """Impure - Resets written_at to 'right now' to keep the lock 'live'."""
     write_count = 0
 
     def lock_contents(first_acquired_at: ty.Optional[datetime]) -> _LockContents:
@@ -83,7 +91,8 @@ def make_lock_contents(lock_uuid: str) -> ty.Callable[[ty.Optional[datetime]], _
             "lock_uuid": lock_uuid,
             "hostname": hostname.friendly(),
             "pid": str(os.getpid()),
-            "last_updated": utc_now().isoformat(),
+            "written_at": utc_now().isoformat(),
+            "expire_s": expire.total_seconds(),
             "write_count": write_count,
             "first_acquired_at": first_acquired_at.isoformat() if first_acquired_at else "",
             "released_at": "",
@@ -119,6 +128,11 @@ def _store_and_lock_uri(lock_dir_uri: str) -> ty.Tuple[BlobStore, str]:
     blob_store = lookup_blob_store(lock_dir_uri)
     lock_uri = blob_store.join(lock_dir_uri, "lock.json")
     return blob_store, lock_uri
+
+
+def make_lock_uri(lock_dir_uri: str) -> str:
+    _, lock_uri = _store_and_lock_uri(lock_dir_uri)
+    return lock_uri
 
 
 class LockfileWriter:
@@ -168,8 +182,8 @@ class LockfileWriter:
     def release(self) -> None:
         assert self.first_acquired_at
         lock_contents = self.generate_lock(self.first_acquired_at)
-        lock_contents["released_at"] = lock_contents["last_updated"]
-        lock_contents["last_updated"] = ""
+        lock_contents["released_at"] = lock_contents["written_at"]
+        lock_contents["written_at"] = ""
         logger.debug("Releasing lock %s after %s", self.lock_uri, utc_now() - self.first_acquired_at)
         _write(self.blob_store, self.lock_uri, json.dumps(lock_contents).encode())
         self._write_debug(lock_contents)
@@ -262,22 +276,29 @@ def acquire(  # noqa: C901
 
     start = utc_now()
 
-    blob_store, lock_uri = _store_and_lock_uri(lock_dir_uri)
+    lock_uri = make_lock_uri(lock_dir_uri)
     my_lock_uuid = uuid4().hex
 
-    generate_lock = make_lock_contents(my_lock_uuid)
+    generate_lock = make_lock_contents(my_lock_uuid, expire)
     read_lockfile = make_read_lockfile(lock_uri)
     lockfile_writer = LockfileWriter(lock_dir_uri, generate_lock)
 
     def is_released(lock_contents: _LockContents) -> bool:
-        return not lock_contents.get("last_updated")
+        return bool(lock_contents.get("released_at"))
 
     def is_fresh(lock_contents: _LockContents) -> bool:
-        last_updated_str = lock_contents.get("last_updated")
-        if not last_updated_str:
+        written_at_str = lock_contents.get("written_at")
+        if not written_at_str:
             # this likely won't happen in practice b/c we check released first.
             return False  # pragma: no cover
-        return datetime.fromisoformat(last_updated_str) + expire >= utc_now()
+        lock_expire_s = lock_contents["expire_s"]
+        if round(lock_expire_s, 4) != round(expire.total_seconds(), 4):
+            logger.warning(
+                f"Remote lock {lock_uri} has expire duration {lock_expire_s},"
+                f" which is different than the local configuration {expire}."
+                " This may lead to multiple simultaneous acquirers on the lock."
+            )
+        return datetime.fromisoformat(written_at_str) + expire >= utc_now()
 
     acquire_delay = 0.0
 
