@@ -5,7 +5,7 @@ from random import randint
 
 from thds.adls import ADLSFileSystem
 from thds.adls._upload import upload_decision_and_settings
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 
 HW = Path(__file__).parent.parent / "data/hello_world.txt"
 
@@ -17,7 +17,7 @@ def test_basic_upload_without_cache(caplog):
     with caplog.at_level(logging.DEBUG):
         # synchronous file not found
         assert upload_decision_and_settings(
-            get_global_client(fs.account_name, fs.file_system).get_file_client(remote_path),
+            get_global_fs_client(fs.account_name, fs.file_system).get_file_client(remote_path),
             HW,
         ).upload_required
         assert "Too small to bother" in caplog.text
@@ -43,7 +43,7 @@ def test_basic_upload_without_cache(caplog):
         with caplog.at_level(logging.DEBUG):
             # synchronous bytes don't match
             assert upload_decision_and_settings(
-                get_global_client(fs.account_name, fs.file_system)
+                get_global_fs_client(fs.account_name, fs.file_system)
                 .get_file_client(remote_path)
                 .get_file_properties,
                 fb,
