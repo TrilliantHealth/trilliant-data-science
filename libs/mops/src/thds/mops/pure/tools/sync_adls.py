@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from thds.adls import AdlsFqn, resource
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 from thds.mops.pure.adls._files import yield_filenames
 from thds.mops.srcdest.destf_pointers import _write_serialized_to_dest_placeholder
 
@@ -26,7 +26,7 @@ def sync_remote_to_local_as_pointers(uri: str, local_root: str = "."):  # pragma
     # normalize to start with no slash and end with a slash.
     directory = directory if directory.endswith("/") else (directory + "/")
     directory = directory[1:] if directory.startswith("/") else directory
-    for azure_filename in yield_filenames(get_global_client(fqn.sa, fqn.container), directory):
+    for azure_filename in yield_filenames(get_global_fs_client(fqn.sa, fqn.container), directory):
         assert azure_filename.startswith(directory)
         path = local_root_path / azure_filename[len(directory) :]
         path.parent.mkdir(exist_ok=True, parents=True)

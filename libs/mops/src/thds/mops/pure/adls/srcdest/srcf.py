@@ -3,7 +3,7 @@ import typing as ty
 from pathlib import Path
 
 from thds.adls import AdlsFqn, AdlsRoot, errors, resource
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
@@ -16,7 +16,7 @@ from .parse_serialized import read_possible_serialized, resource_from_serialized
 def _validate_remote_srcfile(fqn: AdlsFqn, md5b64: ty.Optional[str] = "", **kwargs) -> resource.AHR:
     with errors.blob_not_found_translation(fqn):
         adls_md5 = (
-            get_global_client(fqn.sa, fqn.container)
+            get_global_fs_client(fqn.sa, fqn.container)
             .get_file_client(fqn.path)
             .get_file_properties()
             .content_settings.content_md5

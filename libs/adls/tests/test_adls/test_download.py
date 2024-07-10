@@ -22,7 +22,7 @@ from thds.adls.download import (
     download_or_use_verified,
 )
 from thds.adls.download_lock import _clean_download_locks
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 from thds.adls.ro_cache import Cache, global_cache
 
 __TMPCACHEDIR = TemporaryDirectory(prefix="cache-for-adls-tests--")
@@ -32,7 +32,7 @@ _TEST_DEST = Path(__TMPDIR.name)
 
 _TEST_REMOTE = "thdsdatasets", "prod-datasets"
 _TMP_REMOTE = "thdsscratch", "tmp"
-global_client = get_global_client(*_TEST_REMOTE)
+global_client = get_global_fs_client(*_TEST_REMOTE)
 # this location for test data has been blessed by Matt Eby himself.
 
 
@@ -196,7 +196,7 @@ def test_file_with_md5_doesnt_try_to_set_it(caplog):
     with caplog.at_level(logging.INFO):
         with TemporaryDirectory() as td:
             download_or_use_verified(
-                get_global_client(fs.account_name, fs.file_system), key, Path(td) / "whatever"
+                get_global_fs_client(fs.account_name, fs.file_system), key, Path(td) / "whatever"
             )
 
     for record in caplog.records:

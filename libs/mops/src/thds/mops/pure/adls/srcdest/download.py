@@ -1,7 +1,7 @@
 import os
 
 from thds.adls import download, ro_cache
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 from thds.core.types import StrOrPath
 
 from ....srcdest.remote_file import Serialized
@@ -23,7 +23,7 @@ def download_serialized(serialized: Serialized, local_dest: StrOrPath):
     # write-once, as per the documentation.
     fqn = ahr.fqn
     download.download_or_use_verified(
-        get_global_client(fqn.sa, fqn.container),
+        get_global_fs_client(fqn.sa, fqn.container),
         fqn.path,
         os.fspath(local_dest),
         md5b64=ahr.md5b64,

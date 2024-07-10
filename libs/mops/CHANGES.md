@@ -1,3 +1,8 @@
+## 2.9
+
+- `mops` now coordinates pending function invocations globally - in other words, it has become a
+  (rudimentary) DAG runner that requires no code changes to opt into.
+
 ## 2.8
 
 - `image.default_config` will now always attempt a local image build if a remote build is attempted and

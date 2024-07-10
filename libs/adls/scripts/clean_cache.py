@@ -7,12 +7,12 @@ from multiprocessing import Pool
 from pathlib import Path
 
 from thds.adls import fqn
-from thds.adls.global_client import get_global_client
+from thds.adls.global_client import get_global_fs_client
 from thds.adls.ro_cache import global_cache
 
 
 def test_and_clean(path: Path, fqn: fqn.AdlsFqn):
-    gc = get_global_client(fqn.sa, fqn.container)
+    gc = get_global_fs_client(fqn.sa, fqn.container)
     # according to
     # https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview#move-data-based-on-last-accessed-time
     # checking if the file exists does not count as an access for the
