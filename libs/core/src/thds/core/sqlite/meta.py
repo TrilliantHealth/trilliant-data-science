@@ -1,6 +1,5 @@
 import contextlib
 import os
-import sqlite3
 import typing as ty
 from pathlib import Path
 
@@ -138,26 +137,3 @@ def debug_errors(connectable: Connectable) -> ty.Iterator:
             logger.error(f"SQLite database: {connectable} is not introspectable")
 
         raise
-
-
-@autoconn_scope.bound
-def get_table_schema(
-    conn: ty.Union[sqlite3.Connection, Connectable], table_name: str
-) -> ty.Dict[str, str]:
-    """
-    Retrieve the schema of a given table.
-
-    Args:
-        conn: The database connection object or a Connectable.
-        table_name: The name of the table.
-
-    Returns: A dictionary with column names as keys and their types as values.
-    """
-    # Ensure we have a connection object
-    connection = autoconnect(conn)
-
-    # Fetch the table schema
-    cursor = connection.cursor()
-    cursor.execute(f"PRAGMA table_info('{table_name}')")
-    schema = {row[1]: row[2].lower() for row in cursor.fetchall()}
-    return schema
