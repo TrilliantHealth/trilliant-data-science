@@ -1,6 +1,6 @@
 from thds.core import meta
 
-from . import defaults, etag, resource, source  # noqa: F401
+from . import abfss, defaults, etag, fqn, resource, source, uri  # noqa: F401
 from .cached_up_down import download_directory, download_to_cache, upload_through_cache  # noqa: F401
 from .errors import BlobNotFoundError  # noqa: F401
 from .fqn import *  # noqa: F401,F403
