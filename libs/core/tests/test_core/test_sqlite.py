@@ -2,11 +2,13 @@ import math
 import sqlite3
 from dataclasses import dataclass
 from functools import partial
+from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from thds.core.sqlite import StructTable, connect, read, write_mappings
+from thds.core.sqlite.meta import get_table_schema
 from thds.core.sqlite.structured import BadPrimaryKey, TableMeta, UnknownColumns, autometa_factory
 
 
@@ -136,3 +138,37 @@ def test_partition_read(columns, _base_test_db: sqlite3.Connection, _base_test_d
             assert (
                 math.floor(row_count / n) <= partition_size <= math.ceil(row_count / n)
             ), "Expected evenly divided partitions when not partitioning on columns"
+
+
+def test_get_table_schema_with_sqlite_connection(_base_test_db: sqlite3.Connection):
+    schema = get_table_schema(_base_test_db, "test")
+    expected_schema = {"id": "integer", "name": "text"}
+    assert schema == expected_schema
+
+
+def test_get_table_schema_with_connectable(_base_test_db: sqlite3.Connection, tmp_path: Path):
+    # Create a temporary SQLite database file
+    db_path = tmp_path / "test.db"
+
+    # Write the in-memory database to the temporary file
+    with sqlite3.connect(db_path) as conn:
+        # Iterate over the SQL statements that would recreate the in-memory database
+        for line in _base_test_db.iterdump():
+            # Filter out lines related to internal FTS5 tables to avoid operational errors
+            if all(
+                internal_table not in line
+                for internal_table in [
+                    "test_table_fts_config",
+                    "test_table_fts_data",
+                    "test_table_fts_content",
+                    "test_table_fts_idx",
+                    "test_table_fts_docsize",
+                    "test_table_fts_parent",
+                ]
+            ):
+                conn.execute(line)
+
+    # Pass the path to the function
+    schema = get_table_schema(db_path, "test")
+    expected_schema = {"id": "integer", "name": "text"}
+    assert schema == expected_schema
