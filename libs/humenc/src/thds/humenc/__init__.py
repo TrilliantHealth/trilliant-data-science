@@ -1,9 +1,26 @@
 import base64
+import typing as ty
 
 import wordybin
 
+from thds.core import meta
 
-def encode(the_bytes: bytes, num_bytes: int = 3) -> str:
+__version__ = meta.get_version(__name__)
+__commit__ = meta.read_metadata(__name__).git_commit
+
+ALTCHARS = b"-_"
+SPLITCHAR = "."
+
+Buffer = ty.Union[bytes, bytearray, memoryview]
+
+
+def encode(
+    the_bytes: bytes,
+    num_bytes: int = 3,
+    *,
+    altchars: ty.Optional[Buffer] = ALTCHARS,
+    splitchar: str = SPLITCHAR
+) -> str:
     """The goal here is to allow people to easily read and remember
     the leading bytes of a string-encoded checksum.
 
@@ -22,17 +39,19 @@ def encode(the_bytes: bytes, num_bytes: int = 3) -> str:
     assert num_bytes > 0, "num_bytes must be > 0"
     return (
         wordybin.encode(the_bytes[:num_bytes])
-        + "."
+        + splitchar
         # we use -_ instead of +/ to match URLsafe encodings
-        + base64.b64encode(the_bytes[num_bytes:], altchars=b"-_").decode().rstrip("=")
+        + base64.b64encode(the_bytes[num_bytes:], altchars=altchars).decode().rstrip("=")
         # base64 trailing == are meaningless and just take up space.
-    ).strip(".")
+    ).strip(splitchar)
     # if there was no wordybin part, we don't want a leading dot
 
 
-def decode(the_str: str) -> bytes:
+def decode(
+    the_str: str, *, altchars: ty.Optional[Buffer] = ALTCHARS, splitchar: str = SPLITCHAR
+) -> bytes:
     """Unused by mops but here to formalize the procedure."""
-    if "." in the_str:
-        wordybin_part, b64_part = the_str.split(".")
-        return wordybin.decode(wordybin_part) + base64.b64decode(b64_part + "==", altchars=b"-_")
+    if splitchar in the_str:
+        wordybin_part, b64_part = the_str.split(splitchar)
+        return wordybin.decode(wordybin_part) + base64.b64decode(b64_part + "==", altchars=altchars)
     return wordybin.decode(the_str)

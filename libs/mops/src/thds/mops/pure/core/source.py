@@ -37,12 +37,12 @@ from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
+from thds import humenc
 from thds.core import hashing, log, source
 from thds.core.files import is_file_uri, to_uri
 from thds.core.source import Source
 from thds.core.stack_context import StackContext
 from thds.core.types import StrOrPath
-from thds.mops._utils import human_b64
 
 from .content_addressed import wordybin_content_addressed
 from .output_naming import invocation_output_uri
@@ -56,7 +56,7 @@ logger = log.getLogger(__name__)
 def _hash_to_str(hash: hashing.Hash) -> str:
     # i see no reason to not remain opinionated and "debug-friendly" with the user-visible
     # encoding of our hashes when they are being stored on a blob store/FS of some kind.
-    return f"{hash.algo}-{human_b64.encode(hash.bytes)}"
+    return f"{hash.algo}-{humenc.encode(hash.bytes)}"
 
 
 def _hashref_uri(hash: hashing.Hash, type: ty.Literal["local", "remote"]) -> str:

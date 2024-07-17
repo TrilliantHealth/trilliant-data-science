@@ -1,7 +1,7 @@
 import typing as ty
 
+from thds import humenc
 from thds.core.hashing import Hash
-from thds.mops._utils import human_b64  # should rename to wordybin
 
 from .uris import active_storage_root
 
@@ -26,6 +26,6 @@ def wordybin_content_addressed(
     """This should be used any time you have access to the raw bytes, so that we can stick
     with the Human Base 64 format.
     """
-    base_uri = storage_content_addressed(human_b64.encode(hash.bytes), hash.algo, storage_root)
+    base_uri = storage_content_addressed(humenc.encode(hash.bytes), hash.algo, storage_root)
     # corresponds with '_bytes' as used in `serialize_paths.py`
     return ContentAddressed(f"{base_uri}/_bytes", f"{base_uri}/{debug_name}" if debug_name else "")

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "2.9"
+version = "2.10"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
 readme = "README.md"
@@ -33,13 +33,13 @@ azure-storage-file-datalake = "*"
 cachetools = "*"
 tomli = "*"
 
-thds-adls = { path="../../libs/adls", develop=true }
-thds-core = { path="../../libs/core", develop=true }
+thds-adls = { path = "../../libs/adls", develop = true }
+thds-core = { path = "../../libs/core", develop = true }
+thds-humenc = { path = "../../libs/humenc", develop = true }
 
 # k8s is extra - there are other shells you can use with mops.use_runner.
 kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
 tblib = "^2.0.0"
-wordybin = "0.2.0"
 
 [tool.poetry.extras]
 k8s = ["kubernetes"]

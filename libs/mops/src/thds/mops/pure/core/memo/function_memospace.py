@@ -136,9 +136,9 @@ import hashlib
 import re
 import typing as ty
 
+from thds import humenc
 from thds.core import config
 
-from ...._utils import human_b64
 from ..pipeline_id_mask import (
     extract_mask_from_docstr,
     get_pipeline_id,
@@ -221,4 +221,4 @@ def make_function_memospace(runner_prefix: str, f: ty.Callable) -> str:
 
 
 def args_kwargs_content_address(args_kwargs_bytes: bytes) -> str:
-    return human_b64.encode(hashlib.sha256(args_kwargs_bytes).digest())
+    return humenc.encode(hashlib.sha256(args_kwargs_bytes).digest())

@@ -1,3 +1,8 @@
+## 2.10
+
+- Factored `mops._utils.human_b64` and the module's corresponding tests out into a new library `humenc`,
+  which `mops` now depends on.
+
 ## 2.9
 
 - `mops` now coordinates pending function invocations globally - in other words, it has become a

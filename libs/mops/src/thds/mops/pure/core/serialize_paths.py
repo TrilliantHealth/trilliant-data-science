@@ -3,10 +3,11 @@ import typing as ty
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from thds import humenc
 from thds.core.hash_cache import hash_file
 from thds.core.log import getLogger
 
-from ..._utils import human_b64, once
+from ..._utils import once
 
 Downloader = ty.Callable[[], Path]
 logger = getLogger(__name__)
@@ -16,7 +17,7 @@ _1_MB = 2**20
 def human_sha256b64_file_at_paths(path: Path) -> str:
     """Return a human-readable hash of the file at the given path."""
     assert path.exists(), path
-    return human_b64.encode(hash_file(path, hashlib.sha256()))
+    return humenc.encode(hash_file(path, hashlib.sha256()))
 
 
 class _ProcessLockingPathContentAddresser:

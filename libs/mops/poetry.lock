@@ -1350,7 +1350,7 @@ url = "../adls"
 
 [[package]]
 name = "thds-core"
-version = "1.22"
+version = "1.23"
 description = "Core utilities."
 optional = false
 python-versions = "^3.8"
@@ -1366,6 +1366,23 @@ typing-extensions = "*"
 [package.source]
 type = "directory"
 url = "../core"
+
+[[package]]
+name = "thds-humenc"
+version = "1.0"
+description = "Binary to string encoding for human readers."
+optional = false
+python-versions = "^3.8"
+files = []
+develop = true
+
+[package.dependencies]
+thds-core = {path = "../../libs/core", develop = true}
+wordybin = ">=0.2.0"
+
+[package.source]
+type = "directory"
+url = "../humenc"
 
 [[package]]
 name = "tomli"
@@ -1548,4 +1565,4 @@ k8s = ["kubernetes"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "07f1988aa8b615ace6ae105b24825d258dfa061b5f7fc0e67b89a034ef8a8dbb"
+content-hash = "8dd53f35d13ecf6844b9c6e64109240d7516f83809d82e2aba04cd2b088d4329"
