@@ -1,5 +1,6 @@
 """This helps me guard against typos..."""
-from thds.mops.k8s.config import k8s_namespace, namespace, namespaces_supporting_workload_identity
+from thds.mops.k8s.config import k8s_namespace, namespaces_supporting_workload_identity
+from thds.mops.k8s.namespace import parse_namespace
 
 
 def test_use_workload_identity():
@@ -8,4 +9,4 @@ def test_use_workload_identity():
 
 
 def test_namespace():
-    assert "yu-zhang" == namespace("Yu_Zhang")
+    assert "yu-zhang" == parse_namespace("Yu_Zhang")

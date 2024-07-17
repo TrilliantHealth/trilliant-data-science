@@ -1,25 +1,13 @@
 from datetime import timedelta
-from getpass import getuser
 from pathlib import Path
 
 import tomli
 
 from thds.core import config
 
+from .namespace import parse_namespace, user_namespace
 
-def namespace(input_str: str) -> str:
-    # lowercase and replace all non-alphanumeric characters with dashes
-    return "".join(c if c.isalnum() else "-" for c in input_str.lower())
-
-
-def _user_namespace() -> str:
-    try:
-        return getuser()
-    except OSError:
-        return "CICD-Runner"
-
-
-k8s_namespace = config.item("mops.k8s.namespace", _user_namespace(), parse=namespace)
+k8s_namespace = config.item("mops.k8s.namespace", user_namespace(), parse=parse_namespace)
 k8s_namespace_env_var_key = config.item("mops.k8s.namespace_env_var_key", "K8S_NAMESPACE")
 # the above is used to embed the current namespace _inside_ the container as an
 # environment variable.  it will not affect how your namespace is selected in the first
