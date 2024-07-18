@@ -51,7 +51,7 @@ def format_name(name: str, format: NameFormatType = "git") -> str:
     elif format == "docker":
         return re.sub(DOCKER_EXCLUSION_REGEX, DOCKER_SUB_CHARACTER, name)
     elif format == "hive":
-        return re.sub(HIVE_EXCLUSION_REGEX, HIVE_SUB_CHARACTER, name)
+        return re.sub(HIVE_EXCLUSION_REGEX, HIVE_SUB_CHARACTER, name).lower()
     else:
         raise ValueError(
             f"'{format}' is not a supported `format`. Supported formats: {ty.get_args(NameFormatType)}"
