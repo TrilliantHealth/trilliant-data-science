@@ -1,3 +1,7 @@
+## 1.24
+
+- Added some additional `git` functions: `get_merge_base` and `get_commit_datetime`.
+
 ## 1.23
 
 - Adds an optional `custom_merger` parameter to `sqlite.sqlmap.parallel_to_sqlite`, which defaults to
