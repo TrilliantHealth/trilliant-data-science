@@ -71,12 +71,11 @@ def get_commit_datetime_and_hash(
 
 
 def get_merge_base(branch1: str = "", branch2: str = "main") -> str:
-    return _simple_run(f"git merge-base {branch1 if branch1 else get_branch()} {branch2}")
+    return _simple_run(f"git merge-base {branch1 or get_branch()} {branch2}")
 
 
-def get_commit_datetime(commit: str, date_format: str = CALGITVER_NO_SECONDS_FORMAT):
-    # TODO - don't love how close this name is to `get_commit_datetime_and_hash
+def get_commit_datetime_str(commit_hash: str, date_format: str = CALGITVER_NO_SECONDS_FORMAT) -> str:
     return _simple_run(
-        f"git log -n 1 --date=format-local:{date_format} --format=format:'%cd' {commit}",
+        f"git log -n 1 --date=format-local:{date_format} --format=format:'%cd' {commit_hash}",
         env=dict(os.environ, TZ="UTC0"),
     )
