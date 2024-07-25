@@ -117,6 +117,12 @@ def _yield_running_pods_for_job(
     while attempt < config.k8s_monitor_max_attempts():
         for pod in _list_pods_in_our_namespace():
             owner_refs = pod.metadata.owner_references
+            if not owner_refs:
+                # this is a rare and undocumented case where a pod
+                # will have owner_references=None if it was manually created.
+                # since we're looking for pods created by jobs, we can safely skip these.
+                continue
+
             if len(owner_refs) > 1:
                 logger.warning("Found multiple owner references for a pod. Taking first one...")
             owner_ref = owner_refs[0]
