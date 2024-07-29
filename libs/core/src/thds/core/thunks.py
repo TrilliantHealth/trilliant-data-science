@@ -11,7 +11,7 @@ P = ParamSpec("P")
 R = ty.TypeVar("R")
 
 
-@dataclass(init=False)
+@dataclass
 class Thunk(ty.Generic[R]):
     """Result-typed callable with arguments partially applied beforehand."""
 
