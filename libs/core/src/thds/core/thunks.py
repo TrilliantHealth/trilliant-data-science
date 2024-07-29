@@ -1,5 +1,6 @@
 import sys
 import typing as ty
+from dataclasses import dataclass
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -10,22 +11,18 @@ P = ParamSpec("P")
 R = ty.TypeVar("R")
 
 
+@dataclass(init=False)
 class Thunk(ty.Generic[R]):
-    """Result-typed callable with arguments partially applied beforehand.
+    """Result-typed callable with arguments partially applied beforehand."""
 
-    Unused here but provided for the caller's use if desired.
-    """
+    func: ty.Callable
+    args: P.args
+    kwargs: P.kwargs
 
     def __init__(self, func: ty.Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs
-
-    def __str__(self) -> str:
-        return f"Thunk(func={self.func}, args=*{self.args}, kwargs=**{self.kwargs})"
-
-    def __repr__(self) -> str:
-        return str(self)
 
     def __call__(self) -> R:
         return ty.cast(R, self.func(*self.args, **self.kwargs))

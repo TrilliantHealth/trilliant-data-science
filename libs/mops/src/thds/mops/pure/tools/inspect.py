@@ -28,7 +28,7 @@ def _unpickle_object_for_debugging(uri: str) -> ty.Any:
         if uri.endswith("/" + INVOCATION):
             nested = ty.cast(NestedFunctionPickle, make_read_object(INVOCATION)(uri))
             args, kwargs = mark_as_remote(unfreeze_args_kwargs(nested.args_kwargs_pickle))
-            return Thunk(nested.f, args, kwargs)
+            return Thunk(nested.f, *args, **kwargs)
         return make_read_object("output")(uri)
     except ImportError as ie:
         logger.error(f"Could not import the module ({ie}) needed to unpickle the object.")
@@ -105,7 +105,12 @@ def inspect(uri: str, embed: bool = False):
         _embed(obj)
     else:
         print()
-        pprint(obj, indent=4, width=60, sort_dicts=False)
+        try:
+            from rich import pretty
+
+            pretty.pprint(obj)
+        except ModuleNotFoundError:
+            pprint(obj, indent=4, width=60, sort_dicts=False)
     return obj
 
 
