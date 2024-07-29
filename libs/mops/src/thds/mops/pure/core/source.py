@@ -89,20 +89,37 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
     """Re-create a Source from a Hash by looking up one of two Hashrefs and finding a
     valid Source for the data."""
     local_file_hashref_uri = _hashref_uri(hash, "local")
+    remote_hashref_uri = _hashref_uri(hash, "remote")
+
+    def remote_uri(allow_blob_not_found: bool = True) -> str:
+        try:
+            return _read_hashref(remote_hashref_uri)
+        except Exception as e:
+            if not allow_blob_not_found or not lookup_blob_store(
+                remote_hashref_uri,
+            ).is_blob_not_found(e):
+                # 'remote' blob not found is sometimes fine, but anything else is weird
+                # and we should raise.
+                raise
+            return ""
+
     try:
         # we might be on the same machine where this was originally invoked.
         # therefore, there may be a local path we can use directly.
-        return source.from_file(_read_hashref(local_file_hashref_uri), hash=hash)
+        # Then, there's no need to bother grabbing the remote_uri
+        # - but for debugging's sake, it's quite nice to actually
+        # have the full remote URI as well even if we're ultimately going to use the local copy.
+        return source.from_file(_read_hashref(local_file_hashref_uri), hash=hash, uri=remote_uri())
     except FileNotFoundError:
         # we are not on the same machine as the local ref. assume we need the remote URI.
         pass
     except Exception as e:
         if not lookup_blob_store(local_file_hashref_uri).is_blob_not_found(e):
-            # blob not found is fine, but anything else is weird and we should raise.
+            # 'local' blob not found is fine, but anything else is weird and we should raise.
             raise
 
     # no local file, so we assume there must be a remote URI.
-    return source.from_uri(_read_hashref(_hashref_uri(hash, "remote")), hash=hash)
+    return source.from_uri(remote_uri(False), hash=hash)
 
 
 _PENDING_UPLOADS: StackContext[ty.Dict[hashing.Hash, ty.Callable[[], None]]] = StackContext(

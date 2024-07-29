@@ -106,7 +106,7 @@ def inspect(uri: str, embed: bool = False):
     else:
         print()
         try:
-            from rich import pretty
+            from rich import pretty  # type: ignore[import]
 
             pretty.pprint(obj)
         except ModuleNotFoundError:
