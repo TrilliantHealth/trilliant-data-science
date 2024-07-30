@@ -1,3 +1,4 @@
+[tool]
 [tool.poetry]
 name = "thds.atacama"
 # Patch version is a datetime determined upon release
@@ -39,15 +40,6 @@ pytest = "^7.2"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
 
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -75,3 +67,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG
