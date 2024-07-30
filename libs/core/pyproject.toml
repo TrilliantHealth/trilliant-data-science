@@ -1,3 +1,4 @@
+[tool]
 [tool.poetry]
 name = "thds.core"
 # Patch version is a datetime determined upon release
@@ -35,14 +36,6 @@ new-calgitver = "thds.core.meta:print_calgitver"
 show-thds-config = "thds.core.config:show_config_cli"
 thds-exit-after = "thds.core.exit_after:main"
 
-[build-system]
-requires = ["poetry-core", "attrs>=22.2.0", "cattrs>=22.2"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -70,3 +63,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core", "attrs>=22.2.0", "cattrs>=22.2"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG

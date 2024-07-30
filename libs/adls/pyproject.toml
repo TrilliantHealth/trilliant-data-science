@@ -1,3 +1,4 @@
+[tool]
 [tool.poetry]
 name = "thds.adls"
 version = "2.3"
@@ -32,14 +33,6 @@ pytest-xdist = "^3.3.1"
 adls-download-uri = "thds.adls.tools.download:main"
 adls-ls-uri = "thds.adls.tools.ls:main"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -61,7 +54,6 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
-
 [[tool.mypy.overrides]]
 module = ["aiostream", "setuptools"]
 ignore_missing_imports = true
@@ -74,3 +66,12 @@ follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG
