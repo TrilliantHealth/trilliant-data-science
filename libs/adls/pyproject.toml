@@ -55,7 +55,11 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["aiostream", "setuptools"]
+module = [
+    "aiostream",
+    "azure",
+    "setuptools",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
