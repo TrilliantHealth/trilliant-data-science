@@ -8,7 +8,7 @@ from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
-from thds.core import log, scope
+from thds.core import config, log, scope
 
 from ....__about__ import backward_compatible_with
 from ...._utils.colorize import colorized
@@ -35,6 +35,10 @@ from .._pickle import (
 )
 from ..pickles import NestedFunctionPickle
 from . import sha256_b64
+
+MAINTAIN_LOCKS = config.item(
+    "thds.mops.pure.orchestrator.maintain_locks", default=True, parse=config.tobool
+)
 
 Shell = ty.Callable[[ty.Sequence[str]], ty.Any]
 """A Shell is a way of getting back into a Python process with enough
@@ -183,9 +187,9 @@ class MemoizingPicklingRunner:
 # of progress _complete_, rather than issuing many instructions to the
 # underlying client and allowing it to randomly order the operations
 # such that it takes longer to get a full unit of work complete.
-_OUT_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
+_BEFORE_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
 # _OUT prioritizes uploading a single invocation and its dependencies so the Shell can start running.
-_IN_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
+_AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
 # _IN prioritizes retrieving the result of a Shell that has completed.
 
 INVOCATION = "invocation"
@@ -197,7 +201,7 @@ _LogNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
 _LogAwaitedResult = lambda s: logger.info(_Purple(s))  # noqa: E731
 
 
-def _pickle_func_and_run_via_shell(
+def _pickle_func_and_run_via_shell(  # noqa: C901
     function_memospace: str,
     get_dumper: ty.Callable[[str], Dumper],
     func_: ty.Callable[..., T],
@@ -218,10 +222,10 @@ def _pickle_func_and_run_via_shell(
         fs = uris.lookup_blob_store(function_memospace)
         dumper = get_dumper(storage_root)
 
-        # the network ops being grouped by _OUT include one or more
+        # the network ops being grouped by _BEFORE_INVOCATION include one or more
         # download attempts (consider possible pickled Paths) plus
         # one or more uploads (embedded Paths, invocation).
-        with _OUT_SEMAPHORE:
+        with _BEFORE_INVOCATION_SEMAPHORE:
             # we need to unwrap the partial object and combine its
             # args, kwargs with the other args, kwargs, otherwise the
             # args and kwargs will not get properly considered in the
@@ -301,19 +305,40 @@ def _pickle_func_and_run_via_shell(
             upload_pickled_invocation()
 
         lock_dir_uri = fs.join(memo_uri, "lock")
-        while not (result := check_result("awaited")):
-            # if the result ever 'appears' while we're waiting for the lock, just use it!
-            lock_owned = lock.acquire(lock_dir_uri, expire=timedelta(seconds=88))
-            if lock_owned:
-                release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
-                break  # it is time to run this ourselves
+        # entering this loop is the most common case - the non-memoized case.
+        while not result:
+            with _BEFORE_INVOCATION_SEMAPHORE:
+                lock_owned = lock.acquire(lock_dir_uri, expire=timedelta(seconds=88))
+                # the vastly most common outcome here will be acquiring the lock on the
+                # first try.  this will lead to (directly below) breaking out of the loop
+                # and going on to the shell invocation.
 
+            # relinquish semaphore before we sleep, so that other threads can acquire it.
+            # we could relinquish after the if lock_owned stuff, but that stuff doesn't do
+            # any ADLS operations anyway, so we may as well give it up now.
+
+            if lock_owned:
+                if MAINTAIN_LOCKS():
+                    release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
+                else:
+                    release_lock = lock_owned.release
+                break  # we own the invocation - invoke the shell ourselves
+
+            # getting to this point ONLY happens if we failed to acquire the lock, which
+            # is not expected to be the usual situation. We log a differently-colored
+            # message here to make that clear to users.
             _LogAwaitedResult(
                 f"Result for {memo_uri} does not yet exist but the lock is owned by another process."
             )
             time.sleep(22)
 
+            with _BEFORE_INVOCATION_SEMAPHORE:
+                result = check_result("awaited")
+
         if result:
+            # I don't think this needs to be inside a semaphore, because the 'load' here
+            # should be much less spiky, given that it will only happen after failing to
+            # acquire the lock the first time.
             _LogAwaitedResult(f"Result for {memo_uri} was found after waiting for the lock.")
             return unwrap_remote_result(result)
 
@@ -345,8 +370,8 @@ def _pickle_func_and_run_via_shell(
         finally:
             release_lock()
 
-        # the network ops being grouped by _IN include one or more downloads.
-        with _IN_SEMAPHORE:
+        # the network ops being grouped by _AFTER_INVOCATION include one or more downloads.
+        with _AFTER_INVOCATION_SEMAPHORE:
             result = results.check_if_result_exists(memo_uri)
             if not result:
                 if shell_ex:

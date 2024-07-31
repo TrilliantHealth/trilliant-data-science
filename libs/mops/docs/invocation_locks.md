@@ -57,8 +57,27 @@ there existing a 'pending' execution of the function invocation.
 This limitation can be helped somewhat by increasing lock expirations to larger numbers. This is not
 currently configurable within `mops` but could easily be made so by using `core.config.item`.
 
-An alternative, and more complete, solution, would be to pass the `lock_uuid` out-of-band to the remote
-side (via shell arguments), and ask it to exit quietly if it found that the existing lock was active with
-a different id than expected. This would allow 'stealing acquirers' to start their own invocation, with
-reasonable confidence that any long-delayed invocations would exit prior to actually invoking the
-function.
+> 🔮 An alternative, and more complete, solution, would be to pass the `lock_uuid` out-of-band to the
+> remote side (via shell arguments), and ask it to exit quietly if it found that the existing lock was
+> active with a different id than expected. This would allow 'stealing acquirers' to start their own
+> invocation, with reasonable confidence that any long-delayed invocations would exit prior to actually
+> invoking the function.
+>
+> It _might_ occasionally _delay_ the remote invocation, because there's no guarantee that the first pod
+> to come up would be from the earlier-scheduled Job that acquired the lock - but this is fine; in
+> general, we'd expect that only one orchestrator would be 'alive' at any given time, and we'd prefer to
+> err on the side of not confusing the orchestrator that most recently acquired the lock (and expects its
+> own shell to be the thing that completes the invocation)
+
+### azure Python SDK network errors
+
+If you're running a huge pipeline, like Demand Forecast, it may be advantageous to opt out of the
+network-hungry lock maintenance on the orchestrator side of things. This degrades the utility of the lock
+somewhat, while still providing basic debugging info that is very handy to keep.
+
+The relevant configuration is a core.config item, so you can programmatically disable it by importing
+`MAINTAIN_LOCKS` from `thds.mops.pure.pickling.runner.orchestrator_side` and calling `.set_global(False)`
+on it. You can also set `THDS_MOPS_PURE_ORCHESTRATOR_MAINTAIN_LOCKS=0` in your environment.
+
+> 🔮 A future iteration on improving this situation would be to revisit the remote behavior of the lock as
+> noted above, which would also solve the more general problem for Demand Forecast.
