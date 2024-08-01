@@ -79,14 +79,6 @@ viz = ["pygraphviz"]
 [tool.mono]
 omit_extras = ["viz"]
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.mypy]
 mypy_path = "src"
 namespace_packages = true
@@ -101,15 +93,19 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-  "azure",
-  "bourbaki.*",
-  "networkx",
-  "pyarrow.*",
-  "pygraphviz",
-  "pysqlite3",
-  "ruamel.*",
-  "setuptools",
-  "typing_inspect",
+    "azure",
+    "black",
+    "bourbaki.*",
+    "fastjsonschema",
+    "matplotlib.*",
+    "networkx",
+    "pandas.*",
+    "pyarrow.*",
+    "pygraphviz",
+    "pysqlite3",
+    "ruamel.*",
+    "setuptools",
+    "typing_inspect",
 ]
 ignore_missing_imports = true
 
@@ -133,3 +129,12 @@ source = ["thds.tabularasa"]
 
 [tool.coverage.report]
 show_missing = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG

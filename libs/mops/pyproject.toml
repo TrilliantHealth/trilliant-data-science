@@ -55,14 +55,7 @@ types-cachetools = "*"
 types-urllib3 = "*"
 
 # BUILD CONFIG
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -84,9 +77,15 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
-
 [[tool.mypy.overrides]]
-module = ["azure.*", "colors", "kubernetes.*", "setuptools"]
+module = [
+    "azure",
+    "azure.*",
+    "colors",
+    "google.*",
+    "kubernetes.*",
+    "setuptools",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -99,3 +98,12 @@ follow_imports = "skip"
 testpaths = ["tests"]
 addopts = "-v -s"
 markers = ["integration"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG

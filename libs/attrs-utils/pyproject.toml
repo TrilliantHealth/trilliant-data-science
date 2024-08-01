@@ -47,14 +47,6 @@ cattrs = ["cattrs"]
 docstrings = ["docstring-parser"]
 jsonschema = ["fastjsonschema"]
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -77,7 +69,13 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["fastjsonschema.*", "typing_inspect.*", "setuptools"]
+module = [
+    "fastjsonschema",
+    "fastjsonschema.*",
+    "setuptools",
+    "typing_inspect",
+    "typing_inspect.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -85,3 +83,12 @@ ignore_missing_imports = true
 addopts = "-m 'not integration'"
 markers = ["integration"]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG
