@@ -1,4 +1,3 @@
-[tool]
 [tool.poetry]
 name = "thds.adls"
 version = "2.3"
