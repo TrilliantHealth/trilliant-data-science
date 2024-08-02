@@ -81,7 +81,7 @@ def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
 
     lockfile_writer = LockfileWriter(
         lock_dir_uri,
-        make_lock_contents(lock_uri, timedelta(seconds=expire_s)),
+        make_lock_contents(lock_contents["lock_uuid"], timedelta(seconds=expire_s)),
         expire_s,
     )
     lockfile_writer.first_acquired_at = datetime.fromisoformat(first_acquired_at_s)

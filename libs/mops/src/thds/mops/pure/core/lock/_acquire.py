@@ -99,12 +99,16 @@ def acquire(  # noqa: C901
 
     start = _funcs.utc_now()
 
-    lock_uri = _funcs.make_lock_uri(lock_dir_uri)
     my_lock_uuid = uuid4().hex
 
-    generate_lock = make_lock_contents(my_lock_uuid, expire)
-    read_lockfile = make_read_lockfile(lock_uri)
-    lockfile_writer = LockfileWriter(lock_dir_uri, generate_lock, expire.total_seconds(), debug=debug)
+    lockfile_writer = LockfileWriter(
+        lock_dir_uri,
+        make_lock_contents(my_lock_uuid, expire),
+        expire.total_seconds(),
+        debug=debug,
+    )
+
+    read_lockfile = make_read_lockfile(_funcs.make_lock_uri(lock_dir_uri))
 
     def is_released(lock_contents: LockContents) -> bool:
         return bool(lock_contents.get("released_at"))
@@ -117,7 +121,7 @@ def acquire(  # noqa: C901
         lock_expire_s = lock_contents["expire_s"]
         if round(lock_expire_s, 4) != round(expire.total_seconds(), 4):
             logger.warning(
-                f"Remote lock {lock_uri} has expire duration {lock_expire_s},"
+                f"Remote lock {lock_dir_uri} has expire duration {lock_expire_s},"
                 f" which is different than the local configuration {expire}."
                 " This may lead to multiple simultaneous acquirers on the lock."
             )
@@ -146,9 +150,9 @@ def acquire(  # noqa: C901
         if maybe_lock_contents:
             lock = maybe_lock_contents
             if is_released(lock):
-                logger.debug("Lock %s was released - attempting to lock", lock_uri)
+                logger.debug("Lock %s was released - attempting to lock", lock_dir_uri)
             elif not is_fresh(lock):
-                logger.debug("Lock %s has expired - will attempt to steal it!", lock_uri)
+                logger.debug("Lock %s has expired - will attempt to steal it!", lock_dir_uri)
             elif lock["lock_uuid"] == my_lock_uuid:
                 # LOCK ACQUIRED!
                 lockfile_writer.mark_acquired()
@@ -158,7 +162,7 @@ def acquire(  # noqa: C901
             else:
                 # lock is fresh and held by another acquirer - failed to acquire!
                 if acquire_delay:
-                    logger.info(f"Lost race for lock {lock_uri}")
+                    logger.info(f"Lost race for lock {lock_dir_uri}")
                     # this is info (not debug) because we expect it to be rare.
                     acquire_delay = 0.0
                 if block is not None and _funcs.utc_now() > start + block:
@@ -170,7 +174,7 @@ def acquire(  # noqa: C901
                 # block=0.0 and then do the polling themselves.
                 continue
         else:
-            logger.debug("Lock %s does not exist - will attempt to lock it.", lock_uri)
+            logger.debug("Lock %s does not exist - will attempt to lock it.", lock_dir_uri)
 
         # lock has expired or does not exist - attempt to acquire it by writing!
         lockfile_writer.write()

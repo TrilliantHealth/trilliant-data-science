@@ -16,6 +16,10 @@ def make_lock_contents(
     """Impure - Resets written_at to 'right now' to keep the lock 'live'."""
     write_count = 0
 
+    assert (
+        "/" not in lock_uuid
+    ), f"{lock_uuid} should not contain a slash - maybe you passed a URI instead?"
+
     def lock_contents(first_acquired_at: ty.Optional[datetime]) -> LockContents:
         nonlocal write_count
         write_count += 1
@@ -63,6 +67,7 @@ class LockfileWriter:
 
     def write(self) -> None:
         lock_contents = self.generate_lock(self.first_acquired_at)
+        assert "/" not in lock_contents["lock_uuid"], lock_contents
         lock_bytes = _funcs.json_dumpb(lock_contents)
         assert lock_bytes
         # technically, writing these bytes may cause an overwrite of someone else's lock.
@@ -73,7 +78,7 @@ class LockfileWriter:
         # and should continue as though they acquired the lock. Everyone else should 'fail'
         # to acquire the lock.
         _funcs.write(self.blob_store, self.lock_uri, lock_bytes)
-        self._write_debug(lock_contents)
+        self._maybe_write_debug(lock_contents)
 
     def maintain(self) -> None:
         """It is valid to call this method multiple times as necessary once the lock has been acquired."""
@@ -88,9 +93,9 @@ class LockfileWriter:
             "Releasing lock %s after %s", self.lock_uri, _funcs.utc_now() - self.first_acquired_at
         )
         _funcs.write(self.blob_store, self.lock_uri, _funcs.json_dumpb(lock_contents))
-        self._write_debug(lock_contents)
+        self._maybe_write_debug(lock_contents)
 
-    def _write_debug(self, lock_contents: LockContents) -> None:
+    def _maybe_write_debug(self, lock_contents: LockContents) -> None:
         # this debug bit serves to help us understand when clients actually believed
         # that they had acquired the lock.  Because we only do this after our first
         # 'successful' write, it will not impose extra latency during the
@@ -99,6 +104,7 @@ class LockfileWriter:
             hostname = lock_contents["hostname"]
             pid = lock_contents["pid"]
             lock_uuid = lock_contents["lock_uuid"]
+            assert "/" not in lock_uuid, lock_contents
             debug_uri = self.blob_store.join(
                 self.lock_dir_uri,
                 "acquirers-debug",
