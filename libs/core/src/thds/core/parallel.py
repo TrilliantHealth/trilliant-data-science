@@ -112,6 +112,7 @@ def yield_results(
     executor_cm: ty.Optional[ty.ContextManager[concurrent.futures.Executor]] = None,
     error_fmt: ty.Callable[[str], str] = lambda x: x,
     success_fmt: ty.Callable[[str], str] = lambda x: x,
+    named: str = "",
 ) -> ty.Iterator[R]:
     """Yield only the successful results of your Callables/Thunks.
 
@@ -130,6 +131,7 @@ def yield_results(
 
     num_tasks = try_len(thunks)
     num_tasks_log = "" if not num_tasks else f" of {num_tasks}"
+    named = f" {named} " if named else " result "
 
     for i, (_key, res) in enumerate(
         yield_all(create_keys(thunks), executor_cm=executor_cm),
@@ -137,7 +139,7 @@ def yield_results(
     ):
         if not isinstance(res, Error):
             errors = error_fmt(f"; {len(exceptions)} tasks have raised exceptions") if exceptions else ""
-            logger.info(success_fmt(f"Yielding result {i}{num_tasks_log}{errors}"))
+            logger.info(success_fmt(f"Yielding{named}{i}{num_tasks_log} {errors}"))
             yield res
         else:
             exceptions.append(res.error)
