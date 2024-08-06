@@ -58,21 +58,43 @@ def contextful_threadpool_executor(
     )
 
 
-_NAMED_LOCKS: ty.Dict[str, Lock] = dict()
-_MASTER_LOCK = Lock()
+H = ty.TypeVar("H", bound=ty.Hashable)
+L = ty.TypeVar("L", bound=Lock)
 
 
-def named_lock(name: str) -> Lock:
-    """Get a process-global lock by name, or create it (atomically) if it does not exist.
+class LockSet(ty.Generic[H, L]):
+    """Get a process-global lock by hashable key, or create it (thread-safely) if it does not exist.
 
     Handy if you have things you want to be able to do inside a process, but you don't want
     to completely rule out the possibility of pickling the object that would otherwise hold the Lock object.
 
     This does mean your locks are not shared across processes, but that's a Python limitation anyway.
     """
-    if name not in _NAMED_LOCKS:
-        with _MASTER_LOCK:
-            if name not in _NAMED_LOCKS:
-                _NAMED_LOCKS[name] = Lock()
-    assert name in _NAMED_LOCKS
-    return _NAMED_LOCKS[name]
+
+    def __init__(self, lockclass: ty.Type[L]):
+        self._lockclass = lockclass
+        self._master_lock = Lock()
+        self._hashed_locks: ty.Dict[H, L] = dict()
+
+    def get(self, hashable: H) -> Lock:
+        if hashable not in self._hashed_locks:
+            with self._master_lock:
+                if hashable not in self._hashed_locks:
+                    self._hashed_locks[hashable] = self._lockclass()
+        assert hashable in self._hashed_locks, hashable
+        return self._hashed_locks[hashable]
+
+    def __getitem__(self, hashable: H) -> Lock:
+        return self.get(hashable)
+
+    def delete(self, hashable: H) -> None:
+        with self._master_lock:
+            self._hashed_locks.pop(hashable, None)
+
+
+_GLOBAL_NAMED_LOCKS = LockSet[str, Lock](Lock)
+# a general-purpose instance; you may want to create your own.
+
+
+def named_lock(name: str) -> Lock:
+    return _GLOBAL_NAMED_LOCKS.get(name)
