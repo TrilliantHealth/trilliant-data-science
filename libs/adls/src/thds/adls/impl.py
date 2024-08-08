@@ -322,6 +322,7 @@ class ADLSFileSystem:
         file_system_client: FileSystemClient,
         local_path: Union[str, Path],
         remote_path: str,
+        metadata: Optional[Mapping[str, str]] = None,
     ) -> str:
         """async function that uploads a local file to a remote path
 
@@ -338,7 +339,7 @@ class ADLSFileSystem:
                         content_settings=decision.content_settings,
                         connection_timeout=CONNECTION_TIMEOUT(),
                         chunk_size=UPLOAD_CHUNK_SIZE(),
-                        metadata=metadata_for_upload(),
+                        metadata={**metadata_for_upload(), **(metadata or {})},
                     )
 
         return remote_path
@@ -350,6 +351,7 @@ class ADLSFileSystem:
         remote_path: str,
         recursive: bool = False,
         batch_size: Optional[int] = None,
+        metadata: Optional[Mapping[str, str]] = None,
     ) -> List[str]:
         """async function that uploads all the files in a local directory to a remote path
 
@@ -392,6 +394,7 @@ class ADLSFileSystem:
                             file_system_client,
                             str(path_pair.local_path),
                             path_pair.remote_path,
+                            metadata,
                         )
                         for path_pair in batch
                     ]
@@ -406,6 +409,7 @@ class ADLSFileSystem:
         local_paths: Iterable[Union[str, Path]],
         remote_path: str,
         batch_size: Optional[int] = None,
+        metadata: Optional[Mapping[str, str]] = None,
     ) -> List[str]:
         remote_path = remote_path.rstrip("/") + "/"
 
@@ -428,6 +432,7 @@ class ADLSFileSystem:
                             file_system_client,
                             str(path_pair.local_path),
                             path_pair.remote_path,
+                            metadata,
                         )
                         for path_pair in batch
                     ]
@@ -765,15 +770,21 @@ class ADLSFileSystem:
 
         return self.fetch_directory(remote_path, local_path_resolved, batch_size)
 
-    def put_file(self, local_path: Union[str, Path], remote_path: str) -> str:
+    def put_file(
+        self,
+        local_path: Union[str, Path],
+        remote_path: str,
+        metadata: Optional[Mapping[str, str]] = None,
+    ) -> str:
         """async function that uploads a local file to a remote location
 
         :param local_path: The local path of the file to upload.
         :param remote_path: The remote path to which the file will be uploaded.
+        :param metadata: Metadata to add to the file.
         :returns: remote path of uploaded file
         """
 
-        return self._run(self._put_file, local_path, remote_path)
+        return self._run(self._put_file, local_path, remote_path, metadata)
 
     def put_directory(
         self,
@@ -781,33 +792,37 @@ class ADLSFileSystem:
         remote_path: str,
         recursive: bool = False,
         batch_size: Optional[int] = None,
+        metadata: Optional[Mapping[str, str]] = None,
     ) -> List[str]:
         """async function that uploads all the files in a local directory to a remote directory
 
         :param local_path: The local path of the directory to upload.
         :param remote_path: The remote path to which the directory will be uploaded.
-        :param recursive: recurse into subdirectories when downloading?
-        :param batch_size: the size of each batch
+        :param recursive: Recurse into subdirectories when downloading?
+        :param batch_size: The size of each batch.
+        :param metadata: Metadata to add to each file uploaded.
         :returns: list of remote paths
         """
 
-        return self._run(self._put_directory, local_path, remote_path, recursive, batch_size)
+        return self._run(self._put_directory, local_path, remote_path, recursive, batch_size, metadata)
 
     def put_files(
         self,
         local_paths: Iterable[Union[str, Path]],
         remote_path: str,
         batch_size: Optional[int] = None,
+        metadata: Optional[Mapping[str, str]] = None,
     ) -> List[str]:
         """async function that uploads each in a list of files to a remote directory
 
         :param local_paths: The local paths of the directory to upload.
         :param remote_path: The remote path to which the files will be uploaded.
-        :param batch_size: the size of each batch
+        :param batch_size: The size of each batch.
+        :param metadata: Metadata to add to each file uploaded.
         :returns: list of remote paths
         """
 
-        return self._run(self._put_files, local_paths, remote_path, batch_size)
+        return self._run(self._put_files, local_paths, remote_path, batch_size, metadata)
 
     def delete_file(
         self,
