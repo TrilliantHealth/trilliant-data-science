@@ -1,3 +1,7 @@
+## 2.4
+
+- Added `metadata` as an optional parameter for upload functions.
+
 ## 2.3
 
 - Add global filelock to downloads so that multiple processes on the same machine do not try to download
