@@ -107,7 +107,7 @@ class LockfileWriter:
             assert "/" not in lock_uuid, lock_contents
             debug_uri = self.blob_store.join(
                 self.lock_dir_uri,
-                "acquirers-debug",
+                "writers-debug",
                 f"{hostname}-{pid}-{lock_uuid}-lock.json",
             )
             try:

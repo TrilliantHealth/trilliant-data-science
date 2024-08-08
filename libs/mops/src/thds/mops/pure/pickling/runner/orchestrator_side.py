@@ -300,9 +300,10 @@ def _pickle_func_and_run_via_shell(
             # but if it does not exist, we need to upload the invocation and then run the shell.
             upload_pickled_invocation()
 
+        lock_dir_uri = fs.join(memo_uri, "lock")
         while not (result := check_result("awaited")):
             # if the result ever 'appears' while we're waiting for the lock, just use it!
-            lock_owned = lock.acquire(memo_uri, expire=timedelta(seconds=88))
+            lock_owned = lock.acquire(lock_dir_uri, expire=timedelta(seconds=88))
             if lock_owned:
                 release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
                 break  # it is time to run this ourselves
