@@ -39,6 +39,15 @@ pytest = "^7.2"
 pytest-cov = "^4.0"
 pytest-mock = "^3.10"
 
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
 
@@ -61,21 +70,8 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = [
-    "marshmallow_enum",
-    "setuptools",
-    "typing_inspect",
-]
+module = ["marshmallow_enum", "setuptools", "typing_inspect"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG

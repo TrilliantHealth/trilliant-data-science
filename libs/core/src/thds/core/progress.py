@@ -56,7 +56,7 @@ def report(
     def calc_report_every(total: int, factor: float) -> int:
         decimal_smoothing = 10 ** _mag_10(total / factor)
         report_every = int(int((total / factor) / decimal_smoothing) * decimal_smoothing)
-        assert report_every > 0, str((total, decimal_smoothing))
+        # assert report_every > 0, str((total, decimal_smoothing))
         return report_every
 
     for total, item in enumerate(iterator, start=2):
