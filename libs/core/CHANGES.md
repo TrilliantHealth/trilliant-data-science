@@ -1,7 +1,3 @@
-## 1.25
-
-- Better `__repr__` for `source.Source` and `thunks.Thunk`.
-
 ## 1.24
 
 - Added some additional `git` functions: `get_merge_base` and `get_commit_datetime`.
