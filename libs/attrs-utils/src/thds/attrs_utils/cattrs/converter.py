@@ -1,10 +1,10 @@
 import datetime
 import decimal
 import typing as ty
+from functools import partial
 from typing import Any, Callable, Sequence, Tuple, Type
 
 from cattr.converters import Converter, GenConverter
-from returns.curry import partial
 
 from ..type_utils import is_literal_type, is_set_type, literal_base
 

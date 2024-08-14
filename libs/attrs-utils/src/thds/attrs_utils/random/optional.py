@@ -1,6 +1,5 @@
+from functools import partial
 from typing import Optional
-
-from returns.curry import partial
 
 from .builtin import random_bool
 from .util import Gen, T

@@ -1,7 +1,5 @@
-from functools import wraps
+from functools import partial, wraps
 from typing import Callable, Dict, Type, TypeVar, cast, overload
-
-from returns.curry import partial
 
 T = TypeVar("T")
 U = TypeVar("U")

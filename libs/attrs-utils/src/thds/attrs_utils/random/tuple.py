@@ -1,6 +1,5 @@
+from functools import partial
 from typing import Callable, Sequence, Tuple, TypeVar
-
-from returns.curry import partial
 
 from .util import Gen, T
 

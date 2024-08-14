@@ -2,10 +2,10 @@
 is an inverse."""
 import json
 import math
+from functools import partial
 from typing import Any, Mapping, Sequence
 
 import pytest
-from returns.curry import partial
 
 from thds.attrs_utils.recursion import F, Predicate, StructuredRecursion, value_error
 

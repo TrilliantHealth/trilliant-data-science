@@ -1,9 +1,8 @@
 import random
+from functools import partial
 from itertools import accumulate
 from operator import add
 from typing import Callable, Iterator, Mapping, Optional, Sequence, Tuple, TypeVar, Union
-
-from returns.curry import partial
 
 T = TypeVar("T")
 U = TypeVar("U")

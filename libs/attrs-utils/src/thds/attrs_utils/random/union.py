@@ -1,9 +1,8 @@
 import random
+from functools import partial
 from itertools import accumulate
 from operator import add
 from typing import Sequence, Tuple
-
-from returns.curry import partial
 
 from .util import Gen, T
 

@@ -1,6 +1,6 @@
+from functools import partial
 from typing import Any, Callable, Generic, Sequence, Tuple, Type, TypeVar
 
-from returns.curry import partial
 from typing_extensions import Concatenate, ParamSpec
 
 T = TypeVar("T", contravariant=True)

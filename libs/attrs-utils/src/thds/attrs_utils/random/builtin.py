@@ -1,8 +1,7 @@
 import datetime
 import random
 import string
-
-from returns.curry import partial
+from functools import partial
 
 from .util import Gen
 

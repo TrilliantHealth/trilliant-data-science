@@ -1,8 +1,8 @@
 import collections
+from functools import partial
 from typing import Any, Callable, DefaultDict, Iterable, Mapping, Tuple, Type, cast, get_args
 
 import attr
-from returns.curry import partial
 
 from .. import recursion, type_recursion, type_utils
 from . import attrs, collection, optional, tuple, union

@@ -1,7 +1,6 @@
 import itertools
+from functools import partial
 from typing import Callable, Collection, Iterable, Mapping, Tuple, TypeVar, cast
-
-from returns.curry import partial
 
 from .builtin import random_int_gen
 from .util import Gen

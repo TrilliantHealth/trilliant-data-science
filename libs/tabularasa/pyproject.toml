@@ -17,7 +17,9 @@ networkx = ">=3.0"
 numpy = "*"
 pandas = "^1.4"
 pandera = "~0.7.1"      # 0.8 breaks us
-pydantic = "^1.10.0"    # V2 introduces breaking changes
+pydantic = ">=1.10.9, <2.0"
+# V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin
+# see here: https://github.com/python/mypy/issues/15485
 pyarrow = ">=10.0.0"
 pyyaml = ">=6.0.1"
 setuptools = ">=66.1.1"
