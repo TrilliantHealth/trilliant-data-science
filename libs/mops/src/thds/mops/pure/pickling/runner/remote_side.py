@@ -54,7 +54,9 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
     fs = uris.lookup_blob_store(memo_uri)
 
     try:
-        stop_lock = lock.launch_daemon_lock_maintainer(lock.remote_lock_maintain(memo_uri))
+        stop_lock = lock.launch_daemon_lock_maintainer(
+            lock.remote_lock_maintain(fs.join(memo_uri, "lock"))
+        )
     except lock.CannotMaintainLock as e:
         logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
         stop_lock = lambda: None  # noqa: E731
