@@ -1,3 +1,7 @@
+### 0.3.6
+
+fixes for mypy 1.11
+
 ### 0.3.5
 
 - Set some reasonable defaults in schema `build_options`, specifically:
