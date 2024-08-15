@@ -49,8 +49,8 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
         collection: Optional[RecF[Type, Params, U]] = None,
         tuple: Optional[RecF[Type, Params, U]] = None,
         variadic_tuple: Optional[RecF[Type, Params, U]] = None,
-        newtype: Optional[RecF[Type, Params, U]] = default_newtype,
-        annotated: Optional[RecF[Type, Params, U]] = default_annotated,
+        newtype: Optional[RecF[Type, Params, U]] = default_newtype,  # type: ignore[assignment]
+        annotated: Optional[RecF[Type, Params, U]] = default_annotated,  # type: ignore[assignment]
         typevar: Optional[RecF[Type, Params, U]] = None,
         otherwise: RecF[Type, Params, U],
     ):

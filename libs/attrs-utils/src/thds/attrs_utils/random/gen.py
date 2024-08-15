@@ -1,6 +1,6 @@
 import collections
 from functools import partial
-from typing import Any, Callable, DefaultDict, Iterable, Mapping, Tuple, Type, cast, get_args
+from typing import Any, DefaultDict, Iterable, Tuple, Type, cast, get_args
 
 import attr
 
@@ -93,12 +93,12 @@ def gen_mapping(random_gen, type_: Type[collection.M]) -> Gen[collection.M]:
     kt, vt = args
     v_gen = random_gen(vt)
     kv_gen = juxtapose_gen(random_gen(kt), v_gen)
-    if type_utils.get_origin(type_) is type_utils.get_origin(DefaultDict):
-        cons: Callable[[Iterable[Tuple[T, U]]], Mapping[T, U]] = partial(
-            _construct_defauldict, collections.defaultdict(v_gen)
-        )
-    else:
-        cons = type_utils.concrete_constructor(type_)
+
+    cons = (
+        partial(_construct_defauldict, collections.defaultdict(v_gen))
+        if type_utils.get_origin(type_) is type_utils.get_origin(DefaultDict)
+        else type_utils.concrete_constructor(type_)  # type: ignore [arg-type]
+    )
     return collection.random_mapping_gen(cons, repeat_gen(kv_gen))  # type: ignore [arg-type]
 
 

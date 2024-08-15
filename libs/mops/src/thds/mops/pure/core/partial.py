@@ -9,7 +9,7 @@ def unwrap_partial(
     func: ty.Callable[..., T], args: Args, kwargs: Kwargs
 ) -> ty.Tuple[ty.Callable[..., T], Args, Kwargs]:
     while isinstance(func, partial):
-        args = func.args + args
+        args = func.args + tuple(args)
         kwargs = {**func.keywords, **kwargs}
         func = func.func
     return func, args, kwargs
