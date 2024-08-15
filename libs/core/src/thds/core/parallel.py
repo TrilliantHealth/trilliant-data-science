@@ -7,7 +7,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from uuid import uuid4
 
-from thds.core import concurrency, files, log
+from thds.core import concurrency, config, files, log
+
+PARALLEL_OFF = config.item("off", default=False, parse=config.tobool)
+# if you want to simplify a stack trace, this may be your friend
 
 R = ty.TypeVar("R")
 T_co = ty.TypeVar("T_co", covariant=True)
@@ -79,6 +82,10 @@ def yield_all(
     most mops purposes it should be a ThreadPoolExecutor.
     """
     files.bump_limits()
+
+    if PARALLEL_OFF():
+        for key, thunk in thunks:
+            yield key, thunk()
 
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
         max_workers=try_len(thunks), **concurrency.initcontext()
