@@ -7,10 +7,11 @@ from thds.core.source import Source
 
 
 class DbAndTableP(ty.Protocol):
-    def get_path(self) -> Path:
+    @property  # read-only
+    def db_path(self) -> os.PathLike:
         ...
 
-    @property
+    @property  # read-only
     def table_name(self) -> str:
         ...
 
@@ -19,16 +20,14 @@ class DbAndTable(ty.NamedTuple):
     db_path: Path
     table_name: str
 
-    def get_path(self) -> Path:
-        return self.db_path
-
 
 class TableSource(ty.NamedTuple):
     db_src: Source
     table_name: str
 
-    def get_path(self) -> Path:
-        return self.db_src.path()
+    @property
+    def db_path(self) -> os.PathLike:
+        return self.db_src
 
 
 class TableMaster(ty.NamedTuple):
