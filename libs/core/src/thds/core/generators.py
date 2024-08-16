@@ -42,13 +42,13 @@ class return_wrapper(contextlib.AbstractContextManager, ty.Generic[GEN, R]):
         return self._return_value
 
 
-def iterator_sender(gen: ty.Generator[ty.Any, T, R], iterator: ty.Iterable[T]) -> R:
+def iterator_sender(gen: ty.Generator[None, T, R], iterator: ty.Iterable[T]) -> R:
     """This encapsulates the send/close behavior we want in general. See
     https://discuss.python.org/t/let-generator-close-return-stopiteration-value/24786
     for how a simple `gen.close()` will do this in 3.13.
     """
 
-    gen_wrapper: return_wrapper[ty.Generator, R] = return_wrapper(gen)  # type: ignore[arg-type]
+    gen_wrapper: return_wrapper[ty.Generator, R] = return_wrapper(gen)
     with gen_wrapper:
         for i in iterator:
             gen.send(i)
