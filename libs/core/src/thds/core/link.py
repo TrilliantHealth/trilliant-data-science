@@ -140,7 +140,7 @@ def cheap_copy(
         cow_success = False
         if _IS_MAC:
             try:
-                subprocess.check_output(["cp", "-c", str(src), str(tmp_link_dest)])
+                subprocess.check_output(["cp", "-c", os.fspath(src), str(tmp_link_dest)])
                 cow_success = True
             except subprocess.CalledProcessError:
                 pass
