@@ -614,7 +614,7 @@ class ADLSFileSystem:
             # Synchronous because order of operations must be maintaned.
             # Inner empty subdirs must be deleted before outer subdirs.
             for path in dir_paths:
-                del_props.append(await asyncio.gather(self._delete_file(file_system_client, path)))
+                del_props.extend(await asyncio.gather(self._delete_file(file_system_client, path)))
 
         return del_props
 
