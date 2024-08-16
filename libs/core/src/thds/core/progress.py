@@ -56,7 +56,9 @@ def report(
     def calc_report_every(total: int, factor: float) -> int:
         decimal_smoothing = 10 ** _mag_10(total / factor)
         report_every = int(int((total / factor) / decimal_smoothing) * decimal_smoothing)
-        assert report_every > 0, str((total, decimal_smoothing))
+        if not report_every > 0:
+            logger.warning(f"`report_every` should be greater than 0, got {report_every}")
+            report_every = 1
         return report_every
 
     for total, item in enumerate(iterator, start=2):

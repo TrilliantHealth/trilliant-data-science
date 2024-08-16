@@ -33,7 +33,7 @@ thds-core = {path = "../../libs/core", develop = true}
 # because of a backward-incompatible change to something like mypy or pytest
 # that we didn't explicitly opt into by bumping a version.
 #################
-mypy = "1.11"
+mypy = "^1.0"
 mypy-extensions = "^1.0"
 pytest = "^7.2"
 pytest-cov = "^4.0"
