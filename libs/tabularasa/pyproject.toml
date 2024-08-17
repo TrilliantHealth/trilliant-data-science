@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.tabularasa"
 # Patch version is a datetime determined upon release
-version = "0.3.6"
+version = "0.3.7"
 authors = ["Trilliant Health"]
 description = "Trillant Health reference data build system."
 readme = "README.md"
@@ -16,7 +16,7 @@ cattrs = ">=22.2.0"
 networkx = ">=3.0"
 numpy = "*"
 pandas = "^1.4"
-pandera = "~0.7.1"      # 0.8 breaks us
+pandera = "~0.7.1"          # 0.8 breaks us
 pydantic = ">=1.10.9, <2.0"
 # V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin
 # see here: https://github.com/python/mypy/issues/15485
@@ -95,19 +95,19 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-    "azure",
-    "black",
-    "bourbaki.*",
-    "fastjsonschema",
-    "matplotlib.*",
-    "networkx",
-    "pandas.*",
-    "pyarrow.*",
-    "pygraphviz",
-    "pysqlite3",
-    "ruamel.*",
-    "setuptools",
-    "typing_inspect",
+  "azure",
+  "black",
+  "bourbaki.*",
+  "fastjsonschema",
+  "matplotlib.*",
+  "networkx",
+  "pandas.*",
+  "pyarrow.*",
+  "pygraphviz",
+  "pysqlite3",
+  "ruamel.*",
+  "setuptools",
+  "typing_inspect",
 ]
 ignore_missing_imports = true
 

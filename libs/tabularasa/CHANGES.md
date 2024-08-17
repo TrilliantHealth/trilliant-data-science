@@ -1,6 +1,10 @@
+### 0.3.7
+
+- Adding `sqlite_from_parquet` for conversion from parquet to a DB defined by a tabularasa schema
+
 ### 0.3.6
 
-fixes for mypy 1.11
+- Fixes for mypy 1.11
 
 ### 0.3.5
 

@@ -143,7 +143,7 @@ def render_attrs_loaders(
                     data_dir=data_dir,
                     md5=table.md5,
                     blob_store=None
-                    if schema.remote_blob_store is None
+                    if schema.remote_blob_store is None or table.md5 is None
                     else VarName(REMOTE_BLOB_STORE_VAR_NAME),
                     pyarrow_schema=VarName(
                         f"{PYARROW_SCHEMAS_QUALIFIED_IMPORT}.{table.snake_case_name}_pyarrow_schema"
