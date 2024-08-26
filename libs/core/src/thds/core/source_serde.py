@@ -3,7 +3,7 @@ import json
 import typing as ty
 from functools import partial
 
-from thds.core import hashing, source
+from thds.core import hashing, source, types
 
 _SHA256_B64 = "sha256b64"
 _MD5_B64 = "md5b64"
@@ -65,3 +65,24 @@ def to_json(
         next(filter(None, (ser(source.hash) for ser in hash_serializers if source.hash)), None)
     ) or dict()
     return json.dumps(dict(uri=source.uri, **hash_dict))
+
+
+def from_unknown_user_path(path: types.StrOrPath, desired_uri: str) -> source.Source:
+    """Sometimes you may want to load a Source directly from a Path provided by a user.
+
+    It _might_ represent something loadable as a from_json Source, but it might just be a
+    raw file that needs to be loaded with from_file!
+
+    This is a _reasonable_ (but not guaranteed!) way of trying to ascertain which one it
+    is, and specifying where it should live 'remotely' if such a thing becomes
+    necessary.
+
+    Your application might need to implement something more robust if the
+    actual underlying data is likely to be a JSON blob containing the key `uri`, for
+    instance.
+    """
+    with open(path) as readable:
+        try:
+            return from_json(readable.read(4096))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return source.from_file(path, uri=desired_uri)
