@@ -31,9 +31,9 @@ serialization methods will have to choose how to represent the information retur
 this module, but it should be able to call back into this module with that same state to
 have a Source object returned to it while it performs low-level deserialization.
 """
+
 import io
 import typing as ty
-from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -41,9 +41,9 @@ from thds import humenc
 from thds.core import hashing, log, source
 from thds.core.files import is_file_uri, to_uri
 from thds.core.source import Source
-from thds.core.stack_context import StackContext
 from thds.core.types import StrOrPath
 
+from . import deferred_work
 from .content_addressed import wordybin_content_addressed
 from .output_naming import invocation_output_uri
 from .uris import active_storage_root, lookup_blob_store
@@ -122,44 +122,6 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
     return source.from_uri(remote_uri(False), hash=hash)
 
 
-_PENDING_UPLOADS: StackContext[ty.Dict[hashing.Hash, ty.Callable[[], None]]] = StackContext(
-    "PENDING_SOURCE_UPLOADS", dict()
-)
-
-
-@contextmanager
-def source_argument_buffering() -> ty.Iterator[None]:
-    """Enter this context before you begin serializing your invocation. If
-    perform_source_uploads() is later called, any Sources replaced by Source Arguments
-    during serialization will be uploaded to the remote store. The context should not be
-    closed until after return from the Shell.
-
-    The idea is that you'd call perform_source_uploads() inside your Shell which transfers
-    execution to a remote environment, but _not_ call it if you're transferring execution
-    to a local environment, as the upload will not be needed.
-
-    This is not re-entrant. If this is called while the dictionary is non-empty, an
-    exception will be raised. This is only because I can think of no reason why anyone
-    would want it to be re-entrant, so it seems better to raise an error. If for some
-    reason re-entrancy were desired, we could just silently pass if the dictionary already
-    has pending uploads.
-
-    """
-    assert not _PENDING_UPLOADS(), "source_upload_buffering() is not re-entrant"
-    with _PENDING_UPLOADS.set(dict()):
-        yield
-
-
-def perform_source_uploads() -> None:
-    uploads = _PENDING_UPLOADS()
-    if uploads:
-        # TODO - remove these while uploading?
-        logger.info(f"Uploading {len(uploads)} Sources so they'll be available remotely.")
-        for _hash, upload in uploads.items():
-            # TODO perform these uploads in a small thread pool?
-            upload()
-
-
 def _upload_and_create_remote_hashref(local_path: Path, remote_uri: str, hash: hashing.Hash) -> None:
     # exists only to provide a local (non-serializable) closure around local_path and remote_uri.
     lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
@@ -194,14 +156,25 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # remote URI for this thing automagically; otherwise, use whatever was already
         # specified by the Source itself.
         remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_uri(source_.hash)
-        _PENDING_UPLOADS()[source_.hash] = partial(
-            _upload_and_create_remote_hashref, local_path, remote_uri, source_.hash
+        deferred_work.add(
+            __name__,
+            source_.hash,
+            partial(_upload_and_create_remote_hashref, local_path, remote_uri, source_.hash),
         )
     else:
-        # only create a remote hashref, because this Source represents a non-local resource.
-        _write_hashref(_hashref_uri(source_.hash, "remote"), source_.uri)
+        # prepare to (later, if necessary) create a remote hashref, because this Source
+        # represents a non-local resource.
+        deferred_work.add(
+            __name__,
+            source_.hash,
+            partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri),
+        )
 
     return source_.hash
+
+
+def perform_source_uploads():  # has been replaced by a general work-deferring mechanism.
+    deferred_work.perform_all()
 
 
 # RETURNING FROM REMOTE

@@ -1,3 +1,13 @@
+## 2.11
+
+- Optimize Path and Source uploads, so that in cases of memoized results (very common!), we do not need
+  to talk to Azure/ADLS _at all_ until it's time to check to see if there is already a result. And if
+  there is, then we completely skip writing hash refs and uploading Paths (which obviously must have
+  already been uploaded in the past if there's a result). Even though those uploads would in most cases
+  have been optimized by `thds.adls` to a check of existing, matching bytes, that check is plenty slow
+  enough to be noticed by a human user, and it's quite silly to bother when the memoized result is about
+  to be discovered.
+
 ## 2.10
 
 - Factored `mops._utils.human_b64` and the module's corresponding tests out into a new library `humenc`,

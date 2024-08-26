@@ -7,14 +7,13 @@ from thds.core import source
 from thds.core.hash_cache import filehash
 from thds.core.hashing import Hash
 from thds.mops import tempdir
-from thds.mops.pure.core import output_naming
+from thds.mops.pure.core import deferred_work, output_naming
 from thds.mops.pure.core.source import (
     _hashref_uri,
     create_source_at_uri,
     perform_source_uploads,
     prepare_source_argument,
     prepare_source_result,
-    source_argument_buffering,
     source_from_hashref,
     source_from_source_result,
 )
@@ -29,7 +28,7 @@ _TEST_DIR.mkdir(exist_ok=True)
 @pytest.fixture
 def prep():
     """These things are necessary before our Hashref/Source code can do anything."""
-    with source_argument_buffering(), ACTIVE_STORAGE_ROOT.set(f"file://{_TEST_DIR}"):
+    with deferred_work.open_context(), ACTIVE_STORAGE_ROOT.set(f"file://{_TEST_DIR}"):
         yield
 
 
@@ -81,6 +80,11 @@ def test_remote_source_with_hash(prep, temp_file):  # 3
 
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, Hash)
+
+    perform_source_uploads()
+    # hashrefs are now also gated behind the 'uploads'
+    # abstraction, in order to avoid unnecessarily uploading things
+    # when we may already be able to fetch a result.
 
     reconstituted_source = source_from_hashref(source_arg)
     assert reconstituted_source.hash == initial_source.hash

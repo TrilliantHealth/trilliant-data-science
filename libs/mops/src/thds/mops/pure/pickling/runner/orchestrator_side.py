@@ -17,12 +17,11 @@ from ...._utils.once import Once
 from ....config import max_concurrent_network_ops
 from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
-from ...core import lock, memo, uris
+from ...core import deferred_work, lock, memo, uris
 from ...core.partial import unwrap_partial
 from ...core.pipeline_id_mask import function_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ...core.serialize_paths import CoordinatingPathSerializer
-from ...core.source import source_argument_buffering
 from ...core.types import Args, F, Kwargs, NoResultAfterInvocationError, Serializer, T
 from ...tools.summarize import run_summary
 from .._pickle import (
@@ -236,8 +235,9 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             pipeline_id = scope.enter(function_mask(func))
 
             trigger_src_files_upload(args, kwargs)
-            # eagerly upload (deprecated) SrcFiles prior to serialization
-            scope.enter(source_argument_buffering())
+            # eagerly upload (deprecated) SrcFiles prior to serialization - this is slow and
+            # it will lovely to get rid of it soon-ish.
+            scope.enter(deferred_work.open_context())
             # prepare to optimize Source objects during serialization
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)  # serialize!
             memo_uri = fs.join(function_memospace, memo.args_kwargs_content_address(args_kwargs_bytes))

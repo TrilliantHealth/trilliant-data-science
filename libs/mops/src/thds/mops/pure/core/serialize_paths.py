@@ -1,5 +1,6 @@
 import hashlib
 import typing as ty
+from functools import partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -8,6 +9,7 @@ from thds.core.hash_cache import hash_file
 from thds.core.log import getLogger
 
 from ..._utils import once
+from . import deferred_work
 
 Downloader = ty.Callable[[], Path]
 logger = getLogger(__name__)
@@ -115,7 +117,11 @@ def _serialize_file_path_as_upload(
                 f"{remote_root}/pathname-_{str(local_src).replace('/', '_')}",
             )
 
-    once.run_once(remote_key, upload)
+    deferred_work.add(
+        __name__,
+        remote_key,
+        partial(once.run_once, remote_key, upload),
+    )
     return stream.get_downloader(remote_key)
 
 
