@@ -1,3 +1,9 @@
+## 2.5
+
+```
+- New `FastCachedAzureCliCredential`, which tries to avoid a lot of unnecessary runs of the Azure CLI for token acquisition on developer laptops, saving several seconds of runtime on many common tasks.
+```
+
 ## 2.4
 
 - Added `metadata` as an optional parameter for upload functions.
