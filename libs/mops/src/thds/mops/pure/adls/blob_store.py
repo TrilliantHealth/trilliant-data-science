@@ -1,4 +1,5 @@
 """This abstraction matches what is required by the BlobStore abstraction in remote.core.uris"""
+
 import logging
 import typing as ty
 from pathlib import Path

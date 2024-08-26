@@ -1,5 +1,6 @@
 """Joins pickle functionality and Blob Store functionality to run functions remotely.
 """
+
 import inspect
 import threading
 import time
@@ -16,8 +17,7 @@ from ...._utils.once import Once
 from ....config import max_concurrent_network_ops
 from ....srcdest.destf_pointers import trigger_dest_files_placeholder_write
 from ....srcdest.srcf_trigger_upload import trigger_src_files_upload
-from ...core import lock, uris
-from ...core.memo import args_kwargs_content_address, make_function_memospace, results
+from ...core import lock, memo, uris
 from ...core.partial import unwrap_partial
 from ...core.pipeline_id_mask import function_mask
 from ...core.serialize_big_objs import ByIdRegistry, ByIdSerializer
@@ -176,7 +176,9 @@ class MemoizingPicklingRunner:
         """
         logger.debug("Preparing to run function via remote shell")
         return _pickle_func_and_run_via_shell(
-            make_function_memospace(_runner_prefix_for_pickled_functions(self._get_storage_root()), f),
+            memo.make_function_memospace(
+                _runner_prefix_for_pickled_functions(self._get_storage_root()), f
+            ),
             self._get_stateful_dumper,
             f,
             self._run_directory,
@@ -238,9 +240,12 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             scope.enter(source_argument_buffering())
             # prepare to optimize Source objects during serialization
             args_kwargs_bytes = freeze_args_kwargs(dumper, func, args, kwargs)  # serialize!
-            memo_uri = fs.join(function_memospace, args_kwargs_content_address(args_kwargs_bytes))
+            memo_uri = fs.join(function_memospace, memo.args_kwargs_content_address(args_kwargs_bytes))
 
-            # define some important 'chunks of work'
+            # Define some important and reusable 'chunks of work'
+            # - these are ordered by what they depend on, _not_ the order
+            #   in which they'll be called.
+
             def upload_pickled_invocation():
                 fs.putbytes(
                     fs.join(memo_uri, INVOCATION),
@@ -253,12 +258,12 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
                     type_hint=INVOCATION,
                 )
 
-            def unwrap_remote_result(result: ty.Union[results.Success, results.Error]) -> T:
-                if isinstance(result, results.Success):
+            def unwrap_remote_result(result: ty.Union[memo.results.Success, memo.results.Error]) -> T:
+                if isinstance(result, memo.results.Success):
                     success = ty.cast(T, make_read_object("result")(result.value_uri))
                     trigger_dest_files_placeholder_write(success)
                     return success
-                assert isinstance(result, results.Error), "Must be _error or _success"
+                assert isinstance(result, memo.results.Error), "Must be _error or _success"
                 raise make_read_object("EXCEPTION")(result.exception_uri)
 
             def debug_required_result_failure():
@@ -278,8 +283,8 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
 
             def check_result(
                 status: run_summary.StatusType,
-            ) -> ty.Union[results.Success, results.Error, None]:
-                result = results.check_if_result_exists(
+            ) -> ty.Union[memo.results.Success, memo.results.Error, None]:
+                result = memo.results.check_if_result_exists(
                     memo_uri, rerun_excs=rerun_exceptions, before_raise=debug_required_result_failure
                 )
                 if not result:
@@ -372,7 +377,7 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
 
         # the network ops being grouped by _AFTER_INVOCATION include one or more downloads.
         with _AFTER_INVOCATION_SEMAPHORE:
-            result = results.check_if_result_exists(memo_uri)
+            result = memo.results.check_if_result_exists(memo_uri)
             if not result:
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
