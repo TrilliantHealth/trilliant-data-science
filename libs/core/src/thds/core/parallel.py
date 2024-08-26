@@ -1,5 +1,6 @@
 """Some utilities for running things in parallel - potentially large numbers of things.
 """
+
 import concurrent.futures
 import itertools
 import typing as ty
@@ -67,13 +68,16 @@ class Error:
     error: Exception
 
 
+H = ty.TypeVar("H", bound=ty.Hashable)
+
+
 def yield_all(
-    thunks: ty.Iterable[ty.Tuple[str, ty.Callable[[], R]]],
+    thunks: ty.Iterable[ty.Tuple[H, ty.Callable[[], R]]],
     *,
     executor_cm: ty.Optional[ty.ContextManager[concurrent.futures.Executor]] = None,
-) -> ty.Iterator[ty.Tuple[str, ty.Union[R, Error]]]:
+) -> ty.Iterator[ty.Tuple[H, ty.Union[R, Error]]]:
     """Stream your results so that you don't have to load them all into memory at the same
-    time (necessarily). Also yield Exceptions, wrapped as Errors.
+    time (necessarily). Also, yield (rather than raise) Exceptions, wrapped as Errors.
 
     Additionally, if your iterable has a length and you do not provide
     a pre-sized Executor, we will create a ThreadPoolExecutor with the
@@ -82,13 +86,18 @@ def yield_all(
     most mops purposes it should be a ThreadPoolExecutor.
     """
     files.bump_limits()
+    len_or_none = try_len(thunks)
 
-    if PARALLEL_OFF():
+    if PARALLEL_OFF() or len_or_none == 1:
+        # don't actually transfer this to an executor we only have one task.
         for key, thunk in thunks:
-            yield key, thunk()
+            try:
+                yield key, thunk()
+            except Exception as e:
+                yield key, Error(e)
 
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
-        max_workers=try_len(thunks), **concurrency.initcontext()
+        max_workers=len_or_none, **concurrency.initcontext()
     )
     with executor_cm as executor:
         keys_onto_futures = {key: executor.submit(thunk) for key, thunk in thunks}
