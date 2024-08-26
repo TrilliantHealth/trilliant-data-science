@@ -7,6 +7,9 @@
   have been optimized by `thds.adls` to a check of existing, matching bytes, that check is plenty slow
   enough to be noticed by a human user, and it's quite silly to bother when the memoized result is about
   to be discovered.
+- Use a local cache for control files (mainly, `result` files) so that we can look up results without
+  needing to make a network hop. This cuts out the last perceptible effects of `mops` on retrieval of
+  known results.
 
 ## 2.10
 

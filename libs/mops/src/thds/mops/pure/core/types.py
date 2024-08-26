@@ -1,8 +1,11 @@
 """Core abstractions for the remote runner system."""
+
 import typing as ty
 from pathlib import Path
 
 from typing_extensions import Protocol
+
+from thds.core import config
 
 T = ty.TypeVar("T")
 F = ty.TypeVar("F", bound=ty.Callable)
@@ -50,11 +53,24 @@ class NotARunnerContext(Exception):
 AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
 
 
+DISABLE_CONTROL_CACHE = config.item(
+    "thds.mops.pure.disable_control_cache", default=False, parse=config.tobool
+)
+# set the above to True in order to specifically opt out of read-path caching of
+# mops-created files. This can apply to a local (stack) context, or can
+# apply globally to the process. The former may be used selectively within mops
+# for issues of known correctness, e.g. locks, whereas the latter will be useful
+# for debugging any cases where files have been remotely deleted.
+
+
 class BlobStore(Protocol):
     def readbytesinto(
         self, __remote_uri: str, __stream_or_file: ty.IO[bytes], *, type_hint: str = "bytes"
     ) -> None:
-        """Allows reading into any stream, including a stream-to-disk."""
+        """Allows reading into any stream, including a stream-to-disk.
+
+        May optimize reads by returning a cached version of the file if it has been seen before.
+        """
 
     def getfile(self, __remote_uri: str) -> Path:
         """Read a remote uri directly into a path controlled by the implementation.
@@ -72,7 +88,10 @@ class BlobStore(Protocol):
         """
 
     def exists(self, __remote_uri: str) -> bool:
-        ...
+        """Check if a file exists. May optimize by assuming that files previously seen
+        have not been deleted - since this is intended only for mops control files,
+        and mops never deletes any control files.
+        """
 
     def join(self, *parts: str) -> str:
         ...

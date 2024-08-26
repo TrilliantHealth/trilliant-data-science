@@ -7,15 +7,14 @@ from pathlib import Path
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.adls import AdlsFqn, join, resource
+from thds.adls import AdlsFqn, join, resource, ro_cache
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_fs_client
-from thds.adls.ro_cache import Cache
-from thds.core import config, fretry, link, log, scope
+from thds.core import config, fretry, home, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
-from ..core.types import AnyStrSrc, BlobStore
+from ..core.types import DISABLE_CONTROL_CACHE, AnyStrSrc, BlobStore
 
 T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
@@ -111,8 +110,8 @@ class DangerouslyCachingStore(AdlsBlobStore):
     automated context.
     """
 
-    def __init__(self, root: str):
-        self._cache = Cache(Path(root).resolve(), ("ref", "hard"))
+    def __init__(self, root: Path):
+        self._cache = ro_cache.Cache(root.resolve(), ("ref", "hard"))
 
     def exists(self, remote_uri: str) -> bool:
         cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
@@ -137,10 +136,12 @@ class DangerouslyCachingStore(AdlsBlobStore):
         return outpath
 
 
-DANGEROUSLY_CACHING_ROOT = config.item("cache-dangerously-root", default="")
+_DEFAULT_CONTROL_CACHE = config.item(
+    "thds.mops.pure.adls.control_cache_root", default=home.HOMEDIR() / ".mops-adls-control-cache"
+)
 
 
 def get_store() -> BlobStore:
-    if root := DANGEROUSLY_CACHING_ROOT():
-        return DangerouslyCachingStore(root)
-    return AdlsBlobStore()
+    if DISABLE_CONTROL_CACHE() or not _DEFAULT_CONTROL_CACHE():
+        return AdlsBlobStore()
+    return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE())
