@@ -1,15 +1,23 @@
+import json
 import logging
 import os
+import random
 import threading
+import time
+from pathlib import Path
 from typing import Dict
 
-from azure.identity import DefaultAzureCredential
+from azure.core.credentials import AccessToken, TokenCredential
+from azure.identity import AzureCliCredential, DefaultAzureCredential
 from azure.identity._constants import EnvironmentVariables
 
+from thds.core import config, files, log
 from thds.core.lazy import Lazy
 
 # suppress noisy Azure identity logs
 logging.getLogger("azure.identity").setLevel(logging.WARNING)
+logger = log.getLogger(__name__)
+DISABLE_FAST_CACHED_CREDENTIAL = config.item("disable_fast", default=False, parse=config.tobool)
 
 
 class ThreadSafeAzureCredential(DefaultAzureCredential):
@@ -34,6 +42,42 @@ class ThreadSafeAzureCredential(DefaultAzureCredential):
             return super().close()
 
 
+_CACHED_TOKEN_PATH = "~/.azure/thds-cache-azure-cli-tokens"
+
+
+class FastCachedAzureCliCredential(AzureCliCredential):
+    # AzureCliCredential only allows a single scope per token, so even though
+    # the abstract concept might name *args as *scopes, for our implementation
+    # it would be an error to try to fetch more than one scope at a time anyway.
+    def get_token(self, scope: str, *args, **kwargs):
+        cached_path = Path(os.path.expanduser(_CACHED_TOKEN_PATH)) / scope.replace("/", "|")
+        # the | (pipe) is just to make the local file paths not-weird.
+        # i chose it essentially at random, and while technically this is a form of compression,
+        # I very much doubt any collisions are possible in the real set of scopes Azure offers.
+        try:
+            token_dict = json.loads(open(cached_path).read())
+            expires_on = token_dict["expires_on"]
+            if expires_on - random.randint(50, 150) < time.time():
+                # we conservatively grab a new token even if we're within 50 to 150 seconds
+                # _before_ the current token expires.
+                # The randomness helps avoid a whole bunch of processes all grabbing it at once,
+                # assuming there's a _lot_ of Azure activity going on in parallel.
+                # There is no correctness concern with this; just optimizations.
+                raise ValueError("Expired Token")
+            return AccessToken(**token_dict)
+        except (FileNotFoundError, TypeError, KeyError, ValueError):
+            fresh_token = super().get_token(scope, *args, **kwargs)
+            # we write atomically b/c we know other processes may be reading or writing
+            # this file.  it's really just a best practice for almost all file writes
+            # where there's any chance of other readers or writers.
+            with files.atomic_write_path(cached_path) as wp, open(wp, "w") as wf:
+                wf.write(json.dumps(fresh_token._asdict()))
+            return fresh_token
+        except Exception as e:
+            logger.exception(f"failed to get fast credential: {e}")
+            raise
+
+
 def _has_workload_identity_creds() -> bool:
     workload_identity_vars = [
         EnvironmentVariables.AZURE_TENANT_ID,
@@ -52,7 +96,9 @@ def get_credential_kwargs() -> Dict[str, bool]:
     return dict(exclude_shared_token_cache_credential=True)
 
 
-def _SharedCredential() -> DefaultAzureCredential:
+def _SharedCredential() -> TokenCredential:
+    if not _has_workload_identity_creds() and not DISABLE_FAST_CACHED_CREDENTIAL():
+        return FastCachedAzureCliCredential()  # type: ignore
     return ThreadSafeAzureCredential(**get_credential_kwargs())
 
 
