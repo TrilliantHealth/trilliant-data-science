@@ -12,6 +12,7 @@ Highlights:
 
 Please see thds/core/CONFIG.md for more details.
 """
+
 import typing as ty
 from logging import getLogger
 from os import getenv
@@ -79,6 +80,20 @@ def _fullname(name: str) -> str:
 T = ty.TypeVar("T")
 
 
+def _type_parser(default: T) -> ty.Callable[[ty.Any], T]:
+    if default is None:
+        return lambda x: x  # cannot learn anything about how to parse a future value from None
+    try:
+        default_type = type(default)
+        if default == default_type(default):  # type: ignore
+            # if this succeeds and doesn't raise, then the type is self-parsing.
+            # in other words, type(4)(4) == 4, type('foobar')('foobar') == 'foobar'
+            return default_type
+    except Exception:
+        pass
+    return lambda x: x  # we can't infer a type parser, so we'll return the default no-op parser.
+
+
 class ConfigItem(ty.Generic[T]):
     """Should only ever be constructed at a module level."""
 
@@ -89,7 +104,7 @@ class ConfigItem(ty.Generic[T]):
         # your name to be in the calling module.
         default: T = ty.cast(T, _NOT_CONFIGURED),
         *,
-        parse: ty.Callable[[ty.Any], T] = lambda x: x,
+        parse: ty.Optional[ty.Callable[[ty.Any], T]] = None,
         secret: bool = False,
     ):
         self.secret = secret
@@ -98,15 +113,15 @@ class ConfigItem(ty.Generic[T]):
             raise ConfigNameCollisionError(f"Config item {name} has already been registered!")
         _REGISTRY[name] = self
         self.name = name
-        self.parse = parse
+        self.parse = parse or _type_parser(default)
         raw_resolved_global = _getenv(name, secret=secret)
         if raw_resolved_global:
             # external global values are only resolved at initial
             # creation.  if you want to set this value globally after
             # application start, use set_global.
-            self.global_value = parse(raw_resolved_global)
+            self.global_value = self.parse(raw_resolved_global)
         elif default is not _NOT_CONFIGURED:
-            self.global_value = parse(default)
+            self.global_value = self.parse(default)
         else:
             self.global_value = default
         self._stack_context: StackContext[T] = StackContext(
@@ -119,7 +134,11 @@ class ConfigItem(ty.Generic[T]):
         Will not automatically get transferred to spawned processes.
         """
 
-        self.global_value = self.parse(value)
+        self.global_value = value
+        # we used to parse this value, but I think that was the wrong choice -
+        # we should only have to parse it when it's coming from the environment,
+        # which should be handled by it's initial creation,
+        # or when it's being set as a global default from a config file.
 
     def set_local(self, value: T) -> ty.ContextManager[T]:
         """Local to the current thread.
@@ -168,7 +187,8 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
     for name, value in config.items():
         if not isinstance(value, dict):
             try:
-                _REGISTRY[name].set_global(value)
+                config_item = _REGISTRY[name]
+                config_item.set_global(config_item.parse(value))
             except KeyError:
                 # try directly importing a module - this is only best-effort and will not work
                 # if you did not follow standard configuration naming conventions.
@@ -178,7 +198,8 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
                 try:
                     importlib.import_module(maybe_module_name)
                     try:
-                        _REGISTRY[name].set_global(value)
+                        config_item = _REGISTRY[name]
+                        config_item.set_global(config_item.parse(value))
                     except KeyError as kerr:
                         raise KeyError(
                             f"Config item {name} is not registered"
