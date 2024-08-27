@@ -1,3 +1,13 @@
+## 1.26
+
+- `core.config` now infers a parser for your `ConfigItem` from the type of its default value, if
+  possible. In other words, if your default value is a `Path` object, you do not need to explicitly set
+  `parse=Path`, because we can infer that, if the type of your default argument will idempotently 'parse'
+  your default value, then it is probably a reasonable approach to trying to parse/coerce any future
+  value passed in from the environment or external system.
+- Fix bug in design of `core.config`, where we always ran your parser (if any) when using `set_global`,
+  which might have been confusing if you had a more complex type for your config.
+
 ## 1.25
 
 - Better `__repr__` for `source.Source` and `thunks.Thunk`.
