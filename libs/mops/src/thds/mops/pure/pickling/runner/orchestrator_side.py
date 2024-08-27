@@ -52,7 +52,8 @@ immediately after its return.
 
 
 class ShellBuilder(ty.Protocol):
-    def __call__(self, __f: F, __args: Args, __kwargs: Kwargs) -> Shell: ...  # pragma: no cover
+    def __call__(self, __f: F, __args: Args, __kwargs: Kwargs) -> Shell:
+        ...  # pragma: no cover
 
 
 def _mk_builder(shell: ty.Union[Shell, ShellBuilder]) -> ShellBuilder:
