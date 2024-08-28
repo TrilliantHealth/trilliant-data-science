@@ -1,3 +1,5 @@
+import logging
+
 from thds.core import log
 
 
@@ -17,7 +19,7 @@ def test_short_module_name():
 
 def test_compressed_module_name_fmt():
     fmt = log.ThdsCompactFormatter()
-    assert fmt.format(
+    msg = fmt.format(
         log.logging.LogRecord(
             "very_very_very_long_module_name_that_is_extremely_long",
             log.logging.INFO,
@@ -27,7 +29,10 @@ def test_compressed_module_name_fmt():
             (),
             None,
         )
-    ).endswith("info     very_very_very_lon...t_is_extremely_long () i have things to say")
+    )
+
+    assert msg.endswith(" very_very_very_lon...t_is_extremely_long () i have things to say")
+    assert "info   " in msg
 
 
 def test_keyword_context_formatting(caplog):
@@ -35,3 +40,10 @@ def test_keyword_context_formatting(caplog):
         logger = log.getLogger("test")
         logger.info("i have said certain things to you")
         caplog.records[0].message.endswith("(foo='bar',baz=7) i have said certain things to you")
+
+
+def test_levels_dont_break(capsys, caplog):
+    logger = log.getLogger("test")
+    with capsys.disabled(), caplog.at_level(logging.DEBUG):
+        for level in (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL):
+            logger.log(level, f"this is a {level} message")

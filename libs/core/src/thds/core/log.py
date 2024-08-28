@@ -23,6 +23,7 @@ logger.info("testing 5")
 # 2022-02-18 10:01:16,829 info     FooF () testing 5
 ```
 """
+
 import contextlib
 import logging
 import logging.config
@@ -31,7 +32,7 @@ import typing as ty
 from copy import copy
 from typing import Any, Dict, Iterator, MutableMapping, Optional, Tuple
 
-from . import config
+from . import basic_color, config
 from .stack_context import StackContext
 
 _LOGLEVEL = config.item("level", logging.INFO, parse=logging.getLevelName)
@@ -50,6 +51,26 @@ _TH_REC_CTXT = "th_context"
 
 MAX_MODULE_NAME_LEN = config.item("max_module_name_len", 40, parse=int)
 _MODULE_NAME_FMT_STR = "{compressed_name:" + str(MAX_MODULE_NAME_LEN()) + "}"
+
+_COLOR_LEVEL_MAP = {
+    "low": f"{basic_color.fg.BLUE}{{}}{basic_color.fg.RESET}",
+    "info": f"{basic_color.fg.GREEN}{{}}{basic_color.fg.RESET}",
+    "warning": f"{basic_color.fg.YELLOW}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
+    "error": f"{basic_color.bg.RED}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
+    "critical": f"{basic_color.bg.MAGENTA}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
+}
+
+
+def _log_level_color(record: logging.LogRecord, base_levelname: str) -> str:
+    if record.levelno < logging.INFO:
+        return _COLOR_LEVEL_MAP["low"].format(base_levelname.lower())
+    elif record.levelno < logging.WARNING:
+        return _COLOR_LEVEL_MAP["info"].format(base_levelname.lower())
+    elif record.levelno < logging.ERROR:
+        return _COLOR_LEVEL_MAP["warning"].format(base_levelname)
+    elif record.levelno < logging.CRITICAL:
+        return _COLOR_LEVEL_MAP["error"].format(base_levelname)
+    return _COLOR_LEVEL_MAP["critical"].format(base_levelname)
 
 
 class ThdsCompactFormatter(logging.Formatter):
@@ -81,12 +102,13 @@ class ThdsCompactFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord):
         record.message = record.getMessage()
-        levelname = record.levelname
-        if record.levelno < logging.WARNING:
-            levelname = levelname.lower()
+
+        base_levelname = f"{record.levelname:7}"  # the length of the string 'WARNING'
+        levelname = _log_level_color(record, base_levelname)
+
         th_ctx = getattr(record, _TH_REC_CTXT, None) or tuple()
         short_name = self.format_module_name(record.name)
-        formatted = f"{self.formatTime(record)} {levelname:7}  {short_name} {th_ctx} {record.message}"
+        formatted = f"{self.formatTime(record)} {levelname}  {short_name} {th_ctx} {record.message}"
         if exc_text := self._format_exception_and_trace(record):
             formatted += exc_text
         return formatted
