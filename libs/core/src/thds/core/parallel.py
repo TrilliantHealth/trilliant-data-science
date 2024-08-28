@@ -97,8 +97,8 @@ def yield_all(
                 yield key, Error(e)
 
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
-        max_workers=len_or_none, **concurrency.initcontext()
-    )
+        max_workers=len_or_none or None, **concurrency.initcontext()
+    )  # if len_or_none turns out to be zero, swap in a None which won't kill the executor
     with executor_cm as executor:
         keys_onto_futures = {key: executor.submit(thunk) for key, thunk in thunks}
         future_ids_onto_keys = {id(future): key for key, future in keys_onto_futures.items()}
