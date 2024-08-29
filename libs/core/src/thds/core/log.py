@@ -32,7 +32,7 @@ import typing as ty
 from copy import copy
 from typing import Any, Dict, Iterator, MutableMapping, Optional, Tuple
 
-from . import ansi_esc, config
+from . import basic_color, config
 from .stack_context import StackContext
 
 _LOGLEVEL = config.item("level", logging.INFO, parse=logging.getLevelName)
@@ -53,21 +53,11 @@ MAX_MODULE_NAME_LEN = config.item("max_module_name_len", 40, parse=int)
 _MODULE_NAME_FMT_STR = "{compressed_name:" + str(MAX_MODULE_NAME_LEN()) + "}"
 
 _COLOR_LEVEL_MAP = {
-    "low": f"{ansi_esc.fg.BLUE}{{}}{ansi_esc.fg.RESET}",
-    "info": f"{ansi_esc.fg.GREEN}{{}}{ansi_esc.fg.RESET}",
-    "warning": (
-        f"{ansi_esc.fg.YELLOW}{ansi_esc.style.BRIGHT}" "{}" f"{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
-    ),
-    "error": (
-        f"{ansi_esc.bg.ERROR_RED}{ansi_esc.style.BRIGHT}"
-        "{}"
-        f"{ansi_esc.style.NORMAL}{ansi_esc.bg.RESET}"
-    ),
-    "critical": (
-        f"{ansi_esc.bg.MAGENTA}{ansi_esc.style.BRIGHT}{ansi_esc.style.BLINK}"  # 😂
-        "{}"
-        f"{ansi_esc.bg.RESET}{ansi_esc.style.NORMAL}{ansi_esc.style.NO_BLINK}"
-    ),
+    "low": f"{basic_color.fg.BLUE}{{}}{basic_color.fg.RESET}",
+    "info": f"{basic_color.fg.GREEN}{{}}{basic_color.fg.RESET}",
+    "warning": f"{basic_color.fg.YELLOW}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
+    "error": f"{basic_color.bg.RED}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
+    "critical": f"{basic_color.bg.MAGENTA}{basic_color.style.BRIGHT}{{}}{basic_color.style.RESET_ALL}",
 }
 
 
