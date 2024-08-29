@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import platform
 import random
 import threading
 import time
@@ -97,7 +98,8 @@ def get_credential_kwargs() -> Dict[str, bool]:
 
 
 def _SharedCredential() -> TokenCredential:
-    if not _has_workload_identity_creds() and not DISABLE_FAST_CACHED_CREDENTIAL():
+    if platform.system() == "Darwin" and not DISABLE_FAST_CACHED_CREDENTIAL():
+        # only try this crazy optimization on our local laptops
         return FastCachedAzureCliCredential()  # type: ignore
     return ThreadSafeAzureCredential(**get_credential_kwargs())
 
