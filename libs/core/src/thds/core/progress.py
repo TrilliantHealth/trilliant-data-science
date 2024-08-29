@@ -92,6 +92,7 @@ def report(
                 report_every = calc_report_every(frequency, total, elapsed)
         elif report_every and (total % report_every == 0) and (total - last_report >= report_every):
             elapsed = default_timer() - start
+            # once we have our first report_every value, don't get the time on every iteration
             if total >= elapsed:
                 rate_str = f"{total / elapsed:10,.0f}/s"
             else:
