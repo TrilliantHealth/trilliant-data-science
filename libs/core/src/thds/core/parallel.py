@@ -129,6 +129,7 @@ def yield_results(
     error_fmt: ty.Callable[[str], str] = lambda x: x,
     success_fmt: ty.Callable[[str], str] = lambda x: x,
     named: str = "",
+    progress_logger: ty.Callable[[str], ty.Any] = logger.info,
 ) -> ty.Iterator[R]:
     """Yield only the successful results of your Callables/Thunks.
 
@@ -155,7 +156,7 @@ def yield_results(
     ):
         if not isinstance(res, Error):
             errors = error_fmt(f"; {len(exceptions)} tasks have raised exceptions") if exceptions else ""
-            logger.info(success_fmt(f"Yielding{named}{i}{num_tasks_log} {errors}"))
+            progress_logger(success_fmt(f"Yielding{named}{i}{num_tasks_log} {errors}"))
             yield res
         else:
             exceptions.append(res.error)

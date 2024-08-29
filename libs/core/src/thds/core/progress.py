@@ -24,9 +24,39 @@ def _mag_10(num: float) -> float:
     return math.floor(math.log(abs(num), 10))
 
 
+def _smooth_number(num):
+    if num == 0:
+        return 0
+
+    # Determine the order of magnitude of the number
+    magnitude = int(math.log10(abs(num)))
+
+    # Find the nearest power of 10
+    power_of_10 = 10**magnitude
+
+    # Scale down the number to the range 1-10
+    scaled_num = num / power_of_10
+
+    # Round scaled number to nearest 1, 2, or 5 times 10^n
+    if scaled_num < 1.5:
+        return 1 * power_of_10
+    elif scaled_num < 3:
+        return 2 * power_of_10
+    elif scaled_num < 7:
+        return 5 * power_of_10
+    return 10 * power_of_10
+
+
 logger = log.getLogger(__name__.replace("ud.shared.", ""))
 T = ty.TypeVar("T")
 _progress_scope = scope.Scope("progress")
+
+
+def calc_report_every(target_interval: float, total: int, sec_elapsed: float) -> int:
+    seconds_per_item = sec_elapsed / total
+    rate = 1 / seconds_per_item
+    target_rate = 1 / target_interval
+    return _smooth_number(int(rate / target_rate) or 1)
 
 
 @_progress_scope.bound
@@ -36,40 +66,39 @@ def report(
     name: str = "",
     roughly_every_s: timedelta = timedelta(seconds=20),
 ) -> ty.Iterator[T]:
-    """Reports when both intervals have been met."""
+    """Report round-number progress roughly every so often..."""
     iterator = iter(it)
     total = 0
+    start = default_timer()
+    report_every = 0
+    last_report = 0
+    frequency = roughly_every_s.total_seconds()
+
     try:
         first_item = next(iterator)
+        name = name or _name(first_item)
+        _progress_scope.enter(log.logger_context(t=name))
         yield first_item
         total = 1
     except StopIteration:
-        first_item = None
-
-    name = name or _name(first_item)
-
-    _progress_scope.enter(log.logger_context(t=name))
-    report_every = 0
-    start = default_timer()
-    last_report = 0
-
-    def calc_report_every(total: int, factor: float) -> int:
-        decimal_smoothing = 10 ** _mag_10(total / factor)
-        report_every = int(int((total / factor) / decimal_smoothing) * decimal_smoothing)
-        report_every = 1 if not report_every > 0 else report_every
-        return report_every
+        pass
 
     for total, item in enumerate(iterator, start=2):
         yield item
 
-        if not report_every and default_timer() - start > (roughly_every_s.total_seconds() * 0.5):
-            report_every = calc_report_every(total, 0.5)
+        if not report_every:
+            elapsed = default_timer() - start
+            if elapsed > frequency * 0.5:
+                report_every = calc_report_every(frequency, total, elapsed)
         elif report_every and (total % report_every == 0) and (total - last_report >= report_every):
-            now = default_timer()
-            elapsed = now - start
-            logger.info(f"Processed {total:12,d} in {elapsed:6,.1f}s at {total / elapsed:10,.0f}/s")
+            elapsed = default_timer() - start
+            if total >= elapsed:
+                rate_str = f"{total / elapsed:10,.0f}/s"
+            else:
+                rate_str = f"{elapsed / total:10,.0f}s/item"
+            logger.info(f"Processed {total:12,d} in {elapsed:6,.1f}s at {rate_str}")
             last_report = total
-            report_every = calc_report_every(total, elapsed / roughly_every_s.total_seconds())
+            report_every = calc_report_every(frequency, total, elapsed)
 
     _log = logger.info if total > 0 else logger.warning
     elapsed = default_timer() - start
