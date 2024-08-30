@@ -77,7 +77,7 @@ def report(
     try:
         first_item = next(iterator)
         name = name or _name(first_item)
-        _progress_scope.enter(log.logger_context(t=name))
+        _progress_scope.enter(log.logger_context(P=name))
         yield first_item
         total = 1
     except StopIteration:
@@ -96,7 +96,7 @@ def report(
             if total >= elapsed:
                 rate_str = f"{total / elapsed:10,.0f}/s"
             else:
-                rate_str = f"{elapsed / total:10,.0f}s/item"
+                rate_str = f"{elapsed / total:10,.0f}s/{name}"
             logger.info(f"Processed {total:12,d} in {elapsed:6,.1f}s at {rate_str}")
             last_report = total
             report_every = calc_report_every(frequency, total, elapsed)
