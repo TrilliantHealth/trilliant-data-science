@@ -1,6 +1,6 @@
 import pytest
 
-from thds.core.progress import calc_report_every
+from thds.core.progress import calc_report_every, report_gen
 
 
 @pytest.mark.parametrize(
@@ -40,3 +40,11 @@ def test_basic_even_numbers(target_interval, total, sec_elapsed, expected):
 )
 def test_less_obvious_quantities(target_interval, total, sec_elapsed, expected):
     assert calc_report_every(target_interval, total, sec_elapsed) == expected
+
+
+def test_report_gen():
+    def gen():
+        for i in range(100):
+            yield i
+
+    assert list(report_gen(gen)()) == list(range(100))
