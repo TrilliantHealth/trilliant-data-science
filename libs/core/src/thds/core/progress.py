@@ -1,27 +1,12 @@
 import math
 import typing as ty
 from datetime import timedelta
-from functools import wraps
+from functools import partial, wraps
 from timeit import default_timer
 
 from typing_extensions import ParamSpec
 
 from thds.core import log, scope
-
-
-def _name(obj: ty.Any) -> str:
-    if hasattr(obj, "__class__"):
-        return obj.__class__.__name__
-    if hasattr(obj, "__name__"):
-        return obj.__name__
-    if obj is not None:
-        return str(obj)[:20]
-    return "item"
-
-
-def _mag_10(num: float) -> float:
-    assert num > 0
-    return math.floor(math.log(abs(num), 10))
 
 
 def _smooth_number(num):
@@ -57,6 +42,16 @@ def calc_report_every(target_interval: float, total: int, sec_elapsed: float) ->
     rate = 1 / seconds_per_item
     target_rate = 1 / target_interval
     return _smooth_number(int(rate / target_rate) or 1)
+
+
+def _name(obj: ty.Any) -> str:
+    if hasattr(obj, "__class__"):
+        return obj.__class__.__name__
+    if hasattr(obj, "__name__"):
+        return obj.__name__
+    if obj is not None:
+        return str(obj)[:20]
+    return "item"
 
 
 @_progress_scope.bound
@@ -109,9 +104,9 @@ def report(
 P = ParamSpec("P")
 
 
-def report_gen(f: ty.Callable[P, ty.Iterator[T]], **kwargs: ty.Any) -> ty.Callable[P, ty.Iterator[T]]:
-    @wraps(f)
-    def _report_gen(*args: P.args, **kwargs: P.kwargs) -> ty.Iterator[T]:
-        yield from report(f(*args, **kwargs))
+def _report_gen(f: ty.Callable[P, ty.Iterator[T]], *args: P.args, **kwargs: P.kwargs) -> ty.Iterator[T]:
+    yield from report(f(*args, **kwargs))
 
-    return _report_gen
+
+def report_gen(f: ty.Callable[P, ty.Iterator[T]]) -> ty.Callable[P, ty.Iterator[T]]:
+    return wraps(f)(partial(_report_gen, f))
