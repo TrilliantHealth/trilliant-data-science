@@ -1,5 +1,4 @@
 """Best-effort to link a destination to a source depending on file system support."""
-
 import os
 import platform
 import shutil
@@ -63,7 +62,7 @@ def link(
             try:
                 subprocess.check_output(["cp", "-c", str(src), str(tmp_link_dest)])
                 os.rename(tmp_link_dest, dest)
-                logger.debug(f"Created a copy-on-write reflink from {src} to {dest}")
+                logger.info(f"Created a copy-on-write reflink from {src} to {dest}")
                 return "ref"
             except subprocess.CalledProcessError:
                 pass
@@ -71,7 +70,7 @@ def link(
             try:
                 os.link(src, tmp_link_dest)
                 os.rename(tmp_link_dest, dest)
-                logger.debug(f"Created a hardlink from {src} to {dest}")
+                logger.info(f"Created a hardlink from {src} to {dest}")
                 return "hard"
             except OSError as oserr:
                 logger.warning(f"Unable to hard-link {src} to {dest} ({oserr})")
@@ -79,7 +78,7 @@ def link(
             try:
                 os.symlink(src, tmp_link_dest)
                 os.rename(tmp_link_dest, dest)
-                logger.debug(f"Created a softlink from {src} to {dest}")
+                logger.info(f"Created a softlink from {src} to {dest}")
                 return "soft"
             except OSError as oserr:
                 logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
@@ -112,7 +111,7 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         link_success_type = link(src, dest, *link_types)
         if link_success_type:
             return link_success_type
-        logger.info(f"Unable to link {src} to {dest}; falling back to copy.")
+        logger.warning(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
     with tmp.temppath_same_fs(dest) as tmpfile:
@@ -127,7 +126,7 @@ def cheap_copy(
     dest: ct.StrOrPath,
     *,
     permissions: ty.Optional[int] = None,
-) -> Path:
+) -> None:
     """Make a copy of the file, but first attempt Mac COW semantics if available.
 
     The copy will be done via a temporary file on the same filesystem as the destination,
@@ -150,4 +149,3 @@ def cheap_copy(
         if permissions is not None:
             os.chmod(tmp_link_dest, permissions)
         os.rename(tmp_link_dest, dest)
-    return Path(dest)

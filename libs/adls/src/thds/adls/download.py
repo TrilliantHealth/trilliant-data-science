@@ -67,11 +67,8 @@ def _verify_md5s_before_and_after_download(
             f"ADLS thinks the MD5 of {fqn} is {remote_md5b64}, but we expected {expected_md5b64}."
             " This may indicate that we need to update a hash in the codebase."
         )
-
     yield  # perform download
-
-    with log.logger_context(hash_for="after-download"):
-        local_md5b64 = b64(md5_file(local_dest))
+    local_md5b64 = b64(md5_file(local_dest))
     check_reasonable_md5b64(local_md5b64)  # must always exist
     if remote_md5b64 and remote_md5b64 != local_md5b64:
         raise MD5MismatchError(
@@ -155,6 +152,7 @@ class _FileResult(ty.NamedTuple):
 _dl_scope = scope.Scope("adls.download")
 
 
+@_dl_scope.bound
 def _download_or_use_verified_cached_coroutine(  # noqa: C901
     fqn: AdlsFqn,
     local_path: StrOrPath,
@@ -217,16 +215,14 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
             return None
 
         check_reasonable_md5b64(md5b64)
-        with log.logger_context(hash_for="before-download-dest"):
-            local_md5b64 = _md5b64_path_if_exists(local_path)
+        local_md5b64 = _md5b64_path_if_exists(local_path)
         if local_md5b64 == md5b64:
             logger.debug("Local path matches MD5 - no need to look further")
             if cache:
                 cache_path = cache.path(fqn)
-                with log.logger_context(hash_for="before-download-cache"):
-                    if local_md5b64 != _md5b64_path_if_exists(cache_path):
-                        # only copy if the cache is out of date
-                        from_local_path_to_cache(local_path, cache_path, cache.link)
+                if local_md5b64 != _md5b64_path_if_exists(cache_path):
+                    # only copy if the cache is out of date
+                    from_local_path_to_cache(local_path, cache_path, cache.link)
             return _FileResult(local_md5b64, hit=True)
 
         if local_md5b64:
@@ -312,7 +308,6 @@ def _set_md5_if_missing(
     return file_properties.content_settings
 
 
-@_dl_scope.bound
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -349,13 +344,12 @@ def download_or_use_verified(
                 assert file_properties
                 dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
-                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
+                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
         translate_azure_error(fs_client, remote_key, err)
 
 
-@_dl_scope.bound
 async def async_download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -388,7 +382,7 @@ async def async_download_or_use_verified(
                 assert file_properties
                 await dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
-                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
+                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
         translate_azure_error(fs_client, remote_key, err)

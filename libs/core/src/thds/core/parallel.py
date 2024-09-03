@@ -95,7 +95,6 @@ def yield_all(
                 yield key, thunk()
             except Exception as e:
                 yield key, Error(e)
-        return  # we're done here
 
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
         max_workers=len_or_none or None, **concurrency.initcontext()
@@ -109,17 +108,6 @@ def yield_all(
                 yield thunk_key, ty.cast(R, future.result())
             except Exception as e:
                 yield thunk_key, Error(e)
-
-
-def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterator[ty.Tuple[H, R]]:
-    for key, res in results:
-        if isinstance(res, Error):
-            raise res.error
-        yield key, res
-
-
-def xf_mapping(thunks: ty.Mapping[H, ty.Callable[[], R]]) -> ty.Iterator[ty.Tuple[H, R]]:
-    return failfast(yield_all(IteratorWithLen(len(thunks), thunks.items())))
 
 
 def create_keys(iterable: ty.Iterable[R]) -> ty.Iterator[ty.Tuple[str, R]]:

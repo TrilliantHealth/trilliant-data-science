@@ -4,7 +4,6 @@ import typing as ty
 from pathlib import Path
 
 from azure.core.exceptions import HttpResponseError, ResourceModifiedError
-from azure.storage.blob import ContentSettings
 
 from thds.core import files, fretry, hashing, link, log, scope, tmp
 
@@ -98,8 +97,6 @@ def upload(
     dest: ty.Union[AdlsFqn, str],
     src: UploadSrc,
     write_through_cache: ty.Optional[Cache] = None,
-    *,
-    content_type: str = "",
     **upload_data_kwargs: ty.Any,
 ) -> ty.Optional[AdlsHashedResource]:
     """Uploads only if the remote does not exist or does not match
@@ -111,9 +108,6 @@ def upload(
     calculated, an AdlsHashedResource is returned.
 
     Can write through a local cache, which may save you a download later.
-
-    content_type and all upload_data_kwargs will be ignored if the file
-    has already been uploaded and the md5 matches.
     """
     dest_ = AdlsFqn.parse(dest) if isinstance(dest, str) else dest
     if write_through_cache:
@@ -126,7 +120,7 @@ def upload(
     decision = upload_decision_and_settings(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
     if decision.upload_required:
         # set up some bookkeeping
-        n_bytes = None  # if we pass 0 to upload_blob, it truncates the write now
+        n_bytes = 0
         if isinstance(src, Path):
             n_bytes = src.stat().st_size
             src = scope.enter(open(src, "rb"))
@@ -137,10 +131,6 @@ def upload(
         if "metadata" in upload_data_kwargs:
             adls_meta.update(upload_data_kwargs.pop("metadata"))
 
-        upload_content_settings = decision.content_settings or ContentSettings()
-        if content_type:
-            upload_content_settings.content_type = content_type
-
         # we are now using blob_client instead of file system client
         # because blob client (as of 2024-06-24) does actually do
         # some one-step, atomic uploads, wherein there is not a separate
@@ -148,10 +138,10 @@ def upload(
         # This is both faster, as well as simpler to reason about, and
         # in fact was the behavior I had been assuming all along...
         blob_client.upload_blob(
-            report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes or 0),
+            report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes),
             overwrite=True,
             length=n_bytes,
-            content_settings=upload_content_settings,
+            content_settings=decision.content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
             metadata=adls_meta,

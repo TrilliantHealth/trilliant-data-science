@@ -2,14 +2,11 @@
 import json
 import typing as ty
 from functools import partial
-from pathlib import Path
 
-from thds.core import files, hashing, log, source, types
+from thds.core import hashing, source, types
 
 _SHA256_B64 = "sha256b64"
 _MD5_B64 = "md5b64"
-
-logger = log.getLogger(__name__)
 
 
 def _from_sha256b64(d: dict) -> ty.Optional[hashing.Hash]:
@@ -89,16 +86,3 @@ def from_unknown_user_path(path: types.StrOrPath, desired_uri: str) -> source.So
             return from_json(readable.read(4096))
         except (json.JSONDecodeError, UnicodeDecodeError):
             return source.from_file(path, uri=desired_uri)
-
-
-def write_to_json_file(source: source.Source, local_file: Path) -> bool:
-    """Write the canonical JSON serialization of the Source to a file."""
-    local_file.parent.mkdir(parents=True, exist_ok=True)
-    previous_source = local_file.read_text() if local_file.exists() else None
-    new_source = to_json(source) + "\n"
-    if new_source != previous_source:
-        with files.atomic_text_writer(local_file) as f:
-            logger.info(f"Writing {source} to {local_file}")
-            f.write(new_source)
-            return True
-    return False

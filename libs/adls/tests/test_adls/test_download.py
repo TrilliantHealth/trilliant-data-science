@@ -118,7 +118,8 @@ def test_integration_handles_emoji_and_long_key():
     assert not hit
     assert lcl.exists()
     assert _TEST_CACHE.path(fqn).exists()
-    assert "md5-ff6343d3a291258f48cbe455145cbbfa-" in str(_TEST_CACHE.path(fqn))
+    assert len(str(_TEST_CACHE.path(fqn)).encode()) == 255
+    assert "-md5-cfa12bd7609c74476efe66f0b5198e6b" in str(_TEST_CACHE.path(fqn))
 
 
 def test_integration_md5_verification():

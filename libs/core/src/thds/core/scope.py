@@ -36,7 +36,6 @@ this is actually pretty performant.  You do pay the cost of the
 wrapping function, which is higher than a `with` statement.
 
 """
-
 import atexit
 import contextlib
 import inspect
@@ -101,33 +100,6 @@ def _bound(key: str, func: F) -> F:
                     return ret  # weird syntax here, Python...
 
         return ty.cast(F, __scope_boundary_generator_wrap)
-
-    if inspect.isasyncgenfunction(func):
-
-        @wraps(func)
-        async def __scope_boundary_async_generator_wrap(*args, **kwargs):
-            if key not in _KEYED_SCOPE_CONTEXTS:
-                _init_sc(key, contextlib.ExitStack())
-
-            with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
-                with scoped_exit_stack:
-                    async for ret in func(*args, **kwargs):
-                        yield ret
-
-        return ty.cast(F, __scope_boundary_async_generator_wrap)
-
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def __scope_boundary_coroutine_wrap(*args, **kwargs):
-            if key not in _KEYED_SCOPE_CONTEXTS:
-                _init_sc(key, contextlib.ExitStack())
-
-            with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
-                with scoped_exit_stack:
-                    return await func(*args, **kwargs)
-
-        return ty.cast(F, __scope_boundary_coroutine_wrap)
 
     @wraps(func)
     def __scope_boundary_wrap(*args, **kwargs):

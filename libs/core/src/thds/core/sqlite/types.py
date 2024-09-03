@@ -30,18 +30,6 @@ class TableSource(ty.NamedTuple):
         return self.db_src
 
 
-AnyDbTableSrc = ty.Union[DbAndTableP, ty.Callable[[], DbAndTableP]]
-
-
-def resolve_lazy_db_and_table(table_src: AnyDbTableSrc) -> DbAndTableP:
-    if hasattr(table_src, "table_name"):
-        src = ty.cast(DbAndTableP, table_src)
-    else:
-        src = table_src()  # type: ignore
-    assert hasattr(src, "table_name"), "table_name must be provided"
-    return src
-
-
 class TableMaster(ty.NamedTuple):
     """Element/asset table and its corresponding metadata table"""
 

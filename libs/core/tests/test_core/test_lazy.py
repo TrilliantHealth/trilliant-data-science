@@ -1,8 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from thds.core.lazy import Lazy, threadlocal_lazy
 
 
@@ -54,19 +52,3 @@ def test_thread_local_lazy():
     tot = sum(results)
     assert tot == 6 * 10
     assert len(calls) == 10
-
-
-def test_lazy_is_friendlier_now():
-    class Foo:
-        def __init__(self):
-            self.bar = "baz"
-
-    lazy_foo = Lazy(Foo)
-
-    with pytest.raises(
-        AttributeError,
-        match=r"did you mean to instantiate the object before access, i.e. `\(\)\.bar`\?",
-    ):
-        assert lazy_foo.bar  # type: ignore
-
-    assert "baz" == lazy_foo().bar
