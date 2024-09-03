@@ -2,7 +2,7 @@ import typing as ty
 
 
 class LockContents(ty.TypedDict):
-    """Only lock_uuid, written_at, and expire are technically required for the algorithm
+    """Only writer_id, written_at, and expire are technically required for the algorithm
     - everything else is debugging info.
 
     In fact, expire_s would be 'optional' as well (this can be acquirer-only state), but
@@ -11,7 +11,7 @@ class LockContents(ty.TypedDict):
     to them in order to maintain the lock.
     """
 
-    lock_uuid: str
+    writer_id: str
     written_at: str  # ISO8601 string with timezone in UTC
     expire_s: float  # seconds after written_at to expire
 
@@ -19,8 +19,12 @@ class LockContents(ty.TypedDict):
     hostname: str
     pid: str
     write_count: int
+    first_written_at: str
     first_acquired_at: str
     released_at: str
+
+    # back-compat - this was changed to writer_id to be clearer
+    lock_uuid: str
 
 
 class LockAcquired(ty.Protocol):

@@ -19,16 +19,18 @@ efficient for a single caller to acquire a lock and maintain it for a period of 
 other potential acquirers instead determine that they ought to wait for the lock to be
 released.
 """
+
 import time
 import timeit
 import typing as ty
 from datetime import datetime, timedelta
 from uuid import uuid4
 
+from thds import humenc
 from thds.core import log
 
 from . import _funcs
-from .read import make_read_lockfile
+from .read import get_writer_id, make_read_lockfile
 from .types import LockAcquired, LockContents
 from .write import LockfileWriter, make_lock_contents
 
@@ -99,11 +101,11 @@ def acquire(  # noqa: C901
 
     start = _funcs.utc_now()
 
-    my_lock_uuid = uuid4().hex
+    my_writer_id = humenc.encode(uuid4().bytes)
 
     lockfile_writer = LockfileWriter(
         lock_dir_uri,
-        make_lock_contents(my_lock_uuid, expire),
+        make_lock_contents(my_writer_id, expire),
         expire.total_seconds(),
         debug=debug,
     )
@@ -153,7 +155,7 @@ def acquire(  # noqa: C901
                 logger.debug("Lock %s was released - attempting to lock", lock_dir_uri)
             elif not is_fresh(lock):
                 logger.debug("Lock %s has expired - will attempt to steal it!", lock_dir_uri)
-            elif lock["lock_uuid"] == my_lock_uuid:
+            elif get_writer_id(lock) == my_writer_id:
                 # LOCK ACQUIRED!
                 lockfile_writer.mark_acquired()
                 # You still need to maintain it by calling .maintain() periodically!

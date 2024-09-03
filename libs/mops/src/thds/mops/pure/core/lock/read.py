@@ -11,6 +11,10 @@ from .types import LockContents
 logger = log.getLogger(__name__)
 
 
+def get_writer_id(lock_contents: LockContents) -> str:
+    return lock_contents.get("writer_id") or lock_contents["lock_uuid"]  # old name
+
+
 def make_read_lockfile(lock_uri: str) -> ty.Callable[[], ty.Optional[LockContents]]:
     def read_lockfile() -> ty.Optional[LockContents]:
         with DISABLE_CONTROL_CACHE.set_local(True):

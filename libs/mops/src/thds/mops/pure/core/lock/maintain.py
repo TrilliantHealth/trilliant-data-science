@@ -18,7 +18,7 @@ from threading import Thread
 from thds.core import log
 
 from ._funcs import make_lock_uri
-from .read import make_read_lockfile
+from .read import get_writer_id, make_read_lockfile
 from .types import LockAcquired
 from .write import LockfileWriter, make_lock_contents
 
@@ -81,8 +81,9 @@ def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
 
     lockfile_writer = LockfileWriter(
         lock_dir_uri,
-        make_lock_contents(lock_contents["lock_uuid"], timedelta(seconds=expire_s)),
+        make_lock_contents(get_writer_id(lock_contents), timedelta(seconds=expire_s)),
         expire_s,
+        writer_name="remote",
     )
     lockfile_writer.first_acquired_at = datetime.fromisoformat(first_acquired_at_s)
     # disable releasing from remote

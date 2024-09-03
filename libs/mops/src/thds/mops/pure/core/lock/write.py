@@ -11,25 +11,32 @@ logger = log.getLogger(__name__)
 
 
 def make_lock_contents(
-    lock_uuid: str, expire: timedelta
+    writer_id: str, expire: timedelta
 ) -> ty.Callable[[ty.Optional[datetime]], LockContents]:
     """Impure - Resets written_at to 'right now' to keep the lock 'live'."""
     write_count = 0
+    first_written_at = ""
 
     assert (
-        "/" not in lock_uuid
-    ), f"{lock_uuid} should not contain a slash - maybe you passed a URI instead?"
+        "/" not in writer_id
+    ), f"{writer_id} should not contain a slash - maybe you passed a URI instead?"
 
     def lock_contents(first_acquired_at: ty.Optional[datetime]) -> LockContents:
-        nonlocal write_count
+        nonlocal write_count, first_written_at
         write_count += 1
+        now = _funcs.utc_now().isoformat()
+        first_written_at = first_written_at or now
+
         return {
-            "lock_uuid": lock_uuid,
+            "writer_id": writer_id,
+            "written_at": now,
+            "expire_s": expire.total_seconds(),
+            # debug stuff:
+            "write_count": write_count,
             "hostname": hostname.friendly(),
             "pid": str(os.getpid()),
-            "written_at": _funcs.utc_now().isoformat(),
-            "expire_s": expire.total_seconds(),
-            "write_count": write_count,
+            "lock_uuid": writer_id,  # back-compat old name # TODO: someday delete this.
+            "first_written_at": first_written_at,
             "first_acquired_at": first_acquired_at.isoformat() if first_acquired_at else "",
             "released_at": "",
         }
@@ -51,12 +58,14 @@ class LockfileWriter:
         expire_s: float,
         *,
         debug: bool = True,
+        writer_name: str = "",
     ):
         self.lock_dir_uri = lock_dir_uri
         self.blob_store, self.lock_uri = _funcs.store_and_lock_uri(lock_dir_uri)
         self.generate_lock = generate_lock
         self.expire_s = expire_s
         self.debug = debug
+        self.writer_name = writer_name
         self.first_acquired_at: ty.Optional[datetime] = None
 
     def mark_acquired(self):
@@ -67,7 +76,9 @@ class LockfileWriter:
 
     def write(self) -> None:
         lock_contents = self.generate_lock(self.first_acquired_at)
-        assert "/" not in lock_contents["lock_uuid"], lock_contents
+        if self.writer_name:
+            lock_contents["writer_name"] = self.writer_name  # type: ignore
+        assert "/" not in lock_contents["writer_id"], lock_contents
         lock_bytes = _funcs.json_dumpb(lock_contents)
         assert lock_bytes
         # technically, writing these bytes may cause an overwrite of someone else's lock.
@@ -96,19 +107,22 @@ class LockfileWriter:
         self._maybe_write_debug(lock_contents)
 
     def _maybe_write_debug(self, lock_contents: LockContents) -> None:
+        """Only do this if the lock was actually acquired."""
         # this debug bit serves to help us understand when clients actually believed
         # that they had acquired the lock.  Because we only do this after our first
         # 'successful' write, it will not impose extra latency during the
         # latency-critical section.
         if self.debug and self.first_acquired_at:
+            name = (self.writer_name + ";_") if self.writer_name else ""
+            first_written_at = lock_contents["first_written_at"]
             hostname = lock_contents["hostname"]
             pid = lock_contents["pid"]
-            lock_uuid = lock_contents["lock_uuid"]
-            assert "/" not in lock_uuid, lock_contents
+            acq_uuid = lock_contents["writer_id"]
+            assert "/" not in acq_uuid, lock_contents
             debug_uri = self.blob_store.join(
                 self.lock_dir_uri,
                 "writers-debug",
-                f"{hostname}-{pid}-{lock_uuid}-lock.json",
+                f"firstwrite={first_written_at};_uuid={acq_uuid};_host={hostname};_pid={pid}{name}.json",
             )
             try:
                 self.blob_store.putbytes(
