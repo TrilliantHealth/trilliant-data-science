@@ -1,7 +1,7 @@
 import re
 import warnings
 from collections import defaultdict
-from typing import Any, Dict, Generator, List, Mapping, MutableMapping, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generator, List, Mapping, MutableMapping, Optional, Tuple, TypeVar
 
 DEFAULT_SEP = "."
 VT = TypeVar("VT")
@@ -135,15 +135,15 @@ class DotDict(MutableMapping[str, VT]):
         assert dd.get_value("a.b") == 100
         """
         path = dot_path.split(".")
-        ref: Union[DotDict[VT], VT] = self
+        ref: DotDict[Any] = self
+        for k in path[:-1]:
+            if isinstance(ref, DotDict) and k in ref:
+                ref = ref[k]
+            else:
+                return None
         try:
-            for k in path[:-1]:
-                if isinstance(ref, DotDict) and k in ref:
-                    ref = ref[k]
-                else:
-                    return None
-            return getattr(ref, path[-1])
-        except AttributeError:
+            return ref[path[-1]]
+        except KeyError:
             return None
 
     def set_value(self, dot_path: str, val: VT) -> None:
