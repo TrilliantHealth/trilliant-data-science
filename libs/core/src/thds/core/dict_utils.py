@@ -138,7 +138,7 @@ class DotDict(MutableMapping[str, VT]):
         ref: Union[DotDict[VT], VT] = self
         try:
             for k in path[:-1]:
-                if isinstance(ref, DotDict):
+                if isinstance(ref, DotDict) and k in ref:
                     ref = ref[k]
                 else:
                     return None
