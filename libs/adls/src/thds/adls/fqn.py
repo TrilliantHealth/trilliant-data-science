@@ -13,7 +13,7 @@ def join(*parts: str) -> str:
     def join_(prefix: str, suffix: str) -> str:
         prefix = prefix.rstrip("/")
         suffix = suffix.lstrip("/")
-        return f"{prefix}/{suffix}"
+        return f"{prefix}/{suffix}".rstrip("/")
 
     return reduce(join_, parts)
 

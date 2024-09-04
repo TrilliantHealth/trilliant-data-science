@@ -1,4 +1,4 @@
-from thds.adls.fqn import AdlsFqn, AdlsRoot, format_fqn, parent, parse_fqn
+from thds.adls.fqn import AdlsFqn, AdlsRoot, format_fqn, join, parent, parse_fqn
 
 
 def test_adls_fqn_basics():
@@ -49,3 +49,9 @@ def test_adls_root_parse():
     assert AdlsRoot.parse(uri) == AdlsRoot("foo", "bar")
     assert str(AdlsRoot.parse(uri)) == uri + "/"
     assert AdlsRoot.parse(uri + "/") == AdlsRoot.parse(uri)
+
+
+def test_join_idempotent():
+    uri = "adls://foo/bar"
+    assert uri == join(uri, "", "/", "")
+    assert f"{uri}/baz/box" == join(uri, "/", "", "///baz", "", "box", "", "")
