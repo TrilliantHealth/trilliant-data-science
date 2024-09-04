@@ -10,7 +10,10 @@ Also look at our [changelog](./CHANGES.md).
 
 - `mops-inspect` - a tool for inspecting the `(args, kwargs)` of a given `mops` function invocation. If
   you're not getting the memoization you expect, this is a good place to start. Pass the full memo URI,
-  e.g. `adls://thdsscratch/tmp/mops2-mpf/....`
+  e.g. `adls://thdsscratch/tmp/mops2-mpf/....`.
+
+  - If you want to debug why your function ran a second time, try `--diff-memospace` (see the `--help`
+    text for more details).
 
 - `mops-summarize` - summarize an entire application run with multiple `mops` function invocations. See
   the full [README here](src/thds/mops/pure/tools/summarize/README.md).

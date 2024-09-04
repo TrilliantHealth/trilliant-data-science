@@ -7,7 +7,7 @@ from pathlib import Path
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.adls import AdlsFqn, join, resource, ro_cache
+from thds.adls import AdlsFqn, download, join, resource, ro_cache
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_fs_client
@@ -98,16 +98,29 @@ class AdlsBlobStore(BlobStore):
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
 
+    def list(self, uri: str) -> ty.List[str]:
+        fqn = AdlsFqn.parse(uri)
+        return [
+            str(AdlsFqn(fqn.sa, fqn.container, path.name))
+            for path in get_global_fs_client(fqn.sa, fqn.container).get_paths(fqn.path, recursive=False)
+        ]
+
 
 class DangerouslyCachingStore(AdlsBlobStore):
     """This BlobStore will cache _everything_ locally
     and anything it finds locally it will return without question.
 
     This maximally avoids network operations if for some reason you feel the need
-    to do that, but it will 100% lead to false positive cache hits.
+    to do that, but it will 100% lead to false positive cache hits, because it is no longer
+    checking the hash of the locally-cached file against what ADLS itself advertises.
 
-    It should only be used 'under supervision', e.g. during development, and never in any
-    automated context.
+    It is now believed that this is not as dangerous as originally thought, because mops
+    control files are not intended to be mutable, and if mutated in some kind of
+    distributed systems context (e.g. two parallel runs of the same thing), the results
+    are intended to be at least 'equivalent' even when they're not byte-identical.
+
+    Therefore, this is now enabled by default and considered generally safe to use in any
+    environment, including automated ones.
     """
 
     def __init__(self, root: Path):
@@ -120,14 +133,31 @@ class DangerouslyCachingStore(AdlsBlobStore):
         return super().exists(remote_uri)
 
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+        # readbytesinto is used for _almost_ everything in mops - but almost everything is a 'control file'
+        # of some sort. We use a completely separate cache for all of these things, because
+        # in previous implementations, none of these things would have been cached at all.
+        # (see comment on getfile below...)
         fqn = AdlsFqn.parse(remote_uri)
         cache_path = self._cache.path(fqn)
         if not cache_path.exists():
-            link.link(download_to_cache(fqn), cache_path)
+            download.download_or_use_verified(
+                get_global_fs_client(fqn.sa, fqn.container), fqn.path, cache_path, cache=self._cache
+            )
         with cache_path.open("rb") as f:
             stream.write(f.read())
 
     def getfile(self, remote_uri: str) -> Path:
+        # (continued from comment on readbytesinto...)
+        #
+        # whereas, for getfile, it is really only used for optimizations on larger file
+        # downloads (e.g. Paths), and those were previously subject to long-term caching.
+        # So for getfile, our primary source will be the parent implementation of getfile,
+        # including any caching it already did.
+        #
+        # We still dangerously short-circuit the hash check, and we make a 'cheap copy'
+        # (a link, usually) to our separate cache directory so that it's possible to
+        # completely empty this particular mops cache (and all its 'dangerous' behavior)
+        # simply by deleting that one cache directory.
         cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
         if cache_path.exists():
             return cache_path
