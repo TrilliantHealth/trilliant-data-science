@@ -89,7 +89,7 @@ class AdlsBlobStore(BlobStore):
         )(lambda: self._client(fqn).exists())()
 
     def join(self, *parts: str) -> str:
-        return join(*parts)
+        return join(*parts).rstrip("/")
 
     def split(self, uri: str) -> ty.List[str]:
         fqn = AdlsFqn.parse(uri)

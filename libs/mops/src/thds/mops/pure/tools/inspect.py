@@ -234,6 +234,7 @@ def _diff_memospace(uri: str, new_control: IRE):
             continue
 
         found_siblings = True
+        sibling_uri = sibling_uri.rstrip("/")
 
         if sibling_uri in _IGNORES:
             continue
@@ -285,6 +286,7 @@ def main():
         ),
     )
     args = parser.parse_args()
+    args.uri = args.uri.rstrip("/")
     if args.diff_memospace:
         _check_diff_tool()
 
