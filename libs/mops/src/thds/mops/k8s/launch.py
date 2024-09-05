@@ -9,7 +9,6 @@ from kubernetes import client
 
 from thds.core import scope
 from thds.core.log import logger_context
-from thds.mops.pure.core import deferred_work
 from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
 
 from .._utils.colorize import colorized
@@ -245,9 +244,6 @@ def mops_shell(
         get_container_image = container_image
 
     def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
-        deferred_work.perform_all()
-        # we're transferring to a remote context,
-        # so we should upload any Source that was waiting to find out if we'd stay local.
         assert "args" not in inner_kwargs
         launch(
             get_container_image(),

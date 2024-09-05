@@ -1,3 +1,9 @@
+### 2.11.20240905
+
+- Fix bug where `threadlocal_shell` (`memoize_in`) was not performing deferred work by moving that
+  deferred work to where it really belonged, in the MemoizingPicklingRunner, immediately prior to calling
+  the shell.
+
 ## 2.11
 
 - Optimize Path and Source uploads, so that in cases of memoized results (very common!), we do not need

@@ -357,6 +357,11 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             _LogNewInvocation(f"Triggering new invocation for {memo_uri}")
             shell_ex = None
             shell = shell_builder(func, args_, kwargs_)
+
+            # we're just about to transfer to a remote context,
+            # so it's time to perform any deferred work,
+            # so that our shells don't have to be aware of this.
+            deferred_work.perform_all()
             shell(
                 (
                     MemoizingPicklingRunner.__name__,
