@@ -2,6 +2,7 @@
 
 None of them are required and may not be suitable for a given Runner implementation.
 """
+
 import typing as ty
 
 from thds.core import log, scope
@@ -36,12 +37,17 @@ def route_result_or_exception(
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     set_pipeline_id(pipeline_id)
     scope.enter(log.logger_context(remote=pipeline_id))
+    if pipeline_function_and_arguments_unique_key:
+        pf_key, args_key = pipeline_function_and_arguments_unique_key
+        scope.enter(PipelineFunctionUniqueKey.set(pf_key))
+        scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
     try:
-        if pipeline_function_and_arguments_unique_key:
-            pf_key, args_key = pipeline_function_and_arguments_unique_key
-            scope.enter(PipelineFunctionUniqueKey.set(pf_key))
-            scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
-        channel.result(do_work_return_result_thunk())
+        # i want to _only_ run the user's function inside this try-catch.
+        # If mops itself has a bug, we should not be recording that as
+        # though it were an exception in the user's code.
+        result = do_work_return_result_thunk()
     except Exception as ex:
         logger.exception("Failure to run thunk. Transmitting exception...")
         channel.exception(ex)
+    else:
+        channel.result(result)

@@ -61,10 +61,6 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
         logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
         stop_lock = lambda: None  # noqa: E731
 
-    def do_work_return_result() -> object:
-        func, args, kwargs = _unpickle_invocation(memo_uri)
-        return pipeline_id_mask(pipeline_id)(func)(*args, **kwargs)
-
     def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
         parts = fs.split(memo_uri)
         runner_idx = parts.index(RUNNER_SUFFIX)
@@ -73,6 +69,18 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
         return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
 
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
+
+    try:
+        func, args, kwargs = _unpickle_invocation(memo_uri)
+    except Exception:
+        logger.error(f"Failed to unpickle invocation from {memo_uri} - this is a bug in mops!")
+        raise
+
+    def do_work_return_result() -> object:
+        # ONLY failures in this code should transmit an EXCEPTION
+        # back to the orchestrator side.
+        return pipeline_id_mask(pipeline_id)(func)(*args, **kwargs)
+
     route_result_or_exception(
         _ResultExcChannel(
             fs,

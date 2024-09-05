@@ -3,6 +3,8 @@
 - Fix bug where `threadlocal_shell` (`memoize_in`) was not performing deferred work by moving that
   deferred work to where it really belonged, in the MemoizingPicklingRunner, immediately prior to calling
   the shell.
+- Reduce the surface area for confusion around mops bugs by not transmitting remote-side exceptions back
+  to the orchestrator when it was actually mops code that failed somehow.
 
 ## 2.11
 
