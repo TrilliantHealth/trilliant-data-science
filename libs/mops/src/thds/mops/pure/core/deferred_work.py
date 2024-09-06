@@ -32,7 +32,7 @@ def open_context() -> ty.Iterator[None]:
     has deferred work.
     """
     existing_work = _DEFERRED_INVOCATION_WORK()
-    assert not existing_work, f"deferred work context is not re-entrant! {existing_work}"
+    assert existing_work is None, f"deferred work context is not re-entrant! {existing_work}"
     with _DEFERRED_INVOCATION_WORK.set(dict()):
         logger.debug("Opening deferred work context")
         yield
