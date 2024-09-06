@@ -39,10 +39,9 @@ def open_context() -> ty.Iterator[None]:
         logger.debug("Closing deferred work context")
         work_unperformed = _DEFERRED_INVOCATION_WORK()
         if work_unperformed:
-            logger.warning(
-                f"Internal mops error: some deferred work was not performed before context close! {work_unperformed}"
+            logger.debug(
+                "some deferred work was not performed before context close: %s", work_unperformed
             )
-            perform_all()
 
 
 @contextmanager
