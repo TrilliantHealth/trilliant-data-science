@@ -1,3 +1,8 @@
+### 2.11.20240906
+
+- Fix bug where `deferred_work` made mops itself not re-entrant within a threadlocal_shell, because the
+  same deferred work context for the parent call was still open when the child call was run remotely.
+
 ### 2.11.20240905
 
 - Fix bug where `threadlocal_shell` (`memoize_in`) was not performing deferred work by moving that

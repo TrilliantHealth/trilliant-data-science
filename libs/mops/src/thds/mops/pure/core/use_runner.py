@@ -2,6 +2,7 @@
 
 You can transfer control to a Runner without this, but decorators are a Pythonic approach.
 """
+
 import typing as ty
 from functools import wraps
 
@@ -34,11 +35,11 @@ def use_runner(runner: Runner, skip: ty.Callable[[], bool] = lambda: False) -> t
         @wraps(f)
         def __use_runner_wrapper(*args, **kwargs):  # type: ignore
             if _is_runner_entry() or skip():
-                logger.debug("Calling function directly...")
+                logger.debug("Calling function %s directly...", f)
                 with FUNCTION_UNWRAP_COUNT.set(FUNCTION_UNWRAP_COUNT() + 1):
                     return f(*args, **kwargs)
 
-            logger.debug("Forwarding local function call to runner...")
+            logger.debug("Forwarding local function %s call to runner...", f)
             return runner(f, args, kwargs)
 
         return ty.cast(F, __use_runner_wrapper)

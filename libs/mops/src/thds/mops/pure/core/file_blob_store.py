@@ -62,7 +62,13 @@ class FileBlobStore(BlobStore):
     def getfile(self, remote_uri: str) -> Path:
         assert remote_uri.startswith(FILE_SCHEME)
         p = path_from_uri(remote_uri)
-        assert p.exists()
+        if not p.exists():
+            logger.error(f"{remote_uri} does not exist. Parent = {p.parent}")
+            try:
+                logger.error(list(p.parent.glob("*")))
+            except FileNotFoundError:
+                logger.error(f"{p.parent} does not exist either!")
+            raise FileNotFoundError(f"{remote_uri} does not exist")
         return p
 
     def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):

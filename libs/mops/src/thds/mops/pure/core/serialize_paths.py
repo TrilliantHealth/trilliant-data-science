@@ -117,6 +117,7 @@ def _serialize_file_path_as_upload(
                 f"{remote_root}/pathname-_{str(local_src).replace('/', '_')}",
             )
 
+    logger.debug("Adding deferred upload of %s", remote_key)
     deferred_work.add(
         __name__,
         remote_key,

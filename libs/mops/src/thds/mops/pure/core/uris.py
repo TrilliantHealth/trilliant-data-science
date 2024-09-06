@@ -28,7 +28,9 @@ def get_root(uri: str) -> str:
     if uri.startswith(ADLS_SCHEME):
         return str(AdlsFqn.parse(uri).root())
     if is_file_uri(uri):
-        return to_uri(Path.home())
+        local_root = Path.home() / ".mops-local-root"
+        local_root.mkdir(exist_ok=True)
+        return to_uri(local_root)
     raise ValueError(f"Unsupported URI: {uri}")
 
 

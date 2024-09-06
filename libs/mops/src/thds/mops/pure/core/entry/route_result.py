@@ -7,8 +7,8 @@ import typing as ty
 
 from thds.core import log, scope
 
+from .. import deferred_work
 from ..output_naming import FunctionArgumentsHashUniqueKey, PipelineFunctionUniqueKey
-from ..pipeline_id import set_pipeline_id
 
 logger = log.getLogger(__name__)
 T_contra = ty.TypeVar("T_contra", contravariant=True)
@@ -35,7 +35,16 @@ def route_result_or_exception(
     pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
 ):
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
-    set_pipeline_id(pipeline_id)
+    scope.enter(deferred_work.push_non_context())
+    # deferred work can be requested during result serialization, but because we don't want
+    # to leave a 'broken' result payload (one that refers to unperformed deferred work,
+    # maybe because of network or other failure), we simply don't open a deferred work
+    # context on the remote side, which forces all the work to be performed as it is
+    # added for deferral instead of actually being deferred.
+    #
+    # pushing this non-context is only necessary in the case of a thread-local
+    # 'remote' invocation - in all true remote invocations, there will be no context open.
+
     scope.enter(log.logger_context(remote=pipeline_id))
     if pipeline_function_and_arguments_unique_key:
         pf_key, args_key = pipeline_function_and_arguments_unique_key
@@ -47,7 +56,8 @@ def route_result_or_exception(
         # though it were an exception in the user's code.
         result = do_work_return_result_thunk()
     except Exception as ex:
-        logger.exception("Failure to run thunk. Transmitting exception...")
+        logger.exception("Failure to run remote function. Transmitting exception...")
         channel.exception(ex)
     else:
+        logger.debug("Success running function remotely. Transmitting result...")
         channel.result(result)
