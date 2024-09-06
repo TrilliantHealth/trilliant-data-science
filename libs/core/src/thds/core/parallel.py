@@ -95,6 +95,7 @@ def yield_all(
                 yield key, thunk()
             except Exception as e:
                 yield key, Error(e)
+        return  # we're done here
 
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
         max_workers=len_or_none or None, **concurrency.initcontext()

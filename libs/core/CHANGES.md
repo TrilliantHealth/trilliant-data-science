@@ -1,3 +1,8 @@
+## 1.26.20240905
+
+- Fixed bug in `core.parallel.yield_all`, which would run a single-item list twice, rather than only
+  running it in the current thread, as intended.
+
 ## 1.26
 
 - `core.config` now infers a parser for your `ConfigItem` from the type of its default value, if
