@@ -86,6 +86,7 @@ DEFAULT_STRUCTURE_HOOKS: Sequence[Tuple[Type, Struct]] = (
 DEFAULT_UNSTRUCTURE_HOOKS_JSON: Sequence[Tuple[Type, UnStruct]] = (
     (datetime.date, datetime.date.isoformat),
     (datetime.datetime, datetime.datetime.isoformat),
+    (decimal.Decimal, float),
 )
 DEFAULT_RESTRICTED_CONVERSIONS: Sequence[Tuple[Tuple[Type, ...], Type, UnStruct]] = (
     ((int, str), str, str),
