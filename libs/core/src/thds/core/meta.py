@@ -14,7 +14,7 @@ from types import MappingProxyType
 import attrs
 from cattrs import Converter
 
-from . import calgitver, git
+from . import git
 from .log import getLogger
 from .types import StrOrPath
 
@@ -79,29 +79,60 @@ def get_timestamp(as_datetime: bool = False):
 
 
 def make_calgitver() -> str:
-    """An older version of calgitver that allows for non-determinstic datetimes
-    if the repo is dirty.
+    """Uses local git repo info to construct a more informative CalVer version string.
 
-    See calgitver.calgitver for docs on what this means.
+    This time format was chosen to be CalVer-esque but to drop time
+    fractions smaller than minutes since they're exceeding rarely
+    semantically meaningful, and the git commit hash will in 99.999%
+    of cases be a great disambiguator for cases where multiple
+    versions happen to be generated within the same minute by
+    different users.
+
+    We use only dots as separators to be compatible with both Container Registry
+    formats and PEP440.
     """
     dirty = "" if is_clean() else "dirty"
+    base_components: ty.Tuple[str, ...] = tuple()
     if not dirty:
         # we only attempt this 'determinstic' datetime if the repo is clean, because if
         # it's not clean then this isn't deterministic anyway, and so we'd rather just
         # have an up-to-date timestamp
         try:
-            return calgitver.calgitver()
+            commit_datetime, commit_hash = git.get_commit_datetime_and_hash()
+            base_components = (commit_datetime, commit_hash[:7])
         except git.NO_GIT:
             pass
-    base_components = (
-        datetime.now(tz=timezone.utc).strftime(git.CALGITVER_NO_SECONDS_FORMAT),
-        get_commit()[: calgitver.SHORT_HASH],
-    )
+    if not base_components:
+        base_components = (
+            datetime.now(tz=timezone.utc).strftime(git.CALGITVER_NO_SECONDS_FORMAT),
+            get_commit()[:7],
+        )
+
     return "-".join((*base_components, dirty)).rstrip("-")
 
 
 def print_calgitver():
     print(make_calgitver())
+
+
+CALGITVER_EXTRACT_RE = re.compile(
+    r"""
+    (?P<year>\d{4})
+    (?P<month>\d{2})
+    (?P<day>\d{2})
+    \.
+    (?P<hour>\d{2})
+    (?P<minute>\d{2})
+    -
+    (?P<git_commit>[a-f0-9]{7})
+    (?P<dirty>(-dirty$)|$)
+    """,
+    re.X,
+)
+
+
+def parse_calgitver(maybe_calgitver: str):
+    return CALGITVER_EXTRACT_RE.match(maybe_calgitver)
 
 
 @ty.overload
@@ -126,7 +157,7 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     # This is intended to be general-purpose and therefore a bit heuristic.
     # We attempt to parse the version as CalGitVer first, since it is a
     # narrow format. Failing that, we'll try SemCalVer.
-    if calgitver.parse_calgitver(version):
+    if parse_calgitver(version):
         try:
             return to_result(datetime.strptime(version[:13], git.CALGITVER_NO_SECONDS_FORMAT))
         except ValueError:
@@ -186,13 +217,12 @@ def get_version(pkg: Package, orig: str = "") -> str:
                 if metadata and metadata.pyproject_version:
                     return metadata.pyproject_version
 
-                for env_var in ("CALGITVER", "GIT_COMMIT"):
-                    env_var_version = os.getenv(env_var)
-                    if env_var_version:
-                        LOGGER.info(
-                            f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}"
-                        )
-                        return env_var_version
+                git_commit_hash = os.getenv(GIT_COMMIT)
+                if git_commit_hash:
+                    LOGGER.info(
+                        f"Using GIT_COMMIT {git_commit_hash} as fallback version for {orig or pkg}"
+                    )
+                    return git_commit_hash
 
                 LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
                 return ""
