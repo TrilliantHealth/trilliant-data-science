@@ -66,7 +66,7 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
 
     psize = Path(resolved_path).stat().st_size
     if psize > _1GB:
-        logger.info(f"Hashing downloaded {psize/_1GB:.2f} GB file at {resolved_path}...")
+        logger.info(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}...")
 
     hash_bytes = hash_using(resolved_path, hasher).digest()
     cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
