@@ -186,12 +186,13 @@ def get_version(pkg: Package, orig: str = "") -> str:
                 if metadata and metadata.pyproject_version:
                     return metadata.pyproject_version
 
-                git_commit_hash = os.getenv(GIT_COMMIT)
-                if git_commit_hash:
-                    LOGGER.info(
-                        f"Using GIT_COMMIT {git_commit_hash} as fallback version for {orig or pkg}"
-                    )
-                    return git_commit_hash
+                for env_var in ("CALGITVER", "GIT_COMMIT"):
+                    env_var_version = os.getenv(env_var)
+                    if env_var_version:
+                        LOGGER.info(
+                            f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}"
+                        )
+                        return env_var_version
 
                 LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
                 return ""
