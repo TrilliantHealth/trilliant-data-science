@@ -4,9 +4,10 @@ It is enabled by default via basic_config.py, but is not required.
 """
 
 import logging
+import typing as ty
 
 from .. import ansi_esc, config
-from .kw_logger import TH_REC_CTXT
+from .kw_logger import th_keyvals_from_record
 
 MAX_MODULE_NAME_LEN = config.item("max_module_name_len", 40, parse=int)
 _MODULE_NAME_FMT_STR = "{compressed_name:" + str(MAX_MODULE_NAME_LEN()) + "}"
@@ -75,7 +76,7 @@ class ThdsCompactFormatter(logging.Formatter):
         base_levelname = f"{record.levelname:7}"  # the length of the string 'WARNING'
         levelname = _log_level_color(record, base_levelname)
 
-        th_ctx = getattr(record, TH_REC_CTXT, None) or tuple()
+        th_ctx: ty.Any = th_keyvals_from_record(record) or tuple()
         short_name = self.format_module_name(record.name)
         formatted = f"{self.formatTime(record)} {levelname}  {short_name} {th_ctx} {record.message}"
         if exc_text := self._format_exception_and_trace(record):

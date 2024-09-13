@@ -9,19 +9,21 @@ import typing as ty
 from typing import Iterator, Tuple
 
 from .. import config
+from .json_formatter import ThdsJsonFormatter
 from .kw_formatter import ThdsCompactFormatter
 from .kw_logger import getLogger, make_th_formatters_safe
 
 _LOGLEVEL = config.item("thds.core.log.level", logging.INFO, parse=logging.getLevelName)
 _LOGLEVELS_FILEPATH = config.item("thds.core.log.levels_file", "", parse=lambda s: s.strip())
 # see _parse_thds_loglevels_file for format of this file.
+JSON_FORMAT = config.item("thds.core.log.json_format", False, parse=config.tobool)
 
 
 # this is the base of what gets passed to logging.dictConfig.
 _BASE_LOG_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"default": {"()": ThdsCompactFormatter}},
+    "formatters": {"default": {"()": ThdsJsonFormatter if JSON_FORMAT() else ThdsCompactFormatter}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
     "root": {
         "handlers": ["console"],
