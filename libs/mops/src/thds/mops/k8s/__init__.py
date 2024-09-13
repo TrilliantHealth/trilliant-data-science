@@ -1,4 +1,5 @@
 """Trilliant Health abstraction around launching K8S Jobs."""
+
 try:
     from kubernetes import client as _  # noqa
 except ModuleNotFoundError as mnf:
@@ -6,6 +7,7 @@ except ModuleNotFoundError as mnf:
         "Please install mops with the `k8s` extra to use `thds.mops.k8s`."
     ) from mnf
 
+from . import thds_std  # noqa: F401
 from .launch import K8sJobFailedError, autocr, launch, mops_shell  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
