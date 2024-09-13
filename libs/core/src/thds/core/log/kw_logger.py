@@ -59,6 +59,11 @@ class KwLogger(logging.LoggerAdapter):
         return msg, _embed_th_context_in_extra_kw(kwargs)
 
 
+def th_keyvals_from_record(record: logging.LogRecord) -> Optional[Dict[str, Any]]:
+    """Extracts the key-value pairs embedded via `logger_context` or keyword arguments from a LogRecord."""
+    return getattr(record, TH_REC_CTXT, None)
+
+
 def getLogger(name: Optional[str] = None) -> logging.LoggerAdapter:
     """Using this Logger Adapter will allow you to pass key/value context at the end of
     your logging statements, e.g. `logger.info("my message", key1=value1, key2=value2)`.
