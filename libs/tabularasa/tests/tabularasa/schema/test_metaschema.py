@@ -160,7 +160,7 @@ bad_schema = dict(
             ],
             inherit_schema=dict(
                 tables=["baz", "eggs", "bam"],
-                exclude_columns=["col1", "col2"],
+                columns=["col1", "col2"],
                 update_docs={"col3": "not a column"},
                 update_nullability={"col4": True},
             ),
@@ -266,7 +266,7 @@ expected_validation_errors = [
     schema.validation.index_invalid_for_collection_type("baz", "collection", 1),
     schema.validation.uniqueness_check_invalid_for_collection_type("baz", "collection", 1),
     schema.validation.missing_inherited_table("spam", "bam"),
-    schema.validation.missing_inherited_column("spam", "col2", ["baz", "eggs"], "exclusion"),
+    schema.validation.missing_inherited_column("spam", "col2", ["baz", "eggs"], "inclusion"),
     schema.validation.missing_inherited_column("spam", "col3", ["baz", "eggs"], "docstring update"),
     schema.validation.missing_inherited_column("spam", "col4", ["baz", "eggs"], "nullability update"),
     schema.validation.run_time_table_is_build_time_dependency("spam"),
@@ -306,7 +306,7 @@ def inheritance_schema() -> metaschema._RawSchema:
             bar=metaschema._RawTable(
                 inherit_schema=metaschema.InheritanceSpec(
                     tables=["foo"],
-                    exclude_columns={"col1"},
+                    columns={"col2"},
                     update_docs=dict(col2="col2 in bar"),
                 ),
                 columns=[

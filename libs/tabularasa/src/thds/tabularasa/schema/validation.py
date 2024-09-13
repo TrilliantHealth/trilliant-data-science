@@ -377,7 +377,7 @@ def _validate_table_inheritance(
     defined_column_names = {c.name for c in table.columns}
 
     for column_set, kind in [
-        (inheritance.exclude_columns, "exclusion"),
+        (inheritance.columns, "inclusion"),
         (inheritance.update_docs, "docstring update"),
         (inheritance.update_nullability, "nullability update"),
         (inheritance.update_source_name, "source name update"),
@@ -388,12 +388,16 @@ def _validate_table_inheritance(
                     missing_inherited_column(tablename, column_name, inherited_table_names, kind)
                 )
             defined_explicitly = column_name in defined_column_names
-            excluded = column_name in inheritance.exclude_columns and kind != "exclusion"
+            excluded = (
+                bool(inheritance.columns)
+                and (column_name not in inheritance.columns)
+                and kind != "inclusion"
+            )
             if defined_explicitly or excluded:
                 reference_type = " and ".join(
                     s
                     for s, condition in [
-                        ("marked for exlusion", excluded),
+                        ("not marked for inclusion", excluded),
                         ("defined explicitly", defined_explicitly),
                     ]
                     if condition
@@ -692,6 +696,8 @@ def validation_errors(
     for tablename, table in raw_schema.tables.items():
         errors.extend(_validate_unique_column_names(table, tablename))
         if not bad_inheritance_graph or table.inherit_schema is None:
+            # this check involves resolving inherited columns, so we skip it if the inheritance graph is
+            # badly formed
             errors.extend(_validate_table_constraints(table, tablename, raw_schema))
 
         errors.extend(_validate_column_types(table, tablename, raw_schema.types))

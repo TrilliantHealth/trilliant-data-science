@@ -1,3 +1,11 @@
+### 0.4.0
+
+- Changed metaschema and semantics for `inherit_schema` to facilitate simpler reasoning about the schema
+  of tables using inheritance:
+  - `exclude_columns` is now forbidden
+  - `columns` is added and when specified lists a set of column names to explicitly inherit from the
+    parent tables
+
 ### 0.3.7
 
 - Adding `sqlite_from_parquet` for conversion from parquet to a DB defined by a tabularasa schema

@@ -357,10 +357,13 @@ class _RawColumn(BaseModel, extra=Extra.forbid):
 
 class InheritanceSpec(BaseModel, extra=Extra.forbid):
     """Specification for columns in a table which inherits columns from other tables (usually transient
-    tables which are then used in joins or filtered to a subset"""
+    tables which are then used in joins or filtered to a subset). The `tables` attribute is a list of
+    tables to inherit columns from in order of precedence. The `columns` attribute is an optional list
+    of columns to include from any of the tables. When absent, all columns from all tables are included.
+    """
 
     tables: Sequence[Identifier]
-    exclude_columns: Set[Identifier] = Field(default_factory=set)
+    columns: Set[Identifier] = Field(default_factory=set)
     update_docs: Mapping[Identifier, str] = Field(default_factory=dict)
     update_nullability: Mapping[Identifier, bool] = Field(default_factory=dict)
     update_source_name: Mapping[Identifier, str] = Field(default_factory=dict)
@@ -391,13 +394,13 @@ class _RawTable(BaseModel, extra=Extra.forbid):
                 schema.tables[name] for name in self.inherit_schema.tables if name in schema.tables
             ]
             columns = list(self.columns)
-            used_column_names = set(self.inherit_schema.exclude_columns).union(
-                c.name for c in self.columns
-            )
+            permitted_column_names = self.inherit_schema.columns
+            used_column_names = set(c.name for c in self.columns)
             for table in tables_with_precedence:
                 for column in table.resolve_inherited_columns(schema):
-                    if column.name not in used_column_names:
-                        used_column_names.add(column.name)
+                    if column.name not in used_column_names and (
+                        not permitted_column_names or (column.name in permitted_column_names)
+                    ):
                         if (
                             column.name in self.inherit_schema.update_docs
                             or column.name in self.inherit_schema.update_nullability
@@ -409,6 +412,7 @@ class _RawTable(BaseModel, extra=Extra.forbid):
                                 source_name=self.inherit_schema.update_source_name.get(column.name),
                             )
                         columns.append(column)
+                        used_column_names.add(column.name)
             return columns
 
     @property
