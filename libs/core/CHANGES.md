@@ -1,9 +1,3 @@
-## 1.27
-
-- Add `ThdsJsonFormatter` and `ThdsLogfmter` (which is based on
-  https://github.com/jteppinette/python-logfmter/tree/main) so that we can have more parsable and
-  queryable logs in production. Use `THDS_CORE_LOG_FORMAT` to configure.
-
 ## 1.26.20240905
 
 - Fixed bug in `core.parallel.yield_all`, which would run a single-item list twice, rather than only
