@@ -17,6 +17,13 @@ configuration both for libraries and applications. Please see its [README here](
 This library handles configuration of all DS loggers. By default, all INFO-and-above messages are written
 (to `stderr`).
 
+### Default output formatter
+
+By default we use a custom formatter intended to make things maximally human-readable.
+
+If you want structured logs, you might try setting `THDS_CORE_LOG_FORMAT=logfmt`, or `json` if you want
+JSON logs.
+
 ### File format
 
 To customize what level different modules are logged at, you should create a file that looks like this:
