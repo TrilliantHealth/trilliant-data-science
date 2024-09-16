@@ -290,7 +290,8 @@ class ThdsLogfmter(Logfmter):
         if key == "mod":
             return f"mod={ThdsCompactFormatter.format_module_name(value)}"
         if key == "lvl":
-            return log_level_color(record.levelno, f"lvl={log_level_caps(record.levelno, value)}")
+            core_str = log_level_color(record.levelno, f"lvl={log_level_caps(record.levelno, value)}")
+            return core_str + " " * (7 - len(record.levelname))
         return super().format_key_value(record, key, value)
 
 
