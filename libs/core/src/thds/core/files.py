@@ -1,11 +1,12 @@
 """Various assorted file-related utilities."""
+
 import os
 import resource
 import shutil
 import stat
 import typing as ty
 from contextlib import contextmanager
-from io import BufferedWriter
+from io import BufferedWriter, TextIOWrapper
 from pathlib import Path
 
 from . import config
@@ -62,6 +63,14 @@ def atomic_binary_writer(destination: StrOrPath) -> ty.Iterator[BufferedWriter]:
     """Even shorter shorthand for writing binary data to a file, atomically."""
     with atomic_write_path(destination) as temp_writable_path:
         with open(temp_writable_path, "wb") as f:
+            yield f
+
+
+@contextmanager
+def atomic_text_writer(destination: StrOrPath) -> ty.Iterator[TextIOWrapper]:
+    """Even shorter shorthand for writing text data to a file, atomically."""
+    with atomic_write_path(destination) as temp_writable_path:
+        with open(temp_writable_path, "w") as f:
             yield f
 
 
