@@ -1,6 +1,5 @@
 """Various assorted file-related utilities."""
 
-import hashlib
 import os
 import resource
 import shutil
@@ -10,7 +9,7 @@ from contextlib import contextmanager
 from io import BufferedWriter, TextIOWrapper
 from pathlib import Path
 
-from . import config, hashing
+from . import config
 from .log import getLogger
 from .tmp import temppath_same_fs
 from .types import StrOrPath
@@ -87,36 +86,3 @@ def set_file_limit(n: int):
 def bump_limits():
     """It was common to have to do this manually on our macs. Now that is no longer required."""
     set_file_limit(OPEN_FILES_LIMIT())
-
-
-def shorten_filename(maybe_too_long_name: StrOrPath, max_len: int = 255, retain_last: int = 30) -> str:
-    """Shortens a filename, using a deterministic and probabilistically-unique (hash-based) algorithm.
-
-    The filename is only changed if it exceeds the provided max_len limit.
-
-    The limit defaults to 255 _bytes_ since that is what many filesystems have
-    generally supported.  https://en.wikipedia.org/wiki/Comparison_of_file_systems#Limits
-
-    We intentionally take our 'bite' out of the middle of the filename, so that the file extension is preserved
-    and so that the first part of the path also remains human-readable.
-    """
-    # p for Path, s for str, b for bytes - too many things flying around to keep track of without this.
-    s_maybe_too_long_name = Path(maybe_too_long_name).name
-    b_filename = s_maybe_too_long_name.encode()
-
-    if len(b_filename) <= max_len:
-        # no need to mess with anything - it will 'fit' inside the root path already.
-        return s_maybe_too_long_name
-
-    b_md5_of_filename = (
-        b"-md5-" + hashing.hash_using(b_filename, hashlib.md5()).hexdigest().encode() + b"-"
-    )
-    b_last_n = b_filename[-retain_last:]
-    b_first_n = b_filename[: max_len - len(b_md5_of_filename) - len(b_last_n)]
-    b_modified_filename = b_first_n + b_md5_of_filename + b_last_n
-    assert len(b_modified_filename) <= max_len, (
-        b_modified_filename,
-        len(b_modified_filename),
-        max_len,
-    )
-    return b_modified_filename.decode()
