@@ -1,3 +1,9 @@
+"""Read-only utilities for inspecting a SQLite database.
+
+Note that none of these are safe from SQL injection - you should probably
+not be allowing users to specify tables in an ad-hoc fashion.
+"""
+
 import contextlib
 import os
 import sqlite3
@@ -13,10 +19,21 @@ from .types import Connectable, TableSource
 logger = log.getLogger(__name__)
 
 
+def fullname(table_name: str, schema_name: str = "") -> str:
+    if schema_name:
+        return f"{schema_name}.[{table_name}]"
+    return "[" + table_name + "]"
+
+
 @autoconn_scope.bound
-def list_tables(connectable: Connectable) -> ty.List[str]:
+def list_tables(connectable: Connectable, schema_name: str = "") -> ty.List[str]:
     conn = autoconnect(connectable)
-    return [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+    return [
+        row[0]
+        for row in conn.execute(
+            f"SELECT name FROM {fullname('sqlite_master', schema_name)} WHERE type='table'"
+        )
+    ]
 
 
 @autoconn_scope.bound
@@ -31,7 +48,7 @@ def get_tables(connectable: Connectable, *, schema_name: str = "main") -> ty.Dic
         for row in conn.execute(
             f"""
             SELECT name, sql
-            FROM {schema_name}.[sqlite_master]
+            FROM {fullname('sqlite_master', schema_name)}
             WHERE type = 'table'
             AND sql is not null
             """
@@ -105,7 +122,7 @@ def get_indexes(
         for row in conn.execute(
             f"""
             SELECT name, sql
-            FROM {schema_name}.[sqlite_master]
+            FROM {fullname('sqlite_master', schema_name)}
             WHERE type = 'index' AND tbl_name = '{table_name}'
             AND sql is not null
             """
