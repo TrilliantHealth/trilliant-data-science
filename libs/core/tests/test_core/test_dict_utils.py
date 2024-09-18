@@ -39,13 +39,13 @@ def test_dotdict(convert):
     some_dict_converted = {
         "metrics": {"metric_1": 0.98, "metric_2": {"sub_metric_1": 0.5, "sub_metric_2": 1}}
     }
-    m: DotDict[str, Any] = DotDict(some_dict, convert_keys_to_identifiers=convert)
+    m: DotDict[Any] = DotDict(some_dict, convert_keys_to_identifiers=convert)
     assert dict(**m) == some_dict if not convert else some_dict_converted
     assert m.to_dict(orig_keys=not convert) == some_dict if not convert else some_dict_converted
 
 
 def test_dotdict_get():
-    m: DotDict[str, Any] = DotDict(
+    m: DotDict[Any] = DotDict(
         {"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True
     )
     assert m.a_key == 1
@@ -58,7 +58,7 @@ def test_dotdict_get():
 
 
 def test_dotdict_set():
-    m: DotDict[str, Any] = DotDict(
+    m: DotDict[Any] = DotDict(
         {"a_key": 1, "b": 2, "c": {"d": {"e_key": 3, "f": 4}}}, convert_keys_to_identifiers=True
     )
     m.a_key = 5
