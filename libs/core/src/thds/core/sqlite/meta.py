@@ -178,3 +178,9 @@ def get_table_schema(
     cursor.execute(f"PRAGMA table_info('{table_name}')")
     schema = {row[1]: row[2].lower() for row in cursor.fetchall()}
     return schema
+
+
+@autoconn_scope.bound
+def attach(connectable: Connectable, db_path: Path, schema_name: str) -> None:
+    conn = autoconnect(connectable)
+    conn.execute(f"ATTACH DATABASE '{db_path}' AS {schema_name}")
