@@ -22,7 +22,7 @@ logger = log.getLogger(__name__)
 def fullname(table_name: str, schema_name: str = "") -> str:
     if schema_name:
         return f"{schema_name}.[{table_name}]"
-    return "[" + table_name + "]"
+    return f"[{table_name}]"
 
 
 @autoconn_scope.bound
@@ -182,5 +182,9 @@ def get_table_schema(
 
 @autoconn_scope.bound
 def attach(connectable: Connectable, db_path: Path, schema_name: str) -> None:
+    """ATTACH a database to the current connection, using your provided schema name.
+
+    It must be an actual file.
+    """
     conn = autoconnect(connectable)
     conn.execute(f"ATTACH DATABASE '{db_path}' AS {schema_name}")
