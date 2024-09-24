@@ -2,7 +2,7 @@
 
 Note that this really only works with ADLS-like Blob Stores, and
 only with the MemoizingPicklingRunner, which is the only implementation
-we have as of 2024-02-20, and will probably be the only implementation ever...
+we have as of 2024-09-24, and will probably be the only implementation ever...
 but if you're reading this in the distant future - those are its limitations.
 """
 
@@ -79,7 +79,7 @@ def get_control_file(uri: str) -> ty.Any:
 
     if not _control_uri(uri):
         fs = uris.lookup_blob_store(uri)
-        logger.info(f"Attempting to fetch all control files for {uri}")
+        logger.debug(f"Attempting to fetch all control files for {uri}")
         return IRE(**{cf.lstrip("/"): get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
 
     no_warning = bool(uris.ACTIVE_STORAGE_ROOT())
@@ -140,38 +140,61 @@ def inspect(uri: str, embed: bool = False):
 
 @dataclass
 class Ignores:
-    ignores_file: Path
+    permanent_ignores_file: Path
     known_ignores: ty.Set[str]
-    regexes: ty.List[str]
 
     def __post_init__(self):
-        self.ignores_file.parent.mkdir(parents=True, exist_ok=True)
-        if not self.ignores_file.exists():
-            self.ignores_file.touch()
-        self.known_ignores = set(filter(None, open(self.ignores_file).read().splitlines()))
+        self.permanent_ignores_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.permanent_ignores_file.exists():
+            self.permanent_ignores_file.touch()
+        self.known_ignores = set(filter(None, open(self.permanent_ignores_file).read().splitlines()))
 
-    def add(self, ignore_uri: str):
+    def ignore_uri(self, ignore_uri: str):
         self.known_ignores.add(ignore_uri)
         # possible race condition here if multiple runs of mops-inspect are happening
         # in parallel?
-        with open(self.ignores_file, "a") as wf:
+        with open(self.permanent_ignores_file, "a") as wf:
             wf.write(ignore_uri + "\n")
-
-    def add_regex(self, ignore_regex: str):
-        """These are not permanent"""
-        self.regexes.append(ignore_regex)
-
-    def matches(self, ire_str: str) -> bool:
-        for regex in self.regexes:
-            if re.search(regex, ire_str):
-                return True
-        return False
 
     def __contains__(self, uri: str) -> bool:
         return uri in self.known_ignores
 
 
-_IGNORES = Ignores(Path("~/.mops-inspect-ignores").expanduser(), set(), list())
+@dataclass
+class Matches:
+    must_match: ty.List[str]
+    must_not_match: ty.List[str]
+
+    def add_regex(self, regex: str) -> ty.Literal["ignore", "match"]:
+        """These are not permanent"""
+        if regex.startswith("!"):
+            self.must_not_match.append(regex[1:])
+            return "ignore"
+
+        self.must_match.append(regex)
+        return "match"
+
+    def matches(self, ire_str: str) -> bool:
+        for regex in self.must_not_match:
+            if re.search(regex, ire_str):
+                logger.debug('Ignoring because of regex: "%s"', regex)
+                return False
+
+        if not self.must_match:
+            logger.debug("No regexes must match")
+            return True
+
+        for regex in self.must_match:
+            if re.search(regex, ire_str):
+                logger.debug('Matches because of regex "%s"', regex)
+                return True
+
+        logger.debug("Does not match any of the %d required regexes.", len(self.must_match))
+        return False
+
+
+_IGNORES = Ignores(Path("~/.mops-inspect-ignores").expanduser(), set())
+_MATCHES = Matches(list(), list())
 DIFF_TOOL = os.environ.get("DIFF_TOOL") or "difft"  # nicer diffs by default
 
 
@@ -217,14 +240,14 @@ def _diff_memospace(uri: str, new_control: IRE):
     def sibling_menu(sibling_uri: str):
         choice = input(
             "Enter to continue, Ctrl-C to quit, `i` to permanently ignore this URI,"
-            " or type a regex to auto-skip siblings that match: "
+            " or type a regex to filter future results (prefix with ! to find non-matches, otherwise will find matches: "
         )
         if "i" == choice.lower():
-            _IGNORES.add(sibling_uri)
+            _IGNORES.ignore_uri(sibling_uri)
         elif choice:
             regex = choice
-            _IGNORES.add_regex(regex)
-            logger.info(f"Added regex {regex}")
+            type = _MATCHES.add_regex(regex)
+            logger.info(f"Added <{type}> regex /{regex}/")
 
     sibling_uris = fs.list(memospace_uri)  # type: ignore
     found_siblings = False
@@ -243,7 +266,7 @@ def _diff_memospace(uri: str, new_control: IRE):
         control_sibling = get_control_file(full_uri)
         with tmp.temppath_same_fs() as path_sibling:
             _write_ire_to_path(control_sibling, path_sibling, full_uri)
-            if _IGNORES.matches(path_sibling.read_text()):
+            if not _MATCHES.matches(path_sibling.read_text()):
                 continue
 
             _run_diff_tool(path_sibling, path_new)
@@ -268,23 +291,29 @@ def _inspect_uri(uri: str, diff_memospace: bool, embed: bool):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Inspect a pickled mops invocation.")
-    parser.add_argument("uri", type=str, help="The URI of the object to inspect.")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "uri",
+        type=str,
+        help="The URI of the first object to inspect. Can be adls:// or https:// or even abfss://",
+    )
+    parser.add_argument(
+        "--diff-memospace",
+        "-d",
+        action="store_true",
+        help=(
+            "Find the diff between the invocation at the provided URI,"
+            " and all other invocations that match the same function memospace."
+            " This will only work if your Blob Store is capable of listing files."
+            " It is highly recommended that you `brew install difftastic` to get more precise diffs."
+        ),
+    )
     parser.add_argument(
         "--loop",
         action="store_true",
         help="Keep prompting for URIs to inspect - basically just an embedded while loop.",
     )
     parser.add_argument("--embed", action="store_true", help="Embed an IPython shell after inspection.")
-    parser.add_argument(
-        "--diff-memospace",
-        action="store_true",
-        help=(
-            "Find the diff between the invocation at the provided URI,"
-            " and all other invocations that match the same function memospace."
-            " This will only work if your Blob Store is capable of listing files."
-        ),
-    )
     args = parser.parse_args()
     args.uri = args.uri.rstrip("/")
     if args.diff_memospace:
