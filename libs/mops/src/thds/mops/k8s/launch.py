@@ -132,7 +132,7 @@ def launch(
         template.template = client.V1PodTemplateSpec(metadata=client.V1ObjectMeta(labels=labels))
 
         logger.debug("Applying environment variables ...")
-        env_list = []
+        env_list = [client.V1EnvVar(name="MOPS_IMAGE_FULL_TAG", value=container_image)]
         if env_vars is not None:
             for env_name, env_value in env_vars.items():
                 env_list.append(client.V1EnvVar(name=env_name, value=env_value))
