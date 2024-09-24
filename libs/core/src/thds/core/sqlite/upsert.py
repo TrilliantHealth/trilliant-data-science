@@ -11,29 +11,33 @@ from .write import run_batch_and_isolate_failures
 logger = log.getLogger(__name__)
 
 
-def make_upsert_writer(
+def _make_upsert_writer(
     conn: Connection,
     table_name: str,
     batch_size: int = 1000,
     max_sql_stmt_cache_size: int = 1000,
 ) -> ty.Generator[None, ty.Mapping[str, ty.Any], str]:
     """Upserts in SQLite are a bit... under-featured. You simply cannot ask SQLite in a
-    generic way to write the rows but to select any 'missing' columns for any pre-existing
-    row from the pre-existing row itself.
+    generic way to write the key-value pairs you've provided for a row but not to overwrite
+    any key-value pairs you didn't provide with whatever the default value is (often NULL).
 
-    What you can do is write a query that does this for a single row, then batch any
-    immediately-following rows that fit the same set of keys to be written, and finally,
-    execute multiple queries in a single trip to the database.  This won't be as fast as a
-    true bulk insert, but if you are able to perform any ordering on your data upfront, it
-    may be nearly as fast.
+    In fact, the docs normally suggest doing a SELECT first to see if the row exists...
+
+    What you can do instead is write a query that detects the conflict and follows it up
+    with UPDATE for the specific key-value pairs you provided. On top of that, we can then
+    batch any immediately-following rows that fit the exact same set of keys to be
+    written, and finally, we can commit all of the queries at the end.  This won't be as
+    fast as a true bulk insert, since there's meaningful Python running for every row
+    (converting dict keys into a tuple) and a check against the previous keyset.
+
+    Your perfomance will be better if you are able to make sure that your iterator of rows
+    provides rows with the same keys in the same order in batches, so that we can do as
+    little SQL formatting as possible and execute larger batches with executemany.
     """
 
     primary_keys = primary_key_cols(table_name, conn)
     on_conflict_pkeys = ",".join(primary_keys)
     # https://stackoverflow.com/questions/66904339/sqlite-on-conflict-two-or-more-columns
-
-    def extract_unsorted_keys(row: ty.Mapping[str, ty.Any]) -> ty.Tuple[str, ...]:
-        return tuple(col for col in row.keys())
 
     @lru_cache(maxsize=max_sql_stmt_cache_size)
     def make_upsert_query(row_keys: ty.Tuple[str, ...]) -> str:
@@ -65,7 +69,17 @@ def make_upsert_writer(
         # don't create the cursor til we receive our first actual row.
 
         while True:
-            keyset = extract_unsorted_keys(row)
+            keyset = tuple(row)
+            # Based on some benchmarking, and on the (imagined) most likely actual use
+            # cases, we're choosing not to sort your keys for you - if your rows have
+            # different key orders, we won't be able to make batches as large, and
+            # performance will decrease.  It seems likely that in most real-world use
+            # cases, the code for generating the rows will have somewhat determinstic key
+            # ordering. If this isn't the case, you're welcome to reorder the keys as you
+            # see fit - perhaps it will make your code faster, but my guess is that in
+            # many cases, by taking on that extra Python overhead, you'll end up slower
+            # overall. Either way, the power is in your hands and we're leaving this code
+            # uncomplicated by that detail.
             if keyset != current_keyset or len(batch) >= batch_size:
                 # send current batch:
                 run_batch_and_isolate_failures(cursor, query, batch)
@@ -102,9 +116,9 @@ def mappings(
 ) -> None:
     """Write rows to a table, upserting on the primary keys. Will not overwrite existing values that are not contained within the provided mappings.
 
-    Note that core.sqlite.write.write_mappings is likely to be faster if your rows have
-    homogeneous keys (e.g. if you're writing the full row for each mapping), because this
-    routine needs to generate a specific SQL statement for every unique combination of
-    keys it sees (and to do so, needs to examine the keys for every row).
+    Note that core.sqlite.write.write_mappings is likely to be significantly faster than
+    this if your rows have homogeneous keys (e.g. if you're writing the full row for each
+    mapping), because this routine needs to generate a specific SQL statement for every
+    unique combination of keys it sees (and so needs to examine the keys for every row).
     """
-    generators.iterator_sender(make_upsert_writer(conn, table_name, batch_size=batch_size), rows)
+    generators.iterator_sender(_make_upsert_writer(conn, table_name, batch_size=batch_size), rows)
