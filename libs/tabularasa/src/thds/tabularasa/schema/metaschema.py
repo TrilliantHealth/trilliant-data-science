@@ -848,6 +848,10 @@ class Schema(_RawSchema):
     def transient_tables(self) -> Iterator[Table]:
         return self.filter_tables(lambda table: table.transient)
 
+    @property
+    def computable_tables(self) -> Iterator[Table]:
+        return self.filter_tables(lambda table: table.dependencies is not None)
+
     def filter_tables(self, predicate: Callable[[Table], bool]) -> Iterator[Table]:
         return filter(predicate, self.tables.values())
 

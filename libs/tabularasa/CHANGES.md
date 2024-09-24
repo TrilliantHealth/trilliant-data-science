@@ -1,3 +1,7 @@
+### 0.5.0
+
+- `tabularasa datagen` now ensures _all_ tables in the schema are recomputed when run without args
+
 ### 0.4.0
 
 - Changed metaschema and semantics for `inherit_schema` to facilitate simpler reasoning about the schema

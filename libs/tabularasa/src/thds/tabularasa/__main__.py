@@ -418,8 +418,8 @@ class ReferenceDataManager:
 
     @output_handler(print_list)
     def dependent_tables(self, tables: Optional[Set[str]] = None) -> Set[str]:
-        """Compute the set of tables reachable from a set of tables in the computational DAG,
-        (upstream and downstream), including the original tables"""
+        """Compute the set of tables downstream from a set of tables in the computational DAG,
+        including the original tables"""
         tables = tables or set()
         unknown_tables = {t for t in tables if t not in self.schema.tables}
         if unknown_tables:
@@ -614,20 +614,20 @@ class ReferenceDataManager:
             )
             # force re-computation of the specified tables *and* all their downstream dependents
             tables_to_recompute = self.dependent_tables(tables)
-            # update hashes for all tables in this part of the DAG as well, since any of them may be recomputed
-            # in this build on a hash mismatch
-            tables_to_update_hashes = {
-                str(t)
-                for t in self.schema.dependency_dag(lambda table: table.name in tables_to_recompute)
-                if isinstance(t, metaschema.ReferenceDataRef)
-                # don't update hashes for transient tables with explicitly no hash
-                and not ((table := self.schema.tables[str(t)]).md5 is None and table.transient)
-            }
-            run_hash_update = bool(tables_to_update_hashes) and update_hashes
         else:
-            # build all whose hashes are out of sync or whose files don't exist, and update all hashes
-            tables_to_recompute = tables_to_update_hashes = set()
-            run_hash_update = update_hashes
+            # build all tables
+            tables_to_recompute = set(t.name for t in self.schema.computable_tables)
+
+        # update hashes for all upstream tables in the DAG as well, since any of them may be recomputed
+        # in this build on a hash mismatch
+        tables_to_update_hashes = {
+            str(t)
+            for t in self.schema.dependency_dag(lambda table: table.name in tables_to_recompute)
+            if isinstance(t, metaschema.ReferenceDataRef)
+            and not ((table := self.schema.tables[str(t)]).transient and table.md5 is None)
+            # don't update hashes for transient tables with explicitly no hash
+        }
+        run_hash_update = bool(tables_to_update_hashes) and update_hashes
 
         for table_name in tables_to_recompute:
             table = self.schema.tables[table_name]
