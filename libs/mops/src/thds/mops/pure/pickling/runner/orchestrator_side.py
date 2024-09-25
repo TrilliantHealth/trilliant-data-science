@@ -300,7 +300,9 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
                     " and is being returned without invocation!"
                 )
                 if run_directory:
-                    run_summary.log_function_execution(run_directory, func_, memo_uri, status=status)
+                    run_summary.log_function_execution(
+                        run_directory, func_, memo_uri, status=status, memospace=function_memospace
+                    )
                 return result
 
             # now actually execute the chunks of work that are required...
@@ -395,7 +397,9 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
                 raise NoResultAfterInvocationError(memo_uri)
             if run_directory:
                 # Log that the function was executed
-                run_summary.log_function_execution(run_directory, func_, memo_uri, status="invoked")
+                run_summary.log_function_execution(
+                    run_directory, func_, memo_uri, status="invoked", memospace=function_memospace
+                )
             return unwrap_remote_result(result)
 
     return run_shell_via_pickles_

@@ -4,7 +4,7 @@ from typing import Dict, List
 import pytest
 
 from thds.mops.pure import memoize_in, pipeline_id_mask, pipeline_id_mask_from_docstr
-from thds.mops.pure.core.memo import make_function_memospace
+from thds.mops.pure.core.memo import make_function_memospace, parse_memo_uri
 from thds.mops.pure.core.pipeline_id_mask import extract_mask_from_docstr, get_pipeline_id_mask
 
 
@@ -111,3 +111,15 @@ def test_integration_local_filesystem() -> None:
         {"A": 5, "B": 6, "sum": 11, "product": 30},
     ]
     assert processed_data == expected_data
+
+
+def test_parse_memo_uri():
+    memo_parts = parse_memo_uri(
+        "adls://foo/bar/mops2-mpf/FOOPIPE/PIPEA/PIPEB/tests.test_mops.unit.pure.test_memoize--fx@flk45/PurseHowCorgi-89723098273409283742938742"
+    )
+    assert memo_parts.memospace == "adls://foo/bar/mops2-mpf"
+    assert memo_parts.pipeline_id == "FOOPIPE/PIPEA/PIPEB"
+    assert memo_parts.function_module == "tests.test_mops.unit.pure.test_memoize"
+    assert memo_parts.function_name == "fx"
+    assert memo_parts.function_logic_key == "flk45"
+    assert memo_parts.args_hash == "PurseHowCorgi-89723098273409283742938742"

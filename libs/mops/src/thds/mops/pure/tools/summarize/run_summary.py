@@ -1,12 +1,12 @@
 import datetime as dt
 import json
 import os
-import re
 import typing as ty
 import uuid
 from pathlib import Path
 
 from thds.core import config, log
+from thds.mops.pure.core.memo import function_memospace
 from thds.mops.pure.core.types import T
 
 MOPS_SUMMARY_DIR = config.item("thds.mops.summary_dir", default=Path(".mops"), parse=Path)
@@ -17,11 +17,17 @@ StatusType = ty.Literal["memoized", "invoked", "awaited"]
 logger = log.getLogger(__name__)
 
 
-class LogEntry(ty.TypedDict):
+class LogEntryV1(ty.TypedDict):
     function_name: str
     memo_uri: str
     timestamp: str
     status: StatusType
+
+
+class LogEntry(LogEntryV1, total=False):
+    memospace: str  # includes env and any prefixes like mops2-mpf
+    pipeline_id: str
+    function_logic_key: str
 
 
 if not os.getenv(RUN_NAME_ENV_VAR):
@@ -52,19 +58,6 @@ def create_mops_run_directory() -> Path:
     return run_directory
 
 
-def _extract_and_format_part(memo_uri: str) -> str:
-    match = re.search(r"[^/]+/([^/]+/[^/]+)$", memo_uri)
-
-    if match:
-        # Extract the part after the pipeline id
-        extracted = match.group(1)
-        formatted = extracted.replace("/", "_")
-        # Remove any characters that are not alphanumeric or underscores
-        formatted = re.sub(r"[^a-zA-Z0-9_]", "", formatted)
-        return formatted
-    return ""
-
-
 def _generate_log_filename(run_directory: Path) -> Path:
     """Generate a log filename using the current timestamp and a short UUID, ensuring uniqueness"""
     timestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
@@ -74,16 +67,25 @@ def _generate_log_filename(run_directory: Path) -> Path:
 
 
 def log_function_execution(
-    run_directory: Path, func: ty.Callable[..., T], memo_uri: str, status: StatusType
+    run_directory: Path,
+    func: ty.Callable[..., T],
+    memo_uri: str,
+    status: StatusType,
+    memospace: str = "",
 ) -> None:
     log_file = _generate_log_filename(run_directory)
     func_module = func.__module__
     func_name = func.__name__
     full_function_name = f"{func_module}:{func_name}"
 
+    parts = function_memospace.parse_memo_uri(memo_uri, memospace)
+
     log_entry: LogEntry = {
         "function_name": full_function_name,
         "memo_uri": memo_uri,
+        "memospace": parts.memospace,
+        "pipeline_id": parts.pipeline_id,
+        "function_logic_key": parts.function_logic_key,
         "timestamp": dt.datetime.utcnow().isoformat(),
         "status": status,
     }

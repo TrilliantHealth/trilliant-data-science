@@ -45,12 +45,14 @@ def test_memoizing_pickling_runner_init() -> None:
 
 def test_log_function_execution_new_file(run_directory: Path) -> None:
 
-    memo_uri = "adls://pipeline-id/complex/function-id-new"
+    memo_uri = "adls://env/foo/bar/pipeline-id/complex/the.module--function_id_new/ARGS"
 
     def test_function() -> None:
         pass
 
-    run_summary.log_function_execution(run_directory, test_function, memo_uri, status="invoked")
+    run_summary.log_function_execution(
+        run_directory, test_function, memo_uri, status="invoked", memospace="adls://env/foo/bar"
+    )
 
     log_files = list(run_directory.glob("*.json"))
     assert len(log_files) == 1
@@ -66,7 +68,7 @@ def test_log_function_execution_new_file(run_directory: Path) -> None:
 
 
 def test_log_function_execution_invalid_json(run_directory: Path) -> None:
-    memo_uri = "adls://pipeline-id/some-path/function-id-invalid-json-test"
+    memo_uri = "adls://env/mops2-mpf/pipeline-id/some-path/foo.bar--function-id-invalid-json-test/ARGS"
 
     def test_function() -> None:
         pass
@@ -92,21 +94,3 @@ def test_log_function_execution_invalid_json(run_directory: Path) -> None:
     assert log_data["memo_uri"] == memo_uri
     assert log_data["status"] == "invoked"
     assert datetime.fromisoformat(log_data["timestamp"])
-
-
-@pytest.mark.parametrize(
-    "memo_uri, expected",
-    [
-        (
-            "adls://thdsscratch/tmp/mops2-mpf/examples/__main__--find_in_file/MarchCupRisky.C4_yzRq1cztNXeuiwjOUM_Gotnq6aTwcxxticlE",
-            "__main__find_in_file_MarchCupRiskyC4_yzRq1cztNXeuiwjOUM_Gotnq6aTwcxxticlE",
-        ),
-        (
-            "adls://thdsscratch/tmp/mops2-mpf/Cheick-Berthe/2024-06-05T14:46:16-p7701/__main__--mul2/GriefAimToken.eQr9bcJeS_yka9pcmrfQuf6IBGiSOBB-husCdqI",
-            "__main__mul2_GriefAimTokeneQr9bcJeS_yka9pcmrfQuf6IBGiSOBBhusCdqI",
-        ),
-        ("adls://pipeline-id/complex/function-id", "complex_functionid"),
-    ],
-)
-def test_extract_and_format_part(memo_uri: str, expected: str) -> None:
-    assert run_summary._extract_and_format_part(memo_uri) == expected

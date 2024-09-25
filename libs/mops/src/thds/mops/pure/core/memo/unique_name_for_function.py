@@ -22,8 +22,10 @@ function-logic-key: 2023-03-31
 function-logic-key: try-uint8-math
 
 """
+
 import inspect
 import re
+import typing as ty
 from functools import lru_cache
 
 _DOCSTRING_VERSION_RE = re.compile(r".*function-logic-key:\s+(?P<version>[^\s]+)\b", re.DOTALL)
@@ -65,3 +67,17 @@ def make_unique_name_including_docstring_key(f) -> str:
         except AttributeError:
             name = "MOPS_UNKNOWN_NAME"
     return f"{module}--{name}@{version}".rstrip("@")
+
+
+class FunctionComponents(ty.NamedTuple):
+    module: str
+    name: str
+    function_logic_key: str
+
+
+def parse_unique_name(full_function_name: str) -> FunctionComponents:
+    assert "--" in full_function_name, f"Expected '--' in {full_function_name}"
+    module, name = full_function_name.split("--")
+    if "@" not in name:
+        return FunctionComponents(module, name, "")
+    return FunctionComponents(module, *name.split("@"))

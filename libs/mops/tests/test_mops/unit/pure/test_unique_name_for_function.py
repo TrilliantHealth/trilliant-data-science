@@ -1,6 +1,9 @@
 from functools import partial
 
-from thds.mops.pure.core.memo.unique_name_for_function import make_unique_name_including_docstring_key
+from thds.mops.pure.core.memo.unique_name_for_function import (
+    make_unique_name_including_docstring_key,
+    parse_unique_name,
+)
 
 
 def foobar():
@@ -52,3 +55,12 @@ def yoyo(a, b):
 
 def test_extract_name_and_version_for_partial_func():
     assert f"{MODULE_BASE}--yoyo@3.1415" == make_unique_name_including_docstring_key(partial(yoyo, 1))
+
+
+def test_parse_unique_name():
+    module, name, flk = parse_unique_name(
+        "tests.test_mops.unit.pure.test_unique_name_for_function--yoyo@3.1415"
+    )
+    assert module == MODULE_BASE
+    assert name == "yoyo"
+    assert flk == "3.1415"

@@ -132,6 +132,7 @@ use case for this functionality; we simply don't foresee what that
 would be and decline to prematurely implement such functionality.
 
 """
+
 import hashlib
 import re
 import typing as ty
@@ -146,7 +147,7 @@ from ..pipeline_id_mask import (
     pipeline_id_mask,
 )
 from ..uris import lookup_blob_store
-from .unique_name_for_function import make_unique_name_including_docstring_key
+from .unique_name_for_function import make_unique_name_including_docstring_key, parse_unique_name
 
 
 class _PipelineMemospaceHandler(ty.Protocol):
@@ -218,6 +219,48 @@ def make_function_memospace(runner_prefix: str, f: ty.Callable) -> str:
             get_pipeline_id_mask(),
             callable_name,
         )
+
+
+class MemoUriComponents(ty.NamedTuple):
+    memospace: str
+    pipeline_id: str
+    function_module: str
+    function_name: str
+    function_logic_key: str
+    args_hash: str
+
+
+def parse_memo_uri(
+    memo_uri: str,
+    memospace: str = "",
+    separator: str = "/",
+    backward_compat_split: str = "mops2-mpf",
+) -> MemoUriComponents:
+    if not memospace:
+        # this is in order to help with backward compatibilty for mops summaries that
+        # didn't store any of this. providing memospace is a more precise way to handle this.
+        if backward_compat_split not in memo_uri:
+            raise ValueError("Cannot determine the components of a memo URI with no memospace")
+        parts = memo_uri.split(backward_compat_split, 1)
+        assert len(parts) > 1, parts
+        memospace = separator.join((parts[0].rstrip(separator), backward_compat_split))
+
+    memospace = memospace.rstrip(separator)
+    rest, args_hash = memo_uri.rsplit(separator, 1)  # args hash is last component
+    rest, full_function_name = rest.rsplit(separator, 1)
+    pipeline_id = rest[len(memospace) :]
+    pipeline_id = pipeline_id.strip(separator)
+
+    function_parts = parse_unique_name(full_function_name)
+
+    return MemoUriComponents(
+        memospace,
+        pipeline_id,
+        function_parts.module,
+        function_parts.name,
+        function_parts.function_logic_key,
+        args_hash,
+    )
 
 
 def args_kwargs_content_address(args_kwargs_bytes: bytes) -> str:

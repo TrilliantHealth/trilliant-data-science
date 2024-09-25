@@ -2,8 +2,9 @@ import argparse
 import json
 from functools import reduce
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, TypedDict
+from typing import Dict, List, Literal, Optional, Set, TypedDict
 
+from thds.mops.pure.core.memo.function_memospace import parse_memo_uri
 from thds.mops.pure.tools.summarize import run_summary
 
 SortOrder = Literal["name", "time"]
@@ -14,6 +15,21 @@ class FunctionSummary(TypedDict):
     cache_hits: int
     executed: int
     timestamps: List[str]
+    memospaces: Set[str]
+    pipeline_ids: Set[str]
+    function_logic_keys: Set[str]
+
+
+def _empty_summary() -> FunctionSummary:
+    return {
+        "total_calls": 0,
+        "cache_hits": 0,
+        "executed": 0,
+        "timestamps": [],
+        "memospaces": set(),
+        "pipeline_ids": set(),
+        "function_logic_keys": set(),
+    }
 
 
 def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
@@ -28,18 +44,19 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
 
         function_name = log_entry["function_name"]
         if function_name not in partial_summary:
-            partial_summary[function_name] = {
-                "total_calls": 0,
-                "cache_hits": 0,
-                "executed": 0,
-                "timestamps": [],
-            }
+            partial_summary[function_name] = _empty_summary()
         partial_summary[function_name]["total_calls"] += 1
         if log_entry["status"] in ("memoized", "awaited"):
             partial_summary[function_name]["cache_hits"] += 1
         else:
             partial_summary[function_name]["executed"] += 1
         partial_summary[function_name]["timestamps"].append(log_entry["timestamp"])
+
+        mu_parts = parse_memo_uri(log_entry["memo_uri"], log_entry.get("memospace") or "")
+
+        partial_summary[function_name]["memospaces"].add(mu_parts.memospace)
+        partial_summary[function_name]["pipeline_ids"].add(mu_parts.pipeline_id)
+        partial_summary[function_name]["function_logic_keys"].add(mu_parts.function_logic_key)
 
     return partial_summary
 
@@ -55,11 +72,14 @@ def _combine_summaries(
     """
     for function_name, data in partial.items():
         if function_name not in acc:
-            acc[function_name] = {"total_calls": 0, "cache_hits": 0, "executed": 0, "timestamps": []}
+            acc[function_name] = _empty_summary()
         acc[function_name]["total_calls"] += data["total_calls"]
         acc[function_name]["cache_hits"] += data["cache_hits"]
         acc[function_name]["executed"] += data["executed"]
         acc[function_name]["timestamps"].extend(data["timestamps"])
+        acc[function_name]["memospaces"].update(data["memospaces"])
+        acc[function_name]["pipeline_ids"].update(data["pipeline_ids"])
+        acc[function_name]["function_logic_keys"].update(data["function_logic_keys"])
     return acc
 
 
@@ -73,6 +93,9 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
         "  Cache hits: {cache_hits}\n"
         "  Executed: {executed}\n"
         "  Timestamps: {timestamps}\n"
+        "  Memospaces: {memospaces}\n"
+        "  Pipeline IDs: {pipeline_ids}\n"
+        "  Function Logic Keys: {function_logic_keys}\n"
     )
     report_lines = []
 
@@ -98,6 +121,9 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
                 cache_hits=data["cache_hits"],
                 executed=data["executed"],
                 timestamps=timestamps_str,
+                memospaces=", ".join(data["memospaces"]),
+                pipeline_ids=", ".join(data["pipeline_ids"]),
+                function_logic_keys=", ".join(data["function_logic_keys"]),
             )
         )
     return "\n".join(report_lines)
