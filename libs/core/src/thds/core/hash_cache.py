@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from . import config
+from . import config, files
 from .hashing import Hash, hash_using
 from .home import HOMEDIR
 from .log import getLogger
@@ -57,20 +57,21 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     resolved_path = Path(filepath).resolve()
     cached_hash_location = _filecachekey(resolved_path, hasher.name)
     # now we can check to see if we have hash bytes for that file somewhere already.
-    if (
-        cached_hash_location.exists()
-        and cached_hash_location.stat().st_mtime >= resolved_path.stat().st_mtime
-    ):
-        logger.debug("Reusing known hash %s", resolved_path)
+    hash_exists = cached_hash_location.exists()
+    if hash_exists and cached_hash_location.stat().st_mtime >= resolved_path.stat().st_mtime:
+        logger.debug("Reusing known hash for %s - cache key %s", resolved_path, cached_hash_location)
         return cached_hash_location.read_bytes()
 
-    psize = Path(resolved_path).stat().st_size
+    psize = resolved_path.stat().st_size
     if psize > _1GB:
-        logger.info(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}...")
+        log_at_lvl = logger.warning if hash_exists else logger.info
+        # I want to know how often we're finding 'outdated' hashes; those should be rare.
+        log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}; prev hash? {hash_exists}")
 
     hash_bytes = hash_using(resolved_path, hasher).digest()
     cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
-    cached_hash_location.write_bytes(hash_bytes)
+    with files.atomic_binary_writer(cached_hash_location) as f:
+        f.write(hash_bytes)
     return hash_bytes
 
 

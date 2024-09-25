@@ -25,7 +25,10 @@ def _adls_uri_source_download_handler(uri: str) -> ty.Optional[source.Downloader
             # It's no safer than the non-md5 hash check that Source performs after download.
             return download_to_cache(fqn, b64(hash.bytes))
 
-        # the hash will be validated by Source anyway, after download.
+        # we don't validate this hash, because we already have md5 validation
+        # happening inside the download_to_cache function. the Source hash
+        # is actually mostly for use by systems that want to do content addressing,
+        # and not necessarily intended to be a runtime check in all scenarios.
         return download_to_cache(fqn)
 
     return download
