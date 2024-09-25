@@ -8,7 +8,7 @@ from thds.core import config
 from .namespace import parse_namespace, user_namespace
 
 k8s_namespace = config.item("mops.k8s.namespace", user_namespace(), parse=parse_namespace)
-k8s_namespace_env_var_key = config.item("mops.k8s.namespace_env_var_key", "K8S_NAMESPACE")
+k8s_namespace_env_var_key = config.item("mops.k8s.namespace_env_var_key", "MOPS_K8S_NAMESPACE")
 # the above is used to embed the current namespace _inside_ the container as an
 # environment variable.  it will not affect how your namespace is selected in the first
 # place.
