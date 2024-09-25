@@ -2,12 +2,14 @@
 
 yet will not be downloaded (if non-local) until it is actually opened or unwrapped.
 """
+
 import os
 import typing as ty
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
+from . import log
 from .files import is_file_uri, path_from_uri, to_uri
 from .hash_cache import filehash
 from .hashing import Hash
@@ -46,6 +48,8 @@ def _LocalFileHandler(uri: str) -> ty.Optional[Downloader]:
         lpath = path_from_uri(uri)
         if not lpath.exists():
             raise FileNotFoundError(lpath)
+        if hash:
+            _check_hash(hash, lpath)
         return lpath
 
     return download_file
@@ -73,7 +77,9 @@ class SourceHashMismatchError(ValueError):
 
 
 def _check_hash(expected_hash: ty.Optional[Hash], path: Path) -> Hash:
-    computed_hash = filehash(expected_hash.algo if expected_hash else "sha256", path)
+    hash_algo = expected_hash.algo if expected_hash else "sha256"
+    with log.logger_context(hash_for=f"source-{hash_algo}"):
+        computed_hash = filehash(hash_algo, path)
     if expected_hash and expected_hash != computed_hash:
         raise SourceHashMismatchError(
             f"{expected_hash.algo} mismatch for {path};"
@@ -149,8 +155,9 @@ class Source(os.PathLike):
         """
         if self.cached_path is None or not self.cached_path.exists():
             lpath = _get_download_handler(self.uri)(self.hash)
-            if self.hash:
-                _check_hash(self.hash, lpath)
+            # path() used to be responsible for checking the hash, but since we pass it to the downloader,
+            # it really makes more sense to allow the downloader to decide how to verify its own download,
+            # and we don't want to duplicate any effort that it may have already put in.
             self._set_cached_path(lpath)
 
         assert self.cached_path and self.cached_path.exists()
