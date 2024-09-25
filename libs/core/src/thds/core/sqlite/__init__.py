@@ -1,4 +1,4 @@
-from . import connect, index, read, sqlmap  # noqa: F401
+from . import connect, ddl, index, read, sqlmap, upsert  # noqa: F401
 from .merge import merge_databases  # noqa: F401
 from .meta import (  # noqa: F401
     debug_errors,

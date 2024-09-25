@@ -6,17 +6,17 @@ from thds.core import generators, log
 logger = log.getLogger(__name__)
 
 
-def _run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[tuple]):
-    assert cursor, "cursor must exist"
-    assert query, "query must be non-empty"
+def run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[tuple]):
     if not batch:
         return
+    assert cursor, "cursor must exist"
+    assert query, "query must be non-empty"
     try:
         cursor.executemany(query, batch)
     except Exception:
         if len(batch) >= 2:
-            _run_batch_and_isolate_failures(cursor, query, batch[: len(batch) // 2])
-            _run_batch_and_isolate_failures(cursor, query, batch[len(batch) // 2 :])
+            run_batch_and_isolate_failures(cursor, query, batch[: len(batch) // 2])
+            run_batch_and_isolate_failures(cursor, query, batch[len(batch) // 2 :])
         else:
             bad_data = ""
             for i, col in enumerate(batch[0], 1):
@@ -45,9 +45,9 @@ def make_mapping_writer(
     """
 
     def make_query(first_row) -> str:
-        columns = ",\n    ".join(row.keys())
+        columns = ",\n    ".join(first_row.keys())
         # Create a list of placeholders
-        placeholders = ", ".join(["?"] * len(row))
+        placeholders = ", ".join(["?"] * len(first_row))
 
         rpl = "OR REPLACE" if replace else ""
         # Construct the SQL query for the batch
@@ -67,7 +67,7 @@ def make_mapping_writer(
             batch.append(tuple(row.values()))
 
             if len(batch) >= batch_size:
-                _run_batch_and_isolate_failures(cursor, query, batch)
+                run_batch_and_isolate_failures(cursor, query, batch)
                 batch = list()
 
     except GeneratorExit:
@@ -77,7 +77,7 @@ def make_mapping_writer(
             return ""
 
         # Insert any remaining data in the last batch
-        _run_batch_and_isolate_failures(cursor, query, batch)
+        run_batch_and_isolate_failures(cursor, query, batch)
         # Commit the changes to the database
         conn.commit()
         return table_name
