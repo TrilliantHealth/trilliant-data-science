@@ -73,6 +73,7 @@ def launch(
     fire_and_forget: bool = False,
     suppress_logs: bool = False,
     transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = lambda x: x,
+    service_account_name: str = "",
 ) -> None:
     """Launch a Kubernetes job.
 
@@ -132,7 +133,11 @@ def launch(
         template.template = client.V1PodTemplateSpec(metadata=client.V1ObjectMeta(labels=labels))
 
         logger.debug("Applying environment variables ...")
-        env_list = [client.V1EnvVar(name="MOPS_IMAGE_FULL_TAG", value=container_image)]
+        env_list = [
+            client.V1EnvVar(name="MOPS_IMAGE_FULL_TAG", value=container_image),
+            client.V1EnvVar(name="K8S_NAMESPACE", value=config.k8s_namespace()),
+            # by setting these, things will be 'reentrant' if it is necessary to launch jobs within this job.
+        ]
         if env_vars is not None:
             for env_name, env_value in env_vars.items():
                 env_list.append(client.V1EnvVar(name=env_name, value=env_value))
@@ -168,7 +173,9 @@ def launch(
             node_selector=node_narrowing.get("node_selector", dict()),
             tolerations=node_narrowing.get("tolerations", list()),
         )
-        if use_azure_workload_identity:
+        if service_account_name:
+            template.template.spec.service_account_name = service_account_name
+        elif use_azure_workload_identity:
             template.template.spec.service_account_name = "ds-standard"
 
         logger.debug("Creating job definition ...")
