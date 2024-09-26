@@ -10,7 +10,6 @@ from thds.core import log, scope
 from .. import deferred_work
 from ..output_naming import FunctionArgumentsHashUniqueKey, PipelineFunctionUniqueKey
 
-logger = log.getLogger(__name__)
 T_contra = ty.TypeVar("T_contra", contravariant=True)
 
 
@@ -27,7 +26,11 @@ class ResultChannel(ty.Protocol[T_contra]):
         ...  # pragma: no cover
 
 
-@scope.bound
+logger = log.getLogger(__name__)
+_routing_scope = scope.Scope()
+
+
+@_routing_scope.bound
 def route_result_or_exception(
     channel: ResultChannel[T_contra],
     do_work_return_result_thunk: ty.Callable[[], T_contra],
@@ -35,7 +38,7 @@ def route_result_or_exception(
     pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
 ):
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
-    scope.enter(deferred_work.push_non_context())
+    _routing_scope.enter(deferred_work.push_non_context())
     # deferred work can be requested during result serialization, but because we don't want
     # to leave a 'broken' result payload (one that refers to unperformed deferred work,
     # maybe because of network or other failure), we simply don't open a deferred work
@@ -45,11 +48,11 @@ def route_result_or_exception(
     # pushing this non-context is only necessary in the case of a thread-local
     # 'remote' invocation - in all true remote invocations, there will be no context open.
 
-    scope.enter(log.logger_context(remote=pipeline_id))
+    _routing_scope.enter(log.logger_context(remote=pipeline_id))
     if pipeline_function_and_arguments_unique_key:
         pf_key, args_key = pipeline_function_and_arguments_unique_key
-        scope.enter(PipelineFunctionUniqueKey.set(pf_key))
-        scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
+        _routing_scope.enter(PipelineFunctionUniqueKey.set(pf_key))
+        _routing_scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
     try:
         # i want to _only_ run the user's function inside this try-catch.
         # If mops itself has a bug, we should not be recording that as
