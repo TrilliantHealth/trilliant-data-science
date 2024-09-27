@@ -46,6 +46,7 @@ def test_local_source_no_uploads(prep, temp_file):  # 1
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, Hash)
     assert source_arg == source.from_file(test_file).hash
+    perform_source_uploads()
 
     reconstituted_source = source_from_hashref(source_arg)
     assert reconstituted_source.hash == initial_source.hash

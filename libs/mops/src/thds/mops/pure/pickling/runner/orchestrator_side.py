@@ -246,7 +246,12 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             # - these are ordered by what they depend on, _not_ the order
             #   in which they'll be called.
 
-            def upload_pickled_invocation():
+            def upload_pickled_invocation_and_deps():
+                # we're just about to transfer to a remote context,
+                # so it's time to perform any deferred work,
+                # so that our shells don't have to be aware of this.
+                deferred_work.perform_all()
+
                 fs.putbytes(
                     fs.join(memo_uri, INVOCATION),
                     gimme_bytes(
@@ -269,7 +274,7 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             def debug_required_result_failure():
                 """This is entirely for the purpose of making debugging easier. It serves no internal functional purpose."""
                 # first, upload the invocation as an accessible marker of what was expected to exist.
-                upload_pickled_invocation()
+                upload_pickled_invocation_and_deps()
                 # then use mops-inspect programmatically to print the IRE in the same format as usual.
                 from thds.mops.pure.tools.inspect import inspect
 
@@ -306,8 +311,10 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
             if result:
                 return unwrap_remote_result(result)
 
-            # but if it does not exist, we need to upload the invocation and then run the shell.
-            upload_pickled_invocation()
+        # but if it does not exist, let's:
+        # - exit the BEFORE_INVOCATION_SEMAPHORE
+        # - grab the lock and try to run it ourselves
+        # - or wait for someone else to run it if it's already in progress.
 
         lock_dir_uri = fs.join(memo_uri, "lock")
         # entering this loop is the most common case - the non-memoized case.
@@ -355,13 +362,12 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
 
         try:
             _LogNewInvocation(f"Triggering new invocation for {memo_uri}")
+            with _BEFORE_INVOCATION_SEMAPHORE:
+                upload_pickled_invocation_and_deps()
+
             shell_ex = None
             shell = shell_builder(func, args_, kwargs_)
 
-            # we're just about to transfer to a remote context,
-            # so it's time to perform any deferred work,
-            # so that our shells don't have to be aware of this.
-            deferred_work.perform_all()
             shell(
                 (
                     MemoizingPicklingRunner.__name__,

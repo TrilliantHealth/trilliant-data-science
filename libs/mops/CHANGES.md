@@ -1,3 +1,8 @@
+### 2.11.20240927
+
+- Fix bug where, when not finding required results, we only uploaded the `invocation` and did not do the
+  deferred work upon which that invocation relied to be intelligible.
+
 ### 2.11.20240906
 
 - Fix bug where `deferred_work` made mops itself not re-entrant within a threadlocal_shell, because the

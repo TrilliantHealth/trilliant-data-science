@@ -82,14 +82,14 @@ def get_control_file(uri: str) -> ty.Any:
         logger.debug(f"Attempting to fetch all control files for {uri}")
         return IRE(**{cf.lstrip("/"): get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
 
-    no_warning = bool(uris.ACTIVE_STORAGE_ROOT())
+    has_storage_root = bool(uris.ACTIVE_STORAGE_ROOT())
     try:
         scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(uri)))
         return _unpickle_object_for_debugging(uri)
     except Exception as e:
         if uris.lookup_blob_store(uri).is_blob_not_found(e):
-            if no_warning:
-                logger.warning(f"Could not find an object at the URI {uri}.")
+            if has_storage_root or uri not in str(e):
+                logger.warning(str(e))
             return None
         logger.exception("Unexpected error while unpickling the object.")
         raise

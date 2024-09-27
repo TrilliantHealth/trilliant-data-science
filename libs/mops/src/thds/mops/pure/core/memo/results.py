@@ -49,7 +49,9 @@ EXCEPTION = "exception"
 
 
 class RequiredResultNotFound(Exception):
-    pass
+    def __init__(self, message: str, uri: str):
+        super().__init__(message)
+        self.uri = uri
 
 
 def check_if_result_exists(
@@ -64,7 +66,9 @@ def check_if_result_exists(
 
     if _require_result(memo_uri):
         before_raise()
-        raise RequiredResultNotFound(f"Required a result for {memo_uri} but that result was not found")
+        raise RequiredResultNotFound(
+            f"Required a result for {memo_uri} but that result was not found", memo_uri
+        )
 
     if rerun_excs:
         return None

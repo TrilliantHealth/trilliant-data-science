@@ -150,14 +150,18 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
 
     local_path = source_.cached_path
     if local_path and local_path.exists():
-        # create local hashref...
-        _write_hashref(_hashref_uri(source_.hash, "local"), str(local_path))
+        # register creation of local hashref...
+        deferred_work.add(
+            __name__ + "-localhashref",
+            source_.hash,
+            partial(_write_hashref, _hashref_uri(source_.hash, "local"), str(local_path)),
+        )
         # then also register pending upload - if the URI is a local file, we need to determine a
         # remote URI for this thing automagically; otherwise, use whatever was already
         # specified by the Source itself.
         remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_uri(source_.hash)
         deferred_work.add(
-            __name__,
+            __name__ + "-remotehashref",
             source_.hash,
             partial(_upload_and_create_remote_hashref, local_path, remote_uri, source_.hash),
         )
