@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 HW = DATA_DIR / "hello_world.txt"
 
 
-def test_serde():
+def test_serde():magi
     serialized = '{"uri": "adls://foo/bar/baz", "md5b64": "WPMVPiXYwhMrMjF87w3GvA=="}'
     assert AdlsHashedResource.parse(serialized).serialized == serialized
 
