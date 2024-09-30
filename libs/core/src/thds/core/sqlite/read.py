@@ -36,7 +36,7 @@ def partition(
     if no columns are specified partitioning will be based on rowid
     """
     assert 0 <= i < n
-    if columns is None:
+    if not columns:
         return {f"rowid % {n}": i}
     hash_cols = columns if isinstance(columns, str) else ", ".join(columns)
     # when SQLite uses this in a WHERE clause, as "hash(foo, bar) % 5 = 3",
