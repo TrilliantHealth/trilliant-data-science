@@ -8,11 +8,13 @@ from contextlib import contextmanager
 
 from thds.core import config, log
 
+from ...._utils import colorize
 from ..uris import lookup_blob_store
 
 _REQUIRE_ALL_RESULTS = config.item("require_all_results", default=False, parse=config.tobool)
 # please do not set the above globally unless you really, truly know what you're doing.
 logger = log.getLogger(__name__)
+ORANGE = colorize.colorized("#FF8200")
 
 
 @contextmanager
@@ -67,7 +69,9 @@ def check_if_result_exists(
     if _require_result(memo_uri):
         before_raise()
         raise RequiredResultNotFound(
-            f"Required a result for {memo_uri} but that result was not found", memo_uri
+            # i'm tired of visually scanning for these in logs.
+            f"Required a result for {ORANGE(memo_uri)} but that result was not found",
+            memo_uri,
         )
 
     if rerun_excs:
