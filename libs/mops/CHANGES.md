@@ -1,3 +1,8 @@
+### 2.11.20241001
+
+- Fix bug in `image.py` where we wouldn't build the upstream Docker image (if configured) in its own
+  virtual environment.
+
 ### 2.11.20240927
 
 - Fix bug where, when not finding required results, we only uploaded the `invocation` and did not do the
