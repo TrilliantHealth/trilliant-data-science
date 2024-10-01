@@ -1,4 +1,5 @@
 import datetime
+import enum
 import importlib
 import uuid
 from types import ModuleType
@@ -221,12 +222,23 @@ def gen_jsonschema_attrs(
 def gen_jsonschema_literal(
     gen_jsonschema, type_: Type, type_cache: JSONSchemaTypeCache, serializer: ToJSON
 ):
+    return _gen_jsonschema_enum(get_args(type_), type_, serializer, "literal")
+
+
+@check_cache
+def gen_jsonschema_enum(
+    gen_jsonschema, type_: Type[enum.Enum], type_cache: JSONSchemaTypeCache, serializer: ToJSON
+):
+    return _gen_jsonschema_enum([v.value for v in type_], type_, serializer, "enum")
+
+
+def _gen_jsonschema_enum(base_values, type_: Type[enum.Enum], serializer: ToJSON, kind: str):
     values = []
-    for i, value in enumerate(get_args(type_)):
+    for i, value in enumerate(base_values):
         try:
             values.append(serializer(value))
         except Exception:
-            raise TypeError(f"Can't serialize value {value!r} at index {i:d} of literal type {type_!r}")
+            raise TypeError(f"Can't serialize value {value!r} at index {i:d} of {kind} type {type_!r}")
     return {ENUM: list(values)}
 
 
@@ -303,6 +315,7 @@ gen_jsonschema: "TypeRecursion[[JSONSchemaTypeCache, ToJSON], JSONSchema]" = Typ
     cached=False,  # no caching by type since behavior depends on to_json, type_cache args
     attrs=gen_jsonschema_attrs,
     literal=gen_jsonschema_literal,
+    enum=gen_jsonschema_enum,
     newtype=gen_jsonschema_newtype,
     union=gen_jsonschema_union,
     mapping=gen_jsonschema_mapping,

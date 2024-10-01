@@ -1,4 +1,5 @@
 import collections
+import enum
 import inspect
 import typing
 from typing import Callable, List, Mapping, Optional, Tuple, Type, TypeVar, Union
@@ -84,6 +85,14 @@ def literal_base(type_: Type) -> Type:
     return Union[types]  # type: ignore
 
 
+def enum_base(type_: Type) -> Type:
+    assert is_enum_type(type_)
+    if issubclass(type_, int):  # IntEnum, IntFlag
+        return int
+    types = tuple(type(e.value) for e in type_)
+    return Union[types]  # type: ignore
+
+
 def unwrap_optional(type_: Type) -> Type:
     if is_optional_type(type_):
         args = get_args(type_)
@@ -104,6 +113,10 @@ def unwrap_annotated(type_: Type) -> Type:
     if is_annotated_type(type_):
         return type_.__origin__
     return type_
+
+
+def is_enum_type(type_: Type) -> bool:
+    return isinstance(type_, type) and issubclass(type_, enum.Enum)
 
 
 def is_collection_type(type_: Type) -> bool:

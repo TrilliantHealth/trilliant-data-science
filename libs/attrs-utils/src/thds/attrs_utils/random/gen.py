@@ -1,4 +1,5 @@
 import collections
+import enum
 from functools import partial
 from typing import Any, DefaultDict, Iterable, Tuple, Type, cast, get_args
 
@@ -20,6 +21,11 @@ unknown_type: "recursion.RecF[Type, [], Gen]" = recursion.value_error(_UNKNOWN_T
 def gen_literal(random_gen, type_: Type[T]) -> Gen[T]:
     values = cast(Tuple[T], get_args(type_))
     return choice_gen(values)
+
+
+def gen_enum(random_gen, type_: Type[T]) -> Gen[T]:
+    assert issubclass(type_, enum.Enum)
+    return choice_gen(list(type_))
 
 
 def gen_attrs(random_gen, type_: Type[attr.AttrsInstance]) -> Gen[attr.AttrsInstance]:
@@ -117,6 +123,7 @@ random_gen: "type_recursion.TypeRecursion[[], Gen[Any]]" = type_recursion.TypeRe
     attrs=gen_attrs,
     namedtuple=gen_namedtuple,
     literal=gen_literal,
+    enum=gen_enum,
     optional=gen_optional,
     union=gen_union,
     tuple=gen_tuple,

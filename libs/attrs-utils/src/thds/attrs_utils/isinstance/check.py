@@ -91,6 +91,7 @@ instancecheck: "TypeRecursion[[], Check]" = TypeRecursion(
     # also an optimization to put this check first since these are the most common types.
     first=(type_utils.is_builtin_type, simple_isinstance),
     literal=check_literal,
+    enum=simple_isinstance,
     attrs=check_attrs,
     namedtuple=check_namedtuple,
     union=check_union,
