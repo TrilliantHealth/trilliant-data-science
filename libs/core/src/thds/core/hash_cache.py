@@ -47,6 +47,11 @@ def _filecachekey(path: Path, hashtype: str) -> Path:
     )
 
 
+def _is_no_older_than(file: Path, other: Path) -> bool:
+    """Returns True if `file` is no older than `other`. Both files must exist."""
+    return file.stat().st_mtime >= other.stat().st_mtime
+
+
 def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     """Hashes a file with the given hashlib hasher. If we've already previously computed
     the given hash for the file and the file hasn't changed (according to filesystem
@@ -55,22 +60,22 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     File must exist and respond positively to stat().
     """
     resolved_path = Path(filepath).resolve()
-    cached_hash_location = _filecachekey(resolved_path, hasher.name)
+    cached_hash_path = _filecachekey(resolved_path, hasher.name)
     # now we can check to see if we have hash bytes for that file somewhere already.
-    hash_exists = cached_hash_location.exists()
-    if hash_exists and cached_hash_location.stat().st_mtime >= resolved_path.stat().st_mtime:
-        logger.debug("Reusing known hash for %s - cache key %s", resolved_path, cached_hash_location)
-        return cached_hash_location.read_bytes()
+    hash_cached = "hash-cached" if cached_hash_path.exists() else ""
+    if hash_cached and _is_no_older_than(cached_hash_path, resolved_path):
+        logger.debug("Reusing known hash for %s - cache key %s", resolved_path, cached_hash_path)
+        return cached_hash_path.read_bytes()
 
     psize = resolved_path.stat().st_size
     if psize > _1GB:
-        log_at_lvl = logger.warning if hash_exists else logger.info
+        log_at_lvl = logger.warning if hash_cached else logger.info
         # I want to know how often we're finding 'outdated' hashes; those should be rare.
-        log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}; prev hash? {hash_exists}")
+        log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}{hash_cached}")
 
     hash_bytes = hash_using(resolved_path, hasher).digest()
-    cached_hash_location.parent.mkdir(parents=True, exist_ok=True)
-    with files.atomic_binary_writer(cached_hash_location) as f:
+    cached_hash_path.parent.mkdir(parents=True, exist_ok=True)
+    with files.atomic_binary_writer(cached_hash_path) as f:
         f.write(hash_bytes)
     return hash_bytes
 
