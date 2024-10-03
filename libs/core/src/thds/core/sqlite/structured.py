@@ -6,6 +6,7 @@ from sqlite3 import Connection, OperationalError
 from thds.core import config
 from thds.core.lazy import ThreadLocalLazy
 from thds.core.log import getLogger
+from thds.core.types import StrOrPath
 
 from .connect import row_connect
 from .meta import column_names, primary_key_cols
@@ -27,7 +28,7 @@ class TableMeta:
     colnames: ty.Set[str]
 
 
-DbPathAndTableName = ty.Tuple[str, str]
+DbPathAndTableName = ty.Tuple[StrOrPath, str]
 
 
 class BadPrimaryKey(ValueError):
