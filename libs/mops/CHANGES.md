@@ -1,3 +1,10 @@
+### 2.12.20241009
+
+- We had previously begun to allow you to specify a `service_account_name` for your `mops.k8s`-launched
+  Kubernetes image - but we did not directly apply the magic incanation that would allow you to make use
+  of our `orchestrator` service account and its intended cluster role. This release fixes that issue by
+  automagically applying the correct role (and binding).
+
 ## 2.12
 
 - `pure.require_all_results` now supports a message to be presented to the user in case the results do

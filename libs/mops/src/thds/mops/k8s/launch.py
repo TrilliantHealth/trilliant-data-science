@@ -12,7 +12,7 @@ from thds.core.log import logger_context
 from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
 
 from .._utils.colorize import colorized
-from . import config
+from . import config, orchestrator
 from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .logging import JobLogWatcher
@@ -29,19 +29,6 @@ class K8sJobFailedError(Exception):
     """Raised by `launch` when a Job is seen to terminate in a Failed state."""
 
 
-def autocr(container_image_name: str, cr_url: str = "") -> str:
-    """Prefix the container with the configured container registry URL.
-
-    Idempotent, so it will not apply if called a second time.
-    """
-    cr_url = cr_url or config.k8s_acr_url()
-    assert cr_url, "No container registry URL configured."
-    prefix = cr_url + "/" if cr_url and not cr_url.endswith("/") else cr_url
-    if not container_image_name.startswith(prefix):
-        return prefix + container_image_name
-    return container_image_name
-
-
 class Counter:
     def __init__(self):
         self.value = 0
@@ -56,6 +43,40 @@ class Counter:
 _LAUNCH_COUNT = Counter()
 _FINISH_COUNT = Counter()
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
+
+
+def embed_thds_auth(v1_job_body: client.models.V1Job) -> client.models.V1Job:
+    """Add config to the given job to enable Azure Workload Identity or managed identity."""
+
+    # v1_job_body.spec.template == the pod.
+    pod = v1_job_body.spec.template
+
+    use_azure_workload_identity = (
+        config.k8s_namespace() in config.namespaces_supporting_workload_identity()
+    )
+    if use_azure_workload_identity:
+        logger.debug(
+            "Using Azure Workload Identity," " which is the most reliable form of auth as of Q1 2023"
+        )
+        labels = {"azure.workload.identity/use": "true"}
+        # this is in fact supposed to be string 'true', not value True.
+        # https://azure.github.io/azure-workload-identity/docs/quick-start.html#7-deploy-workload
+        pod.spec.service_account_name = "ds-standard"
+    elif config.aad_pod_managed_identity():
+        logger.debug("Adding AAD pod managed identity")
+        labels = {"aadpodidbinding": config.aad_pod_managed_identity()}
+    else:
+        logger.warning(
+            "No automatic Azure identity being assigned. This might cause authorization issues"
+        )
+        labels = dict()
+
+    pod.metadata.labels = {**(v1_job_body.spec.template.metadata.labels or dict()), **labels}
+
+    if use_azure_workload_identity and not pod.spec.service_account_name:
+        pod.spec.service_account_name = "ds-standard"
+
+    return v1_job_body
 
 
 @scope.bound
@@ -97,40 +118,22 @@ def launch(
 
     # TODO move this entire function out to be separately callable
     @k8s_sdk_retry()
-    def assemble_job() -> client.models.V1Job:
+    def assemble_base_job() -> client.models.V1Job:
         logger.debug(f"Assembling job named `{name}` on image `{container_image}`")
         logger.debug("Fire and forget: %s", fire_and_forget)
         logger.debug("Loading kube configs ...")
         load_config()
         logger.debug("Populating job object ...")
-        body = client.V1Job(api_version="batch/v1", kind="Job")
+        v1_job_body = client.V1Job(api_version="batch/v1", kind="Job")
         logger.debug("Setting object meta ...")
-        body.metadata = client.V1ObjectMeta(namespace=config.k8s_namespace(), name=name)
+        v1_job_body.metadata = client.V1ObjectMeta(namespace=config.k8s_namespace(), name=name)
 
-        body.status = client.V1JobStatus()
+        v1_job_body.status = client.V1JobStatus()
         logger.debug("Creating pod template ...")
-        template = client.V1PodTemplate()
+        pod_template = client.V1PodTemplate()
 
-        use_azure_workload_identity = (
-            config.k8s_namespace() in config.namespaces_supporting_workload_identity()
-        )
-        if use_azure_workload_identity:
-            logger.debug(
-                "Using Azure Workload Identity," " which is the most reliable form of auth as of Q1 2023"
-            )
-            labels = {"azure.workload.identity/use": "true"}
-            # this is in fact supposed to be string 'true', not value True.
-            # https://azure.github.io/azure-workload-identity/docs/quick-start.html#7-deploy-workload
-        elif config.aad_pod_managed_identity():
-            logger.debug("Adding AAD pod managed identity")
-            labels = {"aadpodidbinding": config.aad_pod_managed_identity()}
-        else:
-            logger.warning(
-                "No automatic Azure identity being assigned. This might cause authorization issues"
-            )
-            labels = dict()
-
-        template.template = client.V1PodTemplateSpec(metadata=client.V1ObjectMeta(labels=labels))
+        pod_template.template = client.V1PodTemplateSpec(metadata=client.V1ObjectMeta(labels=dict()))
+        # we make empty labels just in case a later transformer wants to add some.
 
         logger.debug("Applying environment variables ...")
         env_list = [
@@ -166,30 +169,32 @@ def launch(
 
         container = client.V1Container(**v1_container_args)
         logger.debug("Creating podspec definition ...")
-        template.template.spec = client.V1PodSpec(
+        pod_template.template.spec = client.V1PodSpec(
             containers=[container],
             restart_policy="Never",
             node_selector=node_narrowing.get("node_selector", dict()),
             tolerations=node_narrowing.get("tolerations", list()),
         )
-        if service_account_name:
-            template.template.spec.service_account_name = service_account_name
-        elif use_azure_workload_identity:
-            template.template.spec.service_account_name = "ds-standard"
+        pod_template.template.spec.service_account_name = service_account_name
 
         logger.debug("Creating job definition ...")
-        body.spec = client.V1JobSpec(
+        v1_job_body.spec = client.V1JobSpec(
             backoff_limit=config.k8s_job_retry_count(),
             completions=1,
             ttl_seconds_after_finished=config.k8s_job_cleanup_ttl_seconds_after_completion(),
-            template=template.template,
+            template=pod_template.template,
         )
-        logger.debug("Finished creating job definition ...")
-        return body
+        logger.debug("Finished creating base job definition ...")
+        return v1_job_body
 
-    body = transform_job(assemble_job())
+    def job_with_all_transforms() -> client.models.V1Job:
+        job = embed_thds_auth(transform_job(assemble_base_job()))
+        if job.spec.template.spec.service_account_name == orchestrator.cluster_role.STANDARD:
+            orchestrator.cluster_role.create_orchestrator_cluster_role_bindings()
+        return job
 
     if dry_run:
+        job_with_all_transforms()
         logger.info("Dry run assembly successful; not launching...")
         return
 
@@ -197,7 +202,11 @@ def launch(
     def launch_job() -> client.models.V1Job:
         with _SIMULTANEOUS_LAUNCHES:
             upsert_namespace(config.k8s_namespace())
-            return client.BatchV1Api().create_namespaced_job(namespace=config.k8s_namespace(), body=body)
+            # we do the job transform after actually upserting the namespace so that
+            # the transform can use the namespace if necessary.
+            return client.BatchV1Api().create_namespaced_job(
+                namespace=config.k8s_namespace(), body=job_with_all_transforms()
+            )
 
     job = launch_job()
     logger.info(LAUNCHED(f"Job {job_num} launched!") + f" on {container_image}")
@@ -214,7 +223,7 @@ def launch(
             return f"- ({launched - _FINISH_COUNT.inc()} unfinished of {launched})"
 
         job_name = job.metadata.name
-        del body, job  # trying to save memory here while we wait...
+        del job  # trying to save memory here while we wait...
         if not wait_for_job(job_name, short_name=job_num):
             logger.error(FAILED(f"Job {job_num} Failed! {counts()}"))
             raise K8sJobFailedError(f"Job {job_name} failed.")
