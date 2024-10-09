@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "2.11"
+version = "2.12"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
 readme = "README.md"

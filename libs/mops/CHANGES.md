@@ -1,3 +1,10 @@
+## 2.12
+
+- `pure.require_all_results` now supports a message to be presented to the user in case the results do
+  not exist. Additionally, it supports providing an environment variable which can be set to disable the
+  check for that particular case. The message, if provided, and a note about the option to override with
+  environment variable, will be included in the exception that is raised.
+
 ### 2.11.20241001
 
 - Fix bug in `image.py` where we wouldn't build the upstream Docker image (if configured) in its own
