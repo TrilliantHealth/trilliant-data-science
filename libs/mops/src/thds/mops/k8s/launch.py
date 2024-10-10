@@ -12,12 +12,13 @@ from thds.core.log import logger_context
 from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
 
 from .._utils.colorize import colorized
-from . import config, orchestrator
+from . import config
 from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .logging import JobLogWatcher
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
+from .thds_std import embed_thds_auth
 from .wait_job import wait_for_job
 
 LAUNCHED = colorized(fg="white", bg="green")
@@ -45,40 +46,6 @@ _FINISH_COUNT = Counter()
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
 
 
-def embed_thds_auth(v1_job_body: client.models.V1Job) -> client.models.V1Job:
-    """Add config to the given job to enable Azure Workload Identity or managed identity."""
-
-    # v1_job_body.spec.template == the pod.
-    pod = v1_job_body.spec.template
-
-    use_azure_workload_identity = (
-        config.k8s_namespace() in config.namespaces_supporting_workload_identity()
-    )
-    if use_azure_workload_identity:
-        logger.debug(
-            "Using Azure Workload Identity," " which is the most reliable form of auth as of Q1 2023"
-        )
-        labels = {"azure.workload.identity/use": "true"}
-        # this is in fact supposed to be string 'true', not value True.
-        # https://azure.github.io/azure-workload-identity/docs/quick-start.html#7-deploy-workload
-        pod.spec.service_account_name = "ds-standard"
-    elif config.aad_pod_managed_identity():
-        logger.debug("Adding AAD pod managed identity")
-        labels = {"aadpodidbinding": config.aad_pod_managed_identity()}
-    else:
-        logger.warning(
-            "No automatic Azure identity being assigned. This might cause authorization issues"
-        )
-        labels = dict()
-
-    pod.metadata.labels = {**(v1_job_body.spec.template.metadata.labels or dict()), **labels}
-
-    if use_azure_workload_identity and not pod.spec.service_account_name:
-        pod.spec.service_account_name = "ds-standard"
-
-    return v1_job_body
-
-
 @scope.bound
 def launch(
     container_image: str,
@@ -93,7 +60,8 @@ def launch(
     dry_run: bool = False,
     fire_and_forget: bool = False,
     suppress_logs: bool = False,
-    transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = lambda x: x,
+    transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = embed_thds_auth,
+    # this is a default for now. later if we share this code we'll need to have a wrapper interface
     service_account_name: str = "",
 ) -> None:
     """Launch a Kubernetes job.
@@ -174,8 +142,8 @@ def launch(
             restart_policy="Never",
             node_selector=node_narrowing.get("node_selector", dict()),
             tolerations=node_narrowing.get("tolerations", list()),
+            service_account_name=service_account_name,
         )
-        pod_template.template.spec.service_account_name = service_account_name
 
         logger.debug("Creating job definition ...")
         v1_job_body.spec = client.V1JobSpec(
@@ -188,10 +156,7 @@ def launch(
         return v1_job_body
 
     def job_with_all_transforms() -> client.models.V1Job:
-        job = embed_thds_auth(transform_job(assemble_base_job()))
-        if job.spec.template.spec.service_account_name == orchestrator.cluster_role.STANDARD:
-            orchestrator.cluster_role.create_orchestrator_cluster_role_bindings()
-        return job
+        return transform_job(assemble_base_job())
 
     if dry_run:
         job_with_all_transforms()

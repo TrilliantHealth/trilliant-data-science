@@ -37,7 +37,7 @@ def upsert_namespace(namespace: str, created_cache=set()):  # noqa: B006
     scope.enter(_AUTH_RLOCK)
     if namespace in created_cache:
         return
-    logger.info("Creating namespace if not exists: %s" % namespace)
+    logger.debug("Creating namespace if not exists: %s" % namespace)
     load_config()
     kubeapi = client.CoreV1Api()
     ns_obj = client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace))
