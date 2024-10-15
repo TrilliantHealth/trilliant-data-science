@@ -1,3 +1,8 @@
+### 2.5.20241015
+
+- Fix for change in how ADLS servers are interpreting length=0 when we didn't know the length of a byte
+  stream.
+
 ## 2.5
 
 ```

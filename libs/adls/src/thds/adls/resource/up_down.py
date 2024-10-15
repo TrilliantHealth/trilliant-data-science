@@ -120,7 +120,7 @@ def upload(
     decision = upload_decision_and_settings(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
     if decision.upload_required:
         # set up some bookkeeping
-        n_bytes = 0
+        n_bytes = None  # if we pass 0 to upload_blob, it truncates the write now
         if isinstance(src, Path):
             n_bytes = src.stat().st_size
             src = scope.enter(open(src, "rb"))
@@ -138,7 +138,7 @@ def upload(
         # This is both faster, as well as simpler to reason about, and
         # in fact was the behavior I had been assuming all along...
         blob_client.upload_blob(
-            report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes),
+            report_upload_progress(ty.cast(ty.IO, src), str(dest_), n_bytes or 0),
             overwrite=True,
             length=n_bytes,
             content_settings=decision.content_settings,
