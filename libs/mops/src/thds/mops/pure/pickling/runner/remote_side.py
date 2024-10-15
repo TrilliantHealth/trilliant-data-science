@@ -63,8 +63,12 @@ def remote_entry_run_pickled_invocation(memo_uri: str, pipeline_id: str):
 
     def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
         parts = fs.split(memo_uri)
-        runner_idx = parts.index(RUNNER_SUFFIX)
-        assert runner_idx >= 0, f"This URI does not look like it was created by us: {memo_uri}"
+        try:
+            runner_idx = parts.index(RUNNER_SUFFIX)
+        except ValueError as ve:
+            raise ValueError(
+                f"Unable to find the runner suffix {RUNNER_SUFFIX} in parts {parts}"
+            ) from ve
         invocation_parts = parts[runner_idx + 1 :]
         return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
 

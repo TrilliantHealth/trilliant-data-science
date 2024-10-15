@@ -11,7 +11,6 @@ from pathlib import Path
 
 from thds.core import config, log, scope
 
-from ....__about__ import backward_compatible_with
 from ...._utils.colorize import colorized
 from ...._utils.once import Once
 from ....config import max_concurrent_network_ops
@@ -69,7 +68,7 @@ def _mk_builder(shell: ty.Union[Shell, ShellBuilder]) -> ShellBuilder:
 
 
 logger = log.getLogger(__name__)
-RUNNER_SUFFIX = f"mops{backward_compatible_with()}-mpf"
+RUNNER_SUFFIX = "mops2-mpf"  # namespace we use in case there are later incompatibility issues.
 Redirect = ty.Callable[[F, Args, Kwargs], F]
 NO_REDIRECT = lambda f, _args, _kwargs: f  # noqa: E731
 

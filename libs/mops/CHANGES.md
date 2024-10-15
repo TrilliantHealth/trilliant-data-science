@@ -1,3 +1,8 @@
+### 2.12.20241015
+
+- Fix bug where we relied on a semantic version being part of the package, which was guaranteed only by a
+  specific upstream part of `thds.core`, and was a bad tradeoff.
+
 ### 2.12.20241009
 
 - We had previously begun to allow you to specify a `service_account_name` for your `mops.k8s`-launched
