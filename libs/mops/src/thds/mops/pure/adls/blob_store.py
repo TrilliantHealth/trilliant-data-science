@@ -67,9 +67,9 @@ class AdlsBlobStore(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):
+    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"):
         """Upload data to a remote path."""
-        resource.upload(AdlsFqn.parse(remote_uri), data)
+        resource.upload(AdlsFqn.parse(remote_uri), data, content_type=type_hint)
         return remote_uri
 
     @_azure_creds_retry

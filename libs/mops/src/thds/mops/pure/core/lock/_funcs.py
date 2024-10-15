@@ -16,7 +16,7 @@ def utc_now() -> datetime:
 
 def write(blob_store: BlobStore, lock_uri: str, lock_bytes: bytes) -> None:
     try:
-        blob_store.putbytes(lock_uri, lock_bytes, type_hint="lock")
+        blob_store.putbytes(lock_uri, lock_bytes, type_hint="application/mops-lock")
     except Exception:
         logger.error(f"Failed to write lock at {lock_uri}")
         raise

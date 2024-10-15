@@ -82,7 +82,7 @@ def _read_hashref(hashref_uri: str) -> str:
 def _write_hashref(hashref_uri: str, uri: str) -> None:
     """Write URI to this hashref. Performs IO."""
     assert uri, f"Should never encode hashref ({hashref_uri}) pointing to empty URI"
-    lookup_blob_store(hashref_uri).putbytes(hashref_uri, uri.encode())
+    lookup_blob_store(hashref_uri).putbytes(hashref_uri, uri.encode(), type_hint="text/plain")
 
 
 def source_from_hashref(hash: hashing.Hash) -> Source:

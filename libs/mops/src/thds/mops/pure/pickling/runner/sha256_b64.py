@@ -4,6 +4,7 @@ Basically, we take some generic pickle utilities and stitch them together into s
 that efficiently serializes object graphs to a combination of locations at some URI prefix,
 such that they are self-deserializing (via CallableUnpickler) on the other side.
 """
+
 import hashlib
 import io
 import pickle
@@ -47,10 +48,10 @@ def _pickle_obj_and_upload_to_content_addressed_path(
             storage_root,
             debug_name=f"objname_{debug_name}" if debug_name else "",
         )
-        fs.putbytes(bytes_uri, bio)
+        fs.putbytes(bytes_uri, bio, type_hint="application/octet-stream")
         if debug_uri:
             # this name is purely for debugging and affects no part of the runtime.
-            fs.putbytes(debug_uri, "goodbeef".encode())
+            fs.putbytes(debug_uri, "goodbeef".encode(), type_hint="text/plain")
 
     return UnpickleSimplePickleFromUri(bytes_uri)
 

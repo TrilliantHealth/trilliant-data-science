@@ -1,3 +1,8 @@
+## 2.13
+
+- Forward-compatibility shims for upcoming mops 3.0.
+- content-type is now added to the mops control files when uploaded to ADLS.
+
 ### 2.12.20241015
 
 - Fix bug where we relied on a semantic version being part of the package, which was guaranteed only by a

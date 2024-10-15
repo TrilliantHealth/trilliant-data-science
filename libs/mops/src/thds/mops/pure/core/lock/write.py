@@ -128,7 +128,7 @@ class LockfileWriter:
                 self.blob_store.putbytes(
                     debug_uri,
                     _funcs.json_dumpb(lock_contents),
-                    type_hint="lock-breadcrumb",
+                    type_hint="application/mops-lock-breadcrumb",
                 )
             except Exception:
                 logger.warning(f"Problem writing debug lock {debug_uri}")

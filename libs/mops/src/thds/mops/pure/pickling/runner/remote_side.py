@@ -25,17 +25,20 @@ class _ResultExcChannel(ty.NamedTuple):
     call_id: str
 
     def result(self, r: T):
+        result_bytes = gimme_bytes(self.dumper, r)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.RESULT),
-            gimme_bytes(self.dumper, r),
-            type_hint="result",
+            result_bytes,
+            type_hint="application/mops-result",
+            # technically these are bytes, but in the future they will be partially text.
         )
 
     def exception(self, exc: Exception):
+        exc_bytes = gimme_bytes(self.dumper, exc)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.EXCEPTION),
-            gimme_bytes(self.dumper, exc),
-            type_hint="EXCEPTION",
+            exc_bytes,
+            type_hint="application/mops-exception",
         )
 
 

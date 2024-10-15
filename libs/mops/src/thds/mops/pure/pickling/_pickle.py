@@ -1,5 +1,6 @@
 """Utilities built around pickle for the purpose of transferring large amounts of on-disk
 data and also functions."""
+
 import inspect
 import io
 import pickle
@@ -75,11 +76,27 @@ def gimme_bytes(pickle_dump: ty.Callable[[object, ty.IO], None], obj: object) ->
         return bio.read()
 
 
+def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
+    # in order to be forward-compatible with v3 of mops, we're introducing a new
+    # wrinkle in the read. Instead of assuming that the data at the URI
+    # _begins_ with a pickle, we are looking for the first possible pickle
+    # and beginning our read there. Mops 3 will be generating some human-readable,
+    # non-pickle metadata and embedding it at the beginning of the file.
+    first_pickle_pos = full_bytes.find(b"\x80")
+    if first_pickle_pos == -1:
+        raise ValueError("Unable to find a pickle in the bytes")
+    return (
+        full_bytes[:first_pickle_pos],
+        CallableUnpickler(io.BytesIO(full_bytes[first_pickle_pos:])).load(),
+    )
+
+
 def make_read_object(
     type_hint: str, wrapper: ty.Callable[[ty.Any], T] = lambda o: o
 ) -> ty.Callable[[str], T]:
     def read_object(uri: str) -> T:
-        return wrapper(CallableUnpickler(io.BytesIO(get_bytes(uri, type_hint=type_hint))).load())
+        _unused, unpickled = read_partial_pickle(get_bytes(uri, type_hint=type_hint))
+        return wrapper(unpickled)
 
     return read_object
 

@@ -252,14 +252,14 @@ def _pickle_func_and_run_via_shell(  # noqa: C901
                 deferred_work.perform_all()
 
                 fs.putbytes(
-                    fs.join(memo_uri, INVOCATION),
+                    fs.join(memo_uri, INVOCATION),  # until v3, continue to use no suffix here.
                     gimme_bytes(
                         dumper,
                         NestedFunctionPickle(
                             wrap_f(remote_redirect(func, args, kwargs)), args_kwargs_bytes
                         ),
                     ),
-                    type_hint=INVOCATION,
+                    type_hint="application/mops-invocation",
                 )
 
             def unwrap_remote_result(result: ty.Union[memo.results.Success, memo.results.Error]) -> T:
