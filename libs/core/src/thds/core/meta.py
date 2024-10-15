@@ -188,10 +188,9 @@ def get_version(pkg: Package, orig: str = "") -> str:
 
                 for env_var in ("CALGITVER", "GIT_COMMIT"):
                     env_var_version = os.getenv(env_var)
+                    lvl = LOGGER.debug if env_var == "CALGITVER" else LOGGER.info
                     if env_var_version:
-                        LOGGER.info(
-                            f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}"
-                        )
+                        lvl(f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}")
                         return env_var_version
 
                 LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
