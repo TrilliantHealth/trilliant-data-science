@@ -48,8 +48,8 @@ def test_upsert_does_not_overwrite_missing_cols(test_conn: sqlite3.Connection):
             dict(id=42, name="42", foo="42"),  # pure insert
             dict(id=1, name="one", foo="SPAZ"),  # existing/conflict
             # ^ these form a batch, and one is a conflict and the other a pure insert.
-            dict(id=30, name="insert-me", age=10),
-            dict(id=1, name="one", foo="SPEZ", age=10),
+            dict(id=30, age=10, name="insert-me"),
+            dict(id=1, foo="SPEZ", age=10, name="one"),
             # ^ can handle having multiple rows for the same key
             dict(id=8, age=8, countdown=13),
             dict(id=9, age=9, countdown=13),  # these two rows should form a batch

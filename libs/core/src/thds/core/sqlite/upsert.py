@@ -55,7 +55,7 @@ def _make_upsert_writer(
     # so maybe it's a wash?
 
     @lru_cache(maxsize=max_sql_stmt_cache_size)
-    def make_upsert_query(row_keys: ty.Tuple[str, ...]) -> str:
+    def make_upsert_query(colnames_for_partial_row: ty.Sequence[str]) -> str:
         """Makes a query with placeholders which are:
 
         - the values you provide for the row keys
@@ -66,8 +66,8 @@ def _make_upsert_writer(
         """
         colnames_or_placeholders = list()
         for col in all_column_names:
-            if col in row_keys:
-                colnames_or_placeholders.append("?")  # insert/update the provided value
+            if col in colnames_for_partial_row:
+                colnames_or_placeholders.append(f"@{col}")  # insert/update the provided value
             else:
                 colnames_or_placeholders.append(col)  # use the joined default value for an update
 
@@ -84,7 +84,7 @@ def _make_upsert_writer(
         )
 
     cursor = None
-    batch: ty.List[ty.Tuple[ty.Any, ...]] = list()
+    batch: ty.List[ty.Mapping[str, ty.Any]] = list()
     query = ""
     current_keyset: ty.Tuple[str, ...] = tuple()
 
@@ -94,17 +94,7 @@ def _make_upsert_writer(
         # don't create the cursor til we receive our first actual row.
 
         while True:
-            keyset = tuple(row)
-            # Based on some benchmarking, and on the (imagined) most likely actual use
-            # cases, we're choosing not to sort your keys for you - if your rows have
-            # different key orders, we won't be able to make batches as large, and
-            # performance will decrease.  It seems likely that in most real-world use
-            # cases, the code for generating the rows will have somewhat determinstic key
-            # ordering. If this isn't the case, you're welcome to reorder the keys as you
-            # see fit - perhaps it will make your code faster, but my guess is that in
-            # many cases, by taking on that extra Python overhead, you'll end up slower
-            # overall. Either way, the power is in your hands and we're leaving this code
-            # uncomplicated by that detail.
+            keyset = tuple([col for col in all_column_names if col in row])
             if keyset != current_keyset or len(batch) >= batch_size:
                 # send current batch:
                 run_batch_and_isolate_failures(cursor, query, batch)
@@ -113,7 +103,7 @@ def _make_upsert_writer(
                 query = make_upsert_query(keyset)
                 current_keyset = keyset
 
-            batch.append(tuple(row.values()) + tuple(row[col] for col in primary_keys))
+            batch.append(row)
             row = yield
 
     except GeneratorExit:
