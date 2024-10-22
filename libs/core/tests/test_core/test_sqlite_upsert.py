@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from thds.core.sqlite import connect, upsert, write
+from thds.core.sqlite import connect, read, upsert, write
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ TEST_TB = "test"
 def test_conn(_base_test_db_rows) -> sqlite3.Connection:
     db = connect.row_connect(":memory:")
     db.execute(
-        "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT, foo TEXT, age INTEGER, height REAL, countdown INTEGER, allowed_bags INTEGER, untouched TEXT)"
+        "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT NOT NULL, foo TEXT, age INTEGER, height REAL, countdown INTEGER, allowed_bags INTEGER, untouched TEXT)"
     )
     for item in _base_test_db_rows:
         write.write_mappings(db, TEST_TB, [item])
@@ -86,3 +86,27 @@ def test_upsert_does_not_overwrite_missing_cols(test_conn: sqlite3.Connection):
 def test_upsert_warns_if_no_rows(test_conn: sqlite3.Connection, caplog):
     upsert.mappings(test_conn, TEST_TB, [])
     caplog.records[0].getMessage().startswith("No rows to upsert")
+
+
+def test_name_cannot_be_null_but_can_be_omitted_from_update(test_conn: sqlite3.Connection):
+    with pytest.raises(sqlite3.IntegrityError):
+        upsert.mappings(test_conn, TEST_TB, [dict(id=99, age=88)])
+
+    with pytest.raises(sqlite3.IntegrityError):
+        upsert.mappings(test_conn, TEST_TB, [dict(id=99, name=None)])
+
+    upsert.mappings(test_conn, TEST_TB, [dict(id=99, name="George Smythe")])
+    # basic insert to get things moving
+    upsert.mappings(test_conn, TEST_TB, [dict(id=99, age=88)])
+    # would not previously have worked, but since the row exists, this will now be okay.
+
+    assert dict(list(read.matching_select(TEST_TB, test_conn, dict(id=99)))[0]) == dict(
+        id=99,
+        name="George Smythe",
+        age=88,
+        allowed_bags=None,
+        countdown=None,
+        foo=None,
+        height=None,
+        untouched=None,
+    )

@@ -5,10 +5,9 @@ import logging
 import os
 import shutil
 from collections.abc import Mapping as MappingABC
-from functools import cached_property, cmp_to_key, wraps
+from functools import cmp_to_key, wraps
 from pathlib import Path
 from typing import (
-    Awaitable,
     IO,
     Any,
     AsyncIterable,
@@ -178,12 +177,6 @@ class ADLSFileSystem:
                     file_system=self.file_system
                 ) as file_system_client:
                     return await func(file_system_client, *args, **kwargs)
-
-
-    def get_client() -> FileSystemClient:
-        return self._run(
-            lambda file_system_client: file_system_client
-        )
 
     def _local_path_for(self, remote_path: str, local_path: Optional[Union[Path, str]]) -> Path:
         if local_path is None:
