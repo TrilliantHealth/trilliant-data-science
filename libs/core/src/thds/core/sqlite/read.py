@@ -3,8 +3,8 @@ from sqlite3 import Connection, Row
 
 
 def matching_where(to_match_colnames: ty.Iterable[str]) -> str:
-    """Creates a where clause for these column names, with ? placeholders for each column."""
-    qs = " AND ".join(f"{k} = ?" for k in to_match_colnames)
+    """Creates a where clause for these column names, with named @{col} placeholders for each column."""
+    qs = " AND ".join(f"{k} = @{k}" for k in to_match_colnames)
     return f"WHERE {qs}" if qs else ""
 
 
@@ -21,7 +21,10 @@ def matching_select(
     call this function directly and specify any of its keys.
     """
     cols = ", ".join(columns) if columns else "*"
-    where = matching_where(to_match.keys())
+
+    qs = " AND ".join(f"{k} = ?" for k in to_match.keys())
+    where = f"WHERE {qs}" if qs else ""
+    # because we control the whole query, we're matching on the 'dumb' ? placeholder.
 
     old_row_factory = conn.row_factory
     conn.row_factory = Row  # this is an optimized approach to getting 'mappings' (with key names)
