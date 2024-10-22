@@ -2,13 +2,7 @@ import typing as ty
 from sqlite3 import Connection, Row
 
 
-def matching_where(to_match_colnames: ty.Iterable[str]) -> str:
-    """Creates a where clause for these column names, with ? placeholders for each column."""
-    qs = " AND ".join(f"{k} = ?" for k in to_match_colnames)
-    return f"WHERE {qs}" if qs else ""
-
-
-def matching_select(
+def matching(
     table_name: str,
     conn: Connection,
     to_match: ty.Mapping[str, ty.Any],
@@ -21,16 +15,14 @@ def matching_select(
     call this function directly and specify any of its keys.
     """
     cols = ", ".join(columns) if columns else "*"
-    where = matching_where(to_match.keys())
+    qs = " AND ".join(f"{k} = ?" for k in to_match.keys())
+    where = f"WHERE {qs}" if qs else ""
 
     old_row_factory = conn.row_factory
     conn.row_factory = Row  # this is an optimized approach to getting 'mappings' (with key names)
     for row in conn.execute(f"SELECT {cols} FROM {table_name} {where}", tuple(to_match.values())):
         yield row
     conn.row_factory = old_row_factory
-
-
-matching = matching_select  # alias
 
 
 def partition(
