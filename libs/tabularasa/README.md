@@ -154,16 +154,28 @@ error-prone task. It ensures that all your package data and associated hashes ar
 finally ensures that your peers will have up-to-date data when they get a cache miss after pulling your
 code changes.
 
-If you have just cloned the repo or pulled a branch and wish to generate all tables as they should be on
-that branch, simply run
+If you'd like to better understand what you changed after any `tabularasa datagen` invocation before you
+commit the result, you can run `tabularasa data-diff`. By default, this diffs the data as versioned in
+the working tree against the data as versioned in the HEAD commit. If you've already committed, you can
+pass a ref to the previous commit, e.g. `tabularasa data-diff HEAD~`. This will show summary stats
+describing the changes, such as the number of rows added, removed, and modified for each updated table.
+With the `--verbose` flag added, you can see more detail, for instance the row counts for each row-level
+pattern of updates (e.g. in 10 rows, columns 'A' and 'B' were updated, in 5 rows, column 'C' was nulled,
+in 3 rows, column 'A' was filled, etc.).
+
+If you wish to regenerate _all_ package data tables from scratch, you can run
 
 ```bash
 tabularasa datagen
 ```
 
-which will regenerate all package data tables. By default this will skip regeneration of any tables whose
-md5 hashes match those of any existing associated package data files on disk. Package data hashes in the
-schema will then be updated for any package data that was generated.
+This will remove all pre-existing package data files and re-generate them. This is an extreme measure and
+should be used sparingly; in most cases, you will want to only those specific tables whose source data or
+derivation logic you know has changed.
+
+Note that if you have just cloned the repo or pulled a branch and wish to get your local package data
+up-to-date with the state on that branch, you don't need to re-derive all the data! Just
+[sync with the blob store](#syncing-with-the-blob-store) instead.
 
 #### Inspecting auto-generated code
 
@@ -220,10 +232,22 @@ then you may fetch all the package data tables that were omitted in the [build](
 tabularasa sync-blob-store --down
 ```
 
+or just
+
+```bash
+tabularasa pull
+```
+
 If you're using a remote blob store for large files, you will want to include the invocation
 
 ```bash
 tabularasa sync-blob-store --up
+```
+
+or just
+
+```bash
+tabularasa push
 ```
 
 somewhere in your CI build scripts after the [build](#building) completes and before you publish your

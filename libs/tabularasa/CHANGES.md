@@ -1,4 +1,9 @@
-### 0.5.0
+## 0.6.0
+
+- Added new `schema-diff` command to compare the current schema against a previous version of the schema
+  and output the differences in a human-readable markdown format.
+
+## 0.5.0
 
 - `tabularasa datagen` now ensures _all_ tables in the schema are recomputed when run without args
 

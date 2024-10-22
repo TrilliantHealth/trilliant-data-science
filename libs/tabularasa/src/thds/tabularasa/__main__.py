@@ -5,11 +5,12 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from copy import copy
 from enum import Enum
 from functools import partial
 from itertools import repeat
 from pathlib import Path
-from typing import Dict, Iterable, List, NamedTuple, Optional, Set, Type, Union, cast
+from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple, Type, Union, cast
 
 import networkx as nx
 import pkg_resources
@@ -21,12 +22,16 @@ from thds.tabularasa.data_dependencies.adls import (
     sync_adls_data,
 )
 from thds.tabularasa.data_dependencies.build import ReferenceDataBuildCommand, populate_sqlite_db
+from thds.tabularasa.diff import data as data_diff
+from thds.tabularasa.diff import schema as schema_diff
+from thds.tabularasa.diff import summary as diff_summary
+from thds.tabularasa.loaders import parquet_util
 from thds.tabularasa.loaders.util import (
     PandasParquetLoader,
     default_parquet_package_data_path,
     hash_file,
 )
-from thds.tabularasa.schema import metaschema
+from thds.tabularasa.schema import load_schema, metaschema
 from thds.tabularasa.schema.compilation import (
     render_attrs_module,
     render_attrs_sqlite_schema,
@@ -185,6 +190,68 @@ def print_file_hashes_status(hashes: Dict[str, DataFileHashes]):
 def print_list(it: Iterable):
     for i in it:
         print(i)
+
+
+def print_schema_diff_summary(
+    diff: schema_diff.SchemaDiff,
+    *,
+    exit_code: bool = False,
+    heading_level: int = 0,
+    tablefmt: str = diff_summary.DEFAULT_TABLEFMT,
+):
+    """Print the schema diff summary to stdout and raise an exception if there are positive diffs
+
+    :param diff: the schema diff to summarize
+    :param exit_code: if passed, exit with code 1 if there is a positive diff (similar to `git diff --exit-code`)
+    :param tables: if passed, only show diffs for these tables. Note that a table may not be shown if it is
+      transient and the `transient` flag is not passed; a warning is raised in this case
+    :param transient: if passed, show diffs for transient tables
+    :param heading_level: increase this to render smaller headings on the markdown sections
+    :param tablefmt: the table format to use for the markdown tables, as understood by `tabulate`
+    """
+    positive_diff = False
+    for section in diff_summary.markdown_schema_diff_summary(
+        diff,
+        heading_level=heading_level,
+        tablefmt=tablefmt,
+    ):
+        print(section, end="\n\n")
+        positive_diff = True
+    if positive_diff and exit_code:
+        exit(1)
+
+
+def print_data_diff_summaries(
+    data_diffs: Iterator[Tuple[metaschema.Identifier, data_diff.DataFrameDiff]],
+    *,
+    exit_code: bool = False,
+    verbose: bool = False,
+    heading_level: int = 0,
+    tablefmt: str = diff_summary.DEFAULT_TABLEFMT,
+):
+    """Print summaries of data diffs for a sequence of updated tables
+
+    :param data_diffs: an iterator of tuples of table names and their corresponding data diffs
+    :param exit_code: if True, exit with code 1 if there is a positive diff (similar to `git diff --exit-code`)
+    :param verbose: if True, show detailed row change status counts; otherwise show only single-column
+      change counts
+    :param heading_level: increase this to render smaller headings on the markdown sections
+    :param tablefmt: the table format to use for the markdown tables, as understood by `tabulate`
+    """
+    positive_diff = False
+    for table_name, d_diff in data_diffs:
+        for section in diff_summary.markdown_dataframe_diff_summary(
+            d_diff,
+            table_name,
+            verbose,
+            heading_level=heading_level,
+            tablefmt=tablefmt,
+        ):
+            positive_diff = True
+            print(section, end="\n\n")
+
+    if positive_diff and exit_code:
+        exit(1)
 
 
 def to_graphviz(
@@ -845,6 +912,123 @@ class ReferenceDataManager:
         addendum = f"{down_} and {up_}" if down and up else down_ or up_
         self.logger.info(f"Success - all build-time package data tables synced {addendum}")
         return synced
+
+    def pull(self):
+        """Download all remote blobs to the local data directory, with integrity checks."""
+        self.sync_blob_store(down=True)
+
+    def push(self, no_fail_if_absent: bool = False):
+        """Upload all local data files to the remote blob store, with integrity checks.
+
+        :param no_fail_if_absent: when passed, don't fail an upload for lack of a local file being
+          present with the expected hash for a version-controlled table. This is useful in development
+          workflows where you just want to regenerate/sync a particular table that you've updated.
+        """
+        self.sync_blob_store(up=True, no_fail_if_absent=no_fail_if_absent)
+
+    @output_handler(print_schema_diff_summary)
+    def schema_diff(
+        self,
+        base_ref: str = "HEAD",
+        tables: Optional[Set[str]] = None,
+        *,
+        include_transient: bool = False,
+        base_schema_path: Optional[str] = None,
+    ):
+        """Compute a diff between the current schema and a historical version of the schema.
+
+        :param base_ref: the base git ref to compare against
+        :param tables: a set of specific tables to inspect; if not passed the full schemas will be diffed
+        :param include_transient: if passed, include transient tables in the analysis. These are usually
+          implementation details of a derivation process and so are excluded by default (unless
+          a transient table is specifically included in the `tables` argument)
+        :param base_schema_path: path to the schema file to compare against; if not passed, the schema
+          will be assumed to be present at the same location in the filesystem as the current schema.
+          This enables loading of a historical schema even if the schema file or containing package have
+          been moved or renamed.
+        :return: a `SchemaDiff` object representing the differences between the two schemas
+        """
+
+        if base_schema_path is None:
+            base_schema = load_schema(self.package, self.schema_path, git_ref=base_ref)
+        else:
+            base_schema = load_schema(None, base_schema_path, git_ref=base_ref)
+
+        if tables is None and include_transient:
+            this_schema = self.schema
+        else:
+
+            def table_pred(t: metaschema.Table) -> bool:
+                return (include_transient or not t.transient) if tables is None else (t.name in tables)
+
+            base_schema.tables = {name: t for name, t in base_schema.tables.items() if table_pred(t)}
+            this_schema = copy(self.schema)
+            this_schema.tables = {name: t for name, t in this_schema.tables.items() if table_pred(t)}
+
+        return schema_diff.SchemaDiff(base_schema, this_schema)
+
+    @output_handler(print_data_diff_summaries)
+    def data_diff(
+        self,
+        base_ref: str = "HEAD",
+        tables: Optional[Set[str]] = None,
+        *,
+        base_schema_path: Optional[str] = None,
+    ) -> Iterator[Tuple[metaschema.Identifier, data_diff.DataFrameDiff]]:
+        """Compute a diff between the current version-controlled data and the version-controlled data
+        present at a historical point in time.
+
+        :param base_ref: the base git ref to compare against
+        :param tables: a set of specific tables to inspect; if not passed the full set of tables will be
+          diffed
+        :param base_schema_path: path to the schema file to compare against; if not passed, the schema
+          will be assumed to be present at the same location in the filesystem as the current schema.
+          This enables loading of a historical schema even if the schema file or containing package have
+          been moved or renamed.
+        :return: an iterator of tuples of table names and their corresponding `DataFrameDiff`s. These
+          may be consumed lazily, allowing for memory-efficient processing of large data diffs.
+        """
+        s_diff = self.schema_diff(base_ref, base_schema_path=base_schema_path)
+        before_blob_store = s_diff.before.remote_blob_store
+        after_blob_store = s_diff.after.remote_blob_store
+        if before_blob_store is None or after_blob_store is None:
+            raise ValueError("Can't diff data without remote blob stores defined in both schemas")
+        for table_name, table_diff in s_diff.table_diffs.items():
+            if tables and table_name not in tables:
+                continue
+            if (not table_diff.before.md5) or (not table_diff.after.md5):
+                if table_diff.after.build_time_installed and not table_diff.after.transient:
+                    self.logger.warning(f"{table_name}: Can't diff without versioned data (md5 hashes)")
+                continue
+            if not (pkb := table_diff.before.primary_key) or not (pka := table_diff.after.primary_key):
+                self.logger.warning(f"{table_name}: Can't diff without primary keys")
+                continue
+            if len(pka) != len(pkb):
+                self.logger.warning(
+                    f"{table_name}: Can't diff with different primary key lengths ({len(pkb)} vs {len(pka)})"
+                )
+                continue
+
+            before_pk_cols = [next(c for c in table_diff.before.columns if c.name == k) for k in pkb]
+            after_pk_cols = [next(c for c in table_diff.after.columns if c.name == k) for k in pka]
+            incomparable = [
+                (c1.name, c2.name)
+                for c1, c2 in zip(before_pk_cols, after_pk_cols)
+                if not parquet_util.pyarrow_type_compatible(
+                    c1.type.parquet, c2.type.parquet, parquet_util.TypeCheckLevel.compatible
+                )
+            ]
+            if incomparable:
+                _incomparable = ", ".join(f"{a} <-> {b}" for a, b in incomparable)
+                self.logger.warning(
+                    f"{table_name}: Can't diff with incompatibly typed primary key columns {_incomparable}"
+                )
+                continue
+
+            d_diff = data_diff.DataFrameDiff.from_tables(
+                table_diff.before, table_diff.after, before_blob_store, after_blob_store
+            )
+            yield table_name, d_diff
 
 
 def main():

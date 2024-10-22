@@ -1,11 +1,12 @@
 import os
 import re
+import textwrap
 import urllib.parse
 from functools import lru_cache
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 import networkx as nx
@@ -51,23 +52,17 @@ MISSING_BADGE_MSG = (
 # Helper Classes/Functions
 
 
-def split_long_fields(table_data: Iterable, words_per_line: int = 15) -> List[List[Any]]:
+def split_long_fields(
+    table_data: Iterable[Sequence], max_field_width: int = 80
+) -> List[Tuple[str, ...]]:
     """Splits long row fields into multiple lines."""
-    data = []
-    for row in table_data:
-        new_row = []
-        for field in row:
-            words = str(field).split()
-            new_row.append(
-                "\n\n".join(
-                    [
-                        " ".join(words[start : start + words_per_line])
-                        for start in range(0, len(words), words_per_line)
-                    ]
-                )
-            )
-        data.append(new_row)
-    return data
+    return [
+        tuple(
+            "\n\n".join(textwrap.wrap(str(field), width=max_field_width, break_long_words=False))
+            for field in row
+        )
+        for row in table_data
+    ]
 
 
 def join_blocks(blocks: Iterable[str], sep: str) -> str:
@@ -126,10 +121,12 @@ def __tabulate() -> Optional[Any]:
         return None
 
 
-def render_table(header: Tuple[str, ...], rows: Iterable[Iterable[Any]]) -> str:
+def render_table(
+    header: Tuple[str, ...], rows: Iterable[Sequence], tablefmt: str = "grid", max_field_width: int = 80
+) -> str:
     tabulate = __tabulate()
     assert tabulate is not None, "can't render tables in rst without `tabulate` dependency"
-    return tabulate(split_long_fields(rows), headers=header, tablefmt="grid")
+    return tabulate(split_long_fields(rows, max_field_width), headers=header, tablefmt=tablefmt)
 
 
 def render_figure(img_path: Path) -> str:

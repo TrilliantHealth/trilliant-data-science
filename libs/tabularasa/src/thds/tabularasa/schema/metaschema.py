@@ -528,9 +528,11 @@ class _RawSchema(BaseModel, extra=Extra.forbid):
 # Final materialized schema types; these extend the raw types and override the types of some fields to
 # reflect resolution of references within the schema
 
+ResolvedDType = Union[DType, AnonCustomType, CustomType, ArrayType, MappingType]
+
 
 class Column(_RawColumn):
-    type: Union[DType, AnonCustomType, CustomType, ArrayType, MappingType]
+    type: ResolvedDType
 
     @property
     def dtype(self) -> Union[DType, ArrayType, MappingType]:

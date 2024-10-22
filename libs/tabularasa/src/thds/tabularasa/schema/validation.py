@@ -1,7 +1,9 @@
+import io
 import itertools
 import os
 from collections import Counter
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Set, Tuple, Type, Union, cast
 
 import networkx as nx
@@ -9,6 +11,7 @@ import pkg_resources
 import yaml
 from _warnings import warn
 
+from .. import git_util
 from .constraints import AnyColumnConstraint, EnumConstraint
 from .dtypes import DType
 from .files import ADLSDataSpec, LocalDataSpec, TabularFileSource
@@ -643,7 +646,10 @@ def distinct_indexes(table: _RawTable, table_name: str) -> List[Tuple[str, ...]]
 
 
 def _load_external_schema(
-    schema_name: str, package: Optional[str], schema_path: str
+    schema_name: str,
+    package: Optional[str],
+    schema_path: str,
+    git_ref: Optional[str] = None,
 ) -> Tuple[Optional[Schema], List[ErrorMessage]]:
     errors = []
     external_schema: Optional[Schema] = None
@@ -653,6 +659,7 @@ def _load_external_schema(
             schema_path,
             require_data_resources=False,
             require_preprocessors=False,
+            git_ref=git_ref,
         )
     except ModuleNotFoundError:
         errors.append(
@@ -673,6 +680,7 @@ def validation_errors(
     require_external_schemas: bool = True,
     require_data_resources: bool = False,
     require_preprocessors: bool = False,
+    git_ref: Optional[str] = None,
 ) -> Tuple[List[ErrorMessage], Mapping[str, Schema]]:
     errors = _validate_inheritance_dag(raw_schema)
     bad_inheritance_graph = bool(errors)
@@ -683,7 +691,10 @@ def validation_errors(
     if require_external_schemas:
         for schema_name, schema_ref in raw_schema.external_schemas.items():
             external_schema, load_errors = _load_external_schema(
-                schema_name, schema_ref.package, schema_ref.schema_path
+                schema_name,
+                schema_ref.package,
+                schema_ref.schema_path,
+                git_ref=git_ref,
             )
             if load_errors:
                 errors.extend(load_errors)
@@ -765,6 +776,7 @@ def validate(
     json: Dict,
     require_data_resources: bool = False,
     require_preprocessors: bool = False,
+    git_ref: Optional[str] = None,
 ) -> Schema:
     # low-level pydantic validation happens here
     raw_schema = _RawSchema(**json)
@@ -774,6 +786,7 @@ def validate(
         require_external_schemas=True,
         require_data_resources=require_data_resources,
         require_preprocessors=require_preprocessors,
+        git_ref=git_ref,
     )
     if errors:
         raise MetaschemaValidationError(errors)
@@ -838,14 +851,28 @@ def load_schema(
     schema_path: str,
     require_data_resources: bool = False,
     require_preprocessors: bool = False,
+    git_ref: Optional[str] = None,
 ) -> Schema:
-    if package is None:
-        with open(schema_path, "r") as f:
-            json: JSON = yaml.safe_load(f)
+    if git_ref is None:
+        if package is None:
+            with open(schema_path, "r") as f:
+                json: JSON = yaml.safe_load(f)
+        else:
+            with pkg_resources.resource_stream(package, schema_path) as f:
+                json = yaml.safe_load(f)
+
     else:
-        with pkg_resources.resource_stream(package, schema_path) as f:
-            json = yaml.safe_load(f)
+        abspath = (
+            Path(schema_path)
+            if package is None
+            else Path(pkg_resources.resource_filename(package, str(schema_path)))
+        )
+        contents = git_util.blob_contents(abspath, git_ref)
+        json = yaml.safe_load(io.BytesIO(contents))
 
     return validate(
-        json, require_data_resources=require_data_resources, require_preprocessors=require_preprocessors
+        json,
+        require_data_resources=require_data_resources,
+        require_preprocessors=require_preprocessors,
+        git_ref=git_ref,
     )
