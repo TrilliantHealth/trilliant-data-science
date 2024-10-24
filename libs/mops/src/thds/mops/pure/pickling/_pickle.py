@@ -5,18 +5,20 @@ import inspect
 import io
 import pickle
 import typing as ty
+from functools import partial
 
 # so we can pickle and re-raise exceptions with remote tracebacks
 from tblib import pickling_support  # type: ignore
 
 from thds.core import hashing, log, source
 
-from ..core import metadata
+from ..core import memo, metadata
 from ..core.source import prepare_source_argument, prepare_source_result
-from ..core.types import Args, Kwargs, SerializerHandler
+from ..core.types import Args, Deserializer, Kwargs, SerializerHandler
 from ..core.uris import get_bytes
 from .pickles import (
     PicklableFunction,
+    UnpickleFunctionWithLogicKey,
     UnpickleSourceHashrefArgument,
     UnpickleSourceResult,
     UnpickleSourceUriArgument,
@@ -161,3 +163,28 @@ class SourceResultPickler:
             return ty.cast(_DeserSource, UnpickleSourceResult(*prepare_source_result(maybe_source)))
 
         return None
+
+
+class NestedFunctionWithLogicKeyPickler:
+    def __call__(self, maybe_function_with_logic_key: ty.Any) -> ty.Optional[Deserializer]:
+        """Returns a pickle 'persistent id' which is a 'kind' of CallableUnpickler.
+
+        ...or None, which means pickle normally.
+        """
+        if not callable(maybe_function_with_logic_key):
+            return None
+
+        if isinstance(maybe_function_with_logic_key, partial):
+            # do not extract from the partial - only a raw function
+            # which will itself be included in the partial when it gets pickled
+            return None
+
+        function_logic_key = memo.extract_function_logic_key_from_docstr(maybe_function_with_logic_key)
+        if not function_logic_key:
+            return None
+
+        return UnpickleFunctionWithLogicKey(  # type: ignore
+            # we must then wrap the function itself so that this does not cause infinite recursion.
+            pickle.dumps(maybe_function_with_logic_key),
+            function_logic_key,
+        )

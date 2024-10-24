@@ -117,6 +117,7 @@ class MemoizingPicklingRunner:
             ByIdSerializer(self._by_id_registry),
             CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once()),
             _pickle.SourceArgumentPickler(),
+            _pickle.NestedFunctionWithLogicKeyPickler(),
         )
 
     def _serialize_args_kwargs(

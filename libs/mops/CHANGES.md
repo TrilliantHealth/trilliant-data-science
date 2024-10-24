@@ -1,3 +1,11 @@
+## 3.1
+
+- Supports automatically discovering `function-logic-key` in first-class function objects passed as
+  arguments to a wrapped function. In other words, `function-logic-key` is no longer only for the
+  top-level function, but can be used to annotate anything that is an argument (direct or indirect) to
+  the top-level function. Note that `mops` still cannot discover which functions your (non-argument)
+  functions call, as this is ultimately akin to the halting problem.
+
 # 3.0
 
 - BREAKING: Completely remove SrcFile and DestFile and all associated code.

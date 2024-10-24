@@ -36,9 +36,12 @@ def _parse_logic_key(doc: str) -> str:
     return m.group("version") if m else ""
 
 
-def extract_logic_key_from_docstr(obj) -> str:
-    doc = getattr(obj, "__doc__", "")
+def extract_function_logic_key_from_docstr(obj) -> str:
+    doc = getattr(obj, "__doc__", "") or ""
     return _parse_logic_key(doc)
+
+
+extract_logic_key_from_docstr = extract_function_logic_key_from_docstr
 
 
 @lru_cache(maxsize=None)

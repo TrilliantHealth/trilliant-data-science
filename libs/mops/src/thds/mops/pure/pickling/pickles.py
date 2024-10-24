@@ -130,3 +130,19 @@ class UnpickleSourceResult(ty.NamedTuple):
 
     def __call__(self) -> source.Source:
         return source_from_source_result(*self)
+
+
+class UnpickleFunctionWithLogicKey(ty.NamedTuple):
+    """When a mops-memoized function receives, in standard "functional programming" style,
+    a function as an argument (whether partially-applied or not), we need to make
+    sure to represent any function-logic-key on that callable as part of what gets serialized,
+    so that memoization does not happen when unexpected/undesired.
+
+    The function itself must be picklable in the natural way.
+    """
+
+    func_bytes: bytes
+    function_logic_key: str
+
+    def __call__(self) -> ty.Callable:
+        return pickle.loads(self.func_bytes)
