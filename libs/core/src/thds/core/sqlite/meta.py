@@ -103,9 +103,9 @@ def preload_sources(*table_srcs: ty.Optional[TableSource]) -> None:
         if not table_src:
             continue
         assert isinstance(table_src, TableSource)
-        logger.info(f"Preloading {table_src.table_name} from {table_src.db_src.uri}")
+        logger.debug("Preloading %s from %s", table_src.table_name, table_src.db_src.uri)
         pydd(table_src.db_src)
-    logger.info("Preloading complete")
+    logger.debug("Preloading complete")
 
 
 @autoconn_scope.bound

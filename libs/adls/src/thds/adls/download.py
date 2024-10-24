@@ -67,8 +67,11 @@ def _verify_md5s_before_and_after_download(
             f"ADLS thinks the MD5 of {fqn} is {remote_md5b64}, but we expected {expected_md5b64}."
             " This may indicate that we need to update a hash in the codebase."
         )
+
     yield  # perform download
-    local_md5b64 = b64(md5_file(local_dest))
+
+    with log.logger_context(hash_for="after-download"):
+        local_md5b64 = b64(md5_file(local_dest))
     check_reasonable_md5b64(local_md5b64)  # must always exist
     if remote_md5b64 and remote_md5b64 != local_md5b64:
         raise MD5MismatchError(
@@ -215,14 +218,16 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
             return None
 
         check_reasonable_md5b64(md5b64)
-        local_md5b64 = _md5b64_path_if_exists(local_path)
+        with log.logger_context(hash_for="before-download-dest"):
+            local_md5b64 = _md5b64_path_if_exists(local_path)
         if local_md5b64 == md5b64:
             logger.debug("Local path matches MD5 - no need to look further")
             if cache:
                 cache_path = cache.path(fqn)
-                if local_md5b64 != _md5b64_path_if_exists(cache_path):
-                    # only copy if the cache is out of date
-                    from_local_path_to_cache(local_path, cache_path, cache.link)
+                with log.logger_context(hash_for="before-download-cache"):
+                    if local_md5b64 != _md5b64_path_if_exists(cache_path):
+                        # only copy if the cache is out of date
+                        from_local_path_to_cache(local_path, cache_path, cache.link)
             return _FileResult(local_md5b64, hit=True)
 
         if local_md5b64:
