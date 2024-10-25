@@ -1,4 +1,5 @@
 """A thread-safe lazy callable."""
+
 import typing as ty
 from threading import Lock, local
 
@@ -53,6 +54,14 @@ class Lazy(ty.Generic[R]):
 
     def __repr__(self) -> str:
         return f"Lazy({self._source})"
+
+    if not ty.TYPE_CHECKING:
+        # if I don't 'guard' it this way, mypy (unhelpfully) allows all attribute access (as Any)
+        def __getattr__(self, name: str) -> ty.NoReturn:
+            raise AttributeError(
+                f"{self} has no attribute '{name}' -"
+                f" did you mean to instantiate the object before access, i.e. `().{name}`?"
+            )
 
 
 class ThreadLocalLazy(Lazy[R]):
