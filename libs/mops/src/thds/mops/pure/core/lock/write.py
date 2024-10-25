@@ -35,7 +35,6 @@ def make_lock_contents(
             "write_count": write_count,
             "hostname": hostname.friendly(),
             "pid": str(os.getpid()),
-            "lock_uuid": writer_id,  # back-compat old name # TODO: someday delete this.
             "first_written_at": first_written_at,
             "first_acquired_at": first_acquired_at.isoformat() if first_acquired_at else "",
             "released_at": "",
@@ -53,6 +52,7 @@ class LockfileWriter:
 
     def __init__(
         self,
+        lock_writer_id: str,
         lock_dir_uri: str,
         generate_lock: ty.Callable[[ty.Optional[datetime]], LockContents],
         expire_s: float,
@@ -60,6 +60,7 @@ class LockfileWriter:
         debug: bool = True,
         writer_name: str = "",
     ):
+        self.writer_id = lock_writer_id
         self.lock_dir_uri = lock_dir_uri
         self.blob_store, self.lock_uri = _funcs.store_and_lock_uri(lock_dir_uri)
         self.generate_lock = generate_lock
@@ -79,6 +80,7 @@ class LockfileWriter:
         if self.writer_name:
             lock_contents["writer_name"] = self.writer_name  # type: ignore
         assert "/" not in lock_contents["writer_id"], lock_contents
+        assert self.writer_id == lock_contents["writer_id"], (self.writer_id, lock_contents)
         lock_bytes = _funcs.json_dumpb(lock_contents)
         assert lock_bytes
         # technically, writing these bytes may cause an overwrite of someone else's lock.

@@ -3,10 +3,12 @@ pickled in a backward-compatible way - i.e., we want to remember not
 to refactor their names or the name of the module they live in so as
 to maintain backward-compatibility more easily.
 """
+
 import importlib
 import io
 import pickle
 import typing as ty
+from dataclasses import dataclass
 from pathlib import Path
 
 from thds.core import hashing, log, source
@@ -18,11 +20,16 @@ from ..core.uris import get_bytes, lookup_blob_store
 logger = log.getLogger(__name__)
 
 
-class NestedFunctionPickle(ty.NamedTuple):
-    """By pickling args-kwargs on its own, we can get a hash of just those."""
+@dataclass
+class Invocation:
+    """Basically, NestedFunctionPickle was the v2. This is v3. By switching to dataclass,
+    we can more easily add new optional attributes later on.
+    """
 
-    f: ty.Callable
+    func: ty.Callable
     args_kwargs_pickle: bytes
+    # this is pickled separately so that we can hash it separately.
+    # the identity of the function is represented by the name part of the blob path.
 
 
 class PicklableFunction:

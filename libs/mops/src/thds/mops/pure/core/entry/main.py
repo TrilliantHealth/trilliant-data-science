@@ -9,13 +9,16 @@ registered in sys.modules because it's still running `main`.
 
 Ask me how long it took to figure out what was going on there...
 """
+
 import argparse
 import os
+import time
 from timeit import default_timer
 
 from thds.core.log import getLogger
 
 from ....__about__ import __version__
+from .. import metadata
 from .runner_registry import run_named_entry_handler
 
 logger = getLogger(__name__)
@@ -23,17 +26,21 @@ logger = getLogger(__name__)
 
 def main():
     """Routes the top level remote function call in a new process."""
+    start = default_timer()
+    start_timestamp = time.time()
     logger.info(f"Entering remote process {os.getpid()} with installed mops version {__version__}")
     parser = argparse.ArgumentParser(description="Unknown arguments will be passed to the named runner.")
     parser.add_argument(
-        "entry_handler",
+        "runner_name",
         help="Name of a known remote runner that can handle the rest of the arguments",
     )
     # TODO potentially allow things like logger context to be passed in as -- arguments
     args, unknown = parser.parse_known_args()
-    start = default_timer()
-    run_named_entry_handler(args.entry_handler, *unknown)
-    logger.info(f"Exiting remote process {os.getpid()} after {(default_timer() - start)/60:.2f} minutes")
+    run_named_entry_handler(args.runner_name, *unknown)
+    logger.info(
+        f"Exiting remote process {os.getpid()} after {(default_timer() - start)/60:.2f} minutes"
+        + metadata.format_end_of_run_times(start_timestamp, unknown)
+    )
 
 
 if __name__ == "__main__":

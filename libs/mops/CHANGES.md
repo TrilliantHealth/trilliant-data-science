@@ -1,3 +1,12 @@
+# 3.0
+
+- BREAKING: Completely remove SrcFile and DestFile and all associated code.
+- Embed metadata in `result` and `exception` payloads, including who invoked the function, when, and what
+  version of the code was run. Track some metadata from the original invocation.
+- Embed returned metadata into the mops summary files.
+- Report on some of the metadata via the `mops-summarize` tool, including average runtimes for the actual
+  invocations.
+
 ## 2.13
 
 - Forward-compatibility shims for upcoming mops 3.0.

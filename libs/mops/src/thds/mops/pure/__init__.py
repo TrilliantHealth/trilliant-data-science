@@ -4,7 +4,9 @@
 # to avoid requiring the additional dependency.
 
 from . import adls  # noqa
+from . import pickling
 from .core import get_pipeline_id, set_pipeline_id, use_runner  # noqa
+from .core.entry import register_entry_handler
 from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa
     add_pipeline_memospace_handlers,
@@ -16,6 +18,10 @@ from .core.source import create_source_at_uri  # noqa
 from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
-from .pickling.runner import MemoizingPicklingRunner, Shell, ShellBuilder  # noqa
+from .pickling.mprunner import MemoizingPicklingRunner  # noqa
+from .runner import Shell, ShellBuilder  # noqa
 
-AdlsPickleRunner = MemoizingPicklingRunner  # an old alias
+register_entry_handler(
+    pickling.mprunner.RUNNER_NAME,
+    pickling.remote.run_pickled_invocation,  # type: ignore
+)

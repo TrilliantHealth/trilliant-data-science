@@ -1,6 +1,7 @@
 """Builds on top of the pure.MemoizingPicklingRunner to provide
 impure, customizable memoization.
 """
+
 import typing as ty
 
 from thds.core import log
@@ -10,7 +11,7 @@ from ..pure.core.memo.keyfunc import ArgsOnlyKeyfunc, Keyfunc, autowrap_args_onl
 from ..pure.core.types import Args, Kwargs
 from ..pure.core.uris import UriResolvable
 from ..pure.pickling.memoize_only import _threadlocal_shell
-from ..pure.pickling.runner.orchestrator_side import NO_REDIRECT, MemoizingPicklingRunner, Redirect
+from ..pure.pickling.mprunner import NO_REDIRECT, MemoizingPicklingRunner, Redirect
 
 logger = log.getLogger(__name__)
 

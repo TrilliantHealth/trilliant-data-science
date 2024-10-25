@@ -3,6 +3,7 @@ directly in the current thread. This is a good thing to use when the
 computation derives no advantage from not running locally
 (i.e. exhibits no parallelism) but you still want memoization.
 """
+
 from typing import Callable, Sequence
 
 from thds.core.log import getLogger
@@ -11,7 +12,7 @@ from ..core import use_runner
 from ..core.entry.runner_registry import run_named_entry_handler
 from ..core.types import F
 from ..core.uris import UriResolvable
-from .runner import MemoizingPicklingRunner
+from .mprunner import MemoizingPicklingRunner
 
 logger = getLogger(__name__)
 

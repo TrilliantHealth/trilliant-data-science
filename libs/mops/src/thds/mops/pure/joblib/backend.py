@@ -33,7 +33,7 @@ class NoMemmapLokyBackend(LokyBackend):
 
 
 class TrillMlParallelJoblibBackend(ThreadingBackend):
-    """A joblib backend that forwards to our AdlsPickleRunner.
+    """A joblib backend that forwards to our MemoizingPicklingRunner.
 
     Performs simple batching based on the parallelism and oversubscribe factors at construction time.
 

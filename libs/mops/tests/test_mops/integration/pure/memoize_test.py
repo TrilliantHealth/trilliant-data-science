@@ -2,12 +2,14 @@
 calling a wrapped function at runtime.
 
 """
+
 from typing import Sequence
 
 import pytest
 
 from thds.adls import defaults
-from thds.mops.pure import AdlsPickleRunner, pipeline_id_mask, use_runner
+from thds.mops.pure import MemoizingPicklingRunner, pipeline_id_mask, use_runner
+from thds.mops.pure.core.metadata import parse_invocation_metadata_args
 
 
 class PipelineId(Exception):
@@ -15,15 +17,16 @@ class PipelineId(Exception):
 
 
 def _intercept_pipeline_id(args: Sequence[str]) -> None:
-    pickle_runner, memo_uri, pipeline_id = args
-    raise PipelineId(pipeline_id)
+    _pickle_runner, _memo_uri, *meta = args
+    invoc_meta = parse_invocation_metadata_args(meta)
+    raise PipelineId(invoc_meta.pipeline_id)
 
 
 # pipeline_id_mask must be applied 'outside' the use_runner
 # decorator, as it works at call time, and its code must run before
 # the underlying Runner implementation does.
 @pipeline_id_mask("test/static-forever")
-@use_runner(AdlsPickleRunner(_intercept_pipeline_id, defaults.env_root_uri("dev")))
+@use_runner(MemoizingPicklingRunner(_intercept_pipeline_id, defaults.env_root_uri("dev")))
 def fx(a: int) -> float:
     return float(a) + 0.2
 

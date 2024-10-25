@@ -7,7 +7,7 @@ from thds.core.log import getLogger
 from thds.mops._utils.colorize import colorized
 from thds.mops.config import max_concurrent_network_ops
 from thds.mops.parallel import Thunk, parallel_yield_results
-from thds.mops.pure import AdlsPickleRunner, use_runner
+from thds.mops.pure import MemoizingPicklingRunner, use_runner
 
 BROWN = colorized(fg="brown", bg="black")
 
@@ -20,7 +20,7 @@ def _subprocess_remote(args_list):
     logger.info("Completed 'remote' runner")
 
 
-runner = AdlsPickleRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
+runner = MemoizingPicklingRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
 adls_shell = use_runner(runner)
 
 
@@ -34,7 +34,7 @@ def run_and_sleep(i: int, data: ty.List[float], sleep: int) -> float:
 
 
 def stress(max_clients: int, n: int, sleep: int):
-    """AdlsPickleRunner will perform 4 local ADLS operations (1 file
+    """MemoizingPicklingRunner will perform 4 local ADLS operations (1 file
     exists, 1 push, 1 file exists and 1 file pull) per task. The
     remote runner will perform 2 more ADLS operations, which in this
     case will also be occurring on the local machine, using a

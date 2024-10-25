@@ -80,6 +80,7 @@ def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
         raise CannotMaintainLock(f"Lock was never acquired: {lock_contents}")
 
     lockfile_writer = LockfileWriter(
+        lock_contents["writer_id"],
         lock_dir_uri,
         make_lock_contents(get_writer_id(lock_contents), timedelta(seconds=expire_s)),
         expire_s,

@@ -13,10 +13,10 @@ from pathlib import Path
 
 from thds.core import hashing, log
 
-from ...core.content_addressed import storage_content_addressed, wordybin_content_addressed
-from ...core.serialize_paths import Downloader
-from ...core.uris import active_storage_root, lookup_blob_store
-from ..pickles import UnpicklePathFromUri, UnpickleSimplePickleFromUri
+from ..core.content_addressed import storage_content_addressed, wordybin_content_addressed
+from ..core.serialize_paths import Downloader
+from ..core.uris import active_storage_root, lookup_blob_store
+from .pickles import UnpicklePathFromUri, UnpickleSimplePickleFromUri
 
 logger = log.getLogger(__name__)
 T = ty.TypeVar("T")

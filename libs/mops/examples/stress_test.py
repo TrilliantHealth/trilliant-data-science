@@ -3,7 +3,7 @@
 Azure auth is available.
 
 Use this script to experiment with different values for
-adls_max_clients and to stress-test any changes made to AdlsPickleRunner.
+adls_max_clients and to stress-test any changes made to MemoizingPicklingRunner.
 """
 import logging
 

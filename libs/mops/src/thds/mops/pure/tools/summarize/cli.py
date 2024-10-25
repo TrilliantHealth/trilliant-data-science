@@ -1,5 +1,6 @@
 import argparse
 import json
+import typing as ty
 from functools import reduce
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, TypedDict
@@ -14,10 +15,16 @@ class FunctionSummary(TypedDict):
     total_calls: int
     cache_hits: int
     executed: int
+    error_count: int
     timestamps: List[str]
     memospaces: Set[str]
     pipeline_ids: Set[str]
     function_logic_keys: Set[str]
+    invoked_by: List[str]
+    invoker_code_versions: List[str]
+    remote_code_versions: List[str]
+    total_runtime_minutes: List[float]  # minutes
+    remote_runtime_minutes: List[float]  # minutes
 
 
 def _empty_summary() -> FunctionSummary:
@@ -29,6 +36,12 @@ def _empty_summary() -> FunctionSummary:
         "memospaces": set(),
         "pipeline_ids": set(),
         "function_logic_keys": set(),
+        "error_count": 0,
+        "invoked_by": list(),
+        "invoker_code_versions": list(),
+        "remote_code_versions": list(),
+        "total_runtime_minutes": list(),
+        "remote_runtime_minutes": list(),
     }
 
 
@@ -45,18 +58,36 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         function_name = log_entry["function_name"]
         if function_name not in partial_summary:
             partial_summary[function_name] = _empty_summary()
-        partial_summary[function_name]["total_calls"] += 1
+
+        summary = partial_summary[function_name]
+
+        summary["total_calls"] += 1
         if log_entry["status"] in ("memoized", "awaited"):
-            partial_summary[function_name]["cache_hits"] += 1
+            summary["cache_hits"] += 1
         else:
-            partial_summary[function_name]["executed"] += 1
-        partial_summary[function_name]["timestamps"].append(log_entry["timestamp"])
+            summary["executed"] += 1
+        summary["error_count"] += int(log_entry.get("was_error") or 0)
+        summary["timestamps"].append(log_entry["timestamp"])
 
         mu_parts = parse_memo_uri(log_entry["memo_uri"], log_entry.get("memospace") or "")
 
-        partial_summary[function_name]["memospaces"].add(mu_parts.memospace)
-        partial_summary[function_name]["pipeline_ids"].add(mu_parts.pipeline_id)
-        partial_summary[function_name]["function_logic_keys"].add(mu_parts.function_logic_key)
+        summary["memospaces"].add(mu_parts.memospace)
+        summary["pipeline_ids"].add(mu_parts.pipeline_id)
+        summary["function_logic_keys"].add(mu_parts.function_logic_key)
+
+        # new metadata stuff below:
+        def append_if_exists(key: str) -> None:
+            if key in log_entry:
+                summary[key].append(log_entry[key])  # type: ignore
+
+        for key in (
+            "invoked_by",
+            "invoker_code_versions",
+            "remote_code_versions",
+            "total_runtime_minutes",
+            "remote_runtime_minutes",
+        ):
+            append_if_exists(key)
 
     return partial_summary
 
@@ -76,10 +107,21 @@ def _combine_summaries(
         acc[function_name]["total_calls"] += data["total_calls"]
         acc[function_name]["cache_hits"] += data["cache_hits"]
         acc[function_name]["executed"] += data["executed"]
+        acc[function_name]["error_count"] += data["error_count"]
         acc[function_name]["timestamps"].extend(data["timestamps"])
         acc[function_name]["memospaces"].update(data["memospaces"])
         acc[function_name]["pipeline_ids"].update(data["pipeline_ids"])
         acc[function_name]["function_logic_keys"].update(data["function_logic_keys"])
+
+        for key in (
+            "invoked_by",
+            "invoker_code_versions",
+            "remote_code_versions",
+            "total_runtime_minutes",
+            "remote_runtime_minutes",
+        ):
+            acc[function_name][key].extend(data[key])  # type: ignore
+
     return acc
 
 
@@ -92,10 +134,16 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
         "  Total calls: {total_calls}\n"
         "  Cache hits: {cache_hits}\n"
         "  Executed: {executed}\n"
+        "  Error count: {error_count}\n"
         "  Timestamps: {timestamps}\n"
         "  Memospaces: {memospaces}\n"
         "  Pipeline IDs: {pipeline_ids}\n"
         "  Function Logic Keys: {function_logic_keys}\n"
+        "  Avg total runtime: {avg_total_runtime_minutes}m\n"
+        "  Avg remote runtime: {avg_remote_runtime_minutes}m\n"
+        "  Invoked by: {invokers}\n"
+        "  Invoker code versions: {invoker_code_versions}\n"
+        "  Remote code versions: {remote_code_versions}\n"
     )
     report_lines = []
 
@@ -114,22 +162,31 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
         else:
             timestamps_str = ", ".join(timestamps)
 
+        def avg(fs: FunctionSummary, key: str) -> float:
+            return (sum(fs[key]) / len(fs[key])) if len(fs[key]) else 0  # type: ignore
+
         report_lines.append(
             template.format(
                 function_name=function_name,
                 total_calls=data["total_calls"],
                 cache_hits=data["cache_hits"],
                 executed=data["executed"],
+                error_count=data["error_count"],
                 timestamps=timestamps_str,
                 memospaces=", ".join(data["memospaces"]),
                 pipeline_ids=", ".join(data["pipeline_ids"]),
                 function_logic_keys=", ".join(data["function_logic_keys"]),
+                avg_total_runtime_minutes=avg(data, "total_runtime_minutes"),
+                avg_remote_runtime_minutes=avg(data, "remote_runtime_minutes"),
+                invokers=", ".join(sorted(set(data["invoked_by"]))),
+                invoker_code_versions=", ".join(sorted(set(data["invoker_code_versions"]))),
+                remote_code_versions=", ".join(sorted(set(data["remote_code_versions"]))),
             )
         )
     return "\n".join(report_lines)
 
 
-def summarize(run_directory: Optional[str] = None, sort_by: SortOrder = "name") -> None:
+def _auto_find_run_directory() -> ty.Optional[Path]:
     mops_root = run_summary.MOPS_SUMMARY_DIR()
     if not mops_root.exists():
         raise ValueError(f"No mops summary root directory found at {mops_root}")
@@ -138,14 +195,19 @@ def summarize(run_directory: Optional[str] = None, sort_by: SortOrder = "name") 
             "Mops summary root is not a directory! "
             f"Delete {mops_root} to allow mops to recreate it on the next run."
         )
-    if run_directory:
-        run_directory_path = Path(run_directory)
-    else:
-        run_directories = sorted(mops_root.iterdir(), key=lambda x: x.name, reverse=True)
-        if not run_directories:
-            print("No pipeline run directories found.")
-            return
-        run_directory_path = run_directories[0]
+    for directory in sorted(mops_root.iterdir(), key=lambda x: x.name, reverse=True):
+        if directory.is_dir() and list(directory.glob("*.json")):
+            # needs to have some files for it to count for anything
+            return directory
+
+    print("No pipeline run directories found.")
+    return None
+
+
+def summarize(run_directory: Optional[str] = None, sort_by: SortOrder = "name") -> None:
+    run_directory_path = Path(run_directory) if run_directory else _auto_find_run_directory()
+    if not run_directory_path:
+        return
 
     log_files = list(run_directory_path.glob("*.json"))
 

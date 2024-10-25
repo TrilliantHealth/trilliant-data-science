@@ -51,7 +51,7 @@ def test_log_function_execution_new_file(run_directory: Path) -> None:
         pass
 
     run_summary.log_function_execution(
-        run_directory, test_function, memo_uri, status="invoked", memospace="adls://env/foo/bar"
+        run_directory, test_function, memo_uri, itype="invoked", memospace="adls://env/foo/bar"
     )
 
     log_files = list(run_directory.glob("*.json"))
@@ -80,7 +80,7 @@ def test_log_function_execution_invalid_json(run_directory: Path) -> None:
         f.write("invalid json")
 
     # Log a new execution
-    run_summary.log_function_execution(run_directory, test_function, memo_uri, status="invoked")
+    run_summary.log_function_execution(run_directory, test_function, memo_uri, itype="invoked")
 
     new_log_files = list(run_directory.glob("*.json"))
     assert len(new_log_files) == 2

@@ -23,11 +23,11 @@ class LockContents(ty.TypedDict):
     first_acquired_at: str
     released_at: str
 
-    # back-compat - this was changed to writer_id to be clearer
-    lock_uuid: str
-
 
 class LockAcquired(ty.Protocol):
+
+    writer_id: str
+
     def maintain(self) -> None:
         ...  # pragma: no cover
 

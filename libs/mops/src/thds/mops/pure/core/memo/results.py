@@ -78,9 +78,9 @@ def check_if_result_exists(
     before_raise: ty.Callable[[], ty.Any] = lambda: None,
 ) -> ty.Union[None, Success, Error]:
     fs = lookup_blob_store(memo_uri)
-    result_uri = fs.join(memo_uri, RESULT)
-    if fs.exists(result_uri):
-        return Success(result_uri)
+    value_uri = fs.join(memo_uri, RESULT)
+    if fs.exists(value_uri):
+        return Success(value_uri)
 
     required_msg = _should_require_result(memo_uri)
     if required_msg:  # might be custom or the default. either way it indicates a required result.

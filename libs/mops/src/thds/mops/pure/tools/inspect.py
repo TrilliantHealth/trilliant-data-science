@@ -20,21 +20,22 @@ from thds.core import log, scope, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
 from thds.mops.pure.core.memo import results
-from thds.mops.pure.pickling._pickle import make_read_object, unfreeze_args_kwargs
-from thds.mops.pure.pickling.pickles import NestedFunctionPickle
-from thds.mops.pure.pickling.runner.orchestrator_side import INVOCATION
-from thds.mops.srcdest.mark_remote import mark_as_remote
+from thds.mops.pure.pickling._pickle import read_metadata_and_object, unfreeze_args_kwargs
+from thds.mops.pure.pickling.pickles import Invocation
+from thds.mops.pure.runner import strings
 
 logger = log.getLogger(__name__)
 
 
 def _unpickle_object_for_debugging(uri: str) -> ty.Any:
     try:
-        if uri.endswith("/" + INVOCATION):
-            nested = ty.cast(NestedFunctionPickle, make_read_object(INVOCATION)(uri))
-            args, kwargs = mark_as_remote(unfreeze_args_kwargs(nested.args_kwargs_pickle))
-            return Thunk(nested.f, *args, **kwargs)
-        return make_read_object("output")(uri)
+        if uri.endswith("/" + strings.INVOCATION):
+            _no_header, invoc_raw = read_metadata_and_object(strings.INVOCATION, uri)
+            invoc = ty.cast(Invocation, invoc_raw)
+            args, kwargs = unfreeze_args_kwargs(invoc.args_kwargs_pickle)
+            return Thunk(getattr(invoc, "f", None) or invoc.func, *args, **kwargs)
+        header, obj = read_metadata_and_object("output", uri)
+        return obj, header
     except ImportError as ie:
         logger.error(f"Could not import the module ({ie}) needed to unpickle the object.")
         logger.error("Try re-running this tool in the environment where the above module is available.")
@@ -47,14 +48,16 @@ def _resolved_uri(uri: str) -> str:
     return str(parse_uri(uri))
 
 
-_KNOWN_CONTROL_FILES = list(map(lambda cf: "/" + cf, [INVOCATION, results.RESULT, results.EXCEPTION]))
+_KNOWN_CONTROL_FILES = list(
+    map(lambda cf: "/" + cf, [strings.INVOCATION, results.RESULT, results.EXCEPTION])
+)
 # prefix with forward-slash because these live in a blob store 'directory'
 
 
 @dataclass
 class IRE:
     invocation: ty.Any
-    result: ty.Any
+    result: ty.Any  # a.k.a. return_value
     exception: ty.Any
 
 
@@ -136,6 +139,16 @@ def inspect(uri: str, embed: bool = False):
         print()
         _pprint(obj)
     return obj
+
+
+def inspect_and_log(memo_uri: str):
+    inspect(memo_uri)
+    logger.error(
+        "A required result was not found."
+        " You can compare the above output with other invocations"
+        f" by running `mops-inspect {memo_uri}`"
+        " in your local Python environment."
+    )
 
 
 @dataclass

@@ -12,7 +12,7 @@ logger = log.getLogger(__name__)
 
 
 def get_writer_id(lock_contents: LockContents) -> str:
-    return lock_contents.get("writer_id") or lock_contents["lock_uuid"]  # old name
+    return lock_contents["writer_id"]
 
 
 def make_read_lockfile(lock_uri: str) -> ty.Callable[[], ty.Optional[LockContents]]:

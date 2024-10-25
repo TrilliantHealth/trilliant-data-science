@@ -1,18 +1,11 @@
 import subprocess
-from pathlib import Path
 
-from thds.adls import download
 from thds.core.log import getLogger
-from thds.mops.pure import AdlsPickleRunner, use_runner
-from thds.mops.pure.adls.srcdest import download as dl
+from thds.mops.pure import MemoizingPicklingRunner, use_runner
 
 from ...config import TEST_TMP_URI
 
 logger = getLogger(__name__)
-
-# just set up a different global cache
-dl.srcfile_cache = download.Cache(Path(__file__).parent / ".adls-md5-ro-cache", True)
-# this is ugly but it also just doesn't really matter
 
 
 def _subprocess_remote(args_list):
@@ -21,7 +14,7 @@ def _subprocess_remote(args_list):
     logger.info("Completed shell runner")
 
 
-runner = AdlsPickleRunner(_subprocess_remote, TEST_TMP_URI)
+runner = MemoizingPicklingRunner(_subprocess_remote, TEST_TMP_URI)
 
 
 def clear_cache():

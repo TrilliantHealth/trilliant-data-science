@@ -76,8 +76,8 @@ network-hungry lock maintenance on the orchestrator side of things. This degrade
 somewhat, while still providing basic debugging info that is very handy to keep.
 
 The relevant configuration is a core.config item, so you can programmatically disable it by importing
-`MAINTAIN_LOCKS` from `thds.mops.pure.pickling.runner.orchestrator_side` and calling `.set_global(False)`
-on it. You can also set `THDS_MOPS_PURE_ORCHESTRATOR_MAINTAIN_LOCKS=0` in your environment.
+`MAINTAIN_LOCKS` from `thds.mops.pure.pickling.runner.local` and calling `.set_global(False)` on it. You
+can also set `THDS_MOPS_PURE_ORCHESTRATOR_MAINTAIN_LOCKS=0` in your environment.
 
 > 🔮 A future iteration on improving this situation would be to revisit the remote behavior of the lock as
 > noted above, which would also solve the more general problem for Demand Forecast.

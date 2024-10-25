@@ -9,10 +9,12 @@ from thds.core import config, log
 from thds.mops.pure.core.memo import function_memospace
 from thds.mops.pure.core.types import T
 
+from ...core import metadata
+
 MOPS_SUMMARY_DIR = config.item("thds.mops.summary_dir", default=Path(".mops"), parse=Path)
 RUN_NAME_ENV_VAR: ty.Final = "__SECRET_THDS_MOPS_RUN_NAME"
 
-StatusType = ty.Literal["memoized", "invoked", "awaited"]
+InvocationType = ty.Literal["memoized", "invoked", "awaited"]
 
 logger = log.getLogger(__name__)
 
@@ -20,14 +22,21 @@ logger = log.getLogger(__name__)
 class LogEntryV1(ty.TypedDict):
     function_name: str
     memo_uri: str
-    timestamp: str
-    status: StatusType
+    timestamp: str  # more or less "when did this complete?"
+    status: InvocationType  # old name that we're retaining for compatibility
 
 
 class LogEntry(LogEntryV1, total=False):
     memospace: str  # includes env and any prefixes like mops2-mpf
     pipeline_id: str
     function_logic_key: str
+    was_error: bool
+
+    total_runtime_minutes: float
+    remote_runtime_minutes: float
+    invoked_by: str
+    invoker_code_version: str
+    remote_code_version: str
 
 
 if not os.getenv(RUN_NAME_ENV_VAR):
@@ -67,12 +76,18 @@ def _generate_log_filename(run_directory: Path) -> Path:
 
 
 def log_function_execution(
-    run_directory: Path,
+    run_directory: ty.Optional[Path],
     func: ty.Callable[..., T],
     memo_uri: str,
-    status: StatusType,
+    itype: InvocationType,
+    metadata: ty.Optional[metadata.ResultMetadata] = None,
     memospace: str = "",
+    was_error: bool = False,
 ) -> None:
+    if not run_directory:
+        logger.debug("Not writing function summary for %s", memo_uri)
+        return
+
     log_file = _generate_log_filename(run_directory)
     func_module = func.__module__
     func_name = func.__name__
@@ -87,9 +102,17 @@ def log_function_execution(
         "pipeline_id": parts.pipeline_id,
         "function_logic_key": parts.function_logic_key,
         "timestamp": dt.datetime.utcnow().isoformat(),
-        "status": status,
+        "status": itype,
+        "was_error": was_error,
     }
-
+    if metadata:
+        log_entry["total_runtime_minutes"] = metadata.result_wall_minutes
+        log_entry["remote_runtime_minutes"] = metadata.remote_wall_minutes
+        log_entry["invoked_by"] = metadata.invoked_by
+        log_entry["invoker_code_version"] = metadata.invoker_code_version
+        log_entry["remote_code_version"] = metadata.remote_code_version
+        # we don't bother with invoked_at or remote_started_at because they can be
+        # inferred from the timestamp and the wall times
     try:
         assert not log_file.exists(), f"Log file '{log_file}' should not already exist"
         with log_file.open("w") as f:

@@ -70,16 +70,11 @@ provide significant optimizations over other options listed below.
 
 > 📢 The TL;DR of this section is that you should:
 >
-> - replace function parameters representing readable/input data (e.g. `Path`, `SrcFile`, `AdlsFqn`,
->   etc.) with `Source`.
-> - replace function return values (e.g. `Path`, `DestFile`, `AdlsFqn`) with `Source`.
-> - remove input parameter `DestFiles` (which represent output locations) from the function signature
->   entirely if at all possible (preferring the automatic naming behavior provided by `from_file`), and
->   if not, you should replace them with an input parameter URI or AdlsFqn, and then return `Source`.
+> - replace function parameters representing readable/input data (e.g. `Path`, `AdlsFqn`, etc.) with
+>   `Source`.
+> - replace function return values (e.g. `Path`, `AdlsFqn`) with `Source`.
 >
-> These changes will, in general, incur minor changes for the calling code, and, if switching away from
-> `SrcFile`, probably provide some code simplification (removing the need for `with` statements or
-> `scope.enter` on the `SrcFile`) within the functions themselves.
+> These changes will, in general, incur minor changes for the calling code.
 
 On a basic level, `Source` represents two conceptually different possibilities for the availability of
 your data. Data is either:
@@ -159,13 +154,8 @@ the `source.uri` for a file that **does not** exist locally will be the remote U
 See [paths](./paths.md) for documentation on this still-supported but no longer recommended
 functionality.
 
-### Src/DestFiles (deprecated)
-
-See [Src/DestFiles](./src_dest_files.md) for documentation on another deprecated approach to naming and
-sourcing read-only data.
-
 [^1]: The current implementation does not provide for efficiently 'seeking' to a byte range within the
     Source - the entire file must first be downloaded. This is not a fundamental limitation, and could in
     theory be lifted by further technical work, but not all remote file stores would necessarily support
     this type of access anyway, and we have not previously supported anything like this with Paths or the
-    Src/DestFile abstractions.
+    (pre-v3) Src/DestFile abstractions.

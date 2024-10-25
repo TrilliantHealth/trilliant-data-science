@@ -62,8 +62,8 @@ in most cases when defining an output location for large output data.
 
 However, if you're doing a production run and want to [memoize](./memoization.md) your results so that
 others can use them, you should [configure](./config.md#production-runs) `mops` to use a different
-Storage Account and Container for long-term storage of the invocations, results, and output
-[`DestFiles`](./src_dest_files.md).
+Storage Account and Container for long-term storage of the invocations, results, and any output
+[Paths](./paths.md) or [Source objects](./optimizations.md#thds-core-source).
 
 ### Runner bypass
 

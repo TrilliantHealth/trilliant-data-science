@@ -1,3 +1,3 @@
-from .memoize_only import memoize_in  # noqa
-from .runner.orchestrator_side import MemoizingPicklingRunner, Shell, ShellBuilder  # noqa
-from .runner.remote_side import remote_entry_run_pickled_invocation  # noqa # force registration
+from . import mprunner, remote  # noqa: F401
+from .memoize_only import memoize_in  # noqa: F401
+from .mprunner import MemoizingPicklingRunner  # noqa: F401

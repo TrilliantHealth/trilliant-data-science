@@ -11,8 +11,9 @@ from tblib import pickling_support  # type: ignore
 
 from thds.core import hashing, log, source
 
+from ..core import metadata
 from ..core.source import prepare_source_argument, prepare_source_result
-from ..core.types import Args, Kwargs, SerializerHandler, T
+from ..core.types import Args, Kwargs, SerializerHandler
 from ..core.uris import get_bytes
 from .pickles import (
     PicklableFunction,
@@ -91,14 +92,28 @@ def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
     )
 
 
-def make_read_object(
-    type_hint: str, wrapper: ty.Callable[[ty.Any], T] = lambda o: o
-) -> ty.Callable[[str], T]:
-    def read_object(uri: str) -> T:
-        _unused, unpickled = read_partial_pickle(get_bytes(uri, type_hint=type_hint))
-        return wrapper(unpickled)
+H = ty.TypeVar("H")
+
+
+def make_read_header_and_object(
+    type_hint: str, xf_header: ty.Optional[ty.Callable[[bytes], H]] = None
+) -> ty.Callable[[str], ty.Tuple[H, ty.Any]]:
+    def read_object(uri: str) -> ty.Tuple[H, ty.Any]:
+        header, unpickled = read_partial_pickle(get_bytes(uri, type_hint=type_hint))
+        return (xf_header or (lambda h: h))(header), unpickled  # type: ignore
 
     return read_object
+
+
+def read_metadata_and_object(
+    type_hint: str, uri: str
+) -> ty.Tuple[ty.Optional[metadata.ResultMetadata], ty.Any]:
+    def _read_metadata_header(header_bytes: bytes) -> ty.Optional[metadata.ResultMetadata]:
+        if not header_bytes:
+            return None
+        return metadata.parse_result_metadata(header_bytes.decode("utf-8").split("\n"))
+
+    return make_read_header_and_object(type_hint, xf_header=_read_metadata_header)(uri)
 
 
 def freeze_args_kwargs(dumper: Dumper, f, args: Args, kwargs: Kwargs) -> bytes:

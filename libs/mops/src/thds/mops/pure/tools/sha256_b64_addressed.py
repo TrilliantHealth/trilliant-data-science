@@ -1,13 +1,14 @@
 """Upload a file to the location under a given storage root where a
 pathlib.Path would be put by the MemoizingPicklingFunctionRunner.
 """
+
 import argparse
 from pathlib import Path
 
 from ..._utils.once import Once
 from ..core import uris
 from ..core.serialize_paths import CoordinatingPathSerializer, human_sha256b64_file_at_paths
-from ..pickling.runner import sha256_b64
+from ..pickling import sha256_b64
 
 
 def main():

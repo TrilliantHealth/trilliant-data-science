@@ -104,6 +104,7 @@ def acquire(  # noqa: C901
     my_writer_id = humenc.encode(uuid4().bytes)
 
     lockfile_writer = LockfileWriter(
+        my_writer_id,
         lock_dir_uri,
         make_lock_contents(my_writer_id, expire),
         expire.total_seconds(),

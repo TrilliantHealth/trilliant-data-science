@@ -19,7 +19,7 @@ class ResultChannel(ty.Protocol[T_contra]):
     A remote invocation can succeed with a result or fail with an exception.
     """
 
-    def result(self, __result: T_contra) -> None:
+    def return_value(self, __return_value: T_contra) -> None:
         ...  # pragma: no cover
 
     def exception(self, __ex: Exception) -> None:
@@ -31,9 +31,9 @@ _routing_scope = scope.Scope()
 
 
 @_routing_scope.bound
-def route_result_or_exception(
+def route_return_value_or_exception(
     channel: ResultChannel[T_contra],
-    do_work_return_result_thunk: ty.Callable[[], T_contra],
+    do_work_return_value: ty.Callable[[], T_contra],
     pipeline_id: str = "",
     pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
 ):
@@ -57,10 +57,10 @@ def route_result_or_exception(
         # i want to _only_ run the user's function inside this try-catch.
         # If mops itself has a bug, we should not be recording that as
         # though it were an exception in the user's code.
-        result = do_work_return_result_thunk()
+        return_value = do_work_return_value()
     except Exception as ex:
         logger.exception("Failure to run remote function. Transmitting exception...")
         channel.exception(ex)
     else:
-        logger.debug("Success running function remotely. Transmitting result...")
-        channel.result(result)
+        logger.debug("Success running function remotely. Transmitting return value...")
+        channel.return_value(return_value)
