@@ -1,3 +1,8 @@
+## 1.28
+
+- Make `lazy.Lazy` friendlier, in that it will raise a message suggesting you add parentheses prior to
+  your attribute access.
+
 ### 1.27.20241021
 
 - Fixes bug in `core.sqlite.upsert.mappings` stemming from the fact that SQLite apparently never reaches
