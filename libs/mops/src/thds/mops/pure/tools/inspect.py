@@ -7,6 +7,7 @@ but if you're reading this in the distant future - those are its limitations.
 """
 
 import argparse
+import functools
 import os
 import re
 import subprocess
@@ -20,11 +21,35 @@ from thds.core import log, scope, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
 from thds.mops.pure.core.memo import results
-from thds.mops.pure.pickling._pickle import read_metadata_and_object, unfreeze_args_kwargs
+from thds.mops.pure.pickling._pickle import (
+    CallableUnpickler,
+    read_metadata_and_object,
+    unfreeze_args_kwargs,
+)
 from thds.mops.pure.pickling.pickles import Invocation
 from thds.mops.pure.runner import strings
 
 logger = log.getLogger(__name__)
+
+
+class _MopsInspectPrettyPartial(functools.partial):
+    def __repr__(self):
+        return f"partial({self.func.__name__}, {self.args}, {self.keywords})"
+
+    def __rich_repr__(self):
+        """I don't much like how partial does its repr. Especially with nested partials,
+        it becomes almost impossible to follow.
+        """
+        yield "function", self.func.__name__
+        yield "args", self.args
+        yield "keywords", self.keywords
+
+
+class PartialViewingUnpickler(CallableUnpickler):
+    def find_class(self, module, name):
+        if module == "functools" and name == "partial":
+            return _MopsInspectPrettyPartial
+        return super().find_class(module, name)
 
 
 def _unpickle_object_for_debugging(uri: str) -> ty.Any:
@@ -32,7 +57,7 @@ def _unpickle_object_for_debugging(uri: str) -> ty.Any:
         if uri.endswith("/" + strings.INVOCATION):
             _no_header, invoc_raw = read_metadata_and_object(strings.INVOCATION, uri)
             invoc = ty.cast(Invocation, invoc_raw)
-            args, kwargs = unfreeze_args_kwargs(invoc.args_kwargs_pickle)
+            args, kwargs = unfreeze_args_kwargs(invoc.args_kwargs_pickle, PartialViewingUnpickler)
             return Thunk(getattr(invoc, "f", None) or invoc.func, *args, **kwargs)
         header, obj = read_metadata_and_object("output", uri)
         return obj, header

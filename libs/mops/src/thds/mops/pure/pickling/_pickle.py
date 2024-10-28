@@ -130,9 +130,11 @@ def freeze_args_kwargs(dumper: Dumper, f, args: Args, kwargs: Kwargs) -> bytes:
     return gimme_bytes(dumper, (bound_arguments.args, bound_arguments.kwargs))
 
 
-def unfreeze_args_kwargs(args_kwargs_pickle: bytes) -> ty.Tuple[Args, Kwargs]:
+def unfreeze_args_kwargs(
+    args_kwargs_pickle: bytes, unpickler: ty.Type[pickle.Unpickler] = CallableUnpickler
+) -> ty.Tuple[Args, Kwargs]:
     """Undoes a freeze_args_kwargs call."""
-    return CallableUnpickler(io.BytesIO(args_kwargs_pickle)).load()
+    return unpickler(io.BytesIO(args_kwargs_pickle)).load()
 
 
 # SerializerHandlers for Source objects:
