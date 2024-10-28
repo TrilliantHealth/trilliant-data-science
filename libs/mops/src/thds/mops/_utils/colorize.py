@@ -65,8 +65,15 @@ _PREFERRED_COLORS = [
     "darkgoldenrod",
     "coral",
     "darkorchid",
-    "olive",
 ]
+
+
+def _start_from(color_list: ty.List[str], index: int) -> ty.List[str]:
+    return color_list[index:] + color_list[:index]
+
+
+def _preferred_randgreen_start() -> ty.List[str]:
+    return _start_from(_PREFERRED_COLORS, random.randint(0, 6) * 5)
 
 
 def _all_colors() -> ty.List[str]:
@@ -75,7 +82,7 @@ def _all_colors() -> ty.List[str]:
     assert len(used_colors) == len(_PREFERRED_COLORS)  # assert no RGB dupes in the preferred list
     all_colors = list(csscolors.css_colors.items())
     random.shuffle(all_colors)
-    return _PREFERRED_COLORS + [
+    return _preferred_randgreen_start() + [
         name
         for name, rgb in all_colors
         if rgb not in used_colors
