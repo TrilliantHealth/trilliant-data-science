@@ -32,6 +32,13 @@ class Invocation:
     # the identity of the function is represented by the name part of the blob path.
 
 
+class NestedFunctionPickle(ty.NamedTuple):
+    """Not in use - retained for mops-inspect backward-compatibility"""
+
+    f: ty.Callable
+    args_kwargs_pickle: bytes
+
+
 class PicklableFunction:
     """The main 'issue' this is working around is that decorated
     functions aren't picklable because of something having to do with

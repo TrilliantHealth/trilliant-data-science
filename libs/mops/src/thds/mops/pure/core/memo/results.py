@@ -51,7 +51,9 @@ def _should_require_result(memo_uri: str = "") -> str:
     is_envvar_set = envvar_to_override and envvar_to_override in os.environ
     if is_envvar_set:
         return ""
-    return f"{requirement_msg}; Note that you can set the environment variable {envvar_to_override} to skip this check."
+    if envvar_to_override:
+        return f"{requirement_msg}; Note that you can set the environment variable {envvar_to_override} to skip this check."
+    return requirement_msg
 
 
 class Success(ty.NamedTuple):
