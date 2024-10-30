@@ -222,12 +222,12 @@ class Matches:
             logger.debug("No regexes must match")
             return True
 
-        for regex in self.must_match:
-            if re.search(regex, ire_str):
-                logger.debug('Matches because of regex "%s"', regex)
-                return True
+        all_match = all(re.search(regex, ire_str) for regex in self.must_match)
+        if all_match:
+            logger.debug("Matches all required regexes")
+            return True
 
-        logger.debug("Does not match any of the %d required regexes.", len(self.must_match))
+        logger.debug("Does not match all of the %d required regexes.", len(self.must_match))
         return False
 
 
