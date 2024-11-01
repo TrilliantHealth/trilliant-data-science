@@ -111,6 +111,17 @@ def yield_all(
                 yield thunk_key, Error(e)
 
 
+def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterator[ty.Tuple[H, R]]:
+    for key, res in results:
+        if isinstance(res, Error):
+            raise res.error
+        yield key, res
+
+
+def xf_mapping(thunks: ty.Mapping[H, ty.Callable[[], R]]) -> ty.Iterator[ty.Tuple[H, R]]:
+    return failfast(yield_all(IteratorWithLen(len(thunks), thunks.items())))
+
+
 def create_keys(iterable: ty.Iterable[R]) -> ty.Iterator[ty.Tuple[str, R]]:
     """Use this if you wanted to call yield_all with a list or other sequence that
     has no keys, and you don't need to 'track' the correspondence of input thunks to
