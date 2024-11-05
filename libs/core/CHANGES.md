@@ -1,3 +1,18 @@
+## 1.28
+
+- Make `lazy.Lazy` friendlier, in that it will raise a message suggesting you add parentheses prior to
+  your attribute access.
+
+### 1.27.20241021
+
+- Fixes bug in `core.sqlite.upsert.mappings` stemming from the fact that SQLite apparently never reaches
+  the `ON CONFLICT DO UPDATE SET...` clause if the row you're trying to upsert would not be an insertable
+  row on its own. In other words, if you have a `NOT NULL` constraint on a given column, and you don't
+  provide a non-null value for that column because you already know the row exists and you simply want to
+  update it, SQLite will raise an `IntegrityError` immediately upon seeing your row, rather than
+  attempting the insert, discovering a `UNIQUE` constraint conflict, and applying the `ON CONFLICT`
+  clause (as you might otherwise have expected/hoped).
+
 ## 1.27
 
 - Add `ThdsJsonFormatter` and `ThdsLogfmter` (which is based on
