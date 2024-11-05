@@ -200,10 +200,24 @@ def get_version(pkg: Package, orig: str = "") -> str:
     return version_
 
 
+class NoBasePackageFromMain(ValueError):
+    """
+    `get_base_package` needs a 'real' package or module name, not '__main__',
+    in order to discover a meaningful name for the package.
+    You may be using a dynamic library from within __main__ that calls get_base_package,
+    and inside __main__, Python doesn't let us do any nice introspection on a module's name.
+    So, please call that code from a module that isn't what was passed to `python -m` -
+    that is, split your code into a minimal __main__.py and a separate module.
+    """
+
+
 @lru_cache(None)
 def get_base_package(pkg: Package) -> str:
     try:
-        _ = version(norm_name(str(pkg)))
+        str_pkg = str(pkg)
+        if str_pkg == "__main__":
+            raise NoBasePackageFromMain(NoBasePackageFromMain.__doc__)
+        _ = version(norm_name(str_pkg))
     except PackageNotFoundError:
         try:
             _ = version(str(pkg))

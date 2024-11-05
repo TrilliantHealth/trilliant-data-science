@@ -5,7 +5,8 @@ from sqlite3 import Connection
 
 from thds.core import generators, log
 
-from .meta import primary_key_cols
+from .meta import get_table_schema, primary_key_cols
+from .read import matching_where
 from .write import run_batch_and_isolate_failures
 
 logger = log.getLogger(__name__)
@@ -23,12 +24,16 @@ def _make_upsert_writer(
 
     In fact, the docs normally suggest doing a SELECT first to see if the row exists...
 
-    What you can do instead is write a query that detects the conflict and follows it up
-    with UPDATE for the specific key-value pairs you provided. On top of that, we can then
-    batch any immediately-following rows that fit the exact same set of keys to be
-    written, and finally, we can commit all of the queries at the end.  This won't be as
-    fast as a true bulk insert, since there's meaningful Python running for every row
-    (converting dict keys into a tuple) and a check against the previous keyset.
+    We _tried_ doing an ON CONFLICT... DO UPDATE SET clause, but it turns out that
+    does not work in circumstances described below. So we ended up with an approach
+    that basically embeds the SELECT (so that this can be done in pure SQL rather than requiring
+    Python logic to run for each row).
+
+    By doing it this way, we can batch any immediately-following rows that fit the exact
+    same set of keys to be written, and finally, we can commit all of the queries at the
+    end.  This won't be as fast as a true bulk insert, since there's still meaningful
+    Python running for every row (converting dict keys into a tuple) and a check against
+    the previous keyset.
 
     Your perfomance will be better if you are able to make sure that your iterator of rows
     provides rows with the same keys in the same order in batches, so that we can do as
@@ -36,50 +41,60 @@ def _make_upsert_writer(
     """
 
     primary_keys = primary_key_cols(table_name, conn)
-    on_conflict_pkeys = ",".join(primary_keys)
-    # https://stackoverflow.com/questions/66904339/sqlite-on-conflict-two-or-more-columns
+    where_matches_primary_keys = matching_where(primary_keys)
+    all_column_names = tuple(get_table_schema(conn, table_name).keys())
+    all_column_names_comma_str = ", ".join(all_column_names)
+
+    # https://stackoverflow.com/questions/418898/upsert-not-insert-or-replace/4330694#comment65393759_7511635
+    #
+    # the above is the approach i'm taking now that I know that SQLite will (sadly) enforce a
+    # not-null constraint _before_ it actually discovers that the row already exists and that
+    # the ON CONFLICT clause would end up doing a simple UPDATE to an existing row.
+    # This is more boilerplate-y and might be slower, too, because it requires a separate SELECT -
+    # but in theory the database had to do that SELECT in order to check the ON CONFLICT clause anyway,
+    # so maybe it's a wash?
 
     @lru_cache(maxsize=max_sql_stmt_cache_size)
-    def make_upsert_query(row_keys: ty.Tuple[str, ...]) -> str:
-        """Prefer sorting your row keys so that you get overlap here."""
-        insert_columns = ",\n    ".join(row_keys)
-        placeholders = ", ".join(["?"] * len(row_keys))
+    def make_upsert_query(colnames_for_partial_row: ty.Sequence[str]) -> str:
+        """Makes a query with placeholders which are:
 
-        non_pkey_rows = [col for col in row_keys if col not in primary_keys]
+        - the values you provide for the row keys
+        - the primary keys themselves, which must be provided in the same order as they are
+          defined in the table schema.
+
+        Prefer sorting your row keys so that you get overlap here.
+        """
+        colnames_or_placeholders = list()
+        for col in all_column_names:
+            if col in colnames_for_partial_row:
+                colnames_or_placeholders.append(f"@{col}")  # insert/update the provided value
+            else:
+                colnames_or_placeholders.append(col)  # use the joined default value for an update
 
         # Construct the SQL query for the batch
         return textwrap.dedent(
             f"""
-            INSERT INTO {table_name} ({insert_columns})
-                VALUES ({placeholders})
-                ON CONFLICT ({on_conflict_pkeys}) DO UPDATE SET
-                    {", ".join(f"{col}=excluded.{col}" for col in non_pkey_rows)};
+            INSERT OR REPLACE INTO {table_name} ({all_column_names_comma_str})
+                SELECT {", ".join(colnames_or_placeholders)}
+                FROM ( SELECT NULL )
+                LEFT JOIN (
+                    SELECT * from {table_name} {where_matches_primary_keys}
+                )
             """
         )
 
     cursor = None
-    batch: ty.List[ty.Tuple[ty.Any, ...]] = list()
+    batch: ty.List[ty.Mapping[str, ty.Any]] = list()
     query = ""
     current_keyset: ty.Tuple[str, ...] = tuple()
 
     try:
         row = yield
-
         cursor = conn.cursor()
         # don't create the cursor til we receive our first actual row.
 
         while True:
-            keyset = tuple(row)
-            # Based on some benchmarking, and on the (imagined) most likely actual use
-            # cases, we're choosing not to sort your keys for you - if your rows have
-            # different key orders, we won't be able to make batches as large, and
-            # performance will decrease.  It seems likely that in most real-world use
-            # cases, the code for generating the rows will have somewhat determinstic key
-            # ordering. If this isn't the case, you're welcome to reorder the keys as you
-            # see fit - perhaps it will make your code faster, but my guess is that in
-            # many cases, by taking on that extra Python overhead, you'll end up slower
-            # overall. Either way, the power is in your hands and we're leaving this code
-            # uncomplicated by that detail.
+            keyset = tuple([col for col in all_column_names if col in row])
             if keyset != current_keyset or len(batch) >= batch_size:
                 # send current batch:
                 run_batch_and_isolate_failures(cursor, query, batch)
@@ -88,7 +103,7 @@ def _make_upsert_writer(
                 query = make_upsert_query(keyset)
                 current_keyset = keyset
 
-            batch.append(tuple(row.values()))
+            batch.append(row)
             row = yield
 
     except GeneratorExit:
