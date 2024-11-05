@@ -6,7 +6,7 @@ from thds.core import generators, log
 logger = log.getLogger(__name__)
 
 
-def run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[ty.Any]):
+def run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[tuple]):
     if not batch:
         return
     assert cursor, "cursor must exist"
