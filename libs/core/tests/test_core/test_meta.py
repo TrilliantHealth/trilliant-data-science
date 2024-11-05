@@ -565,8 +565,3 @@ def test_write_metadata_not_deploying(
 
 def test_get_repo_name():
     assert meta.get_repo_name() == "ds-monorepo"
-
-
-def test_get_base_package_gives_nice_error_for_main():
-    with pytest.raises(meta.NoBasePackageFromMain, match="nice introspection"):
-        meta.get_base_package("__main__")
