@@ -127,7 +127,7 @@ def cheap_copy(
     dest: ct.StrOrPath,
     *,
     permissions: ty.Optional[int] = None,
-) -> None:
+) -> Path:
     """Make a copy of the file, but first attempt Mac COW semantics if available.
 
     The copy will be done via a temporary file on the same filesystem as the destination,
@@ -150,3 +150,4 @@ def cheap_copy(
         if permissions is not None:
             os.chmod(tmp_link_dest, permissions)
         os.rename(tmp_link_dest, dest)
+    return Path(dest)
