@@ -146,9 +146,9 @@ class DotDict(dict, MutableMapping[KT, VT]):
         ref.__setattr__(path[-1], val)
 
 
-def merge_dicts(*dicts: Dict[Any, Any], default: Any = None) -> Dict[Any, Any]:
+def merge_dicts(*dicts: Dict[Any, Any]) -> Dict[Any, Any]:
     """Merges similar dictionaries into one dictionary where the resulting values are a list of values from the
-    original dicts. If a dictionary does not have a key the default value will be used (defaults to None).
+    original dicts.
 
     Example
     --------
@@ -166,7 +166,7 @@ def merge_dicts(*dicts: Dict[Any, Any], default: Any = None) -> Dict[Any, Any]:
         "f": [None, 300]
     }
     """
-    merged_dict: Dict[str, List[Any]] = defaultdict(lambda: [default for _ in range(len(dicts))])
+    merged_dict: Dict[str, List[Any]] = defaultdict(lambda: [None for _ in range(len(dicts))])
     for i, d in enumerate(dicts):
         for k, v in d.items() if isinstance(d, dict) else {}:
             if isinstance(v, dict):
