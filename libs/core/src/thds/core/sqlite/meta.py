@@ -181,10 +181,10 @@ def get_table_schema(
 
 
 @autoconn_scope.bound
-def attach(connectable: Connectable, db_path: os.PathLike, schema_name: str) -> None:
+def attach(connectable: Connectable, db_path: Path, schema_name: str) -> None:
     """ATTACH a database to the current connection, using your provided schema name.
 
     It must be an actual file.
     """
     conn = autoconnect(connectable)
-    conn.execute(f"ATTACH DATABASE '{os.fspath(db_path)}' AS {schema_name}")
+    conn.execute(f"ATTACH DATABASE '{db_path}' AS {schema_name}")
