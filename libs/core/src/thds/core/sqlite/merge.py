@@ -1,3 +1,4 @@
+import os
 import typing as ty
 from contextlib import closing
 from pathlib import Path
@@ -51,7 +52,7 @@ def merge_databases(
             start = default_timer()
             to_merge = "to_merge"  # just a local/temporary constant alias
             logger.info(f"Merging {filename} into {first_filename}")
-            cursor.execute(f"ATTACH '{filename}' AS " + to_merge)
+            cursor.execute(f"ATTACH '{os.fspath(filename)}' AS " + to_merge)
 
             attached_tables = get_tables(conn, schema_name=to_merge)
             cursor.execute("BEGIN")
