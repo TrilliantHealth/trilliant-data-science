@@ -1,3 +1,11 @@
+## 3.2
+
+- Improve lock/lease behavior so that the remote runners will exit early if they detect an intervening
+  acquirer. This will prevent rare (but observed) scenarios wherein dying orchestrators, relinquishing
+  their leases while their remote is still pending scheduling on a cluster somewhere, end up leading to
+  multiple parallel invocations that race to completion, potentially overwriting each others' results in
+  a manner that can lead to unstable memoization akin to a merge conflict.
+
 ## 3.1
 
 - Supports automatically discovering `function-logic-key` in first-class function objects passed as

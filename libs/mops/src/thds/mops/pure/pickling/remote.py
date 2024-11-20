@@ -94,7 +94,9 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str):
 
     try:
         stop_lock = lock.launch_daemon_lock_maintainer(
-            lock.remote_lock_maintain(fs.join(memo_uri, "lock"))
+            lock.remote_lock_maintain(
+                fs.join(memo_uri, "lock"), expected_writer_id=invocation_metadata.invoker_uuid
+            )
         )
     except lock.CannotMaintainLock as e:
         logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")

@@ -1,9 +1,13 @@
-# Invocation Locks
+# Invocation Locks/Leases
 
 This feature is currently experimental and may be removed or tweaked as we observe its use.
 
 No configuration or code changes are necessary to use this feature. It is baked directly into the
 `MemoizingPicklingRunner`.
+
+Throughout this documentation, we will refer to these as "locks" even though they're more properly
+leases, since they have built-in expiration dates and therefore do not ever require human intervention to
+recover from failed states.
 
 ## Goals
 
@@ -30,14 +34,19 @@ finally attempts to acquire the lock again.
 If the result is ever found prior to acquiring the lock, the orchestrator returns it. If the lock is ever
 acquired, the Shell will be called to start a remote invocation.
 
-The expiring lock must be maintained by the acquirer. In practice, this involves spawning a separate
-thread to 'update' the lock's `updated_at` timestamp on a regular schedule. If this timestamp is not
-updated for longer than the expiration time, the lock is considered to have expired without release, and
-the next attempt to acquire it will succeed.
+The lock should be maintained by the acquirer to prevent expiration. In practice, this involves spawning
+a separate thread to 'update' the lock's `updated_at` timestamp on a regular schedule. If this timestamp
+is not updated for longer than the expiration time, the lock is considered to have expired without
+release, and the next attempt to acquire it will succeed.
 
-On the remote side, early in startup, the remote will begin to 'accompany' the orchestrator in
-maintaining the expiring lock. This way, if the orchestrator itself dies, then the lock will not expire
-until after the remote side exits (whether successfully or unsuccessfully).
+The `MemoizingPicklingRunner` passes the lock writer id to the remote. On the remote side, early in
+startup, the remote will identify the current lock writer id, and only if it matches will it continue to
+execute. This allows a form of "last writer wins" to break ties in cases where the acquirer did not
+maintain the lock (perhaps due to failure of the orchestrator process).
+
+The remote process will maintain the lock as well once it has started. This way, if the orchestrator
+itself dies, then the lock will not expire until after the remote side exits (whether successfully or
+unsuccessfully).
 
 When a Shell exits (whether successfully or unsuccessfully), the orchestrator will _release_ the lock
 immediately. This is mostly useful as a debugging indication that the orchestrator continued running
@@ -48,36 +57,32 @@ orchestrator will ever even attempt to acquire the lock.
 
 ### Delayed remote maintenance + dying orchestrators
 
-If a very large pipeline (such as Demand Forecast) is run, it will create more k8s Jobs than there are
-nodes immediately available to run them. In this situation, if the orchestrator dies before the remote
-begins executing, the lock expiration will eventually arrive, due to lack of lock maintenance. Then any
-other orchestrator, including a restart of the original one, will be able to acquire the lock, despite
-there existing a 'pending' execution of the function invocation.
+With Kubernetes and Databricks, it is possible to have a large delay between acquiring the lock/beginning
+the invocation, and the remote function actually beginning to run, because it takes time for nodes and
+clusters to spin up.
 
-This limitation can be helped somewhat by increasing lock expirations to larger numbers. This is not
-currently configurable within `mops` but could easily be made so by using `core.config.item`.
+In this situation, if the orchestrator dies before the remote begins executing, the lock expiration will
+eventually arrive, due to lack of lock maintenance. Then any other orchestrator, including a restart of
+the original one, will be able to acquire the lock, despite there existing a 'pending' execution of the
+function invocation.
 
-> 🔮 An alternative, and more complete, solution, would be to pass the `lock_uuid` out-of-band to the
-> remote side (via shell arguments), and ask it to exit quietly if it found that the existing lock was
-> active with a different id than expected. This would allow 'stealing acquirers' to start their own
-> invocation, with reasonable confidence that any long-delayed invocations would exit prior to actually
-> invoking the function.
->
-> It _might_ occasionally _delay_ the remote invocation, because there's no guarantee that the first pod
-> to come up would be from the earlier-scheduled Job that acquired the lock - but this is fine; in
-> general, we'd expect that only one orchestrator would be 'alive' at any given time, and we'd prefer to
-> err on the side of not confusing the orchestrator that most recently acquired the lock (and expects its
-> own shell to be the thing that completes the invocation)
+The remote runners are configured to exit with a `LockWasStolenError` if, upon startup, they discover
+that some other acquirer has acquired the lock before they were able to start.
+
+In theory, this gives us "last orchestrator wins" semantics, which will generally be what we want as far
+as the user experience goes, but it will tend to slightly delay completion of a given function, since it
+will often be the first remote runner that chooses to exit even though it had been allocated runtime on a
+cluster. Since its orchestrator is probably dead and no longer polling for its completion, this is not a
+major issue; the later orchestrator will simply have to wait until its remote runner makes it to the head
+of the cluster queue on its own terms.
 
 ### azure Python SDK network errors
 
 If you're running a huge pipeline, like Demand Forecast, it may be advantageous to opt out of the
-network-hungry lock maintenance on the orchestrator side of things. This degrades the utility of the lock
-somewhat, while still providing basic debugging info that is very handy to keep.
+network-hungry lock maintenance on the orchestrator side of things. This will tend to create the above
+situation more frequently, but the lock should still basically prevent multiple invocations from actually
+beginning their computation.
 
 The relevant configuration is a core.config item, so you can programmatically disable it by importing
 `MAINTAIN_LOCKS` from `thds.mops.pure.pickling.runner.local` and calling `.set_global(False)` on it. You
 can also set `THDS_MOPS_PURE_ORCHESTRATOR_MAINTAIN_LOCKS=0` in your environment.
-
-> 🔮 A future iteration on improving this situation would be to revisit the remote behavior of the lock as
-> noted above, which would also solve the more general problem for Demand Forecast.

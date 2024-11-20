@@ -53,10 +53,22 @@ class CannotMaintainLock(ValueError):
     pass  # pragma: no cover
 
 
-def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
+class LockWasStolenError(ValueError):
+    pass  # pragma: no cover
+
+
+def remote_lock_maintain(lock_dir_uri: str, expected_writer_id: str = "") -> LockAcquired:
     """Only for use by remote side - does not _acquire_ the lock,
     but merely maintains it as unexpired. Does not allow for releasing,
     as it is not the responsibility of the remote side to release the lock.
+
+    Will raise a CannotMaintainLock exception if the lock does not exist or has no
+    expiration time.
+
+    Will raise a LockWasStolenError if a provided expected_writer_id (which is the
+    writer_id of the lock as provided to the remote side by the original writer) does not
+    match the lock's actual current writer_id - in other words, if some other writer has
+    acquired the lock before the remote side has been able to start running.
 
     The return value is intended to be launched as the target of a Thread or Process.
     """
@@ -79,8 +91,17 @@ def remote_lock_maintain(lock_dir_uri: str) -> LockAcquired:
     if not first_acquired_at_s:
         raise CannotMaintainLock(f"Lock was never acquired: {lock_contents}")
 
+    current_writer_id = lock_contents["writer_id"]
+    if expected_writer_id and expected_writer_id != current_writer_id:
+        raise LockWasStolenError(
+            "Refusing to maintain lock that was created by a different writer:"
+            f" expected `{expected_writer_id}`, got `{current_writer_id}`."
+            "This probably means you just need to kill and restart your orchestrator "
+            " and it will begin awaiting the results of the new owner of the lock."
+        )
+
     lockfile_writer = LockfileWriter(
-        lock_contents["writer_id"],
+        current_writer_id,
         lock_dir_uri,
         make_lock_contents(get_writer_id(lock_contents), timedelta(seconds=expire_s)),
         expire_s,
