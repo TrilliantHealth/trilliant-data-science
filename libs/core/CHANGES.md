@@ -1,9 +1,3 @@
-## 1.29
-
-- Added `default` to `dict_utils.merge_dict` that allows the user to define other values than just `None`
-  when a dictionary does not have a key.
-- Added `TimeTracker` to `timer`.
-
 ## 1.28
 
 - Make `lazy.Lazy` friendlier, in that it will raise a message suggesting you add parentheses prior to
