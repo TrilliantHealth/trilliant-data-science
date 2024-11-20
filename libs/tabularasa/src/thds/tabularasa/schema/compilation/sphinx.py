@@ -52,17 +52,23 @@ MISSING_BADGE_MSG = (
 # Helper Classes/Functions
 
 
+class DontSplitMe(str):
+    """A string that should not be split by textwrap."""
+
+    pass
+
+
+def _wrap_table_field(max_width: int, text: Any) -> str:
+    if isinstance(text, (AnyUrl, DontSplitMe)):
+        return text
+    return "\n\n".join(textwrap.wrap(str(text), width=max_width, break_long_words=False))
+
+
 def split_long_fields(
     table_data: Iterable[Sequence], max_field_width: int = 80
 ) -> List[Tuple[str, ...]]:
     """Splits long row fields into multiple lines."""
-    return [
-        tuple(
-            "\n\n".join(textwrap.wrap(str(field), width=max_field_width, break_long_words=False))
-            for field in row
-        )
-        for row in table_data
-    ]
+    return [tuple(_wrap_table_field(max_field_width, field) for field in row) for row in table_data]
 
 
 def join_blocks(blocks: Iterable[str], sep: str) -> str:
@@ -96,8 +102,8 @@ def docref(doc_path: str) -> str:
     return f":doc:`{doc_path}`"
 
 
-def anonymous_hyperlink(link_text: str, link: str) -> str:
-    return f"`{link_text} <{link}>`__"
+def anonymous_hyperlink(link_text: str, link: str) -> DontSplitMe:
+    return DontSplitMe(f"`{link_text} <{link}>`__")
 
 
 def escape(text: str) -> str:
@@ -122,11 +128,18 @@ def __tabulate() -> Optional[Any]:
 
 
 def render_table(
-    header: Tuple[str, ...], rows: Iterable[Sequence], tablefmt: str = "grid", max_field_width: int = 80
+    header: Tuple[str, ...],
+    rows: Iterable[Sequence],
+    tablefmt: str = "grid",
+    max_field_width: Optional[int] = 80,
 ) -> str:
     tabulate = __tabulate()
     assert tabulate is not None, "can't render tables in rst without `tabulate` dependency"
-    return tabulate(split_long_fields(rows, max_field_width), headers=header, tablefmt=tablefmt)
+    return tabulate(
+        rows if max_field_width is None else split_long_fields(rows, max_field_width),
+        headers=header,
+        tablefmt=tablefmt,
+    )
 
 
 def render_figure(img_path: Path) -> str:
@@ -239,11 +252,17 @@ def render_derivation_doc(tbl: metaschema.Table) -> str:
 
 
 # File metadata rendering
-def format_repo_url(file: LocalFileSourceMixin, repo_root: Path, repo_url: str) -> str:
+def format_repo_url(
+    file: LocalFileSourceMixin,
+    repo_root: Path,
+    repo_url: str,
+    name: Optional[str] = None,
+) -> DontSplitMe:
     relative_file_path = str(file.full_path.absolute().relative_to(repo_root.absolute()))
     file_path_url = urllib.parse.quote(relative_file_path)
     url = f"{repo_url.rstrip('/')}/{file_path_url}"
-    return f"`{relative_file_path} <{url}>`_"
+    # names may not be unique so we use anonymous refs (__) instead of named refs in those cases
+    return DontSplitMe(f"`{name or relative_file_path} <{url}>`{'__' if name else '_'}")
 
 
 def extract_file_sources(
@@ -386,21 +405,19 @@ def render_curation_status(schema: metaschema.Schema, repo_root: Path) -> str:
 
 def render_source_name(
     fs_name: str,
-    fs_landing: Optional[AnyUrl],
-    fs_url: Optional[AnyUrl],
-) -> str:
+    fs_data: FileSourceMixin,
+    repo_root: Path,
+    repo_url: Optional[str] = None,
+) -> DontSplitMe:
     links = []
-    if fs_landing is not None:
-        links.append(anonymous_hyperlink("homepage", fs_landing))
-    if fs_url is not None:
-        links.append(anonymous_hyperlink("url", fs_url))
+    if fs_data.landing_page is not None:
+        links.append(anonymous_hyperlink("homepage", fs_data.landing_page))
+    if fs_data.url is not None:
+        links.append(anonymous_hyperlink("url", fs_data.url))
+    if repo_url and isinstance(fs_data, LocalFileSourceMixin):
+        links.append(format_repo_url(fs_data, repo_root, repo_url, name="github"))
 
-    if len(links) == 2:
-        return f"{fs_name} ({links[0]} | {links[1]})"
-    elif len(links) == 1:
-        return f"{fs_name} ({links[0]})"
-    else:
-        return fs_name
+    return DontSplitMe(f"{fs_name} ({' | '.join(links)})" if links else fs_name)
 
 
 def render_package_table_links(
@@ -424,10 +441,12 @@ def render_source_info(
     fs_data: FileSourceMixin,
     schema: metaschema.Schema,
     dep_graph: nx.DiGraph,
+    repo_root: Path,
+    repo_url: Optional[str] = None,
     table_docs_relpath: Optional[Path] = None,
 ) -> List[Any]:
     return [
-        render_source_name(fs_name, fs_data.landing_page, fs_data.url),
+        render_source_name(fs_name, fs_data, repo_root, repo_url),
         fs_data.update_frequency,
         fs_data.last_checked,
         fs_data.last_updated,
@@ -436,7 +455,7 @@ def render_source_info(
     ]
 
 
-def build_source_metadata(schema: metaschema.Schema) -> Dict[str, List[Any]]:
+def build_source_metadata(schema: metaschema.Schema, repo_root: Path) -> Dict[str, List[Any]]:
     OPEN_ACCESS = "Open Access Data Sources"
     LICENSED = "Licensed Data Sources"
     INTERNAL = "Internal Data Sources"
@@ -457,7 +476,15 @@ def build_source_metadata(schema: metaschema.Schema) -> Dict[str, List[Any]]:
             if fs_name in sources:
                 continue
             sources.add(fs_name)
-            fs_data_fmt = render_source_info(fs_name, fs_data, schema, dep_graph, table_docs_relpath)
+            fs_data_fmt = render_source_info(
+                fs_name,
+                fs_data,
+                schema,
+                dep_graph,
+                table_docs_relpath=table_docs_relpath,
+                repo_root=repo_root,
+                repo_url=schema.build_options.repo_url,
+            )
             if fs_data.is_open_access:
                 stype = OPEN_ACCESS
             elif fs_data.authority == "Trilliant":
@@ -465,15 +492,18 @@ def build_source_metadata(schema: metaschema.Schema) -> Dict[str, List[Any]]:
             else:
                 stype = LICENSED
             source_meta[stype].append(fs_data_fmt)
+
+    for list_ in source_meta.values():
+        list_.sort(key=lambda list_: list_[0].lower())
+
     return source_meta
 
 
-def render_source_data_tables(schema: metaschema.Schema) -> str:
-    source_metadata = build_source_metadata(schema)
+def render_source_data_tables(schema: metaschema.Schema, repo_root: Path) -> str:
+    source_metadata = build_source_metadata(schema, repo_root)
     parts = []
     for k, source_data in source_metadata.items():
         parts.append(heading(k, 3))
-        source_data.sort(key=lambda row: row[0].lower())
         parts.append(render_table(SOURCE_COLUMNS, source_data))
     return join_blocks(parts, "\n\n")
 
@@ -492,7 +522,7 @@ def render_source_doc(
         heading(REPORT_TITLE, 1),
         render_curation_status(schema, repo_root),
         heading(SOURCE_TITLE, 2),
-        render_source_data_tables(schema),
+        render_source_data_tables(schema, repo_root),
     ]
     return join_blocks(parts, "\n\n")
 

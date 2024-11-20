@@ -1,3 +1,8 @@
+## 0.7.0
+
+- Fixed broken rendering of URLs in sphinx documentation as produced by `tabularasa docgen`
+- Added github urls for those source data files in a schema that are in version control
+
 ## 0.6.0
 
 - Added new `schema-diff` command to compare the current schema against a previous version of the schema
