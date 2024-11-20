@@ -1,3 +1,7 @@
+## 3.3
+
+- Can log a fraction of the Kubernetes pods launched. Non-determinstic.
+
 ## 3.2
 
 - Improve lock/lease behavior so that the remote runners will exit early if they detect an intervening

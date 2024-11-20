@@ -1,6 +1,7 @@
 """Handles things having to do with getting logs out of the Pods of a Job."""
+
 import enum
-import os
+import random
 import threading
 import time
 import typing as ty
@@ -10,7 +11,7 @@ import cachetools
 import urllib3.exceptions
 from kubernetes import client, watch
 
-from thds.core import scope
+from thds import core
 from thds.core.log import logger_context
 
 from .._utils.colorize import colorized, make_colorized_out, next_color
@@ -20,7 +21,10 @@ from ._shared import logger
 from .jobs import get_job
 from .retry import k8s_sdk_retry
 
-_NO_K8S_LOGS = os.getenv("MOPS_NO_K8S_LOGS")  # non-empty if you want to completely disable k8s pod logs.
+NO_K8S_LOGS = core.config.item("mops.no_k8s_logs", parse=core.config.tobool, default=False)
+# non-empty if you want to completely disable k8s pod logs.
+K8S_LOG_POD_FRACTION = core.config.item("mops.k8s.log_pod_fraction", parse=float, default=1.0)
+# fraction of pods to log. 1.0 means all pods.
 
 BOINK = colorized(fg="white", bg="magenta")
 # this module has tons of logs. occasionally you want to find a needle
@@ -52,17 +56,21 @@ class JobLogWatcher:
         self.job_pods_discovery_lock = threading.Lock()
 
     @k8s_sdk_retry()
-    @scope.bound
+    @core.scope.bound
     def start(self, failed_pod_name: str = ""):
         """Call this one time - it will spawn threads as needed."""
-        if _NO_K8S_LOGS:
+        if NO_K8S_LOGS():
             return
 
-        scope.enter(self.job_pods_discovery_lock)
+        if random.random() > K8S_LOG_POD_FRACTION():
+            logger.info(f"Skipping log watcher for {self.job_name} due to fraction.")
+            return
+
+        core.scope.enter(self.job_pods_discovery_lock)
         # we lock here because some of the threads we spawn may
         # eventually call this same method, and we only want one
         # instance of this running at a time.
-        scope.enter(logger_context(log=self.job_name))
+        core.scope.enter(logger_context(log=self.job_name))
         logger.debug("Starting log watcher")
         if failed_pod_name:
             logger.info(
@@ -165,14 +173,14 @@ def _await_pod_phases(phases: ty.Set[K8sPodStatus], pod_name: str) -> str:
         time.sleep(config.k8s_monitor_delay())
 
 
-@scope.bound
+@core.scope.bound
 def _scrape_pod_logs(
     out: ty.Callable[[str], ty.Any],
     pod_name: str,
     failure_callback: ty.Callable[[str], ty.Any],
 ):
     """Contains its own retry error boundary b/c this is notoriously unreliable."""
-    scope.enter(logger_context(log=pod_name))
+    core.scope.enter(logger_context(log=pod_name))
 
     last_scraped_at = default_timer()
     base_kwargs = dict(
