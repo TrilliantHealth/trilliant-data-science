@@ -10,6 +10,7 @@ from . import data as data_diff
 from . import schema as schema_diff
 
 DEFAULT_TABLEFMT = "pipe"
+DEFAULT_FLOATFMT = ".6g"
 
 
 def markdown_list(items: ty.Iterable) -> str:
@@ -144,7 +145,7 @@ def markdown_schema_diff_summary(
         heading_level,
     )
     heading = False
-    for table_name, table_diff in schema_diff.table_diffs.items():
+    for table_name, table_diff in sorted(schema_diff.table_diffs.items(), key=lambda x: x[0]):
         if (table_predicate is None or table_predicate(table_diff.after)) and table_diff:
             if not heading:
                 yield markdown_heading(heading_level + 1, "Tables Modified:")
@@ -153,12 +154,17 @@ def markdown_schema_diff_summary(
             yield from markdown_table_diff_summary(table_diff, heading_level + 2, tablefmt=tablefmt)
 
 
+def _floatfmt_from_df(df: pd.DataFrame, floatfmt: str) -> ty.List[ty.Optional[str]]:
+    return [floatfmt if dt.kind == "f" else None for dt in df.dtypes.values]
+
+
 def markdown_dataframe_diff_summary(
     dataframe_diff: data_diff.DataFrameDiff,
     table_name: ty.Optional[str] = None,
     verbose: bool = False,
     heading_level: int = 0,
     tablefmt: str = DEFAULT_TABLEFMT,
+    floatfmt: str = DEFAULT_FLOATFMT,
 ) -> ty.Iterator[str]:
     heading = False
     table_changes = dataframe_diff.summary()
@@ -167,8 +173,10 @@ def markdown_dataframe_diff_summary(
             yield markdown_heading(heading_level + 1, table_name)
             heading = True
         yield markdown_heading(heading_level + 2, "Key Changes:")
-        table = table_changes.table()
-        yield table[table["count"] > 0].to_markdown(index=True, tablefmt=tablefmt)
+        table = table_changes.table().reset_index()
+        yield table[table["count"] > 0].to_markdown(
+            index=False, tablefmt=tablefmt, floatfmt=_floatfmt_from_df(table, floatfmt)
+        )
 
     def _drop_zero_cols(df: ty.Optional[pd.DataFrame]) -> ty.Optional[pd.DataFrame]:
         if df is None:
@@ -185,4 +193,10 @@ def markdown_dataframe_diff_summary(
         if table_name and not heading:
             yield markdown_heading(heading_level + 1, table_name)
         yield markdown_heading(heading_level + 2, "Value Changes:")
-        yield ty.cast(str, value_changes.reset_index().to_markdown(index=False, tablefmt=tablefmt))
+        value_changes = value_changes.reset_index()
+        yield ty.cast(
+            str,
+            value_changes.to_markdown(
+                index=False, tablefmt=tablefmt, floatfmt=_floatfmt_from_df(value_changes, floatfmt)
+            ),
+        )

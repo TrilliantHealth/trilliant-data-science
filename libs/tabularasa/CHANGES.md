@@ -1,3 +1,10 @@
+## 0.7.1
+
+- `tabularasa data-diff` updates:
+  - Optimization: skips computing diffs for tables whose historical and current md5 hashes are equal
+  - Table diffs print in alphabetical order by table name
+  - `tabulate`'s `floatfmt` arg is used explicitly and set to `.6g` to avoid excessive significant digits
+
 ## 0.7.0
 
 - Fixed broken rendering of URLs in sphinx documentation as produced by `tabularasa docgen`

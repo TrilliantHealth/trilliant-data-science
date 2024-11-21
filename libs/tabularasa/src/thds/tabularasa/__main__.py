@@ -228,6 +228,7 @@ def print_data_diff_summaries(
     verbose: bool = False,
     heading_level: int = 0,
     tablefmt: str = diff_summary.DEFAULT_TABLEFMT,
+    floatfmt: str = diff_summary.DEFAULT_FLOATFMT,
 ):
     """Print summaries of data diffs for a sequence of updated tables
 
@@ -237,6 +238,7 @@ def print_data_diff_summaries(
       change counts
     :param heading_level: increase this to render smaller headings on the markdown sections
     :param tablefmt: the table format to use for the markdown tables, as understood by `tabulate`
+    :param floatfmt: the float format to use for the markdown tables, as understood by `tabulate`
     """
     positive_diff = False
     for table_name, d_diff in data_diffs:
@@ -246,6 +248,7 @@ def print_data_diff_summaries(
             verbose,
             heading_level=heading_level,
             tablefmt=tablefmt,
+            floatfmt=floatfmt,
         ):
             positive_diff = True
             print(section, end="\n\n")
@@ -993,12 +996,15 @@ class ReferenceDataManager:
         after_blob_store = s_diff.after.remote_blob_store
         if before_blob_store is None or after_blob_store is None:
             raise ValueError("Can't diff data without remote blob stores defined in both schemas")
-        for table_name, table_diff in s_diff.table_diffs.items():
+        for table_name, table_diff in sorted(s_diff.table_diffs.items(), key=lambda t: t[0]):
             if tables and table_name not in tables:
                 continue
             if (not table_diff.before.md5) or (not table_diff.after.md5):
                 if table_diff.after.build_time_installed and not table_diff.after.transient:
                     self.logger.warning(f"{table_name}: Can't diff without versioned data (md5 hashes)")
+                continue
+            if table_diff.before.md5 == table_diff.after.md5:
+                self.logger.info(f"{table_name}: Matching md5 hashes; no data diff detected")
                 continue
             if not (pkb := table_diff.before.primary_key) or not (pka := table_diff.after.primary_key):
                 self.logger.warning(f"{table_name}: Can't diff without primary keys")
