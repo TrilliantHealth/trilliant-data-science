@@ -17,12 +17,12 @@ class FunctionSummary(TypedDict):
     executed: int
     error_count: int
     timestamps: List[str]
-    memospaces: Set[str]
+    runner_prefixes: Set[str]
     pipeline_ids: Set[str]
     function_logic_keys: Set[str]
     invoked_by: List[str]
-    invoker_code_versions: List[str]
-    remote_code_versions: List[str]
+    invoker_code_version: List[str]
+    remote_code_version: List[str]
     total_runtime_minutes: List[float]  # minutes
     remote_runtime_minutes: List[float]  # minutes
 
@@ -33,13 +33,13 @@ def _empty_summary() -> FunctionSummary:
         "cache_hits": 0,
         "executed": 0,
         "timestamps": [],
-        "memospaces": set(),
+        "runner_prefixes": set(),
         "pipeline_ids": set(),
         "function_logic_keys": set(),
         "error_count": 0,
         "invoked_by": list(),
-        "invoker_code_versions": list(),
-        "remote_code_versions": list(),
+        "invoker_code_version": list(),
+        "remote_code_version": list(),
         "total_runtime_minutes": list(),
         "remote_runtime_minutes": list(),
     }
@@ -69,9 +69,11 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         summary["error_count"] += int(log_entry.get("was_error") or 0)
         summary["timestamps"].append(log_entry["timestamp"])
 
-        mu_parts = parse_memo_uri(log_entry["memo_uri"], log_entry.get("memospace") or "")
+        mu_parts = parse_memo_uri(
+            log_entry["memo_uri"], runner_prefix=log_entry.get("runner_prefix", "")
+        )
 
-        summary["memospaces"].add(mu_parts.memospace)
+        summary["runner_prefixes"].add(mu_parts.runner_prefix)
         summary["pipeline_ids"].add(mu_parts.pipeline_id)
         summary["function_logic_keys"].add(mu_parts.function_logic_key)
 
@@ -82,8 +84,8 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
 
         for key in (
             "invoked_by",
-            "invoker_code_versions",
-            "remote_code_versions",
+            "invoker_code_version",
+            "remote_code_version",
             "total_runtime_minutes",
             "remote_runtime_minutes",
         ):
@@ -109,14 +111,14 @@ def _combine_summaries(
         acc[function_name]["executed"] += data["executed"]
         acc[function_name]["error_count"] += data["error_count"]
         acc[function_name]["timestamps"].extend(data["timestamps"])
-        acc[function_name]["memospaces"].update(data["memospaces"])
+        acc[function_name]["runner_prefixes"].update(data["runner_prefixes"])
         acc[function_name]["pipeline_ids"].update(data["pipeline_ids"])
         acc[function_name]["function_logic_keys"].update(data["function_logic_keys"])
 
         for key in (
             "invoked_by",
-            "invoker_code_versions",
-            "remote_code_versions",
+            "invoker_code_version",
+            "remote_code_version",
             "total_runtime_minutes",
             "remote_runtime_minutes",
         ):
@@ -136,14 +138,14 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
         "  Executed: {executed}\n"
         "  Error count: {error_count}\n"
         "  Timestamps: {timestamps}\n"
-        "  Memospaces: {memospaces}\n"
+        "  Runner Prefixes: {runner_prefixes}\n"
         "  Pipeline IDs: {pipeline_ids}\n"
         "  Function Logic Keys: {function_logic_keys}\n"
         "  Avg total runtime: {avg_total_runtime_minutes}m\n"
         "  Avg remote runtime: {avg_remote_runtime_minutes}m\n"
         "  Invoked by: {invokers}\n"
-        "  Invoker code versions: {invoker_code_versions}\n"
-        "  Remote code versions: {remote_code_versions}\n"
+        "  Invoker code versions: {invoker_code_version}\n"
+        "  Remote code versions: {remote_code_version}\n"
     )
     report_lines = []
 
@@ -154,13 +156,14 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
     )
 
     for function_name, data in sorted_items:
-        timestamps = data["timestamps"]
-        if len(timestamps) > 3:
-            displayed_timestamps = ", ".join(timestamps[:3])
-            remaining_count = len(timestamps) - 3
-            timestamps_str = f"{displayed_timestamps}, and {remaining_count} more..."
-        else:
-            timestamps_str = ", ".join(timestamps)
+
+        def and_more(obj_set: ty.Collection[str], max_count: int = 3) -> str:
+            if len(obj_set) > max_count:
+                displayed = ", ".join(list(obj_set)[:max_count])
+                remaining_count = len(obj_set) - max_count
+                return f"{displayed}, and {remaining_count} more..."
+            else:
+                return ", ".join(obj_set)
 
         def avg(fs: FunctionSummary, key: str) -> float:
             return (sum(fs[key]) / len(fs[key])) if len(fs[key]) else 0  # type: ignore
@@ -172,15 +175,15 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder) -> 
                 cache_hits=data["cache_hits"],
                 executed=data["executed"],
                 error_count=data["error_count"],
-                timestamps=timestamps_str,
-                memospaces=", ".join(data["memospaces"]),
+                timestamps=and_more(data["timestamps"]),
+                runner_prefixes=and_more(data["runner_prefixes"]),
                 pipeline_ids=", ".join(data["pipeline_ids"]),
                 function_logic_keys=", ".join(data["function_logic_keys"]),
                 avg_total_runtime_minutes=avg(data, "total_runtime_minutes"),
                 avg_remote_runtime_minutes=avg(data, "remote_runtime_minutes"),
                 invokers=", ".join(sorted(set(data["invoked_by"]))),
-                invoker_code_versions=", ".join(sorted(set(data["invoker_code_versions"]))),
-                remote_code_versions=", ".join(sorted(set(data["remote_code_versions"]))),
+                invoker_code_version=", ".join(sorted(set(data["invoker_code_version"]))),
+                remote_code_version=", ".join(sorted(set(data["remote_code_version"]))),
             )
         )
     return "\n".join(report_lines)

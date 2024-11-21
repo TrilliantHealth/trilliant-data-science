@@ -27,7 +27,7 @@ class LogEntryV1(ty.TypedDict):
 
 
 class LogEntry(LogEntryV1, total=False):
-    memospace: str  # includes env and any prefixes like mops2-mpf
+    runner_prefix: str  # includes env and any prefixes like mops2-mpf
     pipeline_id: str
     function_logic_key: str
     was_error: bool
@@ -81,7 +81,7 @@ def log_function_execution(
     memo_uri: str,
     itype: InvocationType,
     metadata: ty.Optional[metadata.ResultMetadata] = None,
-    memospace: str = "",
+    runner_prefix: str = "",
     was_error: bool = False,
 ) -> None:
     if not run_directory:
@@ -93,12 +93,12 @@ def log_function_execution(
     func_name = func.__name__
     full_function_name = f"{func_module}:{func_name}"
 
-    parts = function_memospace.parse_memo_uri(memo_uri, memospace)
+    parts = function_memospace.parse_memo_uri(memo_uri, runner_prefix)
 
     log_entry: LogEntry = {
         "function_name": full_function_name,
         "memo_uri": memo_uri,
-        "memospace": parts.memospace,
+        "runner_prefix": parts.runner_prefix,
         "pipeline_id": parts.pipeline_id,
         "function_logic_key": parts.function_logic_key,
         "timestamp": dt.datetime.utcnow().isoformat(),

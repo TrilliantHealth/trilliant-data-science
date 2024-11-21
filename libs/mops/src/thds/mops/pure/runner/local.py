@@ -11,9 +11,8 @@ from thds.core import config, log, scope
 
 from ..._utils.colorize import colorized
 from ...config import max_concurrent_network_ops
-from ..core import deferred_work, lock, memo, metadata, uris
+from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.partial import unwrap_partial
-from ..core.pipeline_id_mask import function_mask
 from ..core.types import Args, Kwargs, NoResultAfterInvocationError, T
 from ..tools.summarize import run_summary
 from . import strings, types
@@ -66,7 +65,8 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         # args, kwargs with the provided args, kwargs, otherwise the
         # args and kwargs will not get properly considered in the memoization key.
         func, args, kwargs = unwrap_partial(func, args_, kwargs_)
-        pipeline_id = scope.enter(function_mask(func))
+        pipeline_id = scope.enter(pipeline_id_mask.including_function_docstr(func))
+        # TODO pipeline_id should probably be passed in explicitly
 
         scope.enter(deferred_work.open_context())  # optimize Source objects during serialization
 
@@ -108,7 +108,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                 run_summary.log_function_execution(
                     *(run_directory, func, memo_uri, result_and_itype.invoc_type),
                     metadata=metadata,
-                    memospace=function_memospace,
+                    runner_prefix=function_memospace.split(pipeline_id)[0],
                     was_error=not isinstance(result, memo.results.Success),
                 )
 

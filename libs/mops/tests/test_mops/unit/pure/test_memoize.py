@@ -117,7 +117,7 @@ def test_parse_memo_uri():
     memo_parts = parse_memo_uri(
         "adls://foo/bar/mops2-mpf/FOOPIPE/PIPEA/PIPEB/tests.test_mops.unit.pure.test_memoize--fx@flk45/PurseHowCorgi-89723098273409283742938742"
     )
-    assert memo_parts.memospace == "adls://foo/bar/mops2-mpf"
+    assert memo_parts.runner_prefix == "adls://foo/bar/mops2-mpf"
     assert memo_parts.pipeline_id == "FOOPIPE/PIPEA/PIPEB"
     assert memo_parts.function_module == "tests.test_mops.unit.pure.test_memoize"
     assert memo_parts.function_name == "fx"

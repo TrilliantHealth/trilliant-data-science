@@ -1,5 +1,6 @@
 """Public API for masking the mops pipeline id.
 """
+
 import re
 import typing as ty
 from contextlib import contextmanager
@@ -72,7 +73,7 @@ def extract_mask_from_docstr(func: F, require: bool = True) -> str:
 
 
 @contextmanager
-def function_mask(f: F) -> ty.Iterator[str]:
+def including_function_docstr(f: F) -> ty.Iterator[str]:
     with pipeline_id_mask(extract_mask_from_docstr(f, require=False)):
         yield get_pipeline_id_mask()
 

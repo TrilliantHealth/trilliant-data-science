@@ -222,7 +222,7 @@ def make_function_memospace(runner_prefix: str, f: ty.Callable) -> str:
 
 
 class MemoUriComponents(ty.NamedTuple):
-    memospace: str
+    runner_prefix: str
     pipeline_id: str
     function_module: str
     function_name: str
@@ -232,29 +232,29 @@ class MemoUriComponents(ty.NamedTuple):
 
 def parse_memo_uri(
     memo_uri: str,
-    memospace: str = "",
+    runner_prefix: str = "",  # the part up to but not including the pipeline_id
     separator: str = "/",
     backward_compat_split: str = "mops2-mpf",
 ) -> MemoUriComponents:
-    if not memospace:
+    if not runner_prefix:
         # this is in order to help with backward compatibilty for mops summaries that
         # didn't store any of this. providing memospace is a more precise way to handle this.
         if backward_compat_split not in memo_uri:
             raise ValueError("Cannot determine the components of a memo URI with no memospace")
         parts = memo_uri.split(backward_compat_split, 1)
         assert len(parts) > 1, parts
-        memospace = separator.join((parts[0].rstrip(separator), backward_compat_split))
+        runner_prefix = separator.join((parts[0].rstrip(separator), backward_compat_split))
 
-    memospace = memospace.rstrip(separator)
+    runner_prefix = runner_prefix.rstrip(separator)
     rest, args_hash = memo_uri.rsplit(separator, 1)  # args hash is last component
     rest, full_function_name = rest.rsplit(separator, 1)
-    pipeline_id = rest[len(memospace) :]
+    pipeline_id = rest[len(runner_prefix) :]
     pipeline_id = pipeline_id.strip(separator)
 
     function_parts = parse_unique_name(full_function_name)
 
     return MemoUriComponents(
-        memospace,
+        runner_prefix,
         pipeline_id,
         function_parts.module,
         function_parts.name,

@@ -51,7 +51,11 @@ def test_log_function_execution_new_file(run_directory: Path) -> None:
         pass
 
     run_summary.log_function_execution(
-        run_directory, test_function, memo_uri, itype="invoked", memospace="adls://env/foo/bar"
+        run_directory,
+        test_function,
+        memo_uri,
+        itype="invoked",
+        runner_prefix="adls://env/foo/bar/",
     )
 
     log_files = list(run_directory.glob("*.json"))
@@ -65,6 +69,7 @@ def test_log_function_execution_new_file(run_directory: Path) -> None:
     assert log_data["memo_uri"] == memo_uri
     assert log_data["status"] == "invoked"
     assert datetime.fromisoformat(log_data["timestamp"])
+    assert log_data["runner_prefix"] == "adls://env/foo/bar"
 
 
 def test_log_function_execution_invalid_json(run_directory: Path) -> None:
