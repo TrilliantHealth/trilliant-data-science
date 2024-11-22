@@ -1,18 +1,23 @@
 import datetime as dt
 import json
 import os
+import pickle
 import typing as ty
 import uuid
 from pathlib import Path
 
-from thds.core import config, log
+from thds.core import config, log, pickle_visit, source
 from thds.mops.pure.core.memo import function_memospace
+from thds.mops.pure.core.metadata import get_invoked_by
 from thds.mops.pure.core.types import T
 
 from ...core import metadata
 
-MOPS_SUMMARY_DIR = config.item("thds.mops.summary_dir", default=Path(".mops"), parse=Path)
-RUN_NAME_ENV_VAR: ty.Final = "__SECRET_THDS_MOPS_RUN_NAME"
+MOPS_SUMMARY_DIR = config.item("thds.mops.summary.dir", default=Path(".mops"), parse=Path)
+RUN_NAME = config.item(
+    "thds.mops.summary.run_name",
+    default=f"{dt.datetime.utcnow().isoformat()}-pid{os.getpid()}-{get_invoked_by()}",
+)
 
 InvocationType = ty.Literal["memoized", "invoked", "awaited"]
 
@@ -38,18 +43,14 @@ class LogEntry(LogEntryV1, total=False):
     invoker_code_version: str
     remote_code_version: str
 
-
-if not os.getenv(RUN_NAME_ENV_VAR):
-    os.environ[RUN_NAME_ENV_VAR] = f"{dt.datetime.utcnow().isoformat()}-{os.getpid()}"
+    uris_in_rvalue: ty.List[str]
 
 
 def create_mops_run_directory() -> Path:
-    assert RUN_NAME_ENV_VAR in os.environ, f"{RUN_NAME_ENV_VAR} is not set"
-
     # Define the root directory for mops logs
     mops_root = MOPS_SUMMARY_DIR()
     # Use run name if set, otherwise fallback to orchestrator datetime
-    run_name = os.environ[RUN_NAME_ENV_VAR]
+    run_name = RUN_NAME()
     # Create a subdirectory named with the orchestrator datetime and run identifier
     run_directory = mops_root / run_name
     try:
@@ -75,6 +76,23 @@ def _generate_log_filename(run_directory: Path) -> Path:
     return run_directory / filename
 
 
+def _extract_source_uris(result: ty.Any) -> ty.Set[str]:
+    sources: ty.List[source.Source] = list()
+
+    def extract_source(unknown: ty.Any) -> None:
+        if isinstance(unknown, source.Source):
+            sources.append(unknown)
+
+    try:
+        pickle_visit.recursive_visit(extract_source, result)
+    except pickle.PicklingError:
+        pass
+    except Exception as exc:
+        logger.warning(f'Unexpected error trying to extract source URIs from "%s"; {exc}', result)
+
+    return {source.uri for source in sources}
+
+
 def log_function_execution(
     run_directory: ty.Optional[Path],
     func: ty.Callable[..., T],
@@ -83,6 +101,7 @@ def log_function_execution(
     metadata: ty.Optional[metadata.ResultMetadata] = None,
     runner_prefix: str = "",
     was_error: bool = False,
+    return_value: ty.Any = None,
 ) -> None:
     if not run_directory:
         logger.debug("Not writing function summary for %s", memo_uri)
@@ -113,6 +132,9 @@ def log_function_execution(
         log_entry["remote_code_version"] = metadata.remote_code_version
         # we don't bother with invoked_at or remote_started_at because they can be
         # inferred from the timestamp and the wall times
+    if source_uris := _extract_source_uris(return_value):
+        log_entry["uris_in_rvalue"] = sorted(source_uris)
+
     try:
         assert not log_file.exists(), f"Log file '{log_file}' should not already exist"
         with log_file.open("w") as f:

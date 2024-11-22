@@ -96,6 +96,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         def unwrap_value_or_error(result_and_itype: ResultAndInvocationType) -> T:
             result = result_and_itype.value_or_error
             metadata = None
+            value_t = None
             try:
                 if isinstance(result, memo.results.Success):
                     metadata, value_t = get_meta_and_result("value", result.value_uri)
@@ -110,6 +111,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                     metadata=metadata,
                     runner_prefix=function_memospace.split(pipeline_id)[0],
                     was_error=not isinstance(result, memo.results.Success),
+                    return_value=value_t,
                 )
 
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:

@@ -1,3 +1,9 @@
+## 3.4
+
+- All `source.Source` objects that can be found in return values are added to the output mops run summary
+  files, so that `mops-summarize` can print them for you, and so that you can, e.g., write your own `jq`
+  scripts to somehow process every Source object and its URI.
+
 ## 3.3
 
 - Can log a fraction of the Kubernetes pods launched. Non-determinstic.
