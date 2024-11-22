@@ -1,4 +1,5 @@
 """Wait for a Job to finish."""
+
 import time
 from datetime import timedelta
 from timeit import default_timer
@@ -35,22 +36,28 @@ def wait_for_job(job_name: str, short_name: str = "") -> bool:
 
     def _wait_for_job() -> bool:
         nonlocal start_time
-        found = False
+        found_at_least_once = False
         while True:
-            time.sleep(0.5 if found else 10.0)
+            time.sleep(0.5 if found_at_least_once else 10.0)
             job = get_job(job_name)
             if not job:
-                if found:
-                    logger.warning(UNUSUAL(f"Known {log_name} no longer exists - assuming success!"))
+                if found_at_least_once:
+                    logger.warning(UNUSUAL(f"Known job {job_name} no longer exists - assuming success!"))
                     return True
-                if default_timer() - start_time > _max_no_job_wait().total_seconds():
-                    logger.error(UNUSUAL(f"{log_name} has never been found - assuming failure!"))
+                max_wait_seconds = _max_no_job_wait().total_seconds()
+                if default_timer() - start_time > max_wait_seconds:
+                    logger.error(
+                        UNUSUAL(
+                            f"Job {job_name} has not been seen for {max_wait_seconds:.1f} seconds"
+                            " - assuming failure!"
+                        )
+                    )
                     return False
 
-                logger.debug(f"{log_name} not yet found... retrying.")
+                logger.debug("%s not found... retrying.", job_name)
                 continue
 
-            found = True
+            found_at_least_once = True
             start_time = default_timer()  # restart timer since the job has been found.
             status = job.status  # type: ignore
             if not status:
@@ -60,6 +67,9 @@ def wait_for_job(job_name: str, short_name: str = "") -> bool:
                 return True
 
             if not status.active and status.failed:
+                logger.error(
+                    UNUSUAL(f"A Kubernetes Job is reporting an actual failed status: {job_name}")
+                )
                 return False
 
     return _wait_for_job()
