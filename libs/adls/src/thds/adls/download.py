@@ -155,7 +155,6 @@ class _FileResult(ty.NamedTuple):
 _dl_scope = scope.Scope("adls.download")
 
 
-@_dl_scope.bound
 def _download_or_use_verified_cached_coroutine(  # noqa: C901
     fqn: AdlsFqn,
     local_path: StrOrPath,
@@ -313,6 +312,7 @@ def _set_md5_if_missing(
     return file_properties.content_settings
 
 
+@_dl_scope.bound
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -355,6 +355,7 @@ def download_or_use_verified(
         translate_azure_error(fs_client, remote_key, err)
 
 
+@_dl_scope.bound
 async def async_download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
