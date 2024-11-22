@@ -1,3 +1,8 @@
+### 1.29.20241122
+
+- Add support for more callable types in `scope.bound` - hopefully this will help with some obscure
+  errors we've seen logged in the past.
+
 ## 1.29
 
 - Added `default` to `dict_utils.merge_dict` that allows the user to define other values than just `None`
