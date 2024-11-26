@@ -26,3 +26,29 @@ _JOB_SOURCE = WatchingObjectSource(
 
 def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1Job]:
     return _JOB_SOURCE.get(job_name, namespace=namespace)
+
+
+# https://github.com/kubernetes/kubernetes/issues/68712#issuecomment-514008330
+# https://kubernetes.io/docs/concepts/workloads/controllers/job/#terminal-job-conditions
+
+
+def is_job_succeeded(job: client.models.V1Job) -> bool:
+    if not job.status:
+        return False
+
+    for condition in job.status.conditions or tuple():
+        if condition.type == "Complete" and condition.status == "True":
+            return True
+
+    return False
+
+
+def is_job_failed(job: client.models.V1Job) -> bool:
+    if not job.status:
+        return False
+
+    for condition in job.status.conditions or tuple():
+        if condition.type == "Failed" and condition.status == "True":
+            return True
+
+    return False

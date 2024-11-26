@@ -10,7 +10,7 @@ from thds.core.log import logger_context
 from .._utils.colorize import colorized
 from . import config
 from ._shared import logger
-from .jobs import get_job
+from .jobs import get_job, is_job_failed, is_job_succeeded
 
 UNUSUAL = colorized(fg="white", bg="yellow")
 
@@ -57,19 +57,16 @@ def wait_for_job(job_name: str, short_name: str = "") -> bool:
                 logger.debug("%s not found... retrying.", job_name)
                 continue
 
-            found_at_least_once = True
-            start_time = default_timer()  # restart timer since the job has been found.
-            status = job.status  # type: ignore
-            if not status:
-                continue
-
-            if status.completion_time:
+            if is_job_succeeded(job):
                 return True
 
-            if not status.active and status.failed:
+            if is_job_failed(job):
                 logger.error(
                     UNUSUAL(f"A Kubernetes Job is reporting an actual failed status: {job_name}")
                 )
                 return False
+
+            found_at_least_once = True
+            start_time = default_timer()  # restart timer since the job has been found.
 
     return _wait_for_job()

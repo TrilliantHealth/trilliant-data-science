@@ -1,3 +1,10 @@
+### 3.4.20241126
+
+- Fix long-standing bug in how we interpreted the Kubernetes Job status object, occasionally leading to
+  false positive 'Job failed' errors. Apparently this has been
+  [a point of confusion](https://github.com/kubernetes/kubernetes/issues/68712#issuecomment-499716681) in
+  the Kubernetes community as well, which makes me feel slightly better.
+
 ## 3.4
 
 - All `source.Source` objects that can be found in return values are added to the output mops run summary
