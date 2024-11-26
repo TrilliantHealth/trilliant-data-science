@@ -1,3 +1,7 @@
+### 2.5.20241122
+
+- Fix bug in the way we used a `scope.bound` on a generator that didn't always actually get consumed.
+
 ### 2.5.20241015
 
 - Fix for change in how ADLS servers are interpreting length=0 when we didn't know the length of a byte
