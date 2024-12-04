@@ -174,8 +174,7 @@ def from_file(filename: StrOrPath, hash: ty.Optional[Hash] = None, uri: str = ""
     """Create a read-only Source from a local file that already exists.
 
     If URI is passed, the local file will be read and hashed, but the final URI in the
-    Source will be the one provided explicitly. NO UPLOAD IS PERFORMED. It is your
-    responsibility to ensure that your file has been uploaded to the URI you provide.
+    Source will be the one provided explicitly.
     """
     path = path_from_uri(filename) if isinstance(filename, str) else filename
     assert isinstance(path, Path)
