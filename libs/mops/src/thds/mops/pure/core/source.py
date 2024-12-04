@@ -225,11 +225,14 @@ def prepare_source_result(source_: Source) -> SourceResult:
     where we can safely place any named output.
     """
     if not is_file_uri(source_.uri):
-        if source_.cached_path:
+        if source_.cached_path and Path(source_.cached_path).exists():
+            # it exists locally - an upload may be necessary.
             file_uri = to_uri(source_.cached_path)
+            lookup_blob_store(source_.uri).putfile(source_.cached_path, source_.uri)
+            logger.info("Uploading Source to %s", source_.uri)
         else:
             file_uri = ""
-        logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
+            logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
         return SourceResult(source_.uri, source_.hash, file_uri)
 
     # by definition, if this is a file URI, it now needs to be uploaded, because we could
@@ -255,6 +258,9 @@ def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], 
     """Call when deserializing a remote function return value on the orchestrator side, to
     replace all SourceResults with the intended Source object.
     """
+    if not file_uri:
+        return source.from_uri(remote_uri, hash=hash)
+
     local_path = source.path_from_uri(file_uri)
     if local_path.exists():
         try:

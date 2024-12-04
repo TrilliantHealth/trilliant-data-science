@@ -170,3 +170,18 @@ def test_local_source_with_remote(prep, temp_file):
 
     re_source = source_from_source_result(*prepare_source_result(source))
     assert open(re_source).read() == orig_text
+
+
+@pytest.mark.integration
+def test_from_file_with_uri(prep, temp_file):
+    test_file = temp_file("local source with remote from_file(uri=...)")
+    dest_uri = f"{TEST_DATA_TMP_URI}pure-core-source-result/{uuid.uuid4().hex}"
+    source_ = source.from_file(test_file, uri=dest_uri)  # does not do the upload
+
+    orig_text = test_file.read_text()
+
+    re_source = source_from_source_result(*prepare_source_result(source_))
+    # should do the upload
+
+    test_file.unlink()  # make it go away so we can test
+    assert open(re_source).read() == orig_text

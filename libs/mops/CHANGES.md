@@ -1,3 +1,8 @@
+### 3.4.20241204
+
+- Fix bug where a `Source` object created using `from_file(a_path, uri='adls://...')` did not properly
+  force an upload inside the mops machinery during return from a remote invocation.
+
 ### 3.4.20241126
 
 - Fix long-standing bug in how we interpreted the Kubernetes Job status object, occasionally leading to
