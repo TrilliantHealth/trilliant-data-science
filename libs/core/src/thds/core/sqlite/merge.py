@@ -80,4 +80,5 @@ def merge_databases(
             cursor.execute(f"DETACH DATABASE {to_merge}")
 
     logger.info(f"Merge complete after {default_timer() - merge_start:.2f}s")
+    conn.close()
     return Path(first_filename)
