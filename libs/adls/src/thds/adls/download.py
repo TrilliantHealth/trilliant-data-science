@@ -349,7 +349,7 @@ def download_or_use_verified(
                 assert file_properties
                 dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
-                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
+                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
         translate_azure_error(fs_client, remote_key, err)
@@ -388,7 +388,7 @@ async def async_download_or_use_verified(
                 assert file_properties
                 await dl_file_client.set_http_headers(cs, **match_etag(file_properties))
             except HttpResponseError as hre:
-                logger.error(f"Unable to set MD5 for {remote_key}: {hre}")
+                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
         translate_azure_error(fs_client, remote_key, err)
