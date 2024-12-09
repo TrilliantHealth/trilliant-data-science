@@ -4,7 +4,6 @@ from collections import defaultdict
 from typing import Any, Dict, Generator, List, Mapping, MutableMapping, Optional, Tuple, TypeVar
 
 DEFAULT_SEP = "."
-KT = TypeVar("KT")
 VT = TypeVar("VT")
 
 
@@ -20,7 +19,7 @@ def _flatten_gen(
     d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP
 ) -> Generator[Tuple[str, Any], None, None]:
     """
-    flattens a mapping (usually a dict) using a seperator, returning a generator of the flattened keys and values.
+    flattens a mapping (usually a dict) using a separator, returning a generator of the flattened keys and values.
 
     Example
     ---------
@@ -39,7 +38,7 @@ def _flatten_gen(
 
 
 def unflatten(flat_d: Dict[str, Any], sep: str = DEFAULT_SEP):
-    """Given a flattened dictionary returns the unflatten representation."""
+    """Given a flattened dictionary returns the un-flatten representation."""
     unflatten_dict: Dict[str, Any] = {}
     for path, val in flat_d.items():
         dict_ref = unflatten_dict
@@ -55,7 +54,7 @@ def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[st
     return dict(_flatten_gen(d, parent_key, sep))
 
 
-class DotDict(dict, MutableMapping[KT, VT]):
+class DotDict(MutableMapping[str, VT]):
     """A python dictionary that acts like an object."""
 
     _new_to_orig_keys: Dict[str, str] = dict()
@@ -71,9 +70,9 @@ class DotDict(dict, MutableMapping[KT, VT]):
             if convert_keys_to_identifiers:
                 self._new_to_orig_keys[new_key] = k
             if isinstance(v, dict):
-                self[new_key] = DotDict(v)
+                self[new_key] = DotDict(v)  # type: ignore
             elif isinstance(v, (list, tuple, set)):
-                self[new_key] = v.__class__([DotDict(iv) if isinstance(iv, dict) else iv for iv in v])
+                self[new_key] = v.__class__([DotDict(iv) if isinstance(iv, dict) else iv for iv in v])  # type: ignore
             else:
                 self[new_key] = v
 
@@ -87,36 +86,46 @@ class DotDict(dict, MutableMapping[KT, VT]):
         if kwargs:
             self._construct(mapping=kwargs)
 
-    def __getattr__(self, attr):
-        return self.get(attr)
+    def __getattr__(self, key: str) -> VT:
+        return self[key]
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
 
-    def __setitem__(self, key, value):
-        super(DotDict, self).__setitem__(key, value)
+    def __setitem__(self, key: str, value: VT):
         self.__dict__.update({key: value})
 
-    def __delattr__(self, item):
-        self.__delitem__(item)
+    def __delattr__(self, key: str) -> None:
+        self.__delitem__(key)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         super(DotDict, self).__delitem__(key)
         del self.__dict__[key]
 
-    def to_dict(self, orig_keys: bool = False):
+    def __getitem__(self, key: str) -> VT:
+        return self.__dict__[key]
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def __len__(self) -> int:
+        return len(self.__dict__)
+
+    def to_dict(self, orig_keys: bool = False) -> Dict[str, VT]:
         convert_keys_to_identifiers = self._get_hidden_data("convert_keys_to_identifiers")
-        d = dict()
+        d: Dict[str, VT] = dict()
         for k, v in self.items():
             if isinstance(v, DotDict):
                 d[
                     self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k
-                ] = v.to_dict(orig_keys)
+                ] = v.to_dict(
+                    orig_keys
+                )  # type: ignore[assignment]
             else:
                 d[self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k] = v
         return d
 
-    def get_value(self, dot_path: str) -> Optional[Any]:
+    def get_value(self, dot_path: str) -> Optional[VT]:
         """Get a value given a dotted path to the value.
 
         Example
@@ -125,16 +134,19 @@ class DotDict(dict, MutableMapping[KT, VT]):
         dd = DotDict(a={"b": 100})
         assert dd.get_value("a.b") == 100
         """
-        ref = self
         path = dot_path.split(".")
+        ref: DotDict[Any] = self
+        for k in path[:-1]:
+            if isinstance(ref, DotDict) and k in ref:
+                ref = ref[k]
+            else:
+                return None
         try:
-            for k in path[:-1]:
-                ref = getattr(ref, k)
-            return getattr(ref, path[-1])
-        except AttributeError:
+            return ref[path[-1]]
+        except KeyError:
             return None
 
-    def set_value(self, dot_path: str, val):
+    def set_value(self, dot_path: str, val: VT) -> None:
         """Set a vlaue given a dotted path."""
         ref = self
         path = dot_path.split(".")
