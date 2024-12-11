@@ -58,7 +58,7 @@ For such a simple example, let's assume the following Schema validation rules, b
 comes in via the API:
 
 - `created_at` must be before the current moment
-- `priority` must be in the range \[0.0, 10.0\]
+- `priority` must be in the range [0.0, 10.0]
 - `due_on`, if present, must be before 2038, when the Unix epoch will roll over and all computers will
   die a fiery death.
 
