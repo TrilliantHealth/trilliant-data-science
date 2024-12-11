@@ -1,4 +1,8 @@
-## 0.7.1
+### 0.7.2
+
+- Fixed the use of buggy pandas index intersection method
+
+### 0.7.1
 
 - `tabularasa data-diff` updates:
   - Optimization: skips computing diffs for tables whose historical and current md5 hashes are equal

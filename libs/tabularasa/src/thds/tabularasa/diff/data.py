@@ -162,8 +162,25 @@ class DataFrameDiff:
         return self.after.index.difference(self.before.index)
 
     @cached_property
-    def common_keys(self) -> pd.Index:
-        return self.after.index.intersection(self.before.index)
+    def common_keys(self) -> list:
+        """Don't use `.index.intersection` here because it does not work with different types of nulls.
+
+        For a single Index, the returned keys are based on the following True statements:
+            * None is None
+            * pandas.NA is pandas.NA
+            * float("nan") is not float("nan")
+
+        For MultiIndex, `float("nan")` behave differently, please check the test for all null equality checks
+        E.g.,
+        ```
+        In [47]: pd.MultiIndex.from_tuples([float("nan")]) == pd.MultiIndex.from_tuples([float("nan")])
+        Out[47]: array([ True])
+
+        In [48]: pd.Index([float("nan")]) == pd.Index([float("nan")])
+        Out[48]: array([False])
+        ```
+        """
+        return list(set(self.after.index).intersection(self.before.index))
 
     @property
     def dropped_rows(self) -> pd.DataFrame:
