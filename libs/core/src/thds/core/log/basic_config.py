@@ -5,36 +5,14 @@ and 'use' this configuration.
 import logging
 import logging.config
 import os
-import sys
 import typing as ty
-from datetime import datetime
-from pathlib import Path
 from typing import Iterator, Tuple
 
-from .. import config, home
+from .. import config
 from .json_formatter import ThdsJsonFormatter
 from .kw_formatter import ThdsCompactFormatter
 from .kw_logger import getLogger, make_th_formatters_safe
 from .logfmt import mk_default_logfmter
-
-_LOG_FILEPATH = os.getenv(
-    "THDS_CORE_LOG_FILEPATH",
-    str(
-        # we're logging to a file by default now. Set this to empty string to turn off.
-        # It's not a config item because it can't usefully be set after startup.
-        home.HOMEDIR()
-        / ".thds-logs"
-        / "-".join(
-            [
-                datetime.now().isoformat(),
-                f"ppid_{os.getppid()}",
-                f"pid_{os.getpid()}",
-                f"{'_'.join(sys.argv)[:150]}.log",
-            ]
-        ).replace("/", "_")
-    ),
-)
-
 
 _LOGLEVEL = config.item("thds.core.log.level", logging.INFO, parse=logging.getLevelName)
 _LOGLEVELS_FILEPATH = config.item("thds.core.log.levels_file", "", parse=lambda s: s.strip())
@@ -57,7 +35,10 @@ _BASE_LOG_CONFIG = {
     "disable_existing_loggers": False,
     "formatters": {"default": {"()": _pick_formatter()}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
-    "root": {"handlers": ["console"], "level": _LOGLEVEL()},
+    "root": {
+        "handlers": ["console"],
+        "level": _LOGLEVEL(),
+    },
 }
 
 
@@ -141,22 +122,6 @@ if not logging.getLogger().hasHandlers():
     live_config = _BASE_LOG_CONFIG
     for logger_name, level in _parse_thds_loglevels_file(_LOGLEVELS_FILEPATH()):
         live_config = set_logger_to_console_level(live_config, logger_name, level)
-
-    if _LOG_FILEPATH:
-        log_path = Path(_LOG_FILEPATH)
-        try:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            # ^ I hate doing IO in module scope, but we've waited until the last possible moment...
-            live_config["handlers"]["file"] = {  # type: ignore
-                "class": "logging.FileHandler",
-                "formatter": "default",
-                "filename": _LOG_FILEPATH,
-                "delay": True,  # no need to have empty logfiles sitting around
-            }
-            live_config["root"]["handlers"].append("file")  # type: ignore
-        except Exception as err:
-            print(f"Unable to create log directory at '{log_path.parent}' - ERROR: {err}")
-
     logging.config.dictConfig(live_config)
     make_th_formatters_safe(logging.getLogger())
 

@@ -343,7 +343,7 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 
 [[package]]
 name = "thds-core"
-version = "1.30"
+version = "1.26"
 description = "Core utilities."
 optional = false
 python-versions = "^3.8"

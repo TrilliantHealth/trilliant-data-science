@@ -1146,7 +1146,7 @@ files = [
 
 [[package]]
 name = "thds-core"
-version = "1.30"
+version = "1.26"
 description = "Core utilities."
 optional = false
 python-versions = "^3.8"
