@@ -32,9 +32,9 @@ _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _Purple = colorized(fg="white", bg="#800080")
 logger = log.getLogger(__name__)
-_LogKnownResult = lambda s: logger.info(_DarkBlue(s))  # noqa: E731
-_LogNewInvocation = lambda s: logger.info(_GreenYellow(s))  # noqa: E731
-_LogAwaitedResult = lambda s: logger.info(_Purple(s))  # noqa: E731
+_LogKnownResult = lambda s: logger.info(_DarkBlue(f" {s} "))  # noqa: E731
+_LogNewInvocation = lambda s: logger.info(_GreenYellow(f" {s} "))  # noqa: E731
+_LogAwaitedResult = lambda s: logger.info(_Purple(f" {s} "))  # noqa: E731
 
 
 def invoke_via_shell_or_return_memoized(  # noqa: C901
@@ -192,8 +192,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
 
         try:
             with _BEFORE_INVOCATION_SEMAPHORE:
-                _LogNewInvocation(f"Invoking {memo_uri} ")
-                # the extra space after the memo uri makes it more readable in the console.
+                _LogNewInvocation(f"Invoking {memo_uri}")
                 upload_invocation_and_deps()
 
             # can't hold the semaphore while we block on the shell, though.
