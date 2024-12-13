@@ -2,6 +2,7 @@
 
 but whose exit can be delayed by modifying a file on the filesystem.
 """
+
 import argparse
 import os
 import time
@@ -107,7 +108,6 @@ def main():
         help="Unless set, an existing file will be presumed to be from a previous run",
     )
     args = parser.parse_args()
-
     elapsed = exit_when(
         Path(os.path.expanduser(args.exit_time_file)),
         datetime.now(tz=timezone.utc) + timedelta(seconds=args.seconds_from_now),

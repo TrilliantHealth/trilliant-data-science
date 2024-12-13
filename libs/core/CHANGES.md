@@ -1,3 +1,8 @@
+## 1.30
+
+- Log to a file by default. This will be helpful on developer laptops, but will be especially helpful for
+  some deployed use cases where we may need to have configurable log redirection for various reasons.
+
 ### 1.29.20241122
 
 - Add support for more callable types in `scope.bound` - hopefully this will help with some obscure
