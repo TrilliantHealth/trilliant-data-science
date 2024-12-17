@@ -1,10 +1,11 @@
+from functools import partial
 from typing import List, Optional, Tuple, Type
 
 import attr
 from typing_inspect import is_tuple_type, is_typevar, is_union_type
 
 from . import type_utils
-from .recursion import F, Params, Predicate, RecF, StructuredRecursion, U
+from .recursion import F, Params, Predicate, RecF, StructuredRecursion, U, _value_error
 from .registry import Registry
 
 
@@ -22,6 +23,34 @@ def default_annotated(
     """Default implementation for `typing.Annotated` that recurses by simply applying the recursion to
     the type that was wrapped with the annotation"""
     return recurse(type_utils.unwrap_annotated(type_), *args, **kwargs)
+
+
+def _try_bases(
+    msg: str,
+    exc_type: Type[Exception],
+    # placeholder for the recursive function in case you wish to specify this explictly as one of the
+    # recursions; type doesn't matter
+    f: F[Type, Params, U],
+    type_: Type,
+    *args: Params.args,
+    **kwargs: Params.kwargs,
+) -> U:
+    try:
+        mro = type_.mro()
+    except (AttributeError, TypeError):
+        return _value_error(msg, exc_type, f, type_, *args, **kwargs)
+    for base in mro[1:]:
+        try:
+            return f(base, *args, **kwargs)
+        except TypeError:
+            pass
+    return _value_error(msg, exc_type, f, type_, *args, **kwargs)
+
+
+def try_bases(msg: str, exc_type: Type[Exception]) -> RecF[Type, Params, U]:
+    """Helper to be passed as the `otherwise` of a `TypeRecursion` for handling cases of types which
+    inherit from some known type that is not otherwise explicitly registered"""
+    return partial(_try_bases, msg, exc_type)  # type: ignore[return-value]
 
 
 class TypeRecursion(StructuredRecursion[Type, Params, U]):

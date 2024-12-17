@@ -1,3 +1,8 @@
+## 1.3
+
+- Added a `try_bases` helper for compositional use with `TypeRecursion` to enable a fallback method for
+  type resolution via inherited types when the other recursion paths fail.
+
 ## 1.2
 
 - `attrs_value_defaults` helper function for extracting single-valued defaults from an `attrs` class.
