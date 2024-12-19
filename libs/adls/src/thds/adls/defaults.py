@@ -6,7 +6,6 @@ from .fqn import AdlsRoot
 
 _PROD_DATASETS = AdlsRoot.parse("adls://thdsdatasets/prod-datasets")
 _TMP = AdlsRoot.parse("adls://thdsscratch/tmp")
-_UA_PROD = AdlsRoot.parse("adls://uaapunifiedasset/data")
 
 
 def env_root(env: Env = "") -> AdlsRoot:
@@ -16,10 +15,8 @@ def env_root(env: Env = "") -> AdlsRoot:
     env = active_env(env)
     if env == "prod":
         return _PROD_DATASETS
-    if env in ["dev", ""]:
+    if env == "dev":
         return _TMP
-    if env == "ua-prod":
-        return _UA_PROD
     return _TMP
 
 
