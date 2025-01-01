@@ -55,7 +55,7 @@ def parameter_overwriter(
 ) -> ty.Callable[[Args, Kwargs], ty.Tuple[Args, Kwargs]]:
     """Overwrite parameters without regard to the actual argument values."""
 
-    def give_val(val: ty.Any) -> ty.Callable[[ty.Any], ty.Any]:
+    def give_val(val) -> ty.Callable[[ty.Any], ty.Any]:
         return lambda _: val
 
     return argument_transformer(func, {name: give_val(val) for name, val in names_to_values.items()})

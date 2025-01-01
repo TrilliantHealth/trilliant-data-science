@@ -28,8 +28,6 @@ import re
 import typing as ty
 from functools import lru_cache
 
-from thds.mops._utils.names import full_name_and_callable
-
 _DOCSTRING_VERSION_RE = re.compile(r".*function-logic-key:\s+(?P<version>[^\s]+)\b", re.DOTALL)
 
 
@@ -38,7 +36,7 @@ def _parse_logic_key(doc: str) -> str:
     return m.group("version") if m else ""
 
 
-def extract_function_logic_key_from_docstr(obj: ty.Any) -> str:
+def extract_function_logic_key_from_docstr(obj) -> str:
     doc = getattr(obj, "__doc__", "") or ""
     return _parse_logic_key(doc)
 
@@ -47,13 +45,31 @@ extract_logic_key_from_docstr = extract_function_logic_key_from_docstr
 
 
 @lru_cache(maxsize=None)
-def make_unique_name_including_docstring_key(f: ty.Any) -> str:
-    module_and_name, callable = full_name_and_callable(f)
+def make_unique_name_including_docstring_key(f) -> str:
+    module = ""
+    name = ""
     version = ""
-    for attr, value in inspect.getmembers(callable):
+    for attr, value in inspect.getmembers(f):
         if attr == "__doc__" and value:
             version = _parse_logic_key(value)
-    return f"{module_and_name}@{version}".rstrip("@")
+        elif attr == "__module__":
+            module = value
+        elif not name and attr == "__name__":
+            name = value
+    if not name:
+        try:
+            # support functools.partial
+            return make_unique_name_including_docstring_key(f.func)
+        except AttributeError:
+            pass
+        try:
+            # for some reason, __name__ does not exist on instances of objects,
+            # nor does it exist as a 'member' of the __class__ attribute, but
+            # we can just pull it out directly like this for callable classes.
+            name = f.__class__.__name__
+        except AttributeError:
+            name = "MOPS_UNKNOWN_NAME"
+    return f"{module}--{name}@{version}".rstrip("@")
 
 
 class FunctionComponents(ty.NamedTuple):

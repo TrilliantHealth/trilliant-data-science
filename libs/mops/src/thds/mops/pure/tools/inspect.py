@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from pprint import pprint
 
-from thds import adls
+from thds.adls.uri import parse_uri
 from thds.core import log, scope, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
@@ -33,10 +33,10 @@ logger = log.getLogger(__name__)
 
 
 class _MopsInspectPrettyPartial(functools.partial):
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f"partial({self.func.__name__}, {self.args}, {self.keywords})"
 
-    def __rich_repr__(self) -> ty.Iterable[ty.Tuple[str, ty.Any]]:
+    def __rich_repr__(self):
         """I don't much like how partial does its repr. Especially with nested partials,
         it becomes almost impossible to follow.
         """
@@ -46,7 +46,7 @@ class _MopsInspectPrettyPartial(functools.partial):
 
 
 class PartialViewingUnpickler(CallableUnpickler):
-    def find_class(self, module: str, name: str) -> ty.Any:
+    def find_class(self, module, name):
         if module == "functools" and name == "partial":
             return _MopsInspectPrettyPartial
         return super().find_class(module, name)
@@ -70,13 +70,12 @@ def _unpickle_object_for_debugging(uri: str) -> ty.Any:
 def _resolved_uri(uri: str) -> str:
     if not uri:
         return ""
-    if fqn := adls.uri.resolve_uri(uri):
-        return str(fqn)
-    return uri
+    return str(parse_uri(uri))
 
 
-_KNOWN_CONTROL_FILES = [strings.INVOCATION, results.RESULT, results.EXCEPTION]
-
+_KNOWN_CONTROL_FILES = list(
+    map(lambda cf: "/" + cf, [strings.INVOCATION, results.RESULT, results.EXCEPTION])
+)
 # prefix with forward-slash because these live in a blob store 'directory'
 
 
@@ -92,7 +91,7 @@ _NOTHING = object()
 
 def _control_uri(uri: str) -> str:
     for control_file in _KNOWN_CONTROL_FILES:
-        if uri.endswith("/" + control_file):
+        if uri.endswith(control_file):
             return control_file
     return ""
 
@@ -109,7 +108,7 @@ def get_control_file(uri: str) -> ty.Any:
     if not _control_uri(uri):
         fs = uris.lookup_blob_store(uri)
         logger.debug(f"Attempting to fetch all control files for {uri}")
-        return IRE(**{cf: get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
+        return IRE(**{cf.lstrip("/"): get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
 
     has_storage_root = bool(uris.ACTIVE_STORAGE_ROOT())
     try:
@@ -124,7 +123,7 @@ def get_control_file(uri: str) -> ty.Any:
         raise
 
 
-def _embed(o: object) -> None:
+def _embed(o):
     print('\nObject will be available as "o". Perform embedded URI fetches with "get_control_file"\n')
     try:
         __import__("IPython").embed()
@@ -135,7 +134,7 @@ def _embed(o: object) -> None:
         code.interact(local=locals())
 
 
-def _pprint(obj: object, file: ty.Any = None, uri: str = "") -> None:
+def _pprint(obj, file=None, uri: str = ""):
     if uri:
         print(uri, file=file)
 
@@ -154,7 +153,7 @@ def _pprint(obj: object, file: ty.Any = None, uri: str = "") -> None:
         pprint(obj, indent=4, width=60, sort_dicts=False, stream=file)
 
 
-def inspect(uri: str, embed: bool = False) -> ty.Any:
+def inspect(uri: str, embed: bool = False):
     obj = get_control_file(uri)
     if obj is _NOTHING:
         return
@@ -167,7 +166,7 @@ def inspect(uri: str, embed: bool = False) -> ty.Any:
     return obj
 
 
-def inspect_and_log(memo_uri: str) -> None:
+def inspect_and_log(memo_uri: str):
     inspect(memo_uri)
     logger.error(
         "A required result was not found."
@@ -182,13 +181,13 @@ class Ignores:
     permanent_ignores_file: Path
     known_ignores: ty.Set[str]
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         self.permanent_ignores_file.parent.mkdir(parents=True, exist_ok=True)
         if not self.permanent_ignores_file.exists():
             self.permanent_ignores_file.touch()
         self.known_ignores = set(filter(None, open(self.permanent_ignores_file).read().splitlines()))
 
-    def ignore_uri(self, ignore_uri: str) -> None:
+    def ignore_uri(self, ignore_uri: str):
         self.known_ignores.add(ignore_uri)
         # possible race condition here if multiple runs of mops-inspect are happening
         # in parallel?
@@ -237,7 +236,7 @@ _MATCHES = Matches(list(), list())
 DIFF_TOOL = os.environ.get("DIFF_TOOL") or "difft"  # nicer diffs by default
 
 
-def _check_diff_tool() -> None:
+def _check_diff_tool():
     global DIFF_TOOL
     try:
         subprocess.run([DIFF_TOOL, "--version"], check=True, capture_output=True)
@@ -246,16 +245,16 @@ def _check_diff_tool() -> None:
         DIFF_TOOL = "diff"
 
 
-def _run_diff_tool(path_old: Path, path_new: Path) -> None:
+def _run_diff_tool(path_old: Path, path_new: Path):
     subprocess.run([DIFF_TOOL, str(path_old), str(path_new)], check=True)
 
 
-def _write_ire_to_path(ire: IRE, path: Path, uri: str) -> None:
+def _write_ire_to_path(ire: IRE, path: Path, uri: str):
     with open(path, "w") as wf:
         _pprint(ire, file=wf, uri=uri)
 
 
-def _diff_memospace(uri: str, new_control: IRE) -> None:
+def _diff_memospace(uri: str, new_control: IRE):
     """Diff all siblings in the memospace against the new invocation.
 
     Ignore any that have been ignored previously.
@@ -276,7 +275,7 @@ def _diff_memospace(uri: str, new_control: IRE) -> None:
 
     logger.info(f"Diffing against all siblings in the memospace {memospace_uri}")
 
-    def sibling_menu(sibling_uri: str) -> None:
+    def sibling_menu(sibling_uri: str):
         choice = input(
             "Enter to continue, Ctrl-C to quit, `i` to permanently ignore this URI,"
             " or type a regex to filter future results (prefix with ! to find non-matches, otherwise will find matches: "
@@ -321,7 +320,7 @@ def _diff_memospace(uri: str, new_control: IRE) -> None:
 
 
 @scope.bound
-def _inspect_uri(uri: str, diff_memospace: bool, embed: bool) -> None:
+def _inspect_uri(uri: str, diff_memospace: bool, embed: bool):
     uri = _resolved_uri(uri)
     ire_curr = inspect(uri, embed)  # print the main uri
 
@@ -329,7 +328,7 @@ def _inspect_uri(uri: str, diff_memospace: bool, embed: bool) -> None:
         _diff_memospace(uri, ire_curr)
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "uri",

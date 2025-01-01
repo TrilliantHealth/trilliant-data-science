@@ -19,9 +19,9 @@ logger = core.log.getLogger(__name__)
 def open_context() -> ty.Iterator[None]:
     """Enter this context before you begin serializing your invocation. When perform_all()
     is later called, any deferred work will be evaluated. The context should not be
-    closed until after return from the Shim.
+    closed until after return from the Shell.
 
-    The idea is that you'd call perform_all() inside your Shim which transfers
+    The idea is that you'd call perform_all() inside your Shell which transfers
     execution to a remote environment, but _not_ call it if you're transferring execution
     to a local environment, as the upload will not be needed.
 

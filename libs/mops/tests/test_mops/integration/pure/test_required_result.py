@@ -37,7 +37,7 @@ def random_source() -> ty.Iterable[source.Source]:
 def test_required_result_not_found_is_inspectable(random_source):
 
     with pytest.raises(RequiredResultNotFound) as exc_info:
-        with pure.results.require_all():
+        with pure.require_all_results():
             require_result_func(random_source)
 
     ire = inspect.inspect(exc_info.value.uri)
