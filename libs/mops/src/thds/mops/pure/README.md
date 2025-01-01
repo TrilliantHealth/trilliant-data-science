@@ -11,5 +11,5 @@ The core `MemoizingPicklingRunner` implementation uses:
 though each of these implementation details is independent of the others, and other implementations of
 the same system could be written.
 
-The standard remote runtime shim implementation is Kubernetes, but integration tests run using a simple
-subprocess shim, and running on Azure Functions or local Docker containers would be easy to implement.
+The standard remote shell implementation is Kubernetes, but integration tests run using a simple
+subprocess shell, and running on Azure Functions or local Docker containers would be easy to implement.

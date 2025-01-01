@@ -14,19 +14,15 @@ def test_basic_upload_without_cache(caplog):
     fs = ADLSFileSystem("thdsscratch", "tmp")
 
     remote_path = f"test/hello_world/{randint(0, 2**63-1)}.txt"
-    with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
+    with caplog.at_level(logging.DEBUG):
         # synchronous file not found
         assert upload_decision_and_settings(
-            get_global_fs_client(  # type: ignore[arg-type]
-                # TODO - look at above type ignore
-                fs.account_name,
-                fs.file_system,
-            ).get_file_client(remote_path),
+            get_global_fs_client(fs.account_name, fs.file_system).get_file_client(remote_path),
             HW,
         ).upload_required
         assert "Too small to bother" in caplog.text
 
-    with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
+    with caplog.at_level(logging.DEBUG):
         # async file not found, plus upload
         fs.put_file(HW, remote_path)
         assert "failed to get length" in caplog.text
@@ -44,17 +40,17 @@ def test_basic_upload_without_cache(caplog):
         fb = Path(dir) / "foobar.txt"
         with open(fb, "wb") as pw:
             pw.write(b"some other data")
-        with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
+        with caplog.at_level(logging.DEBUG):
             # synchronous bytes don't match
             assert upload_decision_and_settings(
-                get_global_fs_client(fs.account_name, fs.file_system)  # type: ignore[arg-type]
-                # TODO - look at above type ignore
-                .get_file_client(remote_path).get_file_properties,
+                get_global_fs_client(fs.account_name, fs.file_system)
+                .get_file_client(remote_path)
+                .get_file_properties,
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required
             assert "Remote file exists but MD5 does not match" in caplog.text
-        with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
+        with caplog.at_level(logging.DEBUG):
             # async bytes don't match
             fs.put_file(fb, remote_path)
             assert "Remote file exists but MD5 does not match" in caplog.text

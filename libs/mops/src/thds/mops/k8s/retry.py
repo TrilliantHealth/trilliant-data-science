@@ -34,10 +34,10 @@ def k8s_sdk_retry(
 
     def decorator(f: F) -> F:
         @wraps(f)
-        def wrapper(*args, **kwargs):  # type: ignore
+        def wrapper(*args, **kwargs):
             i = 0
 
-            def _raise_if_max(i: int) -> None:
+            def _raise_if_max(i):
                 if i >= max_retries:
                     logger.warning(f"Failing after {i} tries")
                     raise

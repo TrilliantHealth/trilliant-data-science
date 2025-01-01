@@ -1,5 +1,4 @@
 """Bring your own serialization."""
-
 import typing as ty
 from weakref import WeakValueDictionary
 
@@ -22,11 +21,11 @@ class ByIdRegistry(ty.Generic[T, V]):
     dictionary, but the thing doesn't support being hashed.
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         self._objects: ty.Dict[int, T] = WeakValueDictionary()  # type: ignore
         self._values: ty.Dict[int, V] = dict()
 
-    def __setitem__(self, obj: T, value: V) -> None:
+    def __setitem__(self, obj: T, value: V):
         try:
             self._objects[id(obj)] = obj
             self._values[id(obj)] = value
@@ -56,7 +55,7 @@ class ByIdSerializer:
     occupy much memory, as it will be cached.
     """
 
-    def __init__(self, registry: ByIdRegistry[ty.Any, Serializer]) -> None:
+    def __init__(self, registry: ByIdRegistry[ty.Any, Serializer]):
         self._registry = registry
         self._desers: ty.Dict[int, Deserializer] = dict()
         self._once = Once()
@@ -64,7 +63,7 @@ class ByIdSerializer:
     def __call__(self, obj: ty.Any) -> ty.Union[None, Deserializer]:
         if obj in self._registry:
 
-            def serialize_and_cache() -> None:
+            def serialize_and_cache():
                 logger.info(f"Serializing object {type(obj)} {id(obj)}")
                 self._desers[id(obj)] = self._registry[obj](obj)
 

@@ -47,7 +47,7 @@ class PicklableFunction:
     There may be other solutions to this, but this seems to work fine.
     """
 
-    def __init__(self, f: ty.Callable) -> None:
+    def __init__(self, f):
         if f.__module__ == "__main__":
             add_main_module_function(f.__name__, f)
         self.fmod = f.__module__
@@ -64,14 +64,13 @@ class PicklableFunction:
     def __name__(self) -> str:
         return self.fname
 
-    def __call__(self, *args: ty.Any, **kwargs: ty.Any) -> ty.Any:
+    def __call__(self, *args, **kwargs):
         logger.debug(f"Dynamically importing function {str(self)}")
         if self.fmod == "__main__":
-            self.f = get_main_module_function(self.fname)  # type: ignore
+            self.f = get_main_module_function(self.fname)
         else:
             mod = importlib.import_module(self.fmod)
             self.f = getattr(mod, self.fname)
-        assert self.f
         return self.f(*args, **kwargs)
 
 
