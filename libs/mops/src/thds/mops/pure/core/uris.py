@@ -1,60 +1,44 @@
-import importlib.metadata
 import io
-import typing as ty
 from pathlib import Path
 from typing import Callable, Union
 
-from thds.adls import AdlsFqn, AdlsRoot
+from thds.adls import ADLS_SCHEME, AdlsFqn, AdlsRoot
+from thds.core.files import is_file_uri, to_uri
 from thds.core.stack_context import StackContext
 
-from ..adls.blob_store import get_adls_blob_store
-from .file_blob_store import get_file_blob_store
+# we import the ADLS blob store here even though this is the only place in core where we 'touch'
+# the ADLS implementation.
+#
+# In theory this could be abstracted via a registration process instead,
+# but that seems like over-engineering at this point.
+from ..adls.blob_store import get_store
+from .file_blob_store import FileBlobStore
 from .types import BlobStore
-
-GetBlobStoreForUri = ty.Callable[[str], ty.Optional[BlobStore]]
-
-
-# we add the ADLS blob store and FileBlobStore here because they are the 'blessed'
-# implementations that our internal users rely on.
-# Others can be registered via entry-points.
-_REGISTERED_BLOB_STORES: ty.List[GetBlobStoreForUri] = [
-    get_file_blob_store,
-    get_adls_blob_store,
-]
-
-
-def register_blob_store(get_store: GetBlobStoreForUri) -> None:
-    """Dynamically register a BlobStore implementation."""
-    _REGISTERED_BLOB_STORES.append(get_store)
-
-
-def load_plugin_blobstores() -> None:
-    for entry_point in importlib.metadata.entry_points().get("thds.mops.pure.blob_stores", []):
-        try:
-            register_blob_store(entry_point.load())
-        except Exception as e:
-            print(f"Error loading entry point {entry_point.name}: {e}")
 
 
 def lookup_blob_store(uri: str) -> BlobStore:
-    for get_store in _REGISTERED_BLOB_STORES[::-1]:
-        if store := get_store(uri):
-            return store
+    if uri.startswith(ADLS_SCHEME):
+        return get_store()
+    if is_file_uri(uri):
+        return FileBlobStore()
     raise ValueError(f"Unsupported URI: {uri}")
 
 
 def get_root(uri: str) -> str:
-    blob_store = lookup_blob_store(uri)
-    return blob_store.control_root(uri)
+    if uri.startswith(ADLS_SCHEME):
+        return str(AdlsFqn.parse(uri).root())
+    if is_file_uri(uri):
+        local_root = Path.home() / ".mops-local-root"
+        local_root.mkdir(exist_ok=True)
+        return to_uri(local_root)
+    raise ValueError(f"Unsupported URI: {uri}")
 
 
-UriIsh = Union[AdlsRoot, AdlsFqn, str, Path]
+UriIsh = Union[AdlsRoot, AdlsFqn, str]
 UriResolvable = Union[UriIsh, Callable[[], UriIsh]]
 
 
 def to_lazy_uri(resolvable: UriResolvable) -> Callable[[], str]:
-    if isinstance(resolvable, Path):
-        return lambda: str(resolvable.resolve())
     if isinstance(resolvable, (str, AdlsRoot, AdlsFqn)):
         return lambda: str(resolvable)
     if callable(resolvable):

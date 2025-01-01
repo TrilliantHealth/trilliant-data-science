@@ -1,19 +1,3 @@
-## 1.32
-
-- Add `source.tree.SourceTree` dataclass and the related `logical_root` utility, in order to be able to
-  represent potentially remote directories deterministically.
-
-### 1.31.20250124
-
-- Print a traceback in `core.parallel.yield_results`, along with the type of the Exception, so that we're
-  no longer mystified about what's happening during a very large/long run.
-
-## 1.31
-
-- Adds `scaling` module, which is a way for projects to coordinate on scaling factors using explicit
-  stack-local string names, without (over)specifying a shared semantic for what those scaling
-  requirements might be.
-
 ## 1.30
 
 - Log to a file by default. This will be helpful on developer laptops, but will be especially helpful for
