@@ -281,14 +281,15 @@ tabularasa dag                  # generate full DAG
 tabularasa dag [table-name(s)]  # generate DAG for specific tables
 ```
 
-**NOTE**: This requires the `graphviz` source and binaries to be available on your system (`graphviz` is
-a C library that doesn't come packaged with the python wrapper `pygraphviz`). The easiest way to ensure
-this if you have a global anaconda env is to run `conda install graphviz`. However you proceed, you can
-verify that `graphviz` is available by running `which dot` and verifying that a path to an executable for
-the `dot` CLI is found (`dot` is one layout algorithm that comes with graphviz, and the one used in this
-feature). Once you have that, you may `pip install pygraphviz` into your working dev environment. Refer
-to the [pygraphviz docs](https://pygraphviz.github.io/documentation/stable/install.html) if you get
-stuck.
+> [!NOTE]
+> This requires the `graphviz` source and binaries to be available on your system (`graphviz` is a C
+> library that doesn't come packaged with the python wrapper `pygraphviz`). The easiest way to ensure
+> this if you have a global anaconda env is to run `conda install graphviz`. However you proceed, you can
+> verify that `graphviz` is available by running `which dot` and verifying that a path to an executable
+> for the `dot` CLI is found (`dot` is one layout algorithm that comes with graphviz, and the one used in
+> this feature). Once you have that, you may `pip install pygraphviz` into your working dev environment.
+> Refer to the [pygraphviz docs](https://pygraphviz.github.io/documentation/stable/install.html) if you
+> get stuck.
 
 ## Generating documentation
 
