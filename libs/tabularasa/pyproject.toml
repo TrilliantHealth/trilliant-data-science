@@ -133,7 +133,7 @@ source = ["thds.tabularasa"]
 show_missing = true
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core<2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
