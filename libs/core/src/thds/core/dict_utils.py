@@ -54,7 +54,7 @@ def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[st
     return dict(_flatten_gen(d, parent_key, sep))
 
 
-class DotDict(dict, MutableMapping[str, VT]):
+class DotDict(MutableMapping[str, VT]):
     """A python dictionary that acts like an object."""
 
     _new_to_orig_keys: Dict[str, str] = dict()
