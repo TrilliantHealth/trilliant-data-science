@@ -1,5 +1,4 @@
 import os
-import sys
 import typing as ty
 from pathlib import Path
 
@@ -13,10 +12,7 @@ from .fqn import AdlsFqn
 from .md5 import hex_md5_str
 
 GLOBAL_CACHE_PATH = config.item("global-cache-path", HOMEDIR() / ".adls-md5-ro-cache", parse=Path)
-MAX_FILENAME_LEN = config.item("max-filename-len", 255, parse=int)  # safe on most local filesystems?
-MAX_TOTAL_PATH_LEN = config.item(
-    "max-total-path-len", 1023 if sys.platform == "darwin" else 4095, parse=int
-)
+MAX_CACHE_KEY_LEN = config.item("max-cache-key-len", 255, parse=int)  # safe on most local filesystems?
 logger = log.getLogger(__name__)
 
 LinkOpts = ty.Union[bool, ty.Tuple[LinkType, ...]]
@@ -43,61 +39,21 @@ def global_cache(link: LinkOpts = ("ref", "hard")) -> Cache:
     return Cache(GLOBAL_CACHE_PATH(), link)
 
 
-def _compress_long_path_part(part: str, max_bytes: int) -> str:
-    md5_of_entire_part = "-md5-" + hex_md5_str(part) + "-"
-    start_of_excised_section = (len(part) - len(md5_of_entire_part)) // 2
-    end_of_excised_section = start_of_excised_section + len(md5_of_entire_part)
-
-    while True:
-        compressed_part = (
-            part[:start_of_excised_section] + md5_of_entire_part + part[end_of_excised_section:]
-        )
-        num_bytes_overage = len(compressed_part.encode()) - max_bytes
-        if num_bytes_overage <= 0:
-            return compressed_part
-
-        if len(part) - end_of_excised_section < start_of_excised_section:
-            start_of_excised_section -= 1
-        else:
-            end_of_excised_section += 1
-        # this is a very naive iterative approach to taking more 'bites' out of the middle of the filename.
-        # we can't easily reason about how many bytes each character is, but we also can't
-        # operate at the byte level directly, because removing bytes out of Unicode characters
-        # will inevitably lead to invalid UTF-8 sequences.
-
-        assert start_of_excised_section >= 0, (
-            part,
-            compressed_part,
-            start_of_excised_section,
-        )
-        assert end_of_excised_section <= len(part), (
-            part,
-            compressed_part,
-            end_of_excised_section,
-        )
-
-
 def _cache_path_for_fqn(cache: Cache, fqn: AdlsFqn) -> Path:
-    """
-    On Linux, file paths can be 255 bytes per part, and the max full path limit is
-    4095, not including the NULL terminator.  On Mac, the max total length is 1023, and
-    the max part length is 255.
-    """
-    # we assume that neither the SA nor the container will ever be more than MAX_FILENAME_LEN bytes.
-    # However, we know that sometimes the path parts _are_, so in rare
-    # cases we need unique yet mostly readable abbreviation for those.
-    parts = list()
-    for part in fqn.path.split("/"):
-        part_bytes = part.encode()
-        if len(part_bytes) > MAX_FILENAME_LEN():
-            part = _compress_long_path_part(part, MAX_FILENAME_LEN())
-        parts.append(part)
-
-    full_path = str(Path(cache.root.resolve() / fqn.sa / fqn.container, *parts))
-    if len(full_path.encode()) > MAX_TOTAL_PATH_LEN():
-        full_path = _compress_long_path_part(full_path, MAX_TOTAL_PATH_LEN())
-
-    return Path(full_path)
+    fqn_str = str(cache.root.resolve() / f"{fqn.sa}/{fqn.container}/{fqn.path}")
+    fqn_bytes = fqn_str.encode()
+    if len(fqn_bytes) > MAX_CACHE_KEY_LEN():
+        # we now hash the fqn itself, and overwrite the last N bytes
+        # of the filename bytes with the hash. this gets us
+        # consistency even across cache directories, such that the
+        # cache directory is basically relocatable. It also makes testing easier.
+        md5_of_key = b"-md5-" + hex_md5_str(str(fqn)).encode() + b"-"
+        last_30 = fqn_bytes[-30:]
+        first_n = fqn_bytes[: MAX_CACHE_KEY_LEN() - len(md5_of_key) - len(last_30)]
+        fqn_bytes = first_n + md5_of_key + last_30
+        fqn_str = fqn_bytes.decode()
+        assert len(fqn_bytes) <= MAX_CACHE_KEY_LEN(), (fqn_str, len(fqn_bytes))
+    return Path(fqn_str).absolute()
 
 
 def _opts_to_types(opts: LinkOpts) -> ty.Tuple[LinkType, ...]:
