@@ -57,7 +57,7 @@ class _ProcessLockingPathContentAddresser:
         # contents itself, rather than by a mutable reference (the
         # path).
 
-        def _hash_and_remember_path() -> None:
+        def _hash_and_remember_path():
             self.paths_to_keys[resolved] = human_sha256b64_file_at_paths(path)
 
         self.once.run_once(resolved, _hash_and_remember_path)
@@ -65,7 +65,7 @@ class _ProcessLockingPathContentAddresser:
 
 
 class PathStream(ty.Protocol):
-    def local_to_remote(self, __path: Path, __key: str) -> None:
+    def local_to_remote(self, __path: Path, __key: str):
         ...  # pragma: no cover
 
     def get_downloader(self, __key: str) -> Downloader:
@@ -99,7 +99,7 @@ def _serialize_file_path_as_upload(
     # way with the determinism of the hashed bytes themselves.
     remote_key = remote_root + "/_bytes"
 
-    def upload() -> None:
+    def upload():
         size = local_src.stat().st_size
         formatted_size = f"{size / _1_MB:,.2f} MB"
         log = logger.info if size > 10 * _1_MB else logger.debug

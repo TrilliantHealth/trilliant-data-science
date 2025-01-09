@@ -1,4 +1,0 @@
-[tests.test_mops.integration.pure.test_magic.func_test_config]
-mops.pure.magic.pipeline_id = "final-countdown"
-mops.pure.magic.blob_root = "adls://magicians/gob"
-mops.pure.magic.shim = "subprocess"

@@ -11,7 +11,7 @@ from thds.mops import config
 from thds.mops.pure.tools.stress import stress
 
 
-def log_debug(handler: logging.Handler, logger: str = "urllib3") -> None:
+def log_debug(handler: logging.Handler, logger: str = "urllib3"):
     std_formatter = logging.getLogger().handlers[0].formatter
     assert std_formatter
     handler.setFormatter(std_formatter)
@@ -22,7 +22,7 @@ def log_debug(handler: logging.Handler, logger: str = "urllib3") -> None:
 # log_debug(logging.FileHandler("stress.log"))
 
 
-def main() -> None:
+def main():
     import argparse
 
     parser = argparse.ArgumentParser()

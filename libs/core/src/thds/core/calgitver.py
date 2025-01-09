@@ -13,14 +13,13 @@
 
 import os
 import re
-from functools import lru_cache
 
 from . import git
 
 SHORT_HASH = 7
 
 
-def uncached() -> str:
+def calgitver() -> str:
     """This is the 'proper', deterministic CalGitVer - unlike the nondeterministic
     meta.make_calgitver when the repo is dirty. It does allow for the possibility of
     override via environment variable, which is intended to support nonlocal runtime
@@ -52,21 +51,13 @@ def uncached() -> str:
     )
 
 
-cached = lru_cache(maxsize=1)(uncached)
-calgitver = cached
-
-
-def is_clean(cgv: str) -> bool:
-    return bool(cgv and not cgv.endswith("-dirty"))
-
-
 def clean_calgitver() -> str:
     """Only allow CalGitVer computed from a clean repository.
 
     Particularly useful for strict production environments.
     """
     cgv = calgitver()
-    if not is_clean(cgv):
+    if cgv.endswith("-dirty"):
         raise ValueError(f"CalGitVer {cgv} was computed from a dirty repository!")
     return cgv
 
