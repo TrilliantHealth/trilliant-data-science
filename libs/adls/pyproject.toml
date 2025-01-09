@@ -72,7 +72,7 @@ follow_imports = "skip"
 testpaths = ["tests"]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core<2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
