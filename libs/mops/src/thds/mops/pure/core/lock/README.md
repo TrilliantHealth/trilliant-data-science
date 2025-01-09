@@ -81,7 +81,7 @@ and forth keeping it up to date, overwriting the timestamp but maintaining the s
 to confirm anything.
 
 Only the orchestrator will 'release' the lock directly - when the remote function invocation ends and the
-Shim returns, the orchestrator will confirm that a result exists and then release the lock.
+Shell returns, the orchestrator will confirm that a result exists and then release the lock.
 
 If the orchestrator dies and the remote eventually dies as well, the lock will go stale/expire, and that
 will allow any future callers, or callers who were waiting on the existing invocation, to acquire the

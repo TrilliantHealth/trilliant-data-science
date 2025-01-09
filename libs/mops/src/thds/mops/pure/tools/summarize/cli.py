@@ -231,7 +231,7 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
 def _auto_find_run_directory() -> ty.Optional[Path]:
     mops_root = run_summary.MOPS_SUMMARY_DIR()
     if not mops_root.exists():
-        raise ValueError(f"No mops summary root directory found at {mops_root}.")
+        raise ValueError(f"No mops summary root directory found at {mops_root}")
     if not mops_root.is_dir():
         raise RuntimeError(
             "Mops summary root is not a directory! "

@@ -1,67 +1,60 @@
-[project]
+[tool.poetry]
 name = "thds.mops"
-version = "3.6"
 # Patch version is a datetime determined upon release
+version = "3.4"
 description = "ML Ops tools for Trilliant Health"
-readme = "docs/pypi_readme.md"
-authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.8"
-dependencies = [
-    "ansicolors",
-    "azure-core",
-    "azure-identity",
-    "azure-storage-file-datalake",
-    "cachetools",
-    "tblib~=2.0",
-    "thds-adls",
-    "thds-core",
-    "thds-humenc",
-    "tomli",
-]
-
-[project.optional-dependencies]
-k8s = ["kubernetes>=18.20,!=32.0.0"]
-# 32.0.0 has this bug https://github.com/kubernetes-client/python/issues/2356
-
-[project.scripts]
-krsync = "thds.mops.k8s.orchestrator.krsync:main"
-mops-k8s-ns = "thds.mops.k8s.namespace:main"
-mops-exit-after = "thds.core.exit_after:main"
-mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
-mops-inspect = "thds.mops.pure.tools.inspect:main"
-mops-summarize = "thds.mops.pure.tools.summarize.cli:main"
-
-[project.urls]
-Repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-[dependency-groups]
-dev = [
-    "kubernetes>=18.20",
-    "mypy~=1.11.0",
-    "mypy-extensions~=1.0",
-    "pytest~=7.2",
-    "pytest-cov~=4.0",
-    "pytest-mock~=3.10",
-    "pytest-xdist>=3.3.1,<4.0.0",
-    "types-cachetools",
-    "types-urllib3",
-]
-
-[build-system]
-requires = ["setuptools>=61.0.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.package-data]
-"*" = [
+authors = ["Trilliant Health"]
+readme = "README.md"
+packages = [{include = "thds", from="src"}]
+include = [
+    "py.typed",
+    "meta.json",
     "*_config.toml",
     "*.yml.template",
     "*.sh",
 ]
 
-[tool.uv.sources]
-thds-adls = { path = "../../libs/adls", editable = true }
-thds-core = { path = "../../libs/core", editable = true }
-thds-humenc = { path = "../../libs/humenc", editable = true }
+# PROJECT ENTRY POINTS
+[tool.poetry.scripts]
+krsync = "thds.mops.k8s.orchestrator.krsync:main"
+mops-k8s-ns = "thds.mops.k8s.namespace:main"
+mops-exit-after = "thds.core.exit_after:main"
+mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
+mops-inspect = 'thds.mops.pure.tools.inspect:main'
+mops-summarize = 'thds.mops.pure.tools.summarize.cli:main'
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+ansicolors = "*"
+azure-core = "*"
+azure-identity = "*"
+azure-storage-file-datalake = "*"
+cachetools = "*"
+tomli = "*"
+
+thds-adls = { path = "../../libs/adls", develop = true }
+thds-core = { path = "../../libs/core", develop = true }
+thds-humenc = { path = "../../libs/humenc", develop = true }
+
+# k8s is extra - there are other shells you can use with mops.use_runner.
+kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
+tblib = "^2.0.0"
+
+[tool.poetry.extras]
+k8s = ["kubernetes"]
+
+[tool.poetry.group.dev.dependencies]
+mypy = "1.11"
+mypy-extensions = "^1.0"
+pytest = "^7.2"
+pytest-cov = "^4.0"
+pytest-mock = "^3.10"
+pytest-xdist = "^3.3.1"
+types-cachetools = "*"
+types-urllib3 = "*"
+
+# BUILD CONFIG
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -83,26 +76,34 @@ exclude = '''(?x)(
     | \S+\.egg-info/
 )'''
 check_untyped_defs = true
-disallow_untyped_calls = true
-disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
     "azure",
+    "azure.*",
     "colors",
-    "google",
+    "google.*",
     "kubernetes.*",
+    "setuptools",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "scripts.*"]
-# we are not as strict about untyped things in tests, though projects should feel free to
-# make these overrides more targeted to keep test readability high.
-disallow_untyped_calls = false
-disallow_untyped_defs = false
+# temporary fix for mypy error: Function has duplicate type signatures
+# related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
+module = ["azure.storage.filedatalake.*"]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v -s"
 markers = ["integration"]
+
+[build-system]
+requires = ["poetry-core<2.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+# TOOLING CONFIG

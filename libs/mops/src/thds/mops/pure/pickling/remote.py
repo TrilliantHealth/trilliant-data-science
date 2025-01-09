@@ -6,7 +6,7 @@ from functools import cached_property
 from thds.core import log, scope
 
 from ..._utils.once import Once
-from ..core import lock, metadata, pipeline_id, uris
+from ..core import lock, metadata, set_pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.pipeline_id_mask import pipeline_id_mask
@@ -40,7 +40,7 @@ class _ResultExcWithMetadataChannel:
         logger.info(f"Remote code version: {result_metadata.remote_code_version}")
         return metadata.format_result_header(result_metadata).encode("utf-8")
 
-    def _write_metadata_only(self, prefix: str) -> None:
+    def _write_metadata_only(self, prefix: str):
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.
         If you see more than one of these files in a directory, that usually means either
         the success was preceded by a failure, _or_ it means that there was an (unusual) race condition.
@@ -51,7 +51,7 @@ class _ResultExcWithMetadataChannel:
             type_hint="text/plain",
         )
 
-    def return_value(self, r: T) -> None:
+    def return_value(self, r: T):
         return_value_bytes = _pickle.gimme_bytes(self.dumper, r)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.RESULT),
@@ -60,7 +60,7 @@ class _ResultExcWithMetadataChannel:
         )
         self._write_metadata_only("result")
 
-    def exception(self, exc: Exception) -> None:
+    def exception(self, exc: Exception):
         exc_bytes = _pickle.gimme_bytes(self.dumper, exc)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.EXCEPTION),
@@ -79,7 +79,7 @@ def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
     return invocation.func, args, kwargs
 
 
-def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
+def run_pickled_invocation(memo_uri: str, *metadata_args: str):
     """The arguments are those supplied by MemoizingPicklingRunner.
 
     As of v3, we now expect a number of (required) metadata arguments with every invocation.
@@ -87,7 +87,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     started_at = datetime.now(tz=timezone.utc)  # capture this timestamp right at the outset.
     invocation_metadata = metadata.parse_invocation_metadata_args(metadata_args)
     metadata.INVOKED_BY.set_global(invocation_metadata.invoked_by)
-    pipeline_id.set_pipeline_id(invocation_metadata.pipeline_id)
+    set_pipeline_id(invocation_metadata.pipeline_id)
     fs = uris.lookup_blob_store(memo_uri)
 
     # any recursively-called functions that use metadata will retain the original invoker.

@@ -13,7 +13,7 @@ _PIPELINE_ID = ""
 logger = log.getLogger(__name__)
 
 
-def __set_or_generate_pipeline_id_if_empty() -> None:
+def __set_or_generate_pipeline_id_if_empty():
     some_unique_name = meta.get_repo_name() or os.getenv("THDS_DOCKER_IMAGE_NAME") or ""
     clean_commit = meta.get_commit()[:7] if meta.is_clean() else ""
     named_clean_commit = (
@@ -54,7 +54,7 @@ def get_pipeline_id() -> str:
     return _PIPELINE_ID
 
 
-def set_pipeline_id(new_pipeline_id: str) -> None:
+def set_pipeline_id(new_pipeline_id: str):
     """Override the current global pipeline id."""
     if not new_pipeline_id:
         return  # quietly disallow empty strings, since we always want a value here.
