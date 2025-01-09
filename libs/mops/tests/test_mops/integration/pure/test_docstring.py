@@ -1,7 +1,7 @@
-from ._util import adls_shim
+from ._util import adls_shell
 
 
-@adls_shim
+@adls_shell
 def func_with_docstring(a: int, b: int) -> int:
     """has a docstring with a version.
 

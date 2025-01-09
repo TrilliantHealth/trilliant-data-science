@@ -1,16 +1,6 @@
 import pytest
 
-from thds.core.fretry import (
-    expo,
-    is_exc,
-    iter_to_async,
-    n_times,
-    retry_regular,
-    retry_regular_async,
-    retry_sleep,
-    retry_sleep_async,
-    sleep,
-)
+from thds.core.fretry import expo, is_exc, retry_regular, retry_sleep, sleep
 
 
 def test_retry_regular():
@@ -74,41 +64,3 @@ def test_expo_jitter():
         jitter_runs.append(jitter_run)
 
     assert len(set(jitter_runs)) == len(jitter_runs), jitter_runs  # they're all different
-
-
-@pytest.mark.asyncio
-async def test_retry_regular_async():
-    count = 0
-
-    @retry_regular_async(lambda e: True, iter_to_async(n_times(4)))
-    async def broken():
-        nonlocal count
-        count += 1
-        print(count)
-        raise ValueError(str(count))
-
-    with pytest.raises(ValueError):
-        await broken()
-
-    assert count == 5
-    with pytest.raises(ValueError):
-        await broken()
-
-    assert count == 10  # a second attempt goes through the retry loop again.
-
-
-@pytest.mark.asyncio
-async def test_retry_sleep_async():
-    count = 0
-
-    @retry_sleep_async(is_exc(ValueError), expo(retries=4, delay=0.0))
-    async def broken():
-        nonlocal count
-        count += 1
-        print(count)
-        raise ValueError(str(count))
-
-    with pytest.raises(ValueError):
-        await broken()
-
-    assert count == 5

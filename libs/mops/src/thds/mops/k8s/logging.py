@@ -48,7 +48,7 @@ class JobLogWatcher:
     some spurious logging messages.
     """
 
-    def __init__(self, job_name: str, num_pods_expected: int = 1) -> None:
+    def __init__(self, job_name: str, num_pods_expected: int = 1):
         self.job_name = job_name
         self.num_pods_expected = num_pods_expected
         self.pods_being_scraped: ty.Set[str] = set()
@@ -57,7 +57,7 @@ class JobLogWatcher:
 
     @k8s_sdk_retry()
     @core.scope.bound
-    def start(self, failed_pod_name: str = "") -> None:
+    def start(self, failed_pod_name: str = ""):
         """Call this one time - it will spawn threads as needed."""
         if NO_K8S_LOGS():
             return
@@ -88,9 +88,7 @@ class JobLogWatcher:
                 # don't start new threads for pods we've already previously discovered - they have their own thread.
                 self.pods_being_scraped.add(pod_name)
                 if pod_name not in self.pod_colors:
-                    self.pod_colors[pod_name] = make_colorized_out(
-                        colorized(fg=next_color()), fmt_str=pod_name + " {}"
-                    )
+                    self.pod_colors[pod_name] = make_colorized_out(colorized(fg=next_color()), pod_name)
                 log_thread = threading.Thread(
                     target=_scrape_pod_logs,
                     args=(
@@ -161,10 +159,7 @@ def _get_pod_phase(pod_name: str) -> str:
         .read_namespaced_pod(
             namespace=config.k8s_namespace(),
             name=pod_name,
-            _request_timeout=(
-                config.k8s_watch_connection_timeout_seconds(),
-                config.k8s_watch_read_timeout_seconds(),
-            ),
+            _request_timeout=(10, config.k8s_job_timeout_seconds()),
         )
         .status.phase
     )
@@ -183,7 +178,7 @@ def _scrape_pod_logs(
     out: ty.Callable[[str], ty.Any],
     pod_name: str,
     failure_callback: ty.Callable[[str], ty.Any],
-) -> None:
+):
     """Contains its own retry error boundary b/c this is notoriously unreliable."""
     core.scope.enter(logger_context(log=pod_name))
 
@@ -191,10 +186,7 @@ def _scrape_pod_logs(
     base_kwargs = dict(
         name=pod_name,
         namespace=config.k8s_namespace(),
-        _request_timeout=(
-            config.k8s_watch_connection_timeout_seconds(),
-            config.k8s_watch_read_timeout_seconds(),
-        ),
+        _request_timeout=(10, config.k8s_job_timeout_seconds()),
         # i'm occasionally seeing the `stream()` call below hang
         # indefinitely if logs don't come back from the pod for a
         # while. Which is ironic, since most of this code is here to
@@ -206,10 +198,10 @@ def _scrape_pod_logs(
         # what we want to try next.
     )
 
-    def get_retry_kwargs(_: int) -> ty.Tuple[tuple, dict]:
+    def get_retry_kwargs(_: int):
         return tuple(), dict(base_kwargs, since_seconds=int(default_timer() - last_scraped_at))
 
-    def scrape_logs(*_args: ty.Any, **kwargs: ty.Any) -> None:
+    def scrape_logs(*_args, **kwargs):
         nonlocal last_scraped_at
         _await_pod_phases(
             {K8sPodStatus.RUNNING, K8sPodStatus.SUCCEEDED, K8sPodStatus.FAILED},

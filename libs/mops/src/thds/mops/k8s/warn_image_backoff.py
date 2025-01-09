@@ -17,14 +17,14 @@ OnCoreEvent = ty.Callable[[client.CoreV1Event], ty.Any]
 YIKES = colorized(fg="black", bg="yellow")
 
 
-def _emit_basic(event: client.CoreV1Event) -> None:
+def _emit_basic(event: client.CoreV1Event):
     logger.error(YIKES(event.message))
 
 
-def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_basic) -> None:
+def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_basic):
     """Log scary errors when ImagePullBackoff is observed."""
     start_dt = datetime.now(tz=timezone.utc)
-    for _ns, obj, _event_type in yield_objects_from_list(
+    for _ns, obj in yield_objects_from_list(
         namespace,
         lambda _, __: ty.cast(
             # do NOT use client.EventsV1Api here - for some reason
@@ -46,7 +46,7 @@ _WARN_IMAGE_PULL_BACKOFF = OneShotLimiter()
 
 def start_warn_image_pull_backoff_thread(
     namespace: str = "", on_backoff: ty.Optional[OnCoreEvent] = None
-) -> None:
+):
     """Limit 1 thread per namespace per application.
 
     You can pass an additional message context

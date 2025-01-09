@@ -1,13 +1,12 @@
 """Redirect is sort of a catch-all concept and this tests that it can
 do some pretty interesting stuff.
 """
-
 import logging
 from functools import partial
 
 from thds.core.stack_context import StackContext
 from thds.mops.pure import MemoizingPicklingRunner
-from thds.mops.pure.runner.simple_shims import samethread_shim
+from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
 
 from ...config import TEST_TMP_URI
 
@@ -38,7 +37,7 @@ def test_redirect_allows_pickling_of_context_without_affecting_invocation_memoiz
     """
     caplog.set_level(logging.INFO)
 
-    runner = MemoizingPicklingRunner(samethread_shim, TEST_TMP_URI)
+    runner = MemoizingPicklingRunner(_threadlocal_shell, TEST_TMP_URI)
     # run foobar 'directly' via the runner
     assert runner(foobar, (1,), dict()) == 2
     assert not any("already exists" in rec.message for rec in caplog.records)
@@ -53,7 +52,7 @@ def test_redirect_allows_pickling_of_context_without_affecting_invocation_memoiz
     # we can pass context that does not factor into the memoization at all. A real world
     # use case would be passing something that changes side effects but does not affect the real result.
     runner = MemoizingPicklingRunner(
-        samethread_shim, TEST_TMP_URI, redirect=lambda f, _a, _k: partial(foobar_redirect, 3)  # not 2
+        _threadlocal_shell, TEST_TMP_URI, redirect=lambda f, _a, _k: partial(foobar_redirect, 3)  # not 2
     )
     assert runner(foobar, (1,), dict()) == 2
     # still 2 because we got a memoized result not affected by the

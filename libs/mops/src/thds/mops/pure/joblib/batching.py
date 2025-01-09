@@ -1,5 +1,4 @@
 """Fix joblib batching for use with many parallel tasks running remotely."""
-
 import itertools
 import queue
 import typing as ty
@@ -15,7 +14,7 @@ from thds.core.log import getLogger
 logger = getLogger(__name__)
 
 
-def dispatch_one_batch(self: ty.Any, iterator: ty.Iterable[ty.Any]) -> bool:
+def dispatch_one_batch(self, iterator):
     """Joblib batching is truly horrible for running on a remote machine.
 
     Various things conspire to essentially try to outsmart your
