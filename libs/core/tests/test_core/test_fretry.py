@@ -41,16 +41,17 @@ def test_retry_sleep():
 
 def test_expo_jitter():
     no_jitter_run = tuple(expo(retries=4, jitter=False)())
-    assert no_jitter_run == (1.0, 2.0, 4.0, 8.0)
+    assert no_jitter_run == (0.0, 1.0, 3.0, 7.0)
 
     jitter_run_1 = tuple(expo(retries=4)())
     assert jitter_run_1 != no_jitter_run
 
     def check_jitter_run(run):
-        assert 0.5 <= run[0] <= 1.5, run
-        assert 1.0 <= run[1] <= 3.0, run
-        assert 2.0 <= run[2] <= 6.0, run
-        assert 4.0 <= run[3] <= 12.0, run
+        assert run[0] == 0.0, run
+        # the total amount of time should be roughly the same, because
+        # we don't allow jitter to compound itself over time.
+        assert sum(run) >= sum(no_jitter_run[:3]) + no_jitter_run[3] * 0.5
+        assert sum(run) <= sum(no_jitter_run[:3]) + no_jitter_run[3] * 1.5
 
     check_jitter_run(jitter_run_1)
     # check one manually, for debuggability
