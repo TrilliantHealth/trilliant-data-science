@@ -25,8 +25,3 @@ def env_root(env: Env = "") -> AdlsRoot:
 
 def env_root_uri(env: Env = "") -> str:
     return str(env_root(env))
-
-
-def mops_root() -> str:
-    """Returns a URI corresponding to the location where mops materialization should be put."""
-    return str(_TMP)
