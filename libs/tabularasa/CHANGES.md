@@ -1,3 +1,8 @@
+### 0.7.3
+
+- Fixed a bug in the use of `ruamel.yaml` in the CLI which caused errors when multithreading `tabularasa`
+  schema loads/saves in parallel.
+
 ### 0.7.2
 
 - Fixed the use of buggy pandas index intersection method

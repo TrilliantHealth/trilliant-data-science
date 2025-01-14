@@ -95,11 +95,18 @@ except ImportError:
     load_yaml = yaml.safe_load
     dump_yaml = yaml.safe_dump
 else:
-    yaml = YAML()  # type: ignore
-    yaml.preserve_quotes = True  # type: ignore
-    yaml.width = 100  # type: ignore
-    load_yaml = yaml.load  # type: ignore
-    dump_yaml = yaml.dump
+
+    def _yaml():
+        yaml = YAML()
+        yaml.preserve_quotes = True  # type: ignore[assignment]
+        yaml.width = 100  # type: ignore[assignment]
+        return yaml
+
+    def load_yaml(stream):
+        return _yaml().load(stream)
+
+    def dump_yaml(data, stream):  # type: ignore
+        _yaml().dump(data, stream)
 
 
 DEFAULT_GRAPHVIZ_FORMAT = "svg"
@@ -408,9 +415,6 @@ class ReferenceDataManager:
         if require_editable_install:
             self.check_editable_install()
 
-        with pkg_resources.resource_stream(package, schema_path) as f:
-            self.raw_schema = load_yaml(f)
-
     def check_editable_install(self):
         """Ensure that the package being built is installed in an editable mode; otherwise the operations
         defined in this interface may not have the intended effects."""
@@ -424,6 +428,13 @@ class ReferenceDataManager:
             raise RuntimeError(msg)
         else:
             self.logger.info(f"Check passed - package {self.package} is installed in editable mode")
+
+    def load_raw_schema(self):
+        """Round-trippable load of the schema YAML file, for development operations where the file needs
+        to be edited while preserving style and comments"""
+        self.logger.info("Loading round-trippable raw schema")
+        with pkg_resources.resource_stream(self.package, self.schema_path) as f:
+            return load_yaml(f)
 
     @property
     def schema(self) -> metaschema.Schema:
@@ -733,6 +744,7 @@ class ReferenceDataManager:
         tables_to_update = (
             [self.schema.tables[t] for t in tables] if tables else self.schema.build_time_package_tables
         )
+        raw_schema = self.load_raw_schema()
         self.logger.info("Updating data hashes")
         for table in tables_to_update:
             table_name = table.name
@@ -752,7 +764,7 @@ class ReferenceDataManager:
                     continue
 
                 table.md5 = md5
-                self.raw_schema["tables"][table_name]["md5"] = md5
+                raw_schema["tables"][table_name]["md5"] = md5
                 hashes_updated.append(table_name)
             else:
                 self.logger.warning(
@@ -765,7 +777,7 @@ class ReferenceDataManager:
                 f"updated hashes for tables {hashes_updated!r}; writing new schema to {schema_path}"
             )
             with open(schema_path, "w") as f:
-                dump_yaml(self.raw_schema, f)
+                dump_yaml(raw_schema, f)
 
             if codegen:
                 self.logger.info("regenerating source code to update embedded hashes")
