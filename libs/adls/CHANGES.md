@@ -1,6 +1,7 @@
 # 3.0
 
 - Remove deprecated `adls.link` alias for `core`.
+- Add `named_roots` abstraction that decouples named ADLS storage locations from the `core.env` concept.
 
 ### 2.5.20241122
 
