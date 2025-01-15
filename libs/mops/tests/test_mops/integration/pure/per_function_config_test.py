@@ -1,4 +1,3 @@
-from thds.adls import defaults
 from thds.core import config
 from thds.mops.pure.core.memo.function_memospace import (
     make_function_memospace,
@@ -59,6 +58,6 @@ def test_actual_config_is_used():
     config_item = config.config_by_name(config_name)
 
     with config_item.set_local(val):
-        assert val == make_function_memospace(defaults.env_root_uri("dev"), mul)
+        assert val == make_function_memospace(TEST_TMP_URI, mul)
 
-    assert val != make_function_memospace(defaults.env_root_uri("dev"), mul)
+    assert val != make_function_memospace(TEST_TMP_URI, mul)
