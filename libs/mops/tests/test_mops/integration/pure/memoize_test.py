@@ -7,9 +7,10 @@ from typing import Sequence
 
 import pytest
 
-from thds.adls import defaults
 from thds.mops.pure import MemoizingPicklingRunner, pipeline_id_mask, use_runner
 from thds.mops.pure.core.metadata import parse_invocation_metadata_args
+
+from ...config import TEST_TMP_URI
 
 
 class PipelineId(Exception):
@@ -26,7 +27,7 @@ def _intercept_pipeline_id(args: Sequence[str]) -> None:
 # decorator, as it works at call time, and its code must run before
 # the underlying Runner implementation does.
 @pipeline_id_mask("test/static-forever")
-@use_runner(MemoizingPicklingRunner(_intercept_pipeline_id, defaults.env_root_uri("dev")))
+@use_runner(MemoizingPicklingRunner(_intercept_pipeline_id, TEST_TMP_URI))
 def fx(a: int) -> float:
     return float(a) + 0.2
 
