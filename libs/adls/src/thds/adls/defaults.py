@@ -1,26 +1,20 @@
-"""Defaults for Data Science"""
+"""Prefer using named_containers for new code."""
 
-from thds.core.env import Env, active_env
+from thds.core.env import Env
 
-from .fqn import AdlsRoot
+from . import fqn, named_roots
 
-_PROD_DATASETS = AdlsRoot.parse("adls://thdsdatasets/prod-datasets")
-_TMP = AdlsRoot.parse("adls://thdsscratch/tmp")
-_UA_PROD = AdlsRoot.parse("adls://uaapunifiedasset/data")
+try:
+    import thds.adls._thds_defaults  # noqa: F401
+except ImportError:
+    pass
 
 
-def env_root(env: Env = "") -> AdlsRoot:
+def env_root(env: Env = "") -> fqn.AdlsRoot:
     """In many cases, you may want to call this with no arguments
     to default to using the THDS_ENV environment variable.
     """
-    env = active_env(env)
-    if env == "prod":
-        return _PROD_DATASETS
-    if env in ["dev", ""]:
-        return _TMP
-    if env == "ua-prod":
-        return _UA_PROD
-    return _TMP
+    return named_roots.require(env)
 
 
 def env_root_uri(env: Env = "") -> str:
@@ -29,4 +23,4 @@ def env_root_uri(env: Env = "") -> str:
 
 def mops_root() -> str:
     """Returns a URI corresponding to the location where mops materialization should be put."""
-    return str(_TMP)
+    return str(named_roots.require("mops"))
