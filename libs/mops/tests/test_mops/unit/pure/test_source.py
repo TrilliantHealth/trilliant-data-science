@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from thds.core import files, source
+from thds.core import source
 from thds.core.hash_cache import filehash
 from thds.core.hashing import Hash
 from thds.mops import tempdir
@@ -76,7 +76,7 @@ def test_local_source_with_uploads(prep, temp_file):  # 2
 def test_remote_source_with_hash(prep, temp_file):  # 3
     test_file = temp_file("remote source with hash")
     initial_source = source.Source(
-        files.to_uri(test_file), filehash("sha256", test_file)
+        source.to_uri(test_file), filehash("sha256", test_file)
     )  # hash but no local Path
 
     source_arg = prepare_source_argument(initial_source)
@@ -94,7 +94,7 @@ def test_remote_source_with_hash(prep, temp_file):  # 3
 
 def test_remote_source_with_no_hash_just_communicates_uri(prep, temp_file):  # 4
     test_file = temp_file("remote source with NO hash")
-    initial_source = source.Source(files.to_uri(test_file))  # no hash, no local Path
+    initial_source = source.Source(source.to_uri(test_file))  # no hash, no local Path
 
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, str)

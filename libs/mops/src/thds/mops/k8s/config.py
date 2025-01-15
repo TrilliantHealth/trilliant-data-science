@@ -1,4 +1,7 @@
 from datetime import timedelta
+from pathlib import Path
+
+import tomli
 
 from thds.core import config
 
@@ -10,7 +13,6 @@ k8s_namespace_env_var_key = config.item("mops.k8s.namespace_env_var_key", "MOPS_
 # environment variable.  it will not affect how your namespace is selected in the first
 # place.
 
-k8s_watch_object_stale_seconds = config.item("mops.k8s.watch.object_stale_seconds", 30 * 60, parse=int)
 k8s_acr_url = config.item("mops.k8s.acr.url", "")
 k8s_job_retry_count = config.item("mops.k8s.job.retry_count", 6, parse=int)
 k8s_job_cleanup_ttl_seconds_after_completion = config.item(
@@ -35,3 +37,7 @@ aad_pod_managed_identity = config.item("mops.k8s.azure.aad_pod_managed_identity"
 namespaces_supporting_workload_identity = config.item(
     "mops.k8s.azure.namespaces_supporting_workload_identity", ["default"]
 )
+
+
+# load our 'standard' config - someday maybe this moves into a dedicated module
+config.set_global_defaults(tomli.load(open(Path(__file__).parent / "east_config.toml", "rb")))

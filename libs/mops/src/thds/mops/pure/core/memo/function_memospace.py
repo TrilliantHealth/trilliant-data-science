@@ -141,7 +141,7 @@ from thds import humenc
 from thds.core import config
 
 from ..pipeline_id_mask import (
-    extract_from_docstr,
+    extract_mask_from_docstr,
     get_pipeline_id,
     get_pipeline_id_mask,
     pipeline_id_mask,
@@ -211,7 +211,7 @@ def _lookup_pipeline_memospace(runner_prefix: str, callable_name: str) -> ty.Opt
 def make_function_memospace(runner_prefix: str, f: ty.Callable) -> str:
     callable_name = make_unique_name_including_docstring_key(f)
     # always default to the function docstring if no other mask is currently provided.
-    with pipeline_id_mask(extract_from_docstr(f, require=False)):
+    with pipeline_id_mask(extract_mask_from_docstr(f, require=False)):
         return _lookup_pipeline_memospace(runner_prefix, callable_name) or lookup_blob_store(
             runner_prefix
         ).join(

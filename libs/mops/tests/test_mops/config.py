@@ -1,9 +1,6 @@
 # things that need to be configured for testing to work.
-from pathlib import Path
+from thds.core import config
 
-from thds.adls import defaults
-
-TEST_TMP_URI = defaults.mops_root() or "file://" + str(
-    (Path(__file__).parents[2] / "mops-integration-tests").resolve()
-)
+_TEST_TMP_URI = config.item("test_tmp_uri", "adls://thdsscratch/tmp/")
+TEST_TMP_URI = _TEST_TMP_URI()
 TEST_DATA_TMP_URI = TEST_TMP_URI + "test/mops/"
