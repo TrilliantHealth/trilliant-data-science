@@ -46,7 +46,7 @@ def invocation_output_uri(storage_root: uris.UriIsh = "", name: str = "") -> str
     return uris.lookup_blob_store(storage_root).join(
         storage_root,
         pipeline_function_key,
+        "--".join(filter(None, [name, function_arguments_key])),
         name,
-        "--".join([function_arguments_key, name]),
         # we use the name twice now, so that the final part of the path also has a file extension
     )

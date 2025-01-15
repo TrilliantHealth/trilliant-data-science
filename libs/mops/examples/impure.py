@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import sqlite3
 
-from thds.adls.defaults import env_root
+from thds.adls.defaults import mops_root
 from thds.mops import impure, pure
 
 
 @pure.pipeline_id_mask("examples/impure")
-@pure.use_runner(impure.KeyedLocalRunner(env_root, keyfunc=impure.nil_args("conn")))
+@pure.use_runner(impure.KeyedLocalRunner(mops_root, keyfunc=impure.nil_args("conn")))
 def run_limit_query_with_database_client(
     conn: sqlite3.Connection, tbl_name: str, limit: int = 3
 ) -> list:

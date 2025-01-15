@@ -35,7 +35,7 @@ from thds.adls import defaults
 from thds.mops import pure
 from .k8s_shell import df_k8s_spot_11g_shell
 
-run_on_k8s = pure.use_runner(MemoizingPicklingRunner(df_k8s_spot_11g_shell, defaults.env_root))
+run_on_k8s = pure.use_runner(MemoizingPicklingRunner(df_k8s_spot_11g_shell, defaults.mops_root))
 # ^ a decorator that can now cause any pure function to be run remotely on K8s...
 
 @run_on_k8s
@@ -54,11 +54,12 @@ separate processes, though threads are your best bet for the large majority of s
 
 ## Development vs production
 
-In general, you should use `thds.adls.defaults.env_root` as lazily-loaded configuration to split
-production and dev-only runs.
+In general, you should use `thds.adls.defaults.mops_root` as lazily-loaded configuration to
+`MemoizingPicklingRunner`.
 
-This also means you should pass the value of `env_root()`: `invocation_output_fqn(storage_root=env_root)`
-in most cases when defining an output location for large output data.
+You should also use `invocation_output_fqn()` with no storage_root argument in most cases when defining
+an output location for large output data - the storage root will be automatically derived from the root
+of your mops execution context.
 
 However, if you're doing a production run and want to [memoize](./memoization.md) your results so that
 others can use them, you should [configure](./config.md#production-runs) `mops` to use a different
