@@ -32,7 +32,6 @@ types-requests = "^2.32.0.20241016"
 [tool.poetry.scripts]
 adls-download-uri = "thds.adls.tools.download:main"
 adls-ls-uri = "thds.adls.tools.ls:main"
-adls-upload-uri = "thds.adls.tools.upload:main"
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
