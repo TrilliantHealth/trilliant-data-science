@@ -1,3 +1,10 @@
+### 0.8.0
+
+- Made the `datagen` command perform a data sync by default to avoid errors arising from stale data, with
+  a new optional `--no-sync` flag to disable this behavior.
+- Added a new `--debug` flag to the `data-diff` command to drop into a debugger whenever a positive table
+  diff is found.
+
 ### 0.7.3
 
 - Fixed a bug in the use of `ruamel.yaml` in the CLI which caused errors when multithreading `tabularasa`

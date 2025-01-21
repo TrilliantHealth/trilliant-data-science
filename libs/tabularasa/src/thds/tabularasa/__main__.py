@@ -677,11 +677,17 @@ class ReferenceDataManager:
             with open(source_docs_path, "w") as f:
                 f.write(source_doc)
 
-    def datagen(self, tables: Optional[Set[str]] = None, *, update_hashes: bool = True):
+    def datagen(
+        self, tables: Optional[Set[str]] = None, *, update_hashes: bool = True, no_sync: bool = False
+    ):
         """Re-generate package data, optionally skipping files with hashes matching those in the schema
         :param tables: names of the specific tables to build. If not passed, all tables will be built
         :param update_hashes: Should hashes be updated for all tables regenerated at the end of the
-          build? This is done by default but can be disabled.
+          build? This is done by default but can be disabled if you are just experimenting.
+        :param no_sync: when passed, don't pull the latest data from the remote blob store before building.
+          Useful only if you really know what you're doing and are in an intermediate state with
+          "uncommitted" data files whose md5s don't match what's in the schema - e.g. as a result of
+          running `datagen` with `update_hashes=False`.
         """
         data_dir = self.package_data_dir
         transient_data_dir = self.transient_data_dir
@@ -710,6 +716,10 @@ class ReferenceDataManager:
         }
         run_hash_update = bool(tables_to_update_hashes) and update_hashes
 
+        if not no_sync:
+            # ensure local blobs are up-to-date before building
+            self.sync_blob_store(down=True)
+
         for table_name in tables_to_recompute:
             table = self.schema.tables[table_name]
             file_path = self.data_path_for(table)
@@ -718,7 +728,6 @@ class ReferenceDataManager:
                 os.remove(file_path)
             else:
                 self.logger.info(f"No file found for table {table.name}; nothing to remove")
-
         try:
             self.build_command.build_package_data(tables=tables_to_recompute or None)
         except Exception as e:
@@ -989,6 +998,7 @@ class ReferenceDataManager:
         tables: Optional[Set[str]] = None,
         *,
         base_schema_path: Optional[str] = None,
+        debug: bool = False,
     ) -> Iterator[Tuple[metaschema.Identifier, data_diff.DataFrameDiff]]:
         """Compute a diff between the current version-controlled data and the version-controlled data
         present at a historical point in time.
@@ -1000,6 +1010,8 @@ class ReferenceDataManager:
           will be assumed to be present at the same location in the filesystem as the current schema.
           This enables loading of a historical schema even if the schema file or containing package have
           been moved or renamed.
+        :param debug: if True, pause execution at the first positive diff and drop into a debugger.
+          The local `d_diff` object will be available in the debugger context.
         :return: an iterator of tuples of table names and their corresponding `DataFrameDiff`s. These
           may be consumed lazily, allowing for memory-efficient processing of large data diffs.
         """
@@ -1046,6 +1058,8 @@ class ReferenceDataManager:
             d_diff = data_diff.DataFrameDiff.from_tables(
                 table_diff.before, table_diff.after, before_blob_store, after_blob_store
             )
+            if debug and d_diff:
+                breakpoint()
             yield table_name, d_diff
 
 

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "thds.tabularasa"
 # Patch version is a datetime determined upon release
-version = "0.7.3"
+version = "0.8.0"
 authors = ["Trilliant Health"]
 description = "Trillant Health reference data build system."
 readme = "README.md"
