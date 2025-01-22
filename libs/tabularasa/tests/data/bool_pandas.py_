@@ -4,7 +4,6 @@ import pandera as pa
 
 import thds.tabularasa.loaders.util
 
-
 bools_schema = pa.DataFrameSchema(
     columns=dict(
         boolean=pa.Column(np.dtype("bool"), checks=None, nullable=False, unique=False,),

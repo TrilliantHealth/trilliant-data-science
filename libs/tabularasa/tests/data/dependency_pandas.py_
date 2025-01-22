@@ -3,7 +3,6 @@ import pandera as pa
 
 import thds.tabularasa.loaders.util
 
-
 sequences_schema = pa.DataFrameSchema(
     columns=dict(
         fibonacci=pa.Column(np.dtype("int16"), checks=None, nullable=False, unique=True,),

@@ -3,7 +3,6 @@ import pandera as pa
 
 import thds.tabularasa.loaders.util
 
-
 dates_schema = pa.DataFrameSchema(
     columns=dict(
         date2=pa.Column(np.dtype("datetime64[ns]"), checks=None, nullable=True, unique=False,),
