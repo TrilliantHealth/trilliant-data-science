@@ -54,7 +54,7 @@ def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[st
     return dict(_flatten_gen(d, parent_key, sep))
 
 
-class DotDict(dict, MutableMapping[str, VT]):
+class DotDict(MutableMapping[str, VT]):
     """A python dictionary that acts like an object."""
 
     _new_to_orig_keys: Dict[str, str] = dict()
@@ -86,14 +86,14 @@ class DotDict(dict, MutableMapping[str, VT]):
         if kwargs:
             self._construct(mapping=kwargs)
 
-    def __getattr__(self, attr):
-        return self.get(attr)
+    def __getattr__(self, key: str) -> VT:
+        return self[key]
 
     def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
 
-    def __setitem__(self, key, value):
-        super(DotDict, self).__setitem__(key, value)
+    def __setitem__(self, key: str, value: VT):
+        self.__dict__.update({key: value})
 
     def __delattr__(self, key: str) -> None:
         self.__delitem__(key)
@@ -101,6 +101,15 @@ class DotDict(dict, MutableMapping[str, VT]):
     def __delitem__(self, key: str) -> None:
         super(DotDict, self).__delitem__(key)
         del self.__dict__[key]
+
+    def __getitem__(self, key: str) -> VT:
+        return self.__dict__[key]
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def __len__(self) -> int:
+        return len(self.__dict__)
 
     def to_dict(self, orig_keys: bool = False) -> Dict[str, VT]:
         convert_keys_to_identifiers = self._get_hidden_data("convert_keys_to_identifiers")
@@ -128,7 +137,6 @@ class DotDict(dict, MutableMapping[str, VT]):
         path = dot_path.split(".")
         ref: DotDict[Any] = self
         for k in path[:-1]:
-            print(k, path[:-1], ref)
             if isinstance(ref, DotDict) and k in ref:
                 ref = ref[k]
             else:

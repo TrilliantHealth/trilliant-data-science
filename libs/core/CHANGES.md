@@ -1,3 +1,9 @@
+## 1.31
+
+- Adds `scaling` module, which is a way for projects to coordinate on scaling factors using explicit
+  stack-local string names, without (over)specifying a shared semantic for what those scaling
+  requirements might be.
+
 ## 1.30
 
 - Log to a file by default. This will be helpful on developer laptops, but will be especially helpful for
