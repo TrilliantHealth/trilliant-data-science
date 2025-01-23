@@ -3,7 +3,6 @@
 
 import concurrent.futures
 import itertools
-import traceback
 import typing as ty
 from collections import defaultdict
 from dataclasses import dataclass
@@ -113,9 +112,6 @@ def yield_all(
 
 
 def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterator[ty.Tuple[H, R]]:
-    """Use in conjunction with `yield_all` to run things in parallel but to exit at the first sign
-    of failure. More appropriate for small pipeline stages.
-    """
     for key, res in results:
         if isinstance(res, Error):
             raise res.error
@@ -176,14 +172,7 @@ def yield_results(
             yield res
         else:
             exceptions.append(res.error)
-            # print tracebacks as we go, so as not to defer potentially-helpful
-            # debugging information while a long run is ongoing.
-            traceback.print_exception(type(res.error), res.error, res.error.__traceback__)
-            logger.error(  # should only use logger.exception from an except block
-                error_fmt(
-                    f"Task {i}{num_tasks_log} errored with {type(res.error).__name__}({res.error})"
-                )
-            )
+            logger.exception(error_fmt(f"Task {i}{num_tasks_log} errored with {str(res.error)}"))
 
     summarize_exceptions(error_fmt, exceptions)
 
@@ -193,16 +182,16 @@ def summarize_exceptions(
     exceptions: ty.List[Exception],
 ) -> None:
     if exceptions:
-        # group by type
+        # summarize them and raise a final exception
         by_type = defaultdict(list)
         for exc in exceptions:
             by_type[type(exc)].append(exc)
+            logger.error(error_fmt("EXCEPTION"), exc_info=(type(exc), exc, exc.__traceback__))
 
-        # log the count for each Exception type
         most_common_type = None
         max_count = 0
         for _type, excs in by_type.items():
-            logger.error(error_fmt(f"{len(excs)} tasks failed with exception: " + _type.__name__))
+            logger.error(error_fmt(f"{len(excs)} tasks failed with exception: " + str(_type)))
             if len(excs) > max_count:
                 max_count = len(excs)
                 most_common_type = _type
