@@ -95,6 +95,11 @@ class ColumnDiff:
     before: pd.Series
     after: pd.Series
 
+    def __post_init__(self):
+        # to facilitate hassle-free comparison
+        self.before = _uncategorify_series(self.before)
+        self.after = _uncategorify_series(self.after)
+
     @cached_property
     def was_null(self) -> pd.Series:
         return self.before.isna()
@@ -113,9 +118,7 @@ class ColumnDiff:
 
     @cached_property
     def updated(self) -> pd.Series:
-        before = _uncategorify_series(self.before)
-        after = _uncategorify_series(self.after)
-        return (before != after).fillna(False) & ~self.is_null & ~self.was_null
+        return (self.before != self.after).fillna(False) & ~self.is_null & ~self.was_null
 
     @cached_property
     def n_nulled(self) -> int:
@@ -132,6 +135,30 @@ class ColumnDiff:
     def __bool__(self):
         return bool(self.nulled.any() or self.filled.any() or self.updated.any())
 
+    @cached_property
+    def updated_counts(self) -> pd.Series:
+        updated = self.updated
+        return (
+            pd.DataFrame(dict(before=self.before[updated], after=self.after[updated]))
+            .value_counts()
+            .rename("count", copy=False)
+        )
+
+    @cached_property
+    def nulled_counts(self) -> pd.Series:
+        return (
+            self.before[self.nulled]
+            .value_counts()
+            .rename("count", copy=False)
+            .rename_axis(index="before")
+        )
+
+    @cached_property
+    def filled_counts(self) -> pd.Series:
+        return (
+            self.after[self.filled].value_counts().rename("count", copy=False).rename_axis(index="after")
+        )
+
     def summary(self):
         return ColumnDiffSummary(nulled=self.n_nulled, filled=self.n_filled, updated=self.n_updated)
 
@@ -140,6 +167,9 @@ class ColumnDiff:
 class DataFrameDiff:
     before: pd.DataFrame
     after: pd.DataFrame
+
+    def __post_init__(self):
+        self._column_diffs: ty.Dict[str, ColumnDiff] = dict()
 
     @cached_property
     def dropped_columns(self) -> ty.List[str]:
@@ -182,27 +212,33 @@ class DataFrameDiff:
         """
         return list(set(self.after.index).intersection(self.before.index))
 
-    @property
+    @cached_property
     def dropped_rows(self) -> pd.DataFrame:
         return self.before.loc[self.dropped_keys]
 
-    @property
+    @cached_property
     def added_rows(self) -> pd.DataFrame:
         return self.after.loc[self.added_keys]
 
-    @property
+    @cached_property
     def common_rows_before(self) -> pd.DataFrame:
         return self.before.loc[self.common_keys]
 
-    @property
+    @cached_property
     def common_rows_after(self) -> pd.DataFrame:
         return self.after.loc[self.common_keys]
 
+    def column_diff(self, column: str) -> ColumnDiff:
+        if (maybe_diff := self._column_diffs.get(column)) is None:
+            diff = self._column_diffs[column] = ColumnDiff(
+                self.common_rows_before[column], self.common_rows_after[column]
+            )
+            return diff
+        return maybe_diff
+
     @property
     def column_diffs(self) -> ty.Dict[str, ColumnDiff]:
-        rows_before = self.common_rows_before
-        rows_after = self.common_rows_after
-        return {c: ColumnDiff(rows_before[c], rows_after[c]) for c in self.common_columns}
+        return {c: self.column_diff(c) for c in self.common_columns}
 
     def column_diff_summary(self) -> ty.Optional[pd.DataFrame]:
         df = pd.DataFrame.from_dict(
@@ -267,7 +303,7 @@ class DataFrameDiff:
             or len(self.added_keys)
             or len(self.dropped_columns)
             or len(self.added_columns)
-            or any(map(bool, self.column_diffs.values()))
+            or any(map(bool, map(self.column_diff, self.common_columns)))
         )
 
     @staticmethod

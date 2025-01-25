@@ -1,3 +1,8 @@
+### 0.9.0
+
+- Added a new `--value-detail` flag and `--value-detail-min-count` option to the `data-diff` command to
+  allow for inspecting counts of specific row-level updates for each column that was modified in a table.
+
 ### 0.8.0
 
 - Made the `datagen` command perform a data sync by default to avoid errors arising from stale data, with

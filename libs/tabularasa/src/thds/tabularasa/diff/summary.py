@@ -21,6 +21,10 @@ def markdown_heading(level: int, text: str) -> str:
     return f"{'#' * level} {text}"
 
 
+def code_literal(text: str) -> str:
+    return f"`{text}`"
+
+
 def _dropped_and_added(
     kind: str, dropped: ty.Iterable, added: ty.Iterable, heading_level: int = 0
 ) -> ty.Iterator[str]:
@@ -162,6 +166,8 @@ def markdown_dataframe_diff_summary(
     dataframe_diff: data_diff.DataFrameDiff,
     table_name: ty.Optional[str] = None,
     verbose: bool = False,
+    value_detail: bool = False,
+    value_detail_min_count: int = 0,
     heading_level: int = 0,
     tablefmt: str = DEFAULT_TABLEFMT,
     floatfmt: str = DEFAULT_FLOATFMT,
@@ -170,7 +176,7 @@ def markdown_dataframe_diff_summary(
     table_changes = dataframe_diff.summary()
     if table_changes:
         if table_name:
-            yield markdown_heading(heading_level + 1, table_name)
+            yield markdown_heading(heading_level + 1, code_literal(table_name))
             heading = True
         yield markdown_heading(heading_level + 2, "Key Changes:")
         table = table_changes.table().reset_index()
@@ -191,7 +197,7 @@ def markdown_dataframe_diff_summary(
     )
     if value_changes is not None and len(value_changes):
         if table_name and not heading:
-            yield markdown_heading(heading_level + 1, table_name)
+            yield markdown_heading(heading_level + 1, code_literal(table_name))
         yield markdown_heading(heading_level + 2, "Value Changes:")
         value_changes = value_changes.reset_index()
         yield ty.cast(
@@ -200,3 +206,30 @@ def markdown_dataframe_diff_summary(
                 index=False, tablefmt=tablefmt, floatfmt=_floatfmt_from_df(value_changes, floatfmt)
             ),
         )
+        if value_detail:
+            pos_col_diffs = (
+                (col_name, col_diff)
+                for col_name, col_diff in dataframe_diff.column_diffs.items()
+                if col_diff
+            )
+            for col_name, col_diff in pos_col_diffs:
+                col_heading = False
+                for kind, prop in (
+                    ("Nulled", data_diff.ColumnDiff.nulled_counts),
+                    ("Filled", data_diff.ColumnDiff.filled_counts),
+                    ("Updated", data_diff.ColumnDiff.updated_counts),
+                ):
+                    counts = prop.__get__(col_diff)
+                    # evaluate these lazily to allow for rendering as they're computed
+                    if value_detail_min_count:
+                        counts = counts[counts >= value_detail_min_count]
+                    if len(counts):
+                        if not col_heading:
+                            yield markdown_heading(
+                                heading_level + 2, f"Column {code_literal(col_name)} Changes Detail:"
+                            )
+                            col_heading = True
+                        yield markdown_heading(heading_level + 3, f"{kind}:")
+                        yield counts.to_frame("count").reset_index().to_markdown(
+                            index=False, tablefmt=tablefmt
+                        )
