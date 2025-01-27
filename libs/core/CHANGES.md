@@ -1,3 +1,8 @@
+### 1.31.20250124
+
+- Print a traceback in `core.parallel.yield_results`, along with the type of the Exception, so that we're
+  no longer mystified about what's happening during a very large/long run.
+
 ## 1.31
 
 - Adds `scaling` module, which is a way for projects to coordinate on scaling factors using explicit
