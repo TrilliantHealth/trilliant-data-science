@@ -1,4 +1,7 @@
 from datetime import timedelta
+from pathlib import Path
+
+import tomli
 
 from thds.core import config
 
@@ -35,3 +38,7 @@ aad_pod_managed_identity = config.item("mops.k8s.azure.aad_pod_managed_identity"
 namespaces_supporting_workload_identity = config.item(
     "mops.k8s.azure.namespaces_supporting_workload_identity", ["default"]
 )
+
+
+# load our 'standard' config - someday maybe this moves into a dedicated module
+config.set_global_defaults(tomli.load(open(Path(__file__).parent / "east_config.toml", "rb")))
