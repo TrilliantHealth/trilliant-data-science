@@ -16,7 +16,7 @@ def get_user_delegation_key(
     blob_service_client: BlobServiceClient,
     expiry: ty.Union[int, ty.Callable[[], int]] = USER_DELEGATION_KEY_EXPIRY,
 ) -> UserDelegationKey:
-    """For using as an account key for generating SAS tokens.
+    """For using as an account key to generate SAS tokens.
 
     This key must remain valid for the SAS tokens it signs to remain valid.
 

@@ -32,8 +32,11 @@ UPLOAD_CHUNK_SIZE = config.item("upload_chunk_size", 2**20 * 100, parse=int)  # 
 
 CONNECTION_TIMEOUT = config.item("connection_timeout", 2000, parse=int)  # seconds
 
-# these are for SAS tokens
+# below are for SAS tokens
+_SAS_EXPIRY_DEFAULT = 900  # seconds
 # 15 minutes seems like a decent default for the time it would take to complete a SAS requiring operation
-USER_DELEGATION_KEY_EXPIRY = config.ConfigItem("users_delegation_key_expiry", 900, parse=int)  # seconds
-# this key needs to remain valid for signed SAS tokens to remain valid
-BLOB_SAS_EXPIRY = config.ConfigItem("blob_sas_expiry", 900, parse=int)  # seconds
+USER_DELEGATION_KEY_EXPIRY = config.ConfigItem(
+    "users_delegation_key_expiry", _SAS_EXPIRY_DEFAULT, parse=int
+)  # seconds
+# above key needs to remain valid for signed SAS tokens to remain valid
+BLOB_SAS_EXPIRY = config.ConfigItem("blob_sas_expiry", _SAS_EXPIRY_DEFAULT, parse=int)  # seconds

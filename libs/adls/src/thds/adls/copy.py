@@ -8,7 +8,7 @@ from azure.storage.blob import BlobSasPermissions, BlobServiceClient, UserDelega
 
 from thds.core import cache, log, parallel, thunks
 
-from .file_properties import get_blob_properties, get_file_properties, is_directory
+from .file_properties import exists, get_blob_properties, get_file_properties, is_directory
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client, get_global_blob_service_client
 from .sas_tokens import gen_blob_sas_token, get_user_delegation_key
@@ -17,6 +17,9 @@ from .uri import UriIsh, parse_any
 logger = log.getLogger(__name__)
 
 _WAIT_TIMEOUT = 300  # seconds
+# purposely set shorter than SAS token expiry as this is more of a reasonable amount of time for a human to wait
+# rather than a reasonable amount of time for a file to finish copying.
+# the functions using this constant use it as a default argument, so it can be changed as needed.
 
 
 OverwriteMethod = ty.Literal["error", "warn", "skip", "silent"]
@@ -40,10 +43,10 @@ def _copy_file(
     account_key: ty.Union[str, UserDelegationKey],
     overwrite_method: OverwriteMethod = "error",
 ) -> CopyInfo:
-    if not (file_properties := get_file_properties(src)):
+    if not exists(src):
         raise ValueError(f"{src} does not exist!")
 
-    if is_directory(file_properties):
+    if is_directory(get_file_properties(src)):
         raise ValueError(f"{src} is a directory!")
 
     src_blob_client = get_global_blob_container_client(src.sa, src.container).get_blob_client(src.path)
@@ -93,7 +96,11 @@ def _copy_file(
 
 
 def wait_for_copy(fqn: AdlsFqn, timeout: int = _WAIT_TIMEOUT) -> AdlsFqn:
-    """Set timeout to 0 or a negative int to wait indefinitely."""
+    """Set timeout to 0 or a negative int to wait indefinitely.
+
+    Keep in mind that, if the copy is authorized using a SAS token, that token expiry exists separate from the wait
+    timeout.
+    """
     start_time = time.monotonic()
 
     while (time.monotonic() - start_time < timeout) if timeout > 0 else True:
@@ -169,7 +176,7 @@ def copy_files(
         )
 
     # would be cool to do this async, but using threads for quicker dev
-    return sorted(  # just sorting for determinism of output
+    return list(
         parallel.yield_results(
             [thunks.thunking(copy_wrapper)(src, dest) for src, dest in src_dest_fqn_pairs]
         )
