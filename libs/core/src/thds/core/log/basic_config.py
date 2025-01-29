@@ -14,7 +14,7 @@ from typing import Iterator, Tuple
 from .. import config, home
 from .json_formatter import ThdsJsonFormatter
 from .kw_formatter import ThdsCompactFormatter
-from .kw_logger import LOGLEVEL, getLogger, make_th_formatters_safe
+from .kw_logger import getLogger, make_th_formatters_safe
 from .logfmt import mk_default_logfmter
 
 _LOG_FILEPATH = os.getenv(
@@ -36,6 +36,7 @@ _LOG_FILEPATH = os.getenv(
 )
 
 
+_LOGLEVEL = config.item("thds.core.log.level", logging.INFO, parse=logging.getLevelName)
 _LOGLEVELS_FILEPATH = config.item("thds.core.log.levels_file", "", parse=lambda s: s.strip())
 # see _parse_thds_loglevels_file for format of this file.
 
@@ -56,13 +57,13 @@ _BASE_LOG_CONFIG = {
     "disable_existing_loggers": False,
     "formatters": {"default": {"()": _pick_formatter()}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "default"}},
-    "root": {"handlers": ["console"]},
+    "root": {"handlers": ["console"], "level": _LOGLEVEL()},
 }
 
 
 def set_logger_to_console_level(config: dict, logger_name: str, level: int) -> dict:
     if logger_name == "*":
-        if level != LOGLEVEL():
+        if level != _LOGLEVEL():
             getLogger(__name__).warning(f"Setting root logger to {logging.getLevelName(level)}")
         return dict(config, root=dict(config["root"], level=level))
     loggers = config.get("loggers") or dict()
@@ -95,7 +96,7 @@ def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
     The last value encountered for any given logger (or the root) will
     override any previous values.
     """
-    current_level = LOGLEVEL()
+    current_level = _LOGLEVEL()
     if not os.path.exists(filepath):
         return
     with open(filepath) as f:
