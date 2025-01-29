@@ -1,7 +1,3 @@
-## 3.1
-
-- Adds the `copy`, and supporting `sas_tokens`, modules for copying files across ADLS storage locations.
-
 # 3.0
 
 - Remove deprecated `adls.link` alias for `core`.
