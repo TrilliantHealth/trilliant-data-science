@@ -87,7 +87,7 @@ class DotDict(dict, MutableMapping[str, VT]):
             self._construct(mapping=kwargs)
 
     def __getattr__(self, attr) -> VT:
-        return self.get(attr)
+        return self[attr]
 
     def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
@@ -128,7 +128,6 @@ class DotDict(dict, MutableMapping[str, VT]):
         path = dot_path.split(".")
         ref: DotDict[Any] = self
         for k in path[:-1]:
-            print(k, path[:-1], ref)
             if isinstance(ref, DotDict) and k in ref:
                 ref = ref[k]
             else:
