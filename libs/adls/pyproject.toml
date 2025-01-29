@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "thds.adls"
-version = "3.1"
+version = "3.0"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 authors = ["Trilliant Health"]
