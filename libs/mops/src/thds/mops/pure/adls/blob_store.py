@@ -1,4 +1,4 @@
-"""This abstraction matches what is required by the BlobStore abstraction in remote.core.uris"""
+"""This abstraction matches what is required by the BlobStore abstraction in pure.core.uris"""
 
 import logging
 import typing as ty

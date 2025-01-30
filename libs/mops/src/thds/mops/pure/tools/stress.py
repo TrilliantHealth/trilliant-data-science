@@ -3,6 +3,7 @@ import time
 import typing as ty
 from timeit import default_timer
 
+from thds.adls.defaults import mops_root
 from thds.core.log import getLogger
 from thds.mops._utils.colorize import colorized
 from thds.mops.config import max_concurrent_network_ops
@@ -20,7 +21,7 @@ def _subprocess_remote(args_list):
     logger.info("Completed 'remote' runner")
 
 
-runner = MemoizingPicklingRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
+runner = MemoizingPicklingRunner(_subprocess_remote, mops_root)
 adls_shell = use_runner(runner)
 
 
