@@ -86,8 +86,8 @@ class DotDict(dict, MutableMapping[str, VT]):
         if kwargs:
             self._construct(mapping=kwargs)
 
-    def __getattr__(self, attr):
-        return self.get(attr)
+    def __getattr__(self, key: str) -> VT:
+        return self[key]
 
     def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
