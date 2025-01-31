@@ -4,7 +4,7 @@ name = "thds.mops"
 version = "3.6"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
-readme = "README.adoc"
+readme = "docs/pypi_readme.md"
 packages = [{include = "thds", from="src"}]
 include = [
     "py.typed",
