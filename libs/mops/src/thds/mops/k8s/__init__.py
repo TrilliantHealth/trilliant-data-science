@@ -7,7 +7,6 @@ except ModuleNotFoundError as mnf:
         "Please install mops with the `k8s` extra to use `thds.mops.k8s`."
     ) from mnf
 
-from . import thds_std  # noqa: F401
 from .container_registry import autocr  # noqa: F401
 from .launch import K8sJobFailedError, launch, mops_shell  # noqa
 from .node_selection import (  # noqa
@@ -18,3 +17,8 @@ from .node_selection import (  # noqa
     tolerates_gpu,
     tolerates_spot,
 )
+
+try:
+    from . import thds_std  # noqa: F401
+except ModuleNotFoundError:
+    pass
