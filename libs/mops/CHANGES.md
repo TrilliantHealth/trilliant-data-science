@@ -1,3 +1,11 @@
+### 3.5
+
+- Never completely clear the cache of previously-observed K8s Objects during `watch`. Instead, manually
+  track the times of updates we receive from the API, both overall and per object. Previously seen
+  objects can now eventually go stale, but we'll see fewer false 'disappearances' when the K8s API is
+  under heavy load.
+- Improve a few internal names and an exception message.
+
 ### 3.4.20241204
 
 - Fix bug where a `Source` object created using `from_file(a_path, uri='adls://...')` did not properly

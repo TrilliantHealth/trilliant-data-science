@@ -13,7 +13,7 @@ from ..._utils.colorize import colorized
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.partial import unwrap_partial
-from ..core.types import Args, Kwargs, NoResultAfterInvocationError, T
+from ..core.types import Args, Kwargs, NoResultAfterShellSuccess, T
 from ..tools.summarize import run_summary
 from . import strings, types
 
@@ -45,7 +45,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
     run_directory: ty.Optional[Path] = None,
 ) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], T]:
     @scope.bound
-    def run_shell_via_blob_store_(
+    def create_invocation__check_result__wait_shell(
         rerun_exceptions: bool,
         function_memospace: str,
         # by allowing the caller to set the function memospace, we allow 'redirects' to look up an old result by name.
@@ -54,6 +54,15 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         args_: Args,
         kwargs_: Kwargs,
     ) -> T:
+        """This is the generic local runner. Its core abstractions are:
+
+        - serializers of some sort (for the function and its arguments)
+        - a shell of some sort (can start a Python process somewhere else)
+        - a result and metadata deserializer
+        - URIs that are supported by a registered BlobStore implementation.
+
+        It uses a mops-internal locking mechanism to prevent concurrent invocations for the same function+args.
+        """
         invoked_at = datetime.now(tz=timezone.utc)
         # capture immediately, because many things may delay actual start.
         storage_root = uris.get_root(function_memospace)
@@ -222,7 +231,9 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
             if not value_or_error:
                 if shell_ex:
                     raise shell_ex  # re-raise the underlying exception rather than making up our own.
-                raise NoResultAfterInvocationError(memo_uri)
+                raise NoResultAfterShellSuccess(
+                    f"The shell for {memo_uri} exited cleanly, but no result or exception was found."
+                )
             return unwrap_value_or_error(ResultAndInvocationType(value_or_error, "invoked"))
 
-    return run_shell_via_blob_store_
+    return create_invocation__check_result__wait_shell
