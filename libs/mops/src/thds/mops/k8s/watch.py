@@ -2,6 +2,7 @@
 
 This is a general-purpose fix for using watchers in a thread reliably.
 """
+
 import threading
 import time
 import typing as ty
@@ -63,8 +64,9 @@ def yield_objects_from_list(
             logger.debug(
                 f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}"
             )
-            for item in initial_list.items:
-                yield namespace, item
+            for object in initial_list.items:
+                yield namespace, object
+
             if initial_list.metadata._continue:
                 logger.warning(
                     f"We did not fetch the whole list of {object_type_hint} the first time..."
@@ -135,6 +137,20 @@ class OneShotLimiter:
             self._names.add(name)
 
 
+def is_stale(api_last_update_time: float, obj_last_seen_time: float) -> bool:
+    now = time.monotonic()
+    allowed_stale_seconds = config.k8s_watch_object_stale_seconds()
+    if (time_since_api_update := now - api_last_update_time) > allowed_stale_seconds:  # noqa: F841
+        # we haven't heard anything from the API in a while; probably
+        # the API is down. Ignore object staleness to avoid false positives.
+        return False
+
+    if not obj_last_seen_time:
+        return False  # false positives aren't worth it
+
+    return (time_since_obj_update := now - obj_last_seen_time) > allowed_stale_seconds  # noqa: F841
+
+
 class WatchingObjectSource(ty.Generic[T]):
     """Efficiently 'get' objects by reliably watching for changes to all such objects in a given namespace.
 
@@ -163,6 +179,8 @@ class WatchingObjectSource(ty.Generic[T]):
         # this class if you can't afford the memory overhead of
         # observing everything in your namespace and keeping the last
         # known copy of everything forever.
+        self._last_seen_time_by_name: ty.Dict[str, float] = dict()
+        self._last_api_update_time = 0.0
         self._limiter = OneShotLimiter()
 
     def _start_thread(self, namespace: str):
@@ -180,12 +198,17 @@ class WatchingObjectSource(ty.Generic[T]):
             daemon=True,
         ).start()
 
-    def _add_object(self, namespace: str, obj: T):
+    def _add_object(self, namespace: str, obj: T) -> None:
+        """This is where we receive updates from the k8s API."""
+        self._last_api_update_time = time.monotonic()
+
         if not obj:
             logger.warning(f"Received null/empty {self.typename}")
             return
+
         name = _make_name(namespace, self.get_name(obj))
         logger.debug(f"{self.typename} {name} updated")
+        self._last_seen_time_by_name[name] = time.monotonic()
         self._objs_by_name[name] = obj
 
     def _get_list_method_on_restart(self, namespace: str, exc: ty.Optional[Exception]):
@@ -197,29 +220,45 @@ class WatchingObjectSource(ty.Generic[T]):
                 time.sleep(config.k8s_monitor_delay())
                 suffix = f" after {type(exc).__name__}: {exc}"
                 logger.info(f"Watching {self.typename}s in namespace: {namespace}{suffix}")
-        self._objs_by_name = dict()  # clear the whole cache
         return self.get_list_method(namespace, exc)
+
+    def _is_stale(self, name: str) -> bool:
+        return is_stale(self._last_api_update_time, self._last_seen_time_by_name.get(name) or 0)
 
     @scope.bound
     def get(self, obj_name: str, namespace: str = "") -> ty.Optional[T]:
         namespace = namespace or config.k8s_namespace()
         name = _make_name(namespace, obj_name)
         scope.enter(logger_context(name=obj_name, namespace=namespace))
-        if name in self._objs_by_name:
-            return self._objs_by_name[name]
 
+        # first try is looking in our local cache
+        if (obj := self._objs_by_name.get(name)) and not self._is_stale(name):
+            return obj
+
+        # second try is making sure the namespace watcher is running, sleeping, and then looking in the cache again.
+        # This is much more efficient than a manual fetch.
         self._limiter(namespace, self._start_thread)
         time.sleep(config.k8s_monitor_delay())
-        if name in self._objs_by_name:
-            # here
-            return self._objs_by_name[name]
+        if (obj := self._objs_by_name.get(name)) and not self._is_stale(name):
+            return obj
 
+        # if that doesn't work, try a manual fetch.
         if self.backup_fetch:
-            logger.info(f"Manually fetching {self.typename}...")
+            logger.warning(f"Manually fetching {self.typename}...")
+            # doing a lot of manual fetches may indicate that the k8s API is having trouble keeping up...
             try:
-                obj = self.backup_fetch(namespace, obj_name)
-                if obj:
-                    return self._add_object(namespace, obj)
+                if obj := self.backup_fetch(namespace, obj_name):
+                    self._add_object(namespace, obj)  # updates last seen, too
+                    return obj
+
             except Exception:
                 logger.exception(f"Unexpected error during manual fetch of {self.typename}.")
+
+        if self._is_stale(name):
+            logger.warning(
+                f"Could not refresh {name}, and our record of it is stale - dropping stale object!"
+            )
+            self._objs_by_name.pop(name, None)
+            self._last_seen_time_by_name.pop(name, None)
+
         return None
