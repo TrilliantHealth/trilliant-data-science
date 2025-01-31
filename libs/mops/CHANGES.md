@@ -177,7 +177,7 @@
 - `pipeline-id-mask` in function docstrings will now get applied automatically as long as no other mask
   has been defined. This reduces the boilerplate necessary to use the pipeline id mask concept.
 - You can globally register handlers that can modify the
-  [pipeline memospace](docs/memoization.md#memospace-parts) for a programatically-derived subset of
+  [pipeline memospace](docs/memoization.adoc#memospace-parts) for a programatically-derived subset of
   functions. See `pure.add_pipeline_memospace_handlers` and the provided default implementation,
   `pure.matching_mask_pipeline_id`, which is meant to allow you to override/mask the pipeline id using
   regexes that `re.match` (not `fullmatch`) the fully qualified module path for your functions, e.g.
@@ -189,7 +189,7 @@
 ## 2.3
 
 - `KeyedLocalRunner` provides a memoizing-only interface that acts like a memo-key-selector over top of
-  `MemoizingPicklingRunner`. See [Advanced Memoization](docs/advanced_memoization.md) for details.
+  `MemoizingPicklingRunner`. See [Advanced Memoization](docs/advanced_memoization.adoc) for details.
 
 ## 2.2
 

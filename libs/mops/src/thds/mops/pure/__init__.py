@@ -17,9 +17,11 @@ from .core.source import create_source_at_uri  # noqa
 from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable, register_blob_store  # noqa
 from .core.use_runner import use_runner  # noqa
-from .pickling.memoize_only import memoize_in  # noqa
+from .pickling.memoize_only import memoize_in, subprocess_shell  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
 from .runner import Shell, ShellBuilder  # noqa
+
+MPR = MemoizingPicklingRunner  # an alias for the lazy
 
 
 def _register_things():

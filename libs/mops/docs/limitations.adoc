@@ -1,0 +1,30 @@
+link:../README.adoc[↑]
+
+## Limitations
+
+### ADLS-first
+
+Azure Data Lake Storage is the only cloud blob store for which we provide an implementation - and if your remote runner can't access the same blob store as the local, then `mops` cannot transfer the execution there (and the result back). The library itself
+allows other blob store implementations (following the interface defined in link:../src/thds/mops/pure/core/types.py[core/types] to be registered upon installation as an `importlib.metadata` entrypoint - `thds.mops.pure.blob_stores`. See link:../src/thds/mops/pure/core/uris.py[core/uris] for the required plugin interface.
+
+NOTE: Our ADLS blob store implementation has evolved currently with `mops` - it uses a machine-global read-only cache with MD5 hash invalidation, as well as other optimizations. A naive implementation of a different blob store will work as long as it is threadsafe, but you may encounter inefficiencies (e.g. re-downloads), as `mops` leaves this sort of optimization as an exercise for the upstream implementation.
+
+### Network bottlenecks
+
+This library (and our ADLS blob store implementation) has improved over time, but over years of use we have observed that while you can orchestrate
+ workloads of up to ~1000 concurrently-running functions against ADLS just fine, larger workloads (tens of thousands of `use_runner`
+calls simultaneously) may be difficult to manage over a network connection between your laptop and the
+Azure datacenters, causing spurious authentication, connection timeout, and other network errors. If you
+start running into these issues, we recommend the approach of launching the orchestrator process on the 'inside' of an Azure
+datacenter - on a link:./kubernetes.adoc#orchestrator-pods[pod inside] the Kubernetes cluster.
+
+### No specific semantics for DAGs
+
+This is both a limitation and a feature. `mops` encourages you to provide your own Python-based
+link:./orchestrator.adoc#concurrency[control flow between concurrent tasks], meaning that you can write code
+like code, rather than code like config.
+
+However, if you're in a situation where you absolutely can't live without some kind of DAG runner, `mops`
+won't provide that for you. Happily, it _will_ stay out of your way and allow you to wrap any
+sufficiently capable DAG runner around it, while allowing you to reap the benefits of
+link:./memoization.adoc[memoization] and efficient transfer of control to the remote runtime.

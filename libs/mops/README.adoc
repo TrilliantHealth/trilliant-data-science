@@ -1,0 +1,58 @@
+# `mops`
+
+`mops` is a Python library for ML Operations.
+
+Jump to link:docs/quickstart.adoc[Quickstart] if +++<del>+++you're impatient+++</del>+++ prefer examples, like me!
+
+`mops` solves for three core issues:
+
+* Transfer of link:docs/pure_functions.adoc[pure] function execution to link:docs/remote.adoc[remote] execution environments with more &|
+  different compute resources
+* link:docs/optimizations.adoc[Efficient] transfer of large blob data to/from other environments.
+* link:docs/memoization.adoc[Memoization] — i.e. _reproducibility and fault tolerance_ — for individual functions.
+
+It is used by link:docs/basic_usage.adoc[decorating or wrapping your pure function and then calling it] like a normal function.
+
+
+## Requirements
+
+* Python >= 3.8
+* itself to be installed in the link:docs/remote.adoc[remote] execution context as well as in the
+  link:docs/orchestrator.adoc[local] environment.
+* link:docs/pure_functions.adoc['pure' functions]
+* your function and its arguments to be link:docs/serialization.adoc[serializable] with `pickle`.
+* ADLS access on the link:docs/orchestrator.adoc[local/orchestrator] and the link:docs/remote.adoc[remote] runtime.
+
+It is usually used with remote compute on:
+
+* link:docs/kubernetes.adoc[Kubernetes], with code distributed as a Docker image
+
+---or---
+
+* link:../../libs/dbxtend/README.md[dbxtend] (currently internal-only), with code distributed to Databricks as Python wheels.
+
+It optionally integrates with:
+
+* https://joblib.readthedocs.io/en/latest[`joblib`] for local parallelism.
+
+## Limitations
+
+It has some link:docs/limitations.adoc[limitations].
+
+## Tools & Debugging
+
+* link:docs/tools.adoc[Here are some tools for debugging] your functions that are running under `mops`.
+
+## Development
+
+If making changes to the library, please bump the version in `pyproject.toml` accordingly.
+
+Also look at our link:CHANGES.md[changelog].
+
+### Running tests
+
+* `poetry run pytest tests`
+
+To run integration tests against a remote blob store, you'll need to set up some configuration. TODO explain config.
+
+* `poetry run pytest tests -m integration`
