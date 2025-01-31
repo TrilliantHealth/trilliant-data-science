@@ -128,7 +128,6 @@ class DotDict(dict, MutableMapping[str, VT]):
         path = dot_path.split(".")
         ref: DotDict[Any] = self
         for k in path[:-1]:
-            print(k, path[:-1], ref)
             if isinstance(ref, DotDict) and k in ref:
                 ref = ref[k]
             else:
