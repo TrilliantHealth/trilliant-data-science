@@ -4,6 +4,7 @@ computation derives no advantage from not running locally
 (i.e. exhibits no parallelism) but you still want memoization.
 """
 
+import subprocess
 from typing import Callable, Sequence
 
 from thds.core.log import getLogger
@@ -37,3 +38,7 @@ def memoize_in(uri_resolvable: UriResolvable) -> Callable[[F], F]:
     the default for `use_runner`.
     """
     return use_runner(MemoizingPicklingRunner(_threadlocal_shell, uri_resolvable))
+
+
+def subprocess_shell(shell_args: Sequence[str]) -> None:
+    subprocess.check_call(["python", "-m", "thds.mops.pure.core.entry.main", *shell_args])

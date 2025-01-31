@@ -1,6 +1,7 @@
 import importlib.metadata
 import io
 import typing as ty
+from pathlib import Path
 from typing import Callable, Union
 
 from thds.adls import AdlsFqn, AdlsRoot
@@ -47,11 +48,13 @@ def get_root(uri: str) -> str:
     return blob_store.control_root(uri)
 
 
-UriIsh = Union[AdlsRoot, AdlsFqn, str]
+UriIsh = Union[AdlsRoot, AdlsFqn, str, Path]
 UriResolvable = Union[UriIsh, Callable[[], UriIsh]]
 
 
 def to_lazy_uri(resolvable: UriResolvable) -> Callable[[], str]:
+    if isinstance(resolvable, Path):
+        return lambda: str(resolvable.resolve())
     if isinstance(resolvable, (str, AdlsRoot, AdlsFqn)):
         return lambda: str(resolvable)
     if callable(resolvable):

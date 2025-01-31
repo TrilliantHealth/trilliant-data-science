@@ -1,3 +1,5 @@
+link:optimizations.adoc[↑]
+
 # Non-optimized large-file sources and sinks via `pathlib.Path` (deprecated)
 
 **Use `pathlib.Path` and get files (but not directories) transferred automagically.**

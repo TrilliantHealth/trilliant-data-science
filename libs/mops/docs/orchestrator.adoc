@@ -1,15 +1,17 @@
+link:../README.adoc[↑]
+
 # What is an orchestrator?
 
-Simply put, it's a process that tells [other processes](./remote.md) what to do. Often, it then collects
+Simply put, it's a process that tells link:./remote.adoc[other processes] what to do. Often, it then collects
 results from those processes and organizes them, or sends those results to other processes for another
 round of orchestrated task completion.
 
 A good internal example of an orchestrator is
-[`demand-forecast`](https://github.com/TrilliantHealth/demand-forecast), which orchestrates the
+link:../../../apps/demand-forecast[`demand-forecast`], which orchestrates the
 extraction of various slices of Unified Asset data, then orchestrates the training of various models on
 that data, and then orchestrates prediction/forecast based on those models.
 
-Pyspark code is usually a form of orchestration, though it acts at a somewhat higher level than `mops`,
+As an analogy, PySpark code is usually a form of orchestration, though it acts at a somewhat higher level than `mops`,
 since your Spark code will often go through a query planner of some sort before the underlying tasks are
 generated. `mops` takes a lower-level approach that assumes you already have known tasks that you want to
 execute, and that you're willing to write your own code to 'plan' or 'order' their execution.

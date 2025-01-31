@@ -1,17 +1,14 @@
+link:../README.adoc[↑]
+
 # Configuring `mops`
 
-`mops` ships with a limited set of default config that is generally suitable for data science at
-Trilliant Health. This includes basic information about where our [Kubernetes](./kubernetes.md) cluster
-is (should you need to use that), and some default timeouts.
-
-This configuration file is [TOML](https://toml.io/en/), and if you wish to configure `mops` differently,
-there are _several_ [different](../src/thds/mops/config.py) approaches that you can take, depending on
+We use a https://toml.io/en/[TOML] configuration file format, and if you wish to configure `mops` differently,
+there are _several_ link:../src/thds/mops/config.py[different] approaches that you can take, depending on
 which is most convenient for your use case.
 
 ## standalone TOML config
 
-Create a `mops`-only TOML config file, and make sure it includes, at a minimum, values for the keys
-defined in the default [`thds.mops.east_config.toml`](../src/thds/mops/east_config.toml).
+Create a `mops`-only TOML config file.
 
 ### MOPS_CONFIG
 
@@ -37,8 +34,8 @@ have a nested Python dictionary that corresponds to the multilevel config table 
 per-thread/async coroutine level. It provides a context manager for configuration that will allow you to
 set the config for all code called 'below' your `with` statement, like so:
 
-```python
-
+[source,python]
+----
 with mops.config.set_config("mops", "k8s", "namespace")(your_value):
     call_some_func()
 	do_more_stuff()
@@ -47,4 +44,4 @@ with mops.config.set_config("mops", "k8s", "namespace")(your_value):
 	# will see whatever the previously-configured value is.
 	...
 use_original_config()  # and this will not see the configured value from above
-```
+----
