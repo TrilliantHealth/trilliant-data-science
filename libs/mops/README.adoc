@@ -52,8 +52,8 @@ Also look at our link:CHANGES.md[changelog].
 
 ### Running tests
 
-* `poetry run pytest tests`
+* `poetry run pytest tests --test-uri-root file://./mops-tests`
+* `poetry run pytest tests -m integration --test-uri-root file://./mops-tests`
 
-To run integration tests against a remote blob store, you'll need to set up some configuration. TODO explain config.
-
-* `poetry run pytest tests -m integration`
+If you want to run tests against a non-bundled blob store, you will need to make sure that
+blob store is installed in the venv before running the tests.

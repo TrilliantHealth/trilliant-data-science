@@ -95,7 +95,7 @@ module = ["azure.storage.filedatalake.*"]
 follow_imports = "skip"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/test_mops"]
 addopts = "-v -s"
 markers = ["integration"]
 

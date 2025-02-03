@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from thds.core import config
+from thds.mops.pure.core import uris
 from thds.mops.pure.core.memo.function_memospace import (
     make_function_memospace,
     make_unique_name_including_docstring_key,
@@ -21,12 +24,23 @@ def broken_mul(a: int, b: float) -> float:
 
 _NO_REDIRECT = lambda f, _args, _kwargs: f  # noqa: E731
 
+_RESULT_PATH = Path(__file__).parent / "reuse_memoized_via_config.pickle"
+assert _RESULT_PATH.exists(), f"Need to create the file {_RESULT_PATH} first."
+
 
 def test_reuse_memoized_via_config():
     func_uri = (
         f"{TEST_TMP_URI}mops2-mpf/test/some-pipeline-id"
         f"/{make_unique_name_including_docstring_key(mul)}"
     )
+
+    # setting up the 'memoized' result
+    bs = uris.lookup_blob_store(func_uri)
+    # this memo key is also testing stablity of our hash function
+    result_uri = bs.join(func_uri, "SplitJarBlame.YZ6G93_dqAf2i9EB71jA0aQunEZOCFeOjXpd2gs", "result")
+    if not bs.exists(result_uri):
+        bs.putfile(_RESULT_PATH, result_uri)
+    # end setup
 
     def shell_builder(f, _args, _kwargs):
         return _subprocess_remote
