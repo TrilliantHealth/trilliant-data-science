@@ -172,3 +172,37 @@ def test_get_table_schema_with_connectable(_base_test_db: sqlite3.Connection, tm
     schema = get_table_schema(db_path, "test")
     expected_schema = {"id": "integer", "name": "text"}
     assert schema == expected_schema
+
+
+def test_format_bad_data():
+    import textwrap
+
+    from thds.core.sqlite.write import _format_bad_data
+
+    assert (
+        _format_bad_data(("foobar", 3, 1.2))
+        == textwrap.dedent(
+            """
+    COL 1: foobar
+           <class 'str'>
+    COL 2: 3
+           <class 'int'>
+    COL 3: 1.2
+           <class 'float'>
+    """
+        ).strip()
+    )
+
+    assert (
+        _format_bad_data(dict(a="foobar", b=3, c=1.2))
+        == textwrap.dedent(
+            """
+    COL a: foobar
+           <class 'str'>
+    COL b: 3
+           <class 'int'>
+    COL c: 1.2
+           <class 'float'>
+    """
+        ).strip()
+    )
