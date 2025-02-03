@@ -7,6 +7,9 @@ from ...config import TEST_TMP_URI
 
 
 def test_get_bytes_better_blob_not_found():
+    if not TEST_TMP_URI.startswith("adls://"):
+        pytest.skip("This test is only for ADLS.")
+
     with pytest.raises(
         BlobNotFoundError,
         match=f"Blob not found: {TEST_TMP_URI}path-that-should-never-ever-ever-exist.hex",

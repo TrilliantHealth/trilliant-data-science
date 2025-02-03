@@ -104,7 +104,7 @@ disallow_untyped_calls = false
 disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/test_mops"]
 addopts = "-v -s"
 markers = ["integration"]
 
