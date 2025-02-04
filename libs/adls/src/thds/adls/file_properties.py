@@ -24,6 +24,11 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
     )
 
 
+# At some point it may make sense to separate file and blob property modules,
+# but they also are very closely tied together. AFAIK all files are blobs, and given our usage of ADLS,
+# I don't know if we ever deal with things that are blobs but not files.
+
+
 def exists(fqn: AdlsFqn) -> bool:
     try:
         get_blob_properties(fqn)
