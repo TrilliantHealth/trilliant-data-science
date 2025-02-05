@@ -1,9 +1,11 @@
-# This module is the supported interface and everything not exported here is subject to change.
+# This module is the supported interface and everything not exported here is subject to
+# backward-incompatible change without notice.
 #
 # The single exception is the joblib module, which is not exported by default
 # to avoid requiring the additional dependency.
 
 from . import adls  # noqa
+from ._magic import magic  # noqa
 from .core.entry import register_entry_handler
 from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa
@@ -17,11 +19,10 @@ from .core.source import create_source_at_uri  # noqa
 from .core.types import Args, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable, register_blob_store  # noqa
 from .core.use_runner import use_runner  # noqa
-from .pickling.memoize_only import memoize_in, subprocess_shell  # noqa
+from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
 from .runner import Shell, ShellBuilder  # noqa
-
-MPR = MemoizingPicklingRunner  # an alias for the lazy
+from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
 
 
 def _register_things():

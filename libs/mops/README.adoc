@@ -12,7 +12,7 @@ Jump to link:docs/quickstart.adoc[Quickstart] if +++<del>+++you're impatient+++<
 * link:docs/memoization.adoc[Memoization] — i.e. _reproducibility and fault tolerance_ — for individual functions.
 * Droppability: `mops` shouldn't entangle itself with your code, and you should always be able to run your code with or without `mops` in the loop.
 
-It is used by link:docs/basic_usage.adoc[decorating or wrapping your pure function and then calling it] like a normal function.
+It is used by link:docs/magic.adoc[decorating or wrapping your pure function and then calling it] like a normal function.
 
 
 ## Requirements

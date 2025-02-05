@@ -30,6 +30,7 @@ ansicolors = "*"
 azure-core = "*"
 azure-identity = "*"
 azure-storage-file-datalake = "*"
+# TODO make azure-* an extra; it's not _truly_ required except by our import structure.
 cachetools = "*"
 tomli = "*"
 
