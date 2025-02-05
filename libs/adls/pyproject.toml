@@ -65,11 +65,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = [
-    "aiostream",
-    "azure",
-    "setuptools",
-]
+module = ["azure"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
