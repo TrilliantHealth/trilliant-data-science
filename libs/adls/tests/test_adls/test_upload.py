@@ -17,7 +17,11 @@ def test_basic_upload_without_cache(caplog):
     with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
         # synchronous file not found
         assert upload_decision_and_settings(
-            get_global_fs_client(fs.account_name, fs.file_system).get_file_client(remote_path),
+            get_global_fs_client(  # type: ignore[arg-type]
+                # TODO - look at above type ignore
+                fs.account_name,
+                fs.file_system,
+            ).get_file_client(remote_path),
             HW,
         ).upload_required
         assert "Too small to bother" in caplog.text
@@ -43,9 +47,9 @@ def test_basic_upload_without_cache(caplog):
         with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
             # synchronous bytes don't match
             assert upload_decision_and_settings(
-                get_global_fs_client(fs.account_name, fs.file_system)
-                .get_file_client(remote_path)
-                .get_file_properties,
+                get_global_fs_client(fs.account_name, fs.file_system)  # type: ignore[arg-type]
+                # TODO - look at above type ignore
+                .get_file_client(remote_path).get_file_properties,
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required

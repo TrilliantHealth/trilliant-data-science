@@ -180,6 +180,7 @@ async def test_file_missing_md5_gets_one_assigned_after_download(
     assert not cache_hit
 
     fp = await file_client.get_file_properties()
+    assert fp.content_settings.content_md5
     assert b64(fp.content_settings.content_md5) == "8Wz15VCq6d73Z0+KUDNqVg=="
 
     # should not error since the md5 should be correct
