@@ -492,7 +492,7 @@ class ADLSFileSystem:
         file_system_client: FileSystemClient,
         remote_paths: Iterable[str],
         batch_size: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[FileProperties]:
         """Returns a list of `FileProperties` for each file in a list of remote file paths.
 
         See :meth:`~ADLSFileSystem.get_files_info` for more details.
@@ -691,10 +691,11 @@ class ADLSFileSystem:
         self, it: AsyncIterable[T], size: Optional[int] = None
     ) -> AsyncIterator[List[T]]:
         """Async batch generator"""
+        # TODO - look at type ignores here
         batch_size = size if size is not None else self.default_batch_size
-        async with stream.chunks(it, batch_size).stream() as streamer:
+        async with stream.chunks(it, batch_size).stream() as streamer:  # type: ignore[arg-type]
             async for chunk in streamer:
-                yield chunk
+                yield chunk  # type: ignore[misc]
 
     def fetch_files(self, remote_paths: Union[Iterable[str], Mapping[str, Union[Path, str]]]):
         return self._run(self._fetch_files, remote_paths)
