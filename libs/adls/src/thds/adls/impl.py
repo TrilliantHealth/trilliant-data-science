@@ -693,7 +693,7 @@ class ADLSFileSystem:
         """Async batch generator"""
         # TODO - look at type ignores here
         batch_size = size if size is not None else self.default_batch_size
-        async with stream.chunks(it, batch_size).stream() as streamer:  # type: ignore[arg-type]
+        async with stream.chunks(it, batch_size).stream() as streamer:  # type: ignore[arg-type,var-annotated]
             async for chunk in streamer:
                 yield chunk  # type: ignore[misc]
 
