@@ -62,9 +62,5 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
-[[tool.mypy.overrides]]
-module = ["setuptools"]
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
