@@ -4,28 +4,16 @@ computation derives no advantage from not running locally
 (i.e. exhibits no parallelism) but you still want memoization.
 """
 
-import subprocess
-from typing import Callable, Sequence
+from typing import Callable
 
-from thds.core.log import getLogger
-
-from ..core.entry.runner_registry import run_named_entry_handler
 from ..core.types import F
 from ..core.uris import UriResolvable
 from ..core.use_runner import use_runner
+from ..runner import simple_shims
 from .mprunner import MemoizingPicklingRunner
 
-logger = getLogger(__name__)
 
-
-def _threadlocal_shell(shell_args: Sequence[str]) -> None:
-    """Use this inside a memoizing Runner to get the memoization
-    without needing to transfer control to an external process.
-    """
-    logger.info("Running a use_runner function locally in the current thread.")
-    run_named_entry_handler(*shell_args)
-
-
+# this may soon become deprecated in favor of mops.pure.magic(blob_root=...)
 def memoize_in(uri_resolvable: UriResolvable) -> Callable[[F], F]:
     """A decorator that makes a function globally-memoizable, but running in the current
     thread.
@@ -37,8 +25,4 @@ def memoize_in(uri_resolvable: UriResolvable) -> Callable[[F], F]:
     This enables nested memoized function calls, which is not (yet)
     the default for `use_runner`.
     """
-    return use_runner(MemoizingPicklingRunner(_threadlocal_shell, uri_resolvable))
-
-
-def subprocess_shell(shell_args: Sequence[str]) -> None:
-    subprocess.check_call(["python", "-m", "thds.mops.pure.core.entry.main", *shell_args])
+    return use_runner(MemoizingPicklingRunner(simple_shims.samethread_shim, uri_resolvable))

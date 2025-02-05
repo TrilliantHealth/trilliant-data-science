@@ -1,5 +1,7 @@
 ## 3.6
 
+- [New `pure.magic` API for `mops`](docs/magic.adoc). A collection of lessons learned and long wished-for
+  bits of developer-friendliness.
 - `BlobStore` implementations can now be registered dynamically, or as a `thds.mops.pure.blob_stores`
   entrypoint (via `importlib.metadata`). As before, a BlobStore is chosen by matching a URI.
 

@@ -9,7 +9,7 @@ from kubernetes import client
 
 from thds.core import scope
 from thds.core.log import logger_context
-from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
+from thds.mops.pure.runner.simple_shims import samethread_shim
 
 from .._utils.colorize import colorized
 from . import config
@@ -216,7 +216,7 @@ def mops_shell(
     ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
 
     if disable_remote():
-        return _threadlocal_shell
+        return samethread_shim
 
     if isinstance(container_image, str):
         get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731
