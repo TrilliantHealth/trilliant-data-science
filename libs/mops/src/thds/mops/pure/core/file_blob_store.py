@@ -10,7 +10,7 @@ from thds.core.link import link
 
 from ..core.types import AnyStrSrc, BlobStore
 
-MOPS_CONTROL_ROOT = config.item("control_root", default=Path.home() / ".mops-local-root")
+MOPS_ROOT = config.item("control_root", default=Path.home() / ".mops")
 logger = log.getLogger(__name__)
 
 
@@ -56,7 +56,7 @@ def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc):
 
 class FileBlobStore(BlobStore):
     def control_root(self, uri: str) -> str:
-        local_root = MOPS_CONTROL_ROOT()
+        local_root = MOPS_ROOT()
         local_root.mkdir(exist_ok=True)
         return to_uri(local_root)
 
