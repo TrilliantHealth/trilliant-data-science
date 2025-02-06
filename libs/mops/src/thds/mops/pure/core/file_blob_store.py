@@ -61,12 +61,10 @@ class FileBlobStore(BlobStore):
         return to_uri(local_root)
 
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
-        assert remote_uri.startswith(FILE_SCHEME)
         with path_from_uri(remote_uri).open("rb") as f:
             shutil.copyfileobj(f, stream)  # type: ignore
 
     def getfile(self, remote_uri: str) -> Path:
-        assert remote_uri.startswith(FILE_SCHEME)
         p = path_from_uri(remote_uri)
         if not p.exists():
             logger.error(f"{remote_uri} does not exist. Parent = {p.parent}")
@@ -83,11 +81,9 @@ class FileBlobStore(BlobStore):
         _put_bytes_to_file_uri(remote_uri, data)
 
     def putfile(self, path: Path, remote_uri: str):
-        assert remote_uri.startswith(FILE_SCHEME)
         _link(path, remote_uri)
 
     def exists(self, remote_uri: str) -> bool:
-        assert remote_uri.startswith(FILE_SCHEME)
         return path_from_uri(remote_uri).exists()
 
     def join(self, *parts: str) -> str:
@@ -95,8 +91,6 @@ class FileBlobStore(BlobStore):
 
     def split(self, uri: str) -> ty.List[str]:
         """Splits a given URI into its constituent parts"""
-        assert uri.startswith(FILE_SCHEME)
-
         path = remove_file_scheme(uri)
         # normalize the path to handle redundant slashes
         normalized_path = os.path.normpath(path)
@@ -114,8 +108,15 @@ class FileBlobStore(BlobStore):
         return isinstance(exc, FileNotFoundError)
 
 
+_STATELESS_BLOB_STORE = FileBlobStore()
+
+
 def get_file_blob_store(uri: str) -> ty.Optional[FileBlobStore]:
     if uri.startswith(FILE_SCHEME):
-        return FileBlobStore()
+        return _STATELESS_BLOB_STORE
 
-    return None
+    # special case for things where somebody forgot the file:// scheme.
+    # we're the 'first' registered blob store, so we're the last ones to be asked
+    # and this shouldn't cause a significant performance penalty since everything else
+    # with a scheme will get picked up first.
+    return _STATELESS_BLOB_STORE

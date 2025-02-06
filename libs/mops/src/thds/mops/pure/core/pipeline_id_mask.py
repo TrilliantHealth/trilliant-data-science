@@ -51,7 +51,9 @@ def pipeline_id_mask(pipeline_id: str) -> ty.Iterator[bool]:
 
 
 F = ty.TypeVar("F", bound=ty.Callable)
-_DOCSTRING_MASK_RE = re.compile(r".*pipeline-id-mask:\s*(?P<mask>[^\s]+)\b", re.DOTALL)
+_DOCSTRING_MASK_RE = re.compile(r".*pipeline-id(?:-mask)?:\s*(?P<pipeline_id>[^\s]+)\b", re.DOTALL)
+# for backward-compatibility, we support pipeline-id-mask, even though the clearer name is
+# ultimately pipeline-id.
 
 
 @lru_cache(maxsize=32)
@@ -59,16 +61,16 @@ def extract_mask_from_docstr(func: F, require: bool = True) -> str:
     if not func.__doc__:
         if not require:
             return ""
-        raise ValueError(f"Function {func} must have a non-empty docstring to extract pipeline-id-mask")
+        raise ValueError(f"Function {func} must have a non-empty docstring to extract pipeline-id")
     m = _DOCSTRING_MASK_RE.match(func.__doc__)
     if not m:
-        if "pipeline-id-mask:" in func.__doc__:
-            raise ValueError("pipeline-id-mask is present but empty - this is probably an accident")
+        if "pipeline-id:" in func.__doc__ or "pipeline-id-mask:" in func.__doc__:
+            raise ValueError("pipeline-id is present but empty - this is probably an accident")
         if not require:
             return ""
-        raise ValueError(f"Cannot extract pipeline-id-mask from docstring for {func}")
-    mask = m.group("mask")
-    assert mask, "pipeline-id-mask should not have matched if it is empty"
+        raise ValueError(f"Cannot extract pipeline-id from docstring for {func}")
+    mask = m.group("pipeline_id")
+    assert mask, "pipeline-id should not have matched if it is empty"
     return mask
 
 

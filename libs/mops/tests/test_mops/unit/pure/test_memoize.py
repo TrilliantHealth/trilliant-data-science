@@ -38,7 +38,7 @@ def test_that_empty_pipeline_id_has_no_masking_effect():
 
 def in_docstring():
     """
-    pipeline-id-mask: WOO
+    pipeline-id: WOO
     """
     pass
 
@@ -57,7 +57,7 @@ def test_extract_failure_is_not_an_option():
     def no_key():
         """stuff but no pipeline id mask"""
 
-    with pytest.raises(ValueError, match="Cannot extract pipeline-id-mask"):
+    with pytest.raises(ValueError, match="Cannot extract pipeline-id"):
         extract_mask_from_docstr(no_key)
     with pytest.raises(ValueError, match="non-empty docstring"):
         extract_mask_from_docstr(fx)
@@ -67,7 +67,7 @@ def test_extract_failure_is_not_an_option():
         pipeline-id-mask:
         """
 
-    with pytest.raises(ValueError, match="pipeline-id-mask is present but empty"):
+    with pytest.raises(ValueError, match="pipeline-id is present but empty"):
         extract_mask_from_docstr(empty)
 
 

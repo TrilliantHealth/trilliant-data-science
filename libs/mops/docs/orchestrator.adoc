@@ -20,7 +20,7 @@ execute, and that you're willing to write your own code to 'plan' or 'order' the
 
 ### Concurrency
 
-When running many `use_runner` functions concurrently, you should prefer to use **threads** rather than
+When running many `mops.pure` functions concurrently, you should prefer to use **threads** rather than
 parallel processes. Shared memory within the orchestration parts of the process allows for much simpler
 reuse of various contexts, and since the Runner you are using almost certainly builds in process-level
 parallelism, there's no additional advantage (and _many_ possible disadvantages) to layering extra
