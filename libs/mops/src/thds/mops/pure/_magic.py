@@ -12,7 +12,6 @@ ShimBuilder.  If you don't supply one, it will default to the same-thread shell.
 import contextlib
 import functools
 import typing as ty
-from pathlib import Path
 
 from typing_extensions import ParamSpec
 
@@ -20,7 +19,7 @@ from thds import core
 from thds.mops import config
 from thds.mops._utils import path_config
 
-from .core import pipeline_id_mask, uris
+from .core import file_blob_store, pipeline_id_mask, uris
 from .core.memo.unique_name_for_function import full_name_and_callable
 from .core.use_runner import use_runner
 from .pickling.mprunner import MemoizingPicklingRunner
@@ -77,8 +76,7 @@ class _MagicConfig:
 
 
 _MAGIC_CONFIG = _MagicConfig()
-_MOPS_ROOT = Path.home() / ".mops-root"
-_local_root = lambda: f"file://{_MOPS_ROOT}"  # noqa: E731
+_local_root = lambda: f"file://{file_blob_store.MOPS_ROOT()}"  # noqa: E731
 _MAGIC_CONFIG.blob_root[""] = _local_root  # default Blob Store
 _MAGIC_CONFIG.shim_bld[""] = make_builder(samethread_shim)  # default Shim
 _MAGIC_CONFIG.add_dynamic_config(config.dynamic_mops_config())

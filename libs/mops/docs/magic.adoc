@@ -3,11 +3,12 @@ link:../README.adoc[↑]
 # pure.magic
 
 Magic is a new API that we're trialling for `mops`. This ties together a lot of
-functionality that has already been available in `mops.pure`, but the hope is to provide an
-interface that makes it a lot simpler for users to move between development workflows and
-production ones, including running your functions locally with mops in the loop, and
-running your functions locally with mops completely out of the loop. Each of these
-approaches is the right choice for specific situations, and setting things up for this to work should be as easy as we can make it.
+functionality that has already been available in `mops.pure`, but the hope is to provide
+an interface that makes it a lot simpler for users to move between development workflows
+and production ones, including running your functions locally with mops in the loop, and
+running your functions locally with mops xref:#off[completely out of the loop]. Each of
+these approaches is the right choice for specific situations, and setting things up for
+this to work should be as easy as we can make it.
 
 ## `@pure.magic` - the easy button
 
@@ -90,6 +91,7 @@ and not impose overrides with mask.
 pure.magic.shim(None, mask=True)
 ----
 
+[[off]]
 ### Turning `mops` off for a module hierarchy or a function
 
 `shim(None)` sets the shim to `None` - with no shim, `magic` will not run your function through mops at all.

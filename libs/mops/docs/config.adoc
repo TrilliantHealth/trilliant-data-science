@@ -19,7 +19,8 @@ fully-qualified path.
 
 Or, name that file `.mops.toml` and place that in one of the following locations:
 
-1. The current working directory for the Python process that imports `mops`.
+1. The current working directory for the Python process that imports `mops`, or any
+directory above that (`mops` will use the first - and only the first - one it finds).
 1. Your home directory.
 
 ## combined config
