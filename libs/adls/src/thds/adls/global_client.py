@@ -58,12 +58,9 @@ get_global_client = cache.locking(adls_fs_client)
 get_global_fs_client = get_global_client
 
 
-def adls_blob_container_client(
-    storage_account: str, container: str, connpool_size: int = DEFAULT_CONNECTION_POOL_SIZE()
-) -> ContainerClient:
-    """This seems to support an atomic write operation,
-    which is in theory going to be faster than two separate network requests.
-    """
+def adls_blob_service_client(
+    storage_account: str, connpool_size: int = DEFAULT_CONNECTION_POOL_SIZE()
+) -> BlobServiceClient:
     return BlobServiceClient(
         account_url=f"https://{storage_account}.blob.core.windows.net",
         credential=SharedCredential(),
@@ -72,7 +69,19 @@ def adls_blob_container_client(
         max_chunk_get_size=conf.MAX_CHUNK_GET_SIZE(),  # for downloads
         max_block_size=conf.MAX_BLOCK_SIZE(),  # for uploads
         max_single_put_size=conf.MAX_SINGLE_PUT_SIZE(),  # for_uploads
-    ).get_container_client(container)
+    )
+
+
+get_global_blob_service_client = cache.locking(adls_blob_service_client)
+
+
+def adls_blob_container_client(
+    storage_account: str, container: str, connpool_size: int = DEFAULT_CONNECTION_POOL_SIZE()
+) -> ContainerClient:
+    """This seems to support an atomic write operation,
+    which is in theory going to be faster than two separate network requests.
+    """
+    return get_global_blob_service_client(storage_account, connpool_size).get_container_client(container)
 
 
 get_global_blob_container_client = cache.locking(adls_blob_container_client)
