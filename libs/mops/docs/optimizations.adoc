@@ -15,7 +15,8 @@ on the link:./orchestrator.adoc[orchestrator] process.
 
 * replace function parameters representing readable/input data (e.g. `Path`, `AdlsFqn`, etc.) with
   `core.Source`, or `os.PathLike` if you want to be maximally open to callers.
-* replace function return values (e.g. `Path`, `AdlsFqn`) with `core.Source`.
+* replace function return values with `core.Source`, e.g. `core.Source.from_file(aPath)`,
+  `core.Source.from_uri(str(an_AdlsFqn))`.
 
 These changes will, in general, incur minor changes for the calling code.
 ****
@@ -43,6 +44,11 @@ objects.
 
 `thds.core.source` provides an abstraction targeted at read-only data. It allows `mops` to
 provide significant optimizations over other options listed below.
+
+NOTE: `core.Source` very carefully preserves the 'droppability' of `mops`. If you use it
+to represent your inputs and outputs, you will not be stuck using `mops` and can easily
+turn `mops` 'off' at any time while still getting efficient and sane file behavior on your
+local machine.
 
 On a basic level, `Source` represents two conceptually different possibilities for the availability of
 your data. Data is either:

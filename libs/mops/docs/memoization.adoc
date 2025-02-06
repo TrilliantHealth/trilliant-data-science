@@ -1,29 +1,56 @@
 link:../README.adoc[↑]
 
-# Memoization/caching
+= Memoization/caching
 
-A link:./pure_functions.adoc[pure function] is by definition a fully-specified computation with a
+A link:./pure_functions.adoc[pure function] is a fully-specified computation with a
 deterministic result based on its arguments. If the function and its arguments remain the same, then a
 future call to that function, even from a different process on a different computer, should be able to
 return the previously-computed result rather than re-computing.
 
-One scenario where this might be useful would be in the case of some kind of failure of your long-running
-orchestrator process. Another scenario would be the architectural approach of sharing results that you
-know someone else has already computed.
+[sidebar]
+One scenario where this might be useful would be in the case of some kind of
+failure of your long-running orchestrator process. Another scenario would be the
+architectural approach of sharing results that you know someone else has already computed.
 
-NOTE: By default, a unique pipeline id is generated for every application run, so no results
-will be memoized across processes. See xref:#pipeline-id[pipeline id] for how to change this.
+NOTE: If you _aren't_ using the `pure.magic` API, a unique pipeline id is generated for
+every application run, so no results will be memoized across processes. See
+xref:#pipeline-id[pipeline id] for how to change this.
 
-## Conceptual system in `mops`:
+== Conceptual system in `mops`:
 
-Each `use_runner`-decorated function using `mops` `MemoizingPicklingRunner` will combine the
-current `pipeline_id`, the fully-qualfied name (including module) of the function, and the hash of
-the serialized arguments to the function, to produce a _deterministic_ remote storage location for the
-invocation and also for the eventual results.
+Each function using `mops` `MemoizingPicklingRunner` (a.k.a. link:magic.adoc[`@pure.magic`]) will combine:
 
-In its entirety, the unique invocation of your function with its arguments hash constitutes the
-`memo_uri` - a namespace for your specific function under the specific circumstances of its single
-invocation.
+* the current blob root
+* the current `pipeline_id`
+* the fully-qualfied name (including module) of the function
+* the `function-logic-key` (if any)
+* and the hash of the serialized arguments (input) to the function
+
+to produce a _deterministic_ remote storage location for the invocation and also for the
+eventual results.
+
+[sidebar]
+****
+Why so many bits and pieces?
+
+When you think about a function in the common sense, it's easy to forget that,
+mathematically, a function isn't just a named bit of code - it's a *unique and immutable
+transform*, of the input domain into the output codomain.
+
+But in code, we change the code for functions (or the other functions they call) all the
+time. We don't ordinarily rename the function afterward, but the actual effect of the
+function has changed - technically it's a totally new function!
+
+`mops` provides several different approaches to making it easier to map the mathematical
+universe onto the everyday one that programmers inhabit. Perhaps _too many_ approaches -
+they certainly overlap a bit at points. But collectively they provide a set of tools to
+making your functions and their results a bit easier to wrangle, organize, and reason
+about.
+****
+
+In its entirety, the unique invocation of your function with its arguments hash
+constitutes the `memo_uri` - a `mops`-controlled namespace for the specific function under
+the specific circumstances of its single invocation.
 
 _Before_ invoking the function remotely, the `MemoizingPicklingRunner` will check to see if a result
 already exists at the expected path, and if it does, that result will be returned _instead_ of running
@@ -32,25 +59,26 @@ the remote computation.
 This allows function results to be reused across time regardless of who calls the function or when they
 call it.
 
-In cases where all you want is memoization (you don't care about transferring execution to a truly
-link:./remote.adoc[remote execution environment]), you may be able to use `pure.memoize_in` as a shorthand,
-rather than needing to define a `MemoizingPicklingRunner` yourself.
+In cases where all you want is memoization (you don't care about transferring execution to
+a truly link:./remote.adoc[remote execution environment]), you can use `@pure.magic()`
+with no further customization.
 
-In link:./advanced_memoization.adoc[advanced use cases], you may want to memoize on something other than the
-actual function arguments.
+In order to share results across machines, you'll want to configure at minimum the blob
+root to point to a shared blob store.
 
-## Usage
+The other bits and pieces and their purposes are documented below.
 
-In implementation, a fully-qualified `memo_uri` is derived from the following 'logical' components:
+== Usage
 
-1. A storage root provided by your top-level configuration, plus a `mops`-specific suffix, making up a
-   runner prefix that is the global default for any `pure.use_runner` decorated function in your
-   application.
+At runtime, a fully-qualified `memo_uri` is derived from the following 'logical' components:
+
+1. A blob root provided by your top-level configuration, plus a `mops`-specific suffix, making up a
+   runner prefix that is the global default for any ``mops.pure``-wrapped function in your
+   application. This is non-optional, but `pure.magic` sets the default as `$HOME/.mops-root`.
 
 1. [[pipeline-id]] The `pipeline_id`.
-  - It can be set globally by the application using `pure.set_pipeline_id()`
-  - It may also be masked via the `pure.pipeline_id_mask()` decorator/context manager, applied _over top of_ the `use_runner` decorator.
-  - Most commonly, it may be set on a per-function basis by inserting the following annotation somewhere in
+  - `@pure.magic` sets a default pipeline id of `magic`.
+  - Commonly, it may be set on a per-function basis by inserting the following annotation somewhere in
    the function docstring, like so:
 +
 [source,python]
@@ -58,23 +86,28 @@ In implementation, a fully-qualified `memo_uri` is derived from the following 'l
 @pure.use_runner(...)
 def foobar():
    """some docs...
-   pipeline-id-mask: baz
+   pipeline-id: baz
    """
    ...
 ----
++
+  - It may be masked via the `pure.pipeline_id_mask()` decorator/context manager,
+    applied _over top of_ the `@pure.magic` or `@use_runner` decorators.
+  - Each of the above will override a usage above it in the list.
 +
 You may conceptualize the pipeline id as representing a grouping namespace for multiple functions
 within your application. A future version of `mops` may rename this concept to better communicate its
 intended semantics.
 +
-Often there is no reason to change the pipeline id, once defined.
-
+NOTE: Often there is no reason to change the pipeline id, once defined. Used as a
+grouping/naming mechanism, it's mostly a set-it-and-forget-it configuration.
++
 1. A `function_id`, defined by derivation from the function's `__module__` + `__name__`.
 +
 This exists to keep identical `(*args, **kwargs)` separate from each other if passed to different
-functions.
+functions. There is no API for this; it's derived automatically.
 +
-NOTE: If you rename your function, all previous memoized results will no longer be
+WARNING: If you rename your function, all previous memoized results will no longer be
 'found' for that function.
 
 1. A `function-logic-key`, which is an _optional_ user-defined annotation. It will be automatically
@@ -84,7 +117,7 @@ NOTE: If you rename your function, all previous memoized results will no longer 
 The intent of the `function-logic-key` is to allow you to annotate your function's logic as having
 changed (and therefore invalidating previous memoization) without renaming your function (as, in
 common software development practice, the name of a function is often a high-level name, not subject
-to change every time its outputs change).
+to change every time the function is modified to produce different outputs).
 +
 [source,python]
 ----
@@ -92,7 +125,7 @@ to change every time its outputs change).
 def barbaz():
    """does some stuff.
 
-   function-logic-key: 2024-10-24-v2
+   function-logic-key: 241024-v2
    """
    ...
 ----
@@ -100,12 +133,8 @@ def barbaz():
 Function logic keys MUST NOT contain spaces - any whitespace character will be interpreted as the end
 of the key.
 +
-A function may have both a `pipeline-id-mask` and `function-logic-key` annotation in its docstring.
-
-The function author is fully (and trivially) in control of the `function_id` and `function-logic-key`
-components, but the application that calls the function is encouraged to globally set and/or locally mask
-the `pipeline id`. Generally, the `storage root` will be set differently via configuration for production
-vs development, but will be shared across the application run.
+A function may have both a `pipeline-id` and `function-logic-key` annotation in its
+docstring. The order does not matter, but each should be on a separate line.
 
 ### Memospace parts
 
@@ -117,20 +146,24 @@ provided storage system.
 [%nowrap,source,text]
 ----
 adls://thdsscratch/tmp/mops2-mpf/Peter-Gaultney/2023-04-12T15:46:24-p36529/demandforecast.extract:extract_asset_geo_level/CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs/
-<storage root ------->
+<blob root ---------->
 <runner prefix ----------------> <pipeline_id ---------------------------> <function_id --------------------------------> <(args, kwargs) sha256 hash ------------------------>
 <pipeline memospace ----------------------------------------------------->
 <function memospace ---------------------------------------------------------------------------------------------------->
-                                <invocation-unique-key ----------------------------------------------------------------------------------------------------------------------->
+                                 <invocation-unique-key ---------------------------------------------------------------------------------------------------------------------->
 <memo uri -------------------------------------------------------------------------------------------------------------------------------------------------------------------->
 ----
 
 Note that the `invocation-unique-key` is a way of uniquely identifying a function invocation solely by
 reference to the user-controllable, storage-agnostic elements of the `memo_uri`.
 
-Therefore:
+## Advanced Usage
 
-If you want to call a function and get a result that you know already exists (was previously already run
+In general, the blob root and pipeline id should be encoded either in your code (often
+preferable and less 'spooky') or in some kind of config that gets loaded into your code at
+runtime. So the information above is mostly about 'understanding what they do.'
+
+However, if you want to call a function and get a result that you know already exists (was previously already run
 and therefore memoized by `MemoizingPicklingRunner`), you have three main options. These options are
 listed in reverse priority order - the more specific options (listed further down) will be checked first,
 and if configured, the less-specific options (listed earlier) will not be attempted.
@@ -146,28 +179,10 @@ In other words, no error will be raised if the result is not already present. Th
 but an existing namespace is never immune to **modification** if provided to `mops`.
 ====
 
-### Configure: global pipeline id with global storage root
+### Configure: pipeline id mask with global blob root
 
 [sidebar]
-Scope: global, via dict config or set globally by the application.
-
-The global option is to set up your application to run identically to the run that generated the result.
-This includes making sure that the link:./config.adoc[configured value] for `mops.memo.storage_root` is the
-same as from that known run, and then calling `set_pipeline_id` with the `pipeline_id` used or generated
-by the known run.
-
-This global option is most suitable for cases where your application ran partway and then died for some
-reason. Re-using the same config including `pipeline_id` will allow you to just pick up where you left
-off.
-
-The simplest way to set the global pipeline id is by calling
-`thds.mops.pure:set_pipeline_id('yourpipeid')` in the CLI of your application. Be aware that this is a
-global call that must be performed before calling any `mops`-decorated functions.
-
-### Configure: pipeline id mask with global storage root
-
-[sidebar]
-Scope: global storage root, plus stack-local pipeline id mask set by the application or library via
+Scope: global blob root, plus stack-local pipeline id mask set by the application or library via
 decorator or context manager.
 
 You may decorate any `use_runner`-decorated function with `thds.mops.pure.pipeline_id_mask`. It _must_ be
@@ -250,13 +265,13 @@ A simple example would be something like the following:
 
 @pure.use_runner(...)
 def thing1(...):
-    """pipeline-id-mask: BAR-STANDARD"""
+    """pipeline-id: BAR-STANDARD"""
     ...
 
 # in module `thds.foo.stuff`
 @pure.use_runner(...)
 def thing2(...):
-    """pipeline-id-mask: FOO-STANDARD"""
+    """pipeline-id: FOO-STANDARD"""
     ...
 
 # in module `thds.foo.main`
@@ -283,7 +298,7 @@ The most direct option is to configure, on a per-memoized/decorated function bas
 location_.
 
 NOTE: This approach overrides **both** of the previous approaches, and differs from them in that any
-globally-configured storage root will be overridden by this fully-qualified function memospace.
+globally-configured blob root will be overridden by this fully-qualified function memospace.
 
 You might use this option if the function in question has been renamed and/or moved to a different module
 since the results were memoized, or if you know an exact location where previous results exist and you
@@ -311,9 +326,9 @@ The `memospace`, however, is a fully-qualified ADLS URI that actually exists and
 previous run that you're trying to reuse. Note that to find this, you need to know three core components
 from the previous run:
 
-1. The URI that was configured as `mops.memo.storage_root`.
+1. The URI that was configured as `mops.pure.magic.blob_root`.
 1. The `pipeline_id` that was in use.
-1. The fully qualified `module:function_name` at the time of the run.
+1. The fully qualified `module:function_name@function-logic-key` at the time of the run.
 
 [WARNING]
 ====

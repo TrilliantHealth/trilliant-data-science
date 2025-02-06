@@ -18,8 +18,8 @@ GetBlobStoreForUri = ty.Callable[[str], ty.Optional[BlobStore]]
 # implementations that our internal users rely on.
 # Others can be registered via entry-points.
 _REGISTERED_BLOB_STORES: ty.List[GetBlobStoreForUri] = [
-    get_adls_blob_store,
     get_file_blob_store,
+    get_adls_blob_store,
 ]
 
 
@@ -37,7 +37,7 @@ def load_plugin_blobstores():
 
 
 def lookup_blob_store(uri: str) -> BlobStore:
-    for get_store in _REGISTERED_BLOB_STORES:
+    for get_store in _REGISTERED_BLOB_STORES[::-1]:
         if store := get_store(uri):
             return store
     raise ValueError(f"Unsupported URI: {uri}")

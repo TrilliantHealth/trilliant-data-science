@@ -12,6 +12,7 @@ ShimBuilder.  If you don't supply one, it will default to the same-thread shell.
 import contextlib
 import functools
 import typing as ty
+from pathlib import Path
 
 from typing_extensions import ParamSpec
 
@@ -76,7 +77,8 @@ class _MagicConfig:
 
 
 _MAGIC_CONFIG = _MagicConfig()
-_local_root = lambda: "file://.mops-root"  # noqa: E731
+_MOPS_ROOT = Path.home() / ".mops-root"
+_local_root = lambda: f"file://{_MOPS_ROOT}"  # noqa: E731
 _MAGIC_CONFIG.blob_root[""] = _local_root  # default Blob Store
 _MAGIC_CONFIG.shim_bld[""] = make_builder(samethread_shim)  # default Shim
 _MAGIC_CONFIG.add_dynamic_config(config.dynamic_mops_config())

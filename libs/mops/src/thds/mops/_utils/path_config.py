@@ -71,7 +71,7 @@ class PathConfig(ty.Generic[V]):
     Or you can pass in an arbitrary dot-separated string and we'll use it verbatim.
     """
 
-    _debug_name: str = ""
+    debug_name: str = ""
     configs: ty.Dict[str, V] = field(default_factory=dict)
     masks: ty.Dict[str, V] = field(default_factory=dict)
 
@@ -99,7 +99,7 @@ class PathConfig(ty.Generic[V]):
         if default is not _NONE:
             return default
 
-        name = " " if not self._debug_name else f" for {self._debug_name} "
+        name = " " if not self.debug_name else f" for {self.debug_name} "
         raise RuntimeError(f"No configuration{name}matches {path} and no global config was set")
 
     def setv(self, value: V, pathable: Pathable = None, *, mask: bool = False) -> None:

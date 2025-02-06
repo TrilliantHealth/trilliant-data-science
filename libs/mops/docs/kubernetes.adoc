@@ -11,7 +11,7 @@ You must add mops to your project with the `k8s` extras, or your imports of the 
 
 - `pip install thds.mops[k8s]`
 
-## Declarative usage with mops `use_runner`:
+## Declarative usage with mops `pure.magic`
 
 This approach is preferred for cases where the code to be run on Kubernetes can be considered a
 link:./pure_functions.adoc[pure function] and is implemented as or wrapped by Python.
@@ -47,10 +47,10 @@ This will require your Docker image to exist and to be accessible to Kubernetes 
 Container Registry. Additionally, that image must somehow be provided with read and write access to your blob store,
 since all data will be transferred back and forth from your local environment via your blob store.
 
-Once you have constructed an appropriate Shell, you need only pass it to the `MemoizingPicklingRunner`
-constructor, and then use `use_runner` plus that runner to construct a decorator that will transmit
-computation for any pure function to the remote K8s environment, and inject its result right back into
-the local/orchestrator context.
+Once you have constructed an appropriate Shell, you need only pass it to the
+`pure.magic()` decorator factory, and apply that decorator to any pure function to the
+remote K8s environment, and inject its result right back into the local/orchestrator
+context.
 
 ## Imperative usage
 
