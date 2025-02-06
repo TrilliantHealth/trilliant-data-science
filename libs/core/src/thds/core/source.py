@@ -166,6 +166,14 @@ class Source(os.PathLike):
     def __fspath__(self) -> str:
         return os.fspath(self.path())
 
+    @staticmethod
+    def from_file(filename: StrOrPath, hash: ty.Optional[Hash] = None, uri: str = "") -> "Source":
+        return from_file(filename, hash, uri)
+
+    @staticmethod
+    def from_uri(uri: str, hash: ty.Optional[Hash] = None) -> "Source":
+        return from_uri(uri, hash)
+
 
 # Creation from local Files or from remote URIs
 
