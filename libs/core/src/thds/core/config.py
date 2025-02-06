@@ -94,6 +94,14 @@ def _type_parser(default: T) -> ty.Callable[[ty.Any], T]:
     return lambda x: x  # we can't infer a type parser, so we'll return the default no-op parser.
 
 
+class ConfigRegistry(ty.Dict[str, "ConfigItem"]):  # noqa: B903
+    def __init__(self, name: str):
+        self.name = name
+
+
+_DEFAULT_REGISTRY = ConfigRegistry("default")
+
+
 class ConfigItem(ty.Generic[T]):
     """Should only ever be constructed at a module level."""
 
@@ -106,12 +114,15 @@ class ConfigItem(ty.Generic[T]):
         *,
         parse: ty.Optional[ty.Callable[[ty.Any], T]] = None,
         secret: bool = False,
+        registry: ConfigRegistry = _DEFAULT_REGISTRY,
     ):
         self.secret = secret
         name = _fullname(name)
-        if name in _REGISTRY:
-            raise ConfigNameCollisionError(f"Config item {name} has already been registered!")
-        _REGISTRY[name] = self
+        if name in registry:
+            raise ConfigNameCollisionError(
+                f"Config item {name} has already been registered in {registry.name}!"
+            )
+        registry[name] = self
         self.name = name
         self.parse = parse or _type_parser(default)
         raw_resolved_global = _getenv(name, secret=secret)
@@ -171,15 +182,18 @@ item = ConfigItem
 # a short alias
 
 
-_REGISTRY: ty.Dict[str, ConfigItem] = dict()
-
-
-def config_by_name(name: str) -> ConfigItem:
+def config_by_name(
+    name: str,
+    registry: ConfigRegistry = _DEFAULT_REGISTRY,
+) -> ConfigItem:
     """This is a dynamic interface - in general, prefer accessing the ConfigItem object directly."""
-    return _REGISTRY[_fullname(name)]
+    return registry[_fullname(name)]
 
 
-def set_global_defaults(config: ty.Dict[str, ty.Any]):
+def set_global_defaults(
+    config: ty.Dict[str, ty.Any],
+    registry: ty.Dict[str, ConfigItem] = _DEFAULT_REGISTRY,
+):
     """Any config-file parser can create a dictionary of only the
     items it managed to read, and then all of those can be set at once
     via this function.
@@ -187,7 +201,7 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
     for name, value in config.items():
         if not isinstance(value, dict):
             try:
-                config_item = _REGISTRY[name]
+                config_item = registry[name]
                 config_item.set_global(config_item.parse(value))
             except KeyError:
                 # try directly importing a module - this is only best-effort and will not work
@@ -198,7 +212,7 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
                 try:
                     importlib.import_module(maybe_module_name)
                     try:
-                        config_item = _REGISTRY[name]
+                        config_item = registry[name]
                         config_item.set_global(config_item.parse(value))
                     except KeyError as kerr:
                         raise KeyError(
@@ -218,8 +232,8 @@ def set_global_defaults(config: ty.Dict[str, ty.Any]):
             set_global_defaults({f"{name}.{key}": val for key, val in value.items()})
 
 
-def get_all_config() -> ty.Dict[str, ty.Any]:
-    return {k: v() if not v.secret else "***SECRET***" for k, v in _REGISTRY.items()}
+def get_all_config(registry: ty.Dict[str, ConfigItem] = _DEFAULT_REGISTRY) -> ty.Dict[str, ty.Any]:
+    return {k: v() if not v.secret else "***SECRET***" for k, v in registry.items()}
 
 
 def show_config_cli():
