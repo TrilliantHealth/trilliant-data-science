@@ -21,13 +21,13 @@ link:./pure_functions.adoc[pure function] and is implemented as or wrapped by Py
 
 You will need to construct a `k8s_shell` with configuration appropriate to the Python function that will
 ultimately be invoked remotely. This includes specifying the name of your Docker container as well as
-providing resource requests or limitations. For example, you might create a module called `k8s_shell.py`:
+providing resource requests or limitations. For example, you might create a module called `k8s_shim.py`:
 
 [source,python]
 ----
-import thds.mops.k8s as mops_k8s
+from thds import mops
 
-df_k8s_spot_11g_shell = mops_k8s.k8s_shell(
+df_k8s_spot_11g_shim = mops.k8s.shim(
     mops_k8s.autocr('ds/demand-forecast:latest'),
     # gotta specify which container this runs on
     node_narrowing=dict(
@@ -38,16 +38,16 @@ df_k8s_spot_11g_shell = mops_k8s.k8s_shell(
 ----
 
 ****
-`mops` does _not_ distribute your code for you, and neither does the provided k8s shell. You must
+`mops` does _not_ distribute your code for you, and neither does the provided k8s shim. You must
 perform your own code distribution by building and pushing a Docker image to an accessible container
-registry, and configuring the K8s Shell so that it knows what pre-published image to use.
+registry, and configuring the K8s runtime shim so that it knows what pre-published image to use.
 ****
 
 This will require your Docker image to exist and to be accessible to Kubernetes via the configured
 Container Registry. Additionally, that image must somehow be provided with read and write access to your blob store,
 since all data will be transferred back and forth from your local environment via your blob store.
 
-Once you have constructed an appropriate Shell, you need only pass it to the
+Once you have constructed an appropriate runtime shim, you need only pass it to the
 `pure.magic()` decorator factory, and apply that decorator to any pure function to the
 remote K8s environment, and inject its result right back into the local/orchestrator
 context.

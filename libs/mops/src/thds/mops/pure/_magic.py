@@ -6,7 +6,7 @@ requiring an absolute minimum of boilerplate/config.
 
 Unlike the more open-ended interface of use_runner plus BYO Runner, this one assumes
 MemoizingPicklingRunner, and the most likely non-default config will be a runtime Shim or
-ShimBuilder.  If you don't supply one, it will default to the same-thread shell.
+ShimBuilder.  If you don't supply one, it will default to the same-thread shim.
 """
 
 import contextlib
@@ -24,8 +24,8 @@ from .core import file_blob_store, pipeline_id_mask, uris
 from .core.memo.unique_name_for_function import full_name_and_callable
 from .core.use_runner import use_runner
 from .pickling.mprunner import MemoizingPicklingRunner
-from .runner import Shell, ShellBuilder
-from .runner.shell_builder import make_builder
+from .runner import Shim, ShimBuilder
+from .runner.shim_builder import make_builder
 from .runner.simple_shims import samethread_shim, subprocess_shim
 
 ShimName = ty.Literal[
@@ -33,12 +33,12 @@ ShimName = ty.Literal[
     "subprocess",  # memoization and coordination, but transfer to a subprocess rather than remote.
     "off",  # equivalent to None - disables use of mops.
 ]
-ShimOrBuilder = ty.Union[ShellBuilder, Shell]
+ShimOrBuilder = ty.Union[ShimBuilder, Shim]
 logger = core.log.getLogger(__name__)
 _local_root = lambda: f"file://{file_blob_store.MOPS_ROOT()}"  # noqa: E731
 
 
-def _shim_name_to_builder(shim_name: ShimName) -> ty.Optional[ShellBuilder]:
+def _shim_name_to_builder(shim_name: ShimName) -> ty.Optional[ShimBuilder]:
     if shim_name == "samethread":
         return make_builder(samethread_shim)
     if shim_name == "subprocess":
@@ -49,7 +49,7 @@ def _shim_name_to_builder(shim_name: ShimName) -> ty.Optional[ShellBuilder]:
     return None
 
 
-def _to_shim_builder(shim: ty.Union[None, ShimName, ShimOrBuilder]) -> ty.Optional[ShellBuilder]:
+def _to_shim_builder(shim: ty.Union[None, ShimName, ShimOrBuilder]) -> ty.Optional[ShimBuilder]:
     if shim is None:
         return None
     if isinstance(shim, str):
@@ -61,7 +61,7 @@ class _MagicConfig:
     def __init__(self):
         # these ConfigTree objects apply configuration to callables wrapped with pure.magic
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
-        self.shim_bld = config_tree.ConfigTree[ty.Optional[ShellBuilder]](
+        self.shim_bld = config_tree.ConfigTree[ty.Optional[ShimBuilder]](
             "mops.pure.shim", parse=_to_shim_builder  # type: ignore
         )
         self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
@@ -138,7 +138,7 @@ class Magic(ty.Generic[P, R]):
             yield
 
     @property
-    def _shim_builder_or_off(self) -> ty.Optional[ShellBuilder]:
+    def _shim_builder_or_off(self) -> ty.Optional[ShimBuilder]:
         if stack_local_shim := self._shim():
             return _to_shim_builder(stack_local_shim)
         return self.config.shim_bld.getv(self._func_config_path)
@@ -146,7 +146,7 @@ class Magic(ty.Generic[P, R]):
     def _is_off(self) -> bool:
         return self._shim_builder_or_off is None
 
-    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shell:
+    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shim:
         # this can be set using a stack-local context, or set globally as specifically
         # or generally as the user needs. We prefer stack local over everything else.
         sb = self._shim_builder_or_off

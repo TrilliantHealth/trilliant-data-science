@@ -22,10 +22,10 @@ def _subprocess_remote(args_list):
 
 
 runner = MemoizingPicklingRunner(_subprocess_remote, mops_root)
-adls_shell = use_runner(runner)
+adls_shim = use_runner(runner)
 
 
-@adls_shell
+@adls_shim
 def run_and_sleep(i: int, data: ty.List[float], sleep: int) -> float:
     """Runs 'remotely' - arguments are pickled and passed via ADLS; result is returned via ADLS."""
     the_sum = sum(data)

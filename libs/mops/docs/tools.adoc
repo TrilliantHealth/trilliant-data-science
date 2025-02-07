@@ -2,7 +2,9 @@ link:../README.adoc[↑]
 
 # Tools & Debugging Applications Using `mops`
 
-NOTE: Remember that all `mops` functions are Python functions. If your function is failing to execute, (where possible) the best first step is to - temporarily - stop wrapping your function with `mops` and run the function locally. You'll avoid any build steps required by the Shell, you can use a debugger, etc.
+NOTE: Remember that all `mops` functions are Python functions. If your function is failing to execute, (where possible) the best first step is to - temporarily - stop wrapping your function with `mops` and run the function locally. You'll avoid any build steps required by the Shim, you can use a debugger, etc.
+
+If you're using `@pure.magic`, you can call `pure.magic.off(your_func)` after the function definition, or use the link:magic.adoc#config-file[config file].
 
 ## Tools
 

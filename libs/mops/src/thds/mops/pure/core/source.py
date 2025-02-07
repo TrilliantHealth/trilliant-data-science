@@ -9,13 +9,13 @@ stored.
 - remote file source only having URI - cannot be optimized - passed as a raw URI.
 
 Decoupling hashref creation from potential upload is important because it lets us avoid
-upload in cases where the Shell turns out to be a local machine shell.
+upload in cases where the Shim turns out to be a local machine shim.
 
 We create hashrefs for Sources on the local machine in a shared location. Since this
 data is immutable and content-addressed, there should be no serious concurrency objections
 to this approach.
 
-Then, if we cross a boundary into a Shell that will start execution on a different
+Then, if we cross a boundary into a Shim that will start execution on a different
 machine, we serialize the local Path to content-addressed storage in the current active
 storage root, and we then create a hashref in the active storage root (again, these
 should be effectively immutable on the shared store even if they will mostly likely get

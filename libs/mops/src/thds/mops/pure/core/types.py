@@ -44,8 +44,8 @@ class NoResultAfterInvocationError(Exception):  # TODO remove in v4.
     """Runners should raise this if the remotely-invoked function does not provide any result."""
 
 
-class NoResultAfterShellSuccess(NoResultAfterInvocationError):
-    """Raised this if the shell returns with no error, but no result is found in the blob store.
+class NoResultAfterShimSuccess(NoResultAfterInvocationError):
+    """Raised this if the shim returns with no error, but no result is found in the blob store.
 
     A better name for NoResultAfterInvocationError.
     """

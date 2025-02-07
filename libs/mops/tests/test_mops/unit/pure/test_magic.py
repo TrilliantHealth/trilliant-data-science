@@ -116,6 +116,6 @@ def test_repr(clear_magic):
     f1_repr = repr(func1)
     print(f1_repr)
     assert f1_repr.startswith(
-        "Magic('tests.test_mops.unit.pure.test_magic.func1', shim=<static_shell_builder for <function samethread_shim"
+        "Magic('tests.test_mops.unit.pure.test_magic.func1', shim=<static_shim_builder for <function samethread_shim"
     )
     assert f1_repr.endswith("/.mops', pipeline_id='magic')")

@@ -8,7 +8,7 @@ except ModuleNotFoundError as mnf:
     ) from mnf
 
 from .container_registry import autocr  # noqa: F401
-from .launch import K8sJobFailedError, launch, mops_shell  # noqa
+from .launch import K8sJobFailedError, launch, shim  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
     ResourceDefinition,
@@ -22,3 +22,6 @@ try:
     from . import thds_std  # noqa: F401
 except ModuleNotFoundError:
     pass
+
+
+mops_shell = shim  # deprecated alias
