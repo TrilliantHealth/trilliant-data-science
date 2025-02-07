@@ -3,9 +3,9 @@ from typing import Dict, List
 
 import pytest
 
-from thds.mops.pure import memoize_in, pipeline_id_mask, pipeline_id_mask_from_docstr
+from thds.mops.pure import memoize_in, pipeline_id_mask
 from thds.mops.pure.core.memo import make_function_memospace, parse_memo_uri
-from thds.mops.pure.core.pipeline_id_mask import extract_mask_from_docstr, get_pipeline_id_mask
+from thds.mops.pure.core.pipeline_id_mask import extract_from_docstr
 
 
 def fx(a: int) -> float:
@@ -43,14 +43,8 @@ def in_docstring():
     pass
 
 
-def test_extract_pipeline_id_mask_from_docstr():
-    assert "WOO" == extract_mask_from_docstr(in_docstring)
-
-
-def test_construct_pipeline_id_mask_from_func():
-    with pipeline_id_mask_from_docstr(in_docstring) as visible:
-        assert visible
-        assert "WOO" == get_pipeline_id_mask()
+def test_extract_from_docstr():
+    assert "WOO" == extract_from_docstr(in_docstring)
 
 
 def test_extract_failure_is_not_an_option():
@@ -58,9 +52,9 @@ def test_extract_failure_is_not_an_option():
         """stuff but no pipeline id mask"""
 
     with pytest.raises(ValueError, match="Cannot extract pipeline-id"):
-        extract_mask_from_docstr(no_key)
+        extract_from_docstr(no_key)
     with pytest.raises(ValueError, match="non-empty docstring"):
-        extract_mask_from_docstr(fx)
+        extract_from_docstr(fx)
 
     def empty():
         """
@@ -68,7 +62,7 @@ def test_extract_failure_is_not_an_option():
         """
 
     with pytest.raises(ValueError, match="pipeline-id is present but empty"):
-        extract_mask_from_docstr(empty)
+        extract_from_docstr(empty)
 
 
 def get_storage_root() -> str:

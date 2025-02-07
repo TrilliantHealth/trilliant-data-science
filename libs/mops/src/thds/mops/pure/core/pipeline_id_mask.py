@@ -5,7 +5,6 @@ import re
 import typing as ty
 from contextlib import contextmanager
 from functools import lru_cache
-from types import TracebackType
 
 from thds.core.stack_context import StackContext
 
@@ -57,7 +56,7 @@ _DOCSTRING_MASK_RE = re.compile(r".*pipeline-id(?:-mask)?:\s*(?P<pipeline_id>[^\
 
 
 @lru_cache(maxsize=32)
-def extract_mask_from_docstr(func: F, require: bool = True) -> str:
+def extract_from_docstr(func: F, require: bool = True) -> str:
     if not func.__doc__:
         if not require:
             return ""
@@ -76,35 +75,5 @@ def extract_mask_from_docstr(func: F, require: bool = True) -> str:
 
 @contextmanager
 def including_function_docstr(f: F) -> ty.Iterator[str]:
-    with pipeline_id_mask(extract_mask_from_docstr(f, require=False)):
+    with pipeline_id_mask(extract_from_docstr(f, require=False)):
         yield get_pipeline_id_mask()
-
-
-T_co = ty.TypeVar("T_co", covariant=True)
-
-
-class ContextManagerDeco(ty.Protocol[T_co]):
-    """I can't find a type exported by the stdlib that correctly
-    represents what contextlib.contextmanager provides.
-    """
-
-    def __call__(self, __f: F) -> F:
-        ...
-
-    def __enter__(self) -> T_co:
-        ...
-
-    def __exit__(
-        self,
-        __typ: ty.Optional[ty.Type[BaseException]],
-        __value: ty.Optional[BaseException],
-        __traceback: ty.Optional[TracebackType],
-    ) -> ty.Optional[bool]:
-        ...
-
-
-def pipeline_id_mask_from_docstr(
-    func: F,
-) -> ContextManagerDeco[bool]:
-    """Use this to more firmly attach a 'default' pipeline id mask to a function."""
-    return pipeline_id_mask(extract_mask_from_docstr(func))

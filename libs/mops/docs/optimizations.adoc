@@ -92,7 +92,7 @@ An example:
 from pathlib import Path
 
 from thds.core.source import Source, from_file
-from thds.mops import tempdir
+
 
 def remote_func(src_a: Source, src_b: Source) -> Source:
     outf = Path.cwd() / 'c.txt'
@@ -114,7 +114,7 @@ The above code will work whether or not `mops` is in play at all, and it will pr
 results in either case, with the exception that if your `remote_func` actually runs on a different
 machine, there will not be a `c.txt` in your current working directory when the function returns (since
 side-effects are not propagated by `mops`). In fact, if you use `mops` but still execute locally (e.g.
-with `memoize_in`), `c.txt` _will_ exist in your current working directory, and only a single upload of
+with `@pure.magic()`), `c.txt` _will_ exist in your current working directory, and only a single upload of
 the result data will take place (and no downloads of any kind), as all input data is available locally,
 and the output data is already present locally after return.
 

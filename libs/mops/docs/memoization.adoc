@@ -14,16 +14,17 @@ architectural approach of sharing results that you know someone else has already
 
 NOTE: If you _aren't_ using the `pure.magic` API, a unique pipeline id is generated for
 every application run, so no results will be memoized across processes. See
-xref:#pipeline-id[pipeline id] for how to change this.
+link:pipeline-ids.adoc[pipeline ids] for how to change this.
 
 == Conceptual system in `mops`:
 
-Each function using `mops` `MemoizingPicklingRunner` (a.k.a. link:magic.adoc[`@pure.magic`]) will combine:
+At the time of call, each function wrapped with `mops` `MemoizingPicklingRunner`
+(or link:magic.adoc[`@pure.magic`]) will combine:
 
 * the current blob root
-* the current `pipeline_id`
+* the link:pipeline-ids.adoc[current `pipeline_id`]
 * the fully-qualfied name (including module) of the function
-* the `function-logic-key` (if any)
+* the `function-logic-key` on the docstring (if any)
 * and the hash of the serialized arguments (input) to the function
 
 to produce a _deterministic_ remote storage location for the invocation and also for the
@@ -77,32 +78,15 @@ At runtime, a fully-qualified `memo_uri` is derived from the following 'logical'
    application. This is non-optional, but `pure.magic` sets the default as `$HOME/.mops-root`.
 
 1. [[pipeline-id]] The `pipeline_id`.
-  - `@pure.magic` sets a default pipeline id of `magic`.
-  - Commonly, it may be set on a per-function basis by inserting the following annotation somewhere in
-   the function docstring, like so:
-+
-[source,python]
-----
-@pure.use_runner(...)
-def foobar():
-   """some docs...
-   pipeline-id: baz
-   """
-   ...
-----
-+
-  - It may be masked via the `pure.pipeline_id_mask()` decorator/context manager,
-    applied _over top of_ the `@pure.magic` or `@use_runner` decorators.
-  - Each of the above will override a usage above it in the list.
 +
 You may conceptualize the pipeline id as representing a grouping namespace for multiple functions
 within your application. A future version of `mops` may rename this concept to better communicate its
 intended semantics.
 +
-NOTE: Often there is no reason to change the pipeline id, once defined. Used as a
+NOTE: Often there is no reason to change the pipeline id, once link:pipeline-ids.adoc[defined]. Used as a
 grouping/naming mechanism, it's mostly a set-it-and-forget-it configuration.
 +
-1. A `function_id`, defined by derivation from the function's `__module__` + `__name__`.
+1. A `function_id`, defined by derivation from the function's `+__module__+` + `+__name__+`.
 +
 This exists to keep identical `(*args, **kwargs)` separate from each other if passed to different
 functions. There is no API for this; it's derived automatically.
