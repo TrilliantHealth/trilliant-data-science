@@ -224,7 +224,7 @@ def random_test_file_fqn(
 def test_parallel_downloads_only_perform_a_single_download(
     caplog: pytest.LogCaptureFixture, random_test_file_fqn: AdlsFqn
 ):
-    with caplog.at_level(logging.DEBUG, logger="thds.adls.download"):
+    with caplog.at_level(logging.DEBUG):
         # we're not actually coordinating via shared memory,
         # but the easiest way to be able to configure the logs
         # so that we can see them in the test is to use threads
