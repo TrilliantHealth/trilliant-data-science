@@ -8,7 +8,7 @@ from thds.mops.pure.runner.simple_shims import samethread_shim, subprocess_shim
 
 @pytest.fixture
 def clear_magic():
-    _magic._MAGIC_CONFIG = _magic._MagicConfig()  # type: ignore
+    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()  # type: ignore
     yield
 
 
@@ -34,7 +34,7 @@ def test_magic_blob_root_configuration(clear_magic):
     def func1():
         pass
 
-    assert func1._get_blob_root() == magic.local_root()
+    assert func1._get_blob_root() == _magic.sauce._local_root()
 
     # Test override
     new_uri = "adls://new/container"
