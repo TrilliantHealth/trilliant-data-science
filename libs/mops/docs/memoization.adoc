@@ -18,10 +18,11 @@ link:pipeline-ids.adoc[pipeline ids] for how to change this.
 
 == Conceptual system in `mops`:
 
-At the time of call, each function wrapped with `mops` `MemoizingPicklingRunner`
+At the time of function call, each function wrapped with `mops` `MemoizingPicklingRunner`
 (or link:magic.adoc[`@pure.magic`]) will combine:
 
 * the current blob root
+* a `mops`-specific prefix, `mops2-mpf`, which exists to keep the root namespace organized
 * the link:pipeline-ids.adoc[current `pipeline_id`]
 * the fully-qualfied name (including module) of the function
 * the `function-logic-key` on the docstring (if any)
@@ -60,6 +61,17 @@ the remote computation.
 This allows function results to be reused across time regardless of who calls the function or when they
 call it.
 
+[WARNING]
+====
+Whether or not memoized results are available at the fully-derived `memo_uri`
+will _not_ prevent _new, unmemoized_ results from being computed and inserted into the
+blob store.
+
+In other words, no error will be raised if the result is not already present. This is a
+**non-destructive** re-use of the namespace, because no existing results will be modified in any way -
+but an existing blob store is never immune to **modification** if provided to `mops`.
+====
+
 In cases where all you want is memoization (you don't care about transferring execution to
 a truly link:./remote.adoc[remote execution environment]), you can use `@pure.magic()`
 with no further customization.
@@ -69,24 +81,24 @@ root to point to a shared blob store.
 
 The other bits and pieces and their purposes are documented below.
 
-== Usage
+== Configurability
 
-At runtime, a fully-qualified `memo_uri` is derived from the following 'logical' components:
+At the time of function call, a fully-qualified `memo_uri` is derived from the following
+components which are either chosen explicitly by the user, determined by names in code ,
+or which arise from `@pure.magic` defaults`.
 
-1. A blob root provided by your top-level configuration, plus a `mops`-specific suffix, making up a
-   runner prefix that is the global default for any ``mops.pure``-wrapped function in your
-   application. This is non-optional, but `pure.magic` sets the default as `$HOME/.mops-root`.
-
-1. [[pipeline-id]] The `pipeline_id`.
+1. A blob root (non-optional, user-controlled, has `pure.magic` default).
+   `pure.magic` sets the default blob root as `$HOME/.mops-root`.
 +
-You may conceptualize the pipeline id as representing a grouping namespace for multiple functions
-within your application. A future version of `mops` may rename this concept to better communicate its
-intended semantics.
+1. [[pipeline-id]] The `pipeline_id` (non-optional, user-controlled, defaults provided
+either by `pure.magic` or by local system state)
 +
-NOTE: Often there is no reason to change the pipeline id, once link:pipeline-ids.adoc[defined]. Used as a
-grouping/naming mechanism, it's mostly a set-it-and-forget-it configuration.
+More documentation about pipeline ids may be be link:pipeline-ids.adoc[found here], but
+you you should conceptualize the pipeline id as representing a grouping mechanism.  within
+your application.
 +
-1. A `function_id`, defined by derivation from the function's `+__module__+` + `+__name__+`.
+1. A `function_id` (defined as a constant by derivation from the function's `+__module__+`
++ `+__name__+` - not user-controllable).
 +
 This exists to keep identical `(*args, **kwargs)` separate from each other if passed to different
 functions. There is no API for this; it's derived automatically.
@@ -94,9 +106,11 @@ functions. There is no API for this; it's derived automatically.
 WARNING: If you rename your function, all previous memoized results will no longer be
 'found' for that function.
 
-1. A `function-logic-key`, which is an _optional_ user-defined annotation. It will be automatically
-   extracted when present from the docstring of the top-level function or any function passed as an
-   argument (however nested) to the top-level function.
+1. A `function-logic-key` (optional, user-controlled, defaults to empty string)
++
+The function logic key, if any, will be automatically extracted when present from the
+   docstring of the top-level function or any function passed as an argument (however
+   nested) to the top-level function.
 +
 The intent of the `function-logic-key` is to allow you to annotate your function's logic as having
 changed (and therefore invalidating previous memoization) without renaming your function (as, in
@@ -119,6 +133,13 @@ of the key.
 +
 A function may have both a `pipeline-id` and `function-logic-key` annotation in its
 docstring. The order does not matter, but each should be on a separate line.
++
+1. Hash of function arguments (deterministically defined based on actual arguments passed
+to the function - not user-controllable)
++
+This can't be affected in any way other than passing different arguments. Don't even
+link:advanced_memoization.adoc#keyed-local-runner[think about it].
+
 
 ### Memospace parts
 
@@ -147,179 +168,6 @@ In general, the blob root and pipeline id should be encoded either in your code 
 preferable and less 'spooky') or in some kind of config that gets loaded into your code at
 runtime. So the information above is mostly about 'understanding what they do.'
 
-However, if you want to call a function and get a result that you know already exists (was run previously
-and therefore memoized by `MemoizingPicklingRunner`), you have three main options. These options are
-listed in reverse priority order - the more specific options (listed further down) will be checked first,
-and if configured, the less-specific options (listed earlier) will not be attempted.
-
-[WARNING]
-====
-Whether or not memoized results are available within the namespace as specified or derived
-will _not_ prevent _new, unmemoized_ results from being computed and inserted into that
-same namespace.
-
-In other words, no error will be raised if the result is not already present. This is a
-**non-destructive** re-use of the namespace, because no existing results will be modified in any way -
-but an existing namespace is never immune to **modification** if provided to `mops`.
-====
-
-### Configure: pipeline id mask with global blob root
-
-[sidebar]
-Scope: global blob root, plus stack-local pipeline id mask set by the application or library via
-decorator or context manager.
-
-You may decorate any `use_runner`-decorated function with `thds.mops.pure.pipeline_id_mask`. It _must_ be
-applied outside the `use_runner` decorator, because it will set a stack-local variable at the time of
-invocation of the function, but prior to the operation of the underlying `Runner` that will reference its
-work.
-
-NOTE: A pipeline id mask will in all cases override the global pipeline id.
-
-It may also be used as a context manager, with the caveat that this will _not_ propagate to threads
-created in the current context.
-
-[WARNING]
-====
-☠️ ☠️ ☠️ Logically, the 'pipeline id mask' for a given function changes every time the function code
-changes. If you use this as a decorator directly on a `use_runner` function, and fail to change its
-string value after the underlying code has changed, then your function's callers will get **unwanted**
-memoization. **YOU HAVE BEEN WARNED.**
-====
-
-[source,python]
-----
-# every call to this function will automatically use the below pipeline_id.
-# The decorator will always apply regardless of threading.
-
-@pipeline_id_mask('2023-05-02')
-@use_runner(MemoizingPicklingRunner(...))
-def generate_nppes(...):
-    ...
-
-@pipeline_id_mask('other')
-@use_runner(MemoizingPicklingRunner(...))
-def use_nppes(...):
-    ...
-
-# however, if a caller wishes to override, they have several options:
-
-# option 1, as context manager
-# suitable for call only in the _current_ thread/process:
-with pipeline_id_mask('special-run'):
-    nppes = generate_nppes(...)
-    use_nppes(nppes)
-    # note that both mops functions will use this same pipeline id mask.
-
-# option 2, suitable for calling the function in a separate thread later on...
-my_special_nppes = pipeline_id_mask('special-run')(generate_nppes)
-...
-nppes = my_special_nppes(...)
-# but the undecorated `use_nppes` will use its own mask
-use_nppes(nppes)
-
-# option 3, also suitable for use in a launched thread:
-@pipeline_id_mask('special-run')
-def my_special_nppes(*args, **kwargs):
-    args, kwargs = special_adjust_args_kwargs(args, kwargs)
-    return generate_nppes(*args, **kwargs)
-...
-my_special_nppes(...)
-----
-
-As seen above, this decorator or its underlying context manager may even be applied multiple times -
-_only_ the outermost call to this decorator will be applied at the time of function invocation, providing
-the final say to the calling application.
-
-### Configure: pipeline memospace with dynamic runtime matching
-
-[sidebar]
-Scope: match a function or set of functions based on their fully-qualified `+__module__:__name__+`
-using Python code registered as one of many in-order globally-registered handlers
-
-This is probably most appropriate for applications that wish to provide control over the pipeline id or
-overall pipeline memospace for their functions but only their functions; in other words, for applications
-that do _not_ wish to override the choices of other libraries using mops from which they consume outputs.
-
-A simple example would be something like the following:
-
-[source,python]
-----
-# in module `thds.bar.where.ever`
-
-@pure.use_runner(...)
-def thing1(...):
-    """pipeline-id: BAR-STANDARD"""
-    ...
-
-# in module `thds.foo.stuff`
-@pure.use_runner(...)
-def thing2(...):
-    """pipeline-id: FOO-STANDARD"""
-    ...
-
-# in module `thds.foo.main`
-pure.add_pipeline_memospace_handlers(
-    pure.matching_mask_pipeline_id('FOO-NON-STANDARD!!', r'thds\.foo')
-)
-----
-
-The above will mask the pipeline id for `thing2` in `thds.foo.stuff` (as well as any other functions
-underneath `thds.foo`) but will _not_ mask the pipeline id for `thds.bar.where.ever:thing1`, as its
-fully-qualified name will not match the `thds.foo` regex.
-
-NOTE: This _overrides_ the use of `pipeline_id_mask` in all respects if a match is found. It is up to the
-application developers to have their handler respect existing ``pipeline_id_mask``s if they so choose.
-
-### Configure: function-scoped fully-qualified memospace
-
-[sidebar]
-Scope: per-function (referenced by function_id) memospace, set by application via global (TOML) or
-stack-local (context manager) config.
-
-The most direct option is to configure, on a per-memoized/decorated function basis, the fully-qualified
-`memospace` from the known run, referenced by the fully-qualified name of the function at its _current
-location_.
-
-NOTE: This approach overrides **both** of the previous approaches, and differs from them in that any
-globally-configured blob root will be overridden by this fully-qualified function memospace.
-
-You might use this option if the function in question has been renamed and/or moved to a different module
-since the results were memoized, or if you know an exact location where previous results exist and you
-want to hard-code that result set outside of your code. This renaming ability affords the most direct
-control compared to the other options for configuring memoization.
-
-In the following example, function `foo` was run previously with `pipeline_id=2023april`, and the results
-were stored on `adls://thdsdata/ml-ops`. The run which will re-use these results will have an
-autogenerated `pipeline_id` and will use the configured values for SA and container for all of the other,
-not-configured functions.
-
-In a mops link:./config.adoc[config file], add the following lines to your config:
-
-[source,toml]
-----
-[mops.memo."thds.mymodule.foomod:foobar"]
-memospace = "adls://thdsdata/ml-ops/mops/pipeline-pickled-functions-v1/2023april/thds.mymodule.OLDMOD:barbaz"
-----
-
-Note that the name that is part of the configuration key must be the fully-qualified path to the function
-in the _current_ codebase. This is how we will recognize what results you're trying to retrieve when you
-call the current function.
-
-The `memospace`, however, is a fully-qualified ADLS URI that actually exists and was created by the
-previous run that you're trying to reuse. Note that to find this, you need to know three core components
-from the previous run:
-
-1. The URI that was configured as `mops.pure.magic.blob_root`.
-1. The `pipeline_id` that was in use.
-1. The fully qualified `module:function_name@function-logic-key` at the time of the run.
-
-[WARNING]
-====
-This configuration needs to be present every time a memoized result is retrieved. You cannot perform
-a new run with this config, and then expect a future reuse of the _new_ pipeline id to present you with
-those results. They will not be found.
-
-In other words, this configuration is cumulative and explicit - if you want to pick up results from
-various different historical runs, you'll need to specify the configuration for each previous run.
-====
+However, if you want to call a function and get a result that you know already exists (was
+run previously and therefore memoized by `MemoizingPicklingRunner`), and you don't wish to
+change your current code, you have several options, which are link:advanced_memoization.adoc[documented separately here].
