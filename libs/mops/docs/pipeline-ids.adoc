@@ -4,6 +4,9 @@ link:../README.adoc[↑]
 
 This is a basic grouping mechanism for `mops` control files and outputs.
 
+A future version of `mops` may rename this concept to better communicate
+its intended semantics.
+
 == Usage
 
 The pipeline id is chosen for each `mops` wrapped function at the time of call. It can be
@@ -32,6 +35,9 @@ def foobar(...):
 pure.pipeline_id_mask('baz')(foobar)(*args)
 ----
   - Each of the above will override a usage above it in the list.
+
+NOTE: Often there is no reason to change the pipeline id, once defined for a given
+application.  It's mostly a set-it-and-forget-it configuration.
 
 == What does it do?
 
