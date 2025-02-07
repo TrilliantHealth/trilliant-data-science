@@ -30,7 +30,7 @@ orchestrator side to make sure the files get moved to the appropriate destinatio
 crossing the `mops.pure` function boundary back into the orchestrator process will point to a temporary
 location.
 
-See `tests.integration.remote.shell_test.func_with_paths` to see examples of both of these usages in
+See `tests.integration.remote.shim_test.func_with_paths` to see examples of both of these usages in
 action.
 
 ### Path must exist and be a regular file!

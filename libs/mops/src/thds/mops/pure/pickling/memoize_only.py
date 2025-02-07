@@ -1,9 +1,3 @@
-"""A tiny shim 'shell' that supports invoking a pickle-memoized function
-directly in the current thread. This is a good thing to use when the
-computation derives no advantage from not running locally
-(i.e. exhibits no parallelism) but you still want memoization.
-"""
-
 from typing import Callable
 
 from ..core.types import F

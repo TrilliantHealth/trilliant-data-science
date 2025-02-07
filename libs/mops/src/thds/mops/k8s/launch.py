@@ -195,7 +195,7 @@ def launch(
         logger.info(COMPLETE(f"Job {job_num} Complete! {counts()}"))
 
 
-def mops_shell(
+def shim(
     container_image: ty.Union[str, ty.Callable[[], str]],
     disable_remote: ty.Callable[[], bool] = lambda: False,
     **outer_kwargs: ty.Any,
@@ -204,7 +204,7 @@ def mops_shell(
 
     Now supports callables that return a container image name; the
     goal being to allow applications to perform this lazily on the
-    first actual use of the k8s shell. The passed callable will be
+    first actual use of the k8s runtime shim. The passed callable will be
     called each time, so if you want it to be called only once, you'll
     need to wrap it yourself.
 

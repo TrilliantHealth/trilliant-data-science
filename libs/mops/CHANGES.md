@@ -6,7 +6,9 @@
   entrypoint (via `importlib.metadata`). As before, a BlobStore is chosen by matching a URI.
 - `mops` summary files will be output in the `.mops/summary` directory, to make room for other usage of
   that directory in the future. Technically this is a 'breaking' change, but in practice it will make no
-  difference to current internal users.
+  difference to current users.
+- Renaming the `Shell/Builder` concept to `Shim/Builder`, to distance ourselves from other technical
+  concepts that people commonly associate with the word shell.
 
 ## 3.5
 

@@ -20,7 +20,7 @@ from .core.uris import UriIsh, UriResolvable, register_blob_store  # noqa
 from .core.use_runner import use_runner  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
-from .runner import Shell, ShellBuilder  # noqa
+from .runner import Shim, ShimBuilder  # noqa
 from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
 
 
@@ -37,3 +37,7 @@ def _register_things():
 
 
 _register_things()
+
+
+Shell = Shim  # deprecated alias
+ShellBuilder = ShimBuilder  # deprecated alias

@@ -1,9 +1,9 @@
 from thds.mops.pure.core.output_naming import pipeline_function_invocation_unique_key
 
-from ._util import adls_shell
+from ._util import adls_shim
 
 
-@adls_shell
+@adls_shim
 def mul(a: int, b: float = 4.2) -> float:
     in_un_key = pipeline_function_invocation_unique_key()
     assert in_un_key

@@ -22,7 +22,7 @@ without any other config. By default, your function will now:
 - run in the same thread where it was called, just like a normal Python function.
 - be memoized underneath `.mops-root` in your local directory.
 
-== `pure.magic.shim` - Set the runtime shim (a.k.a. Shell)
+== `pure.magic.shim` - Set the runtime shim (f.k.a. Shell)
 
 If you want your function to run with a different runtime shim, use
 `+pure.magic.shim(...)+` as function at the module level, or pass a shim as the
@@ -182,6 +182,7 @@ If you're setting a module-wide value, set that near the top of your module. It'
 be able to see that sort of 'broad config' near the top with other types of globals that
 are consumed in the rest of the module.
 
+[[config-file]]
 == Config external to code
 
 Several things that `mops.pure.magic` does can also be configured outside the code, though
