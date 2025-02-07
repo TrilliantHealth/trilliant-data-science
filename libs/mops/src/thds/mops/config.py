@@ -14,7 +14,9 @@ from pathlib import Path
 
 import tomli
 
-from thds.core import config
+from thds.core import config, log
+
+logger = log.getLogger(__name__)
 
 
 def find_first_upward_mops_toml() -> ty.Optional[Path]:
@@ -31,15 +33,22 @@ def find_first_upward_mops_toml() -> ty.Optional[Path]:
             return None
 
 
-def _load_first_found_config() -> ty.Dict[str, ty.Any]:
+def first_found_config_file() -> ty.Optional[Path]:
     paths = [
         Path(os.environ.get("MOPS_CONFIG", "")),
         find_first_upward_mops_toml(),
         Path(f"{Path.home()}/.mops.toml"),
     ]
     for path in paths:
-        if path and path.exists() and path.is_file():
-            return tomli.load(open(path, "rb"))
+        if path and path.is_file():
+            return path
+    return None
+
+
+def load(config_file: ty.Optional[Path], name: str = "mops") -> ty.Dict[str, ty.Any]:
+    if config_file:
+        logger.debug("Loading %s config from %s", name, config_file)
+        return tomli.load(open(config_file, "rb"))
     return dict()
 
 
@@ -54,9 +63,9 @@ max_concurrent_network_ops = config.item("mops.max_concurrent_network_ops", 8, p
 open_files_limit = config.item("mops.resources.max_open_files", 10000)
 
 
+def _filter_to_known_mops_config(config: ty.Dict[str, ty.Any]) -> ty.Dict[str, ty.Any]:
+    return {k: v for k, v in config.items() if k.startswith("mops.") or k.startswith("thds.mops")}
+
+
 # load this after creating the config items
-config.set_global_defaults(_load_first_found_config())
-
-
-def dynamic_mops_config() -> ty.Dict[str, ty.Any]:
-    return {k: v for k, v in config.get_all_config().items() if k.startswith("mops.")}
+config.set_global_defaults(_filter_to_known_mops_config(load(first_found_config_file())))

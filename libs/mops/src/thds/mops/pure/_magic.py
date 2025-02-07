@@ -12,12 +12,13 @@ ShimBuilder.  If you don't supply one, it will default to the same-thread shell.
 import contextlib
 import functools
 import typing as ty
+from pathlib import Path
 
 from typing_extensions import ParamSpec
 
 from thds import core
 from thds.mops import config
-from thds.mops._utils import path_config
+from thds.mops._utils import config_tree
 
 from .core import file_blob_store, pipeline_id_mask, uris
 from .core.memo.unique_name_for_function import full_name_and_callable
@@ -33,6 +34,8 @@ ShimName = ty.Literal[
     "off",  # equivalent to None - disables use of mops.
 ]
 ShimOrBuilder = ty.Union[ShellBuilder, Shell]
+logger = core.log.getLogger(__name__)
+_local_root = lambda: f"file://{file_blob_store.MOPS_ROOT()}"  # noqa: E731
 
 
 def _shim_name_to_builder(shim_name: ShimName) -> ty.Optional[ShellBuilder]:
@@ -46,81 +49,84 @@ def _shim_name_to_builder(shim_name: ShimName) -> ty.Optional[ShellBuilder]:
     return None
 
 
-_CONF_PREFIX = "mops.pure.magic"
+def _to_shim_builder(shim: ty.Union[None, ShimName, ShimOrBuilder]) -> ty.Optional[ShellBuilder]:
+    if shim is None:
+        return None
+    if isinstance(shim, str):
+        return _shim_name_to_builder(shim)
+    return make_builder(shim)
 
 
 class _MagicConfig:
     def __init__(self):
-        # these PathConfig objects apply configuration to callables wrapped with pure.magic
+        # these ConfigTree objects apply configuration to callables wrapped with pure.magic
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
-        self.shim_bld = path_config.PathConfig[ty.Optional[ShellBuilder]]("Shim Builder")
-        self.blob_root = path_config.PathConfig[ty.Callable[[], str]]("Blob Root")
+        self.shim_bld = config_tree.ConfigTree[ty.Optional[ShellBuilder]](
+            "mops.pure.shim", parse=_to_shim_builder  # type: ignore
+        )
+        self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
+            "mops.pure.blob_root", parse=uris.to_lazy_uri
+        )
+        self.pipeline_id = config_tree.ConfigTree[str]("mops.pure.pipeline_id")
+        self.blob_root[""] = _local_root  # default Blob Store
+        self.shim_bld[""] = make_builder(samethread_shim)  # default Shim
+        self.pipeline_id[""] = "magic"  # default pipeline_id
 
-    def get_path(self, config_key: str, key: str) -> str:
-        conf_prefix = f"{_CONF_PREFIX}.{config_key}."
-        if key.startswith(conf_prefix):
-            return key[len(conf_prefix) :]
-        return ""
-
-    def add_dynamic_config(self, config: ty.Mapping[str, ty.Any]) -> None:
-        """Add dynamic configuration to the MagicConfig, e.g. from the mops config"""
-        for key, value in config.items():
-            if pathable := self.get_path("blob_store", key):
-                self.blob_root[pathable] = uris.to_lazy_uri(value)
-            elif pathable := self.get_path("shim", key):
-                self.shim_bld[pathable] = _shim_name_to_builder(value)
-            elif pathable := self.get_path("__mask.blob_root", key):
-                self.blob_root.setv(uris.to_lazy_uri(value), pathable, mask=True)
-            elif pathable := self.get_path("__mask.shim", key):
-                self.shim_bld.setv(_shim_name_to_builder(value), pathable, mask=True)
+    def __repr__(self) -> str:
+        return f"MagicConfig(shim_bld={self.shim_bld}, blob_root={self.blob_root}, pipeline_id={self.pipeline_id})"
 
 
-_MAGIC_CONFIG = _MagicConfig()
-_local_root = lambda: f"file://{file_blob_store.MOPS_ROOT()}"  # noqa: E731
-_MAGIC_CONFIG.blob_root[""] = _local_root  # default Blob Store
-_MAGIC_CONFIG.shim_bld[""] = make_builder(samethread_shim)  # default Shim
-_MAGIC_CONFIG.add_dynamic_config(config.dynamic_mops_config())
-logger = core.log.getLogger(__name__)
+_MAGIC_CONFIG: ty.Final = _MagicConfig()
 P = ParamSpec("P")
 R = ty.TypeVar("R")
+
+
+def _get_config() -> _MagicConfig:  # for testing
+    return _MAGIC_CONFIG
 
 
 class Magic(ty.Generic[P, R]):
     """Magic adds mops' powers (memoization, coordination, remote execution) to a callable.
 
-    You can completely disable mops magic for a function by opening a context with the function,
-    like so:
+    If you want to _change_ which runtime shim the function is using, that can be set globally
+    to the program with pure.magic.shim(other_shim, my_magic_func), and it can also be set
+    as a stack-local variable in a context manager provided by this object:
+
+    with my_magic_func.shim("subprocess"):
+        my_magic_func(1, 2, 3)
+
+    You can completely disable mops magic for a function in the same ways, either with a contextmanager
+    or globally, using `off()`, like so:
 
     with my_magic_func.off():
         ...
         my_magic_func(1, 2, 3)
-
-    If you want to change which runtime shim the function is using, that can be set globally
-    to the program with pure.magic.shim(other_shim, my_magic_func), or you can choose a named
-    shim with pure.magic.shim("subprocess", my_magic_func).
     """
 
     def __init__(
         self,
         func: ty.Callable[P, R],
-        config: _MagicConfig = _MAGIC_CONFIG,
+        config: ty.Optional[_MagicConfig] = None,
     ):
         functools.update_wrapper(self, func)
         self._func_config_path = full_name_and_callable(func)[0].replace("--", ".")
 
-        self.config = config
-        self._shim = core.stack_context.StackContext[ty.Optional[ShellBuilder]](
-            str(func) + "_SHIM", None
+        self.config = config or _get_config()
+        if p_id := pipeline_id_mask.extract_from_docstr(func, require=False):
+            # this allows the docstring pipeline id to become 'the most specific' config.
+            self.config.pipeline_id.setv(p_id, self._func_config_path)
+        self._shim = core.stack_context.StackContext[ty.Union[None, ShimName, ShimOrBuilder]](
+            str(func) + "_SHIM", None  # none means nothing has been set stack-local
         )
         self.runner = MemoizingPicklingRunner(self._shimbuilder, self._get_blob_root)
-        self.pipeline_id_mask = pipeline_id_mask.extract_mask_from_docstr(func, require=False) or "magic"
         self._func = use_runner(self.runner, self._is_off)(func)
         self.__doc__ = f"{func.__doc__}\n\nMagic class info:\n{self.__class__.__doc__}"
         self.__wrapped__ = func
 
     @contextlib.contextmanager
-    def shim(self, shim_or_builder: ty.Optional[ShimOrBuilder]) -> ty.Iterator[None]:
-        with self._shim.set(make_builder(shim_or_builder) if shim_or_builder else None):
+    def shim(self, shim_or_builder: ty.Union[None, ShimName, ShimOrBuilder]) -> ty.Iterator[None]:
+        """If None is passed, no change will be made."""
+        with self._shim.set(shim_or_builder or self._shim()):
             yield
 
     @contextlib.contextmanager
@@ -128,51 +134,49 @@ class Magic(ty.Generic[P, R]):
         """off is an API for setting the shim to None,
         effectively turning off mops for the wrapped function.
         """
-        with self.shim(None):
+        with self.shim("off"):
             yield
 
     @property
-    def _shim_builder_cfg(self) -> ty.Optional[ShellBuilder]:
-        return self._shim() or self.config.shim_bld.getv(self._func_config_path)
+    def _shim_builder_or_off(self) -> ty.Optional[ShellBuilder]:
+        if stack_local_shim := self._shim():
+            return _to_shim_builder(stack_local_shim)
+        return self.config.shim_bld.getv(self._func_config_path)
 
     def _is_off(self) -> bool:
-        return self._shim_builder_cfg is None
+        return self._shim_builder_or_off is None
 
     def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shell:
         # this can be set using a stack-local context, or set globally as specifically
         # or generally as the user needs. We prefer stack local over everything else.
-        sb = self._shim_builder_cfg
+        sb = self._shim_builder_or_off
         assert sb is not None, "This should have been handled by use_runner(self._off)"
         return sb(f, args, kwargs)
 
     def _get_blob_root(self) -> str:
         return self.config.blob_root.getv(self._func_config_path)()
 
+    @property
+    def _pipeline_id(self) -> str:
+        return self.config.pipeline_id.getv(self._func_config_path)
+
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """This is the wrapped function."""
-        with pipeline_id_mask.pipeline_id_mask(self.pipeline_id_mask):
+        with pipeline_id_mask.pipeline_id_mask(self._pipeline_id):
             return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
-        return f"Magic({self._func_config_path})"
-
-
-_MAGIC_VAULT: ty.Dict[str, Magic] = dict()
-# not sure what we're going to use this for but I have a feeling we'll want it.
-
-
-def _to_shim_builder(shim: ty.Union[None, ShimName, ShimOrBuilder]) -> ty.Optional[ShellBuilder]:
-    if isinstance(shim, str):
-        return _shim_name_to_builder(shim)
-    elif shim is not None:
-        return make_builder(shim)
-    return None
+        return (
+            f"Magic('{self._func_config_path}', shim={self._shim_builder_or_off},"
+            f" blob_root='{self._get_blob_root()}', pipeline_id='{self._pipeline_id}')"
+        )
 
 
 def _magic(
     config: _MagicConfig,
     shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None],
     blob_root: uris.UriResolvable,
+    pipeline_id: str,
 ) -> ty.Callable[[ty.Callable[P, R]], Magic[P, R]]:
     def deco(func: ty.Callable[P, R]) -> Magic[P, R]:
         fully_qualified_name = full_name_and_callable(func)[0].replace("--", ".")
@@ -180,9 +184,9 @@ def _magic(
             config.shim_bld[fully_qualified_name] = _to_shim_builder(shim_or_builder)
         if blob_root:  # could be empty string
             config.blob_root[fully_qualified_name] = uris.to_lazy_uri(blob_root)
-        magic_func = Magic(func)
-        _MAGIC_VAULT[fully_qualified_name] = magic_func
-        return magic_func
+        if pipeline_id:  # could be empty string
+            config.pipeline_id[fully_qualified_name] = pipeline_id
+        return Magic(func, config)
 
     return deco
 
@@ -190,7 +194,13 @@ def _magic(
 class _MagicApi:
     """The public API for this module.
 
-    Entirely static methods, but this way we can do magic() or magic.shim(), etc.
+    Each of these methods makes a global change to your application, so they're designed
+    to be used at import time or in other situations where no functions have been called.
+
+    If you want to apply a shim, blob_root, or pipeline_id to a single function, prefer
+    the @pure.magic(shim, blob_root=your_blob_root, pipeline_id='lazing/sunday') decorator
+    approach rather than configuring them after the fact, to keep the definition as close
+    as possible to the site of use.
     """
 
     @staticmethod
@@ -198,20 +208,21 @@ class _MagicApi:
         shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
         *,
         blob_root: uris.UriResolvable = "",
+        pipeline_id: str = "",
     ) -> ty.Callable[[ty.Callable[P, R]], Magic[P, R]]:
-        return _magic(_MAGIC_CONFIG, shim_or_builder, blob_root)
+        return _magic(_get_config(), shim_or_builder, blob_root, pipeline_id)
 
     @staticmethod
     def blob_root(
-        blob_root_uri: uris.UriResolvable, pathable: path_config.Pathable = None, *, mask: bool = False
+        blob_root_uri: uris.UriResolvable, pathable: config_tree.Pathable = None, *, mask: bool = False
     ) -> None:
         """Sets the root URI for the blob store and control files for a specific module or function."""
-        _MAGIC_CONFIG.blob_root.setv(uris.to_lazy_uri(blob_root_uri), pathable, mask=mask)
+        _get_config().blob_root.setv(uris.to_lazy_uri(blob_root_uri), pathable, mask=mask)
 
     @staticmethod
     def shim(
-        shim: ty.Union[None, ShimName, ShimOrBuilder],
-        pathable: path_config.Pathable = None,
+        shim: ty.Union[ShimName, ShimOrBuilder],
+        pathable: config_tree.Pathable = None,
         *,
         mask: bool = False,
     ) -> None:
@@ -228,15 +239,36 @@ class _MagicApi:
         To instead _mask_ everything at this level and below regardless of more specific
         config, pass mask=True.
         """
-        _MAGIC_CONFIG.shim_bld.setv(_to_shim_builder(shim), pathable, mask=mask)
+        _get_config().shim_bld.setv(_to_shim_builder(shim), pathable, mask=mask)
 
     @staticmethod
-    def off(pathable: path_config.Pathable = None, *, mask: bool = False) -> None:
+    def off(pathable: config_tree.Pathable = None, *, mask: bool = False) -> None:
         """Turn off mops for everything matching the pathable.
 
         A shortcut for shim(None).
         """
-        _MagicApi.shim(None, pathable, mask=mask)
+        _MagicApi.shim("off", pathable, mask=mask)
+
+    @staticmethod
+    def pipeline_id(
+        pipeline_id: str, pathable: config_tree.Pathable = None, *, mask: bool = False
+    ) -> None:
+        """Sets the pipeline_id for a specific module or function."""
+        _get_config().pipeline_id.setv(pipeline_id, pathable, mask=mask)
+
+    @staticmethod
+    def load_config_file(magic_config: ty.Optional[Path] = None) -> None:
+        """Call this to load pure.magic config from the nearest .mops.toml file upward,
+        or the path you provide.
+
+        Should be called only once, in the `__main__` block of your program,
+        and after all imports are resolved.
+        """
+        all_config = config.load(magic_config or config.first_found_config_file(), name="pure.magic")
+        m_config = _get_config()
+        m_config.shim_bld.load_config(all_config)
+        m_config.blob_root.load_config(all_config)
+        m_config.pipeline_id.load_config(all_config)
 
     @staticmethod
     def local_root() -> str:

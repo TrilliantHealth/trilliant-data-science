@@ -26,6 +26,8 @@ if __name__ == "__main__":
     parser.add_argument("--disable-mops", "-d", action="store_true")
     args = parser.parse_args()
 
+    pure.magic.load_config_file()
+
     os.environ["URI"] = args.blob_store_uri
     # the environ thing is a bit of a hack, to make this work recursively across processes.
 

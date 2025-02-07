@@ -12,7 +12,7 @@ NOTE: Normally, `mops` would be used with a cloud-based blob store and some kind
 import sys
 from thds.mops import pure
 
-@pure.magic()  # memoizes inside ~/.mops-root by default
+@pure.magic()  # memoizes inside ~/.mops/ by default
 def fibonacci(n: int) -> int:
     if n <= 1:
         return n
@@ -23,25 +23,25 @@ if __name__ == '__main__':
     print(f"fibonacci({n}) == {fibonacci(n)}")
 ----
 
-* `python docs/fibonacci.py 20`
+* `python docs/fibonacci.py 30`
 
-If you run the above code, you'll see a lot of logs - `mops` logs at `INFO` level by default. What you should notice is that the code starts out with a lot of logs with green backgrounds that say `+Invoking file://~/.mops-root/...+`, as `mops` runs `fibonacci` with the relevant arguments for the first time... but quickly there start to be blue background logs saying `+memoized value for file://~/.mops-root/... already exists and is being returned without invocation!+`. `mops` is running `fibonacci` every time it finds new arguments for the function - but when it finds previously-completed calls with the same arguments, it reuses the memoized result.
+If you run the above code, you'll see a lot of logs - `mops` logs at `INFO` level by default. What you should notice is that the code starts out with a lot of logs with green backgrounds that say `+Invoking file://~/.mops/...+`, as `mops` runs `fibonacci` with the relevant arguments for the first time... but quickly there start to be blue background logs saying `+memoized value for file://~/.mops/... already exists and is being returned without invocation!+`. `mops` is running `fibonacci` every time it finds new arguments for the function - but when it finds previously-completed calls with the same arguments, it reuses the memoized result.
 
-Eventually the program prints `fibonacci(20) == 6765`, and it's done!
+Eventually the program prints `fibonacci(30) == 832040`, and it's done!
 
-The second time you run this program... it will emit only a single 'blue' log, and immediately print `fibonacci(20) == 6765`. The very first call was one that it had seen before, and it reused the result directly.
+The second time you run this program... it will emit only a single 'blue' log, and immediately print `fibonacci(30) == 832040`. The very first call was one that it had seen before, and it reused the result directly.
 
 Try a third time, with `python docs/fibonacci.py 21`, and you'll get what you expected - only a single new function invocation, and everything else is reused from the previous runs.
 
 ## How does this work?
 
-Look inside the `~/.mops-root/mops2-mpf` directory. You'll see the folder `magic`. This corresponds to the `pipeline-id` set by default with the `pure.magic` decorator. If you link:memoization.adoc#pipeline-id[change] this `pipeline-id`, your previous runs won't be reused, and you'll see a new folder created with the changed pipeline id mask. You can change it in [several ways](pipeline-ids.adoc) depending on your needs.
+Look inside the `~/.mops/mops2-mpf` directory. You'll see the folder `magic`. This corresponds to the `pipeline-id` set by default with the `pure.magic` decorator. If you link:memoization.adoc#pipeline-id[change] this `pipeline-id`, your previous runs won't be reused, and you'll see a new folder created with the changed pipeline id mask. You can change it in [several ways](pipeline-ids.adoc) depending on your needs.
 
-Look inside `~/.mops-root/mops2-mpf/magic`. You'll see the folder `+__main__--fibonacci+`. This is the `+{module}--{function.__name__}+` for your function. This keeps each and every function in your system distinct from every other, no matter what.
+Look inside `~/.mops/mops2-mpf/magic`. You'll see the folder `+__main__--fibonacci+`. This is the `+{module}--{function.__name__}+` for your function. This keeps each and every function in your system distinct from every other, no matter what.
 
-Look inside `+~/.mops-root/mops2-mpf/magic/__main__--fibonacci+`. You'll see 20 directories, each with an odd three-word name with more base64-encoded gibberish after it. This is the SHA256 hash of the arguments to your function - in this case, only `n`. Inside each of these is an `invocation`, a `result`, a `lock` directory, and a `result-metadata-...` file. The only ones you care about are `invocation` and `result`.
+Look inside `+~/.mops/mops2-mpf/magic/__main__--fibonacci+`. You'll see 30 directories, each with an odd three-word name with more base64-encoded gibberish after it. This is the SHA256 hash of the arguments to your function - in this case, only `n`. Inside each of these is an `invocation`, a `result`, a `lock` directory, and a `result-metadata-...` file. The only ones you care about are `invocation` and `result`.
 
-Run `+mops-inspect file://~/.mops-root/mops2-mpf/magic/__main__--fibonacci/GhostJamLayer._ClxDsKdEb8h6isreN4jt8R0cVmsIIemKaADUOs+`. You should see output that looks something like:
+Run `+mops-inspect file://~/.mops/mops2-mpf/magic/__main__--fibonacci/GhostJamLayer._ClxDsKdEb8h6isreN4jt8R0cVmsIIemKaADUOs+`. You should see output that looks something like:
 
 [%nowrap,source,python]
 ----
@@ -76,6 +76,6 @@ IRE(
 You've successfully installed and used `mops`. Although it's a toy example, everything you need for local-only memoization is already working.
 
 If you want to do very expensive computations inside automagically-launched subprocesses, rather than in the same thread as `@pure.magic()` does by default, you could call it as `@pure.magic('subprocess')`.footnote:[Technically, you'll also need to move your function into a separate module from your `+__main__+`, as Python makes it difficult to track down the actual module your code is in if it's being run as main.] If you prefer to provide a different shim, like a Kubernetes runner, see the further link:magic.adoc[docs on `pure.magic`].
-Believe it or not... if you have read+write access to an ADLS Storage Account and Container, you can replace the default `"file://.mops-root"` blob root like so: `@pure.magic(blob_root="adls://yoursa/container/")`, and `mops` will automatically share your results across any other users of the same SA+Container.
+Believe it or not... if you have read+write access to an ADLS Storage Account and Container, you can replace the default `"file://~/.mops"` blob root like so: `@pure.magic(blob_root="adls://yoursa/container/")`, and `mops` will automatically share your results across any other users of the same SA+Container.
 
 Sprinkle in some Docker images and a Kubernetes cluster (using the built-in `mops.k8s.mops_shell`), and you'll have remotely-running Python code just by calling your own functions.

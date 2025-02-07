@@ -169,6 +169,9 @@ class ConfigItem(ty.Generic[T]):
             raise UnconfiguredError(f"Config item '{self.name}' has not been configured!")
         return self.global_value
 
+    def __repr__(self) -> str:
+        return f"ConfigItem('{self.name}', {self()})"
+
 
 def tobool(s_or_b: ty.Union[str, bool]) -> bool:
     """A reasonable implementation that we could expand in the future."""

@@ -1,10 +1,39 @@
 link:../README.adoc[↑]
 
-# pipeline ids
+= pipeline ids
 
 This is a basic grouping mechanism for `mops` control files and outputs.
 
-## What does it do?
+== Usage
+
+The pipeline id is chosen for each `mops` wrapped function at the time of call. It can be
+set in many ways - probably too many ways. :)
+
+  - it can be set for an entire module or module tree link:magic.adoc#pipeline-id[with `@pure.magic.pipeline_id('baz')`]
+  - `@pure.magic` sets a default pipeline id of `magic`.
+  - it can be passed to the decorator: `@pure.magic(pipeline_id='baz')`
+  - it can be set in the function docstring:
++
+[source,python]
+----
+@pure.use_runner(MemoizingPicklingRunner(...))
+def foobar(...):
+   """some docs...
+   pipeline-id: baz
+   """
+   ...
+----
++
+  - it can be 'masked' with `pure.pipeline_id_mask` on a stack-local basis, used as a decorator
+    or as a context manager:
++
+[source,python]
+----
+pure.pipeline_id_mask('baz')(foobar)(*args)
+----
+  - Each of the above will override a usage above it in the list.
+
+== What does it do?
 
 When you run something under `mops`, `mops` puts its own files 'underneath' a root of
 `mops2-mpf`.footnote:[`mops` itself is unaware of hierarchy, but your blob store may allow
@@ -19,10 +48,10 @@ but the next piece will be the fully-qualified name of your module-level callabl
 that, any `function-logic-key` added to the docstring, and, finally, an odd-looking string
 that is actually a hash of the arguments to your callable.
 
-
 In addition to the `mops2-mpf` control files, there may also be paths under the root that
-begin with the pipeline id directly. Let's say you have 2 functions using `@pure.magic` with no customizations.
-If you look underneath `.mops-root` in the local directory, you may see only:
+begin with the pipeline id directly. Let's say you have 2 functions using `@pure.magic`
+with no customizations.  If you look underneath `.mops-root` in the local directory, you
+may see only:
 
 [source]
 ----
@@ -50,7 +79,7 @@ There's a lot of similarity in the layout here, but the ``mops``-specific contro
 are within `mops2-mpf`, whereas your data is not - but it still uses the pipeline id as a
 prefix to help with grouping.
 
-## Purpose
+== Purpose
 
 As you can see, the pipeline id functions mainly as a grouping mechanism. Because `mops`
 will name certain large output blobs for you,footnote:[It's common to write 'impure'
@@ -64,7 +93,7 @@ NOTE: Another use that can be served by a pipeline id is to allow you to 'start 
 entire set of functions. For various reasons, you might find yourself wanting to re-run
 everything from scratch without any memoized results.
 
-By setting a different pipeline id (often via `pipeline_id_mask` near the root of your
+By setting a different pipeline id (often via `pure.magic.pipeline_id` near the root of your
 application), you will 'invalidate the cache' for everything all at once; be deliberate!
 You may want to switch to the new run completely, and if you later remove the pipeline id
 mask, you'll return to the previous set of results.
