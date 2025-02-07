@@ -5,7 +5,7 @@
 # to avoid requiring the additional dependency.
 
 from . import adls  # noqa
-from ._magic import magic  # noqa
+from ._magic.api import magic  # noqa
 from .core.entry import register_entry_handler
 from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa

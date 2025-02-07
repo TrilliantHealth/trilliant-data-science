@@ -11,9 +11,9 @@ from ...config import TEST_TMP_URI
 
 @pytest.fixture
 def clear_magic():
-    pure._magic._MAGIC_CONFIG = pure._magic._MagicConfig()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
     yield
-    pure._magic._MAGIC_CONFIG = pure._magic._MagicConfig()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
 
 
 @pure.magic(blob_root=TEST_TMP_URI, pipeline_id=f"test/pure-magic/{datetime.utcnow().isoformat()}")
@@ -35,7 +35,7 @@ def test_load_magic_config(clear_magic):
     pure.magic.load_config_file(config_file)
 
     print()
-    print("config before", pure._magic._get_config())
+    print("config before", pure._magic.api._get_config())
     print()
 
     @pure.magic()

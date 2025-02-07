@@ -5,7 +5,7 @@ from thds.mops import pure
 
 
 def _blob_root() -> str:
-    return os.getenv("URI") or pure.magic.local_root()
+    return os.getenv("URI") or ""
 
 
 @pure.magic(blob_root=_blob_root)
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("n", type=int)
     parser.add_argument(
         "--blob-store-uri",
-        default=_blob_root(),
+        default=_blob_root() or fibonacci._get_blob_root(),
         help="must be a URI with a scheme:// that is supported by a registered blob store",
     )
     parser.add_argument("--disable-mops", "-d", action="store_true")
