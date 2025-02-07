@@ -15,13 +15,13 @@ from .core.memo.function_memospace import (  # noqa
 from .core.pipeline_id import get_pipeline_id, set_pipeline_id  # noqa
 from .core.pipeline_id_mask import pipeline_id_mask  # noqa
 from .core.source import create_source_at_uri  # noqa
-from .core.types import Args, Kwargs, Runner  # noqa
+from .core.types import Args, BlobStore, Kwargs, Runner  # noqa
 from .core.uris import UriIsh, UriResolvable, register_blob_store  # noqa
 from .core.use_runner import use_runner  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
-from .runner import Shim, ShimBuilder  # noqa
 from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
+from .runner.types import Shim, ShimBuilder  # noqa
 
 
 def _register_things():

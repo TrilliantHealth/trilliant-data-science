@@ -2,7 +2,7 @@
 
 `mops` is a Python library for ML Operations.
 
-Jump to link:docs/quickstart.adoc[Quickstart] if +++<del>+++you're impatient+++</del>+++ prefer examples, like me!
+Jump to link:docs/quickstart.adoc[Quickstart] if you +++<del>+++are impatient+++</del>+++ prefer examples, like me!
 
 `mops` solves for four core design goals:
 

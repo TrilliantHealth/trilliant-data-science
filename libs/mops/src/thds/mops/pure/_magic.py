@@ -24,9 +24,9 @@ from .core import file_blob_store, pipeline_id_mask, uris
 from .core.memo.unique_name_for_function import full_name_and_callable
 from .core.use_runner import use_runner
 from .pickling.mprunner import MemoizingPicklingRunner
-from .runner import Shim, ShimBuilder
 from .runner.shim_builder import make_builder
 from .runner.simple_shims import samethread_shim, subprocess_shim
+from .runner.types import Shim, ShimBuilder
 
 ShimName = ty.Literal[
     "samethread",  # memoization and coordination, but run in the same thread as the caller.
@@ -62,12 +62,12 @@ class _MagicConfig:
         # these ConfigTree objects apply configuration to callables wrapped with pure.magic
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
         self.shim_bld = config_tree.ConfigTree[ty.Optional[ShimBuilder]](
-            "mops.pure.shim", parse=_to_shim_builder  # type: ignore
+            "mops.pure.magic.shim", parse=_to_shim_builder  # type: ignore
         )
         self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
-            "mops.pure.blob_root", parse=uris.to_lazy_uri
+            "mops.pure.magic.blob_root", parse=uris.to_lazy_uri
         )
-        self.pipeline_id = config_tree.ConfigTree[str]("mops.pure.pipeline_id")
+        self.pipeline_id = config_tree.ConfigTree[str]("mops.pure.magic.pipeline_id")
         self.blob_root[""] = _local_root  # default Blob Store
         self.shim_bld[""] = make_builder(samethread_shim)  # default Shim
         self.pipeline_id[""] = "magic"  # default pipeline_id
@@ -215,9 +215,9 @@ class _MagicApi:
     @staticmethod
     def blob_root(
         blob_root_uri: uris.UriResolvable, pathable: config_tree.Pathable = None, *, mask: bool = False
-    ) -> None:
+    ) -> core.config.ConfigItem[ty.Callable[[], str]]:
         """Sets the root URI for the blob store and control files for a specific module or function."""
-        _get_config().blob_root.setv(uris.to_lazy_uri(blob_root_uri), pathable, mask=mask)
+        return _get_config().blob_root.setv(uris.to_lazy_uri(blob_root_uri), pathable, mask=mask)
 
     @staticmethod
     def shim(
@@ -225,7 +225,7 @@ class _MagicApi:
         pathable: config_tree.Pathable = None,
         *,
         mask: bool = False,
-    ) -> None:
+    ) -> core.config.ConfigItem[ty.Optional[ShimBuilder]]:
         """Use the provided shim for everything matching the pathable,
         unless there's a more specific path that matches.
 
@@ -239,7 +239,7 @@ class _MagicApi:
         To instead _mask_ everything at this level and below regardless of more specific
         config, pass mask=True.
         """
-        _get_config().shim_bld.setv(_to_shim_builder(shim), pathable, mask=mask)
+        return _get_config().shim_bld.setv(_to_shim_builder(shim), pathable, mask=mask)
 
     @staticmethod
     def off(pathable: config_tree.Pathable = None, *, mask: bool = False) -> None:
@@ -252,9 +252,9 @@ class _MagicApi:
     @staticmethod
     def pipeline_id(
         pipeline_id: str, pathable: config_tree.Pathable = None, *, mask: bool = False
-    ) -> None:
+    ) -> core.config.ConfigItem[str]:
         """Sets the pipeline_id for a specific module or function."""
-        _get_config().pipeline_id.setv(pipeline_id, pathable, mask=mask)
+        return _get_config().pipeline_id.setv(pipeline_id, pathable, mask=mask)
 
     @staticmethod
     def load_config_file(magic_config: ty.Optional[Path] = None) -> None:
