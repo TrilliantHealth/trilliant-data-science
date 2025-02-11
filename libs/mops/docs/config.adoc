@@ -39,10 +39,10 @@ set the config for all code called 'below' your `with` statement, like so:
 ----
 with mops.config.set_config("mops", "k8s", "namespace")(your_value):
     call_some_func()
-	do_more_stuff()
-	# everything in here will see your config value,
-	# while anything else running in the same process
-	# will see whatever the previously-configured value is.
-	...
+    do_more_stuff()
+    # everything in here will see your config value,
+    # while anything else running in the same process
+    # will see whatever the previously-configured value is.
+    ...
 use_original_config()  # and this will not see the configured value from above
 ----

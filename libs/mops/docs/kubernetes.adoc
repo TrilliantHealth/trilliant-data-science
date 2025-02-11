@@ -28,11 +28,11 @@ providing resource requests or limitations. For example, you might create a modu
 from thds import mops
 
 df_k8s_spot_11g_shim = mops.k8s.shim(
-    mops_k8s.autocr('ds/demand-forecast:latest'),
+    mops.k8s.autocr('ds/demand-forecast:latest'),
     # gotta specify which container this runs on
     node_narrowing=dict(
         resource_requests={"cpu": "3.6", "memory": "11G"},
-        tolerations=[mops_k8s.tolerates_spot()],
+        tolerations=[mops.k8s.tolerates_spot()],
     ),
 )
 ----
@@ -107,8 +107,9 @@ In any case, if you're running a new process, or have recently changed something
 keep an eye on the API or console for ImageBackOff errors that might be an indication that you've asked
 `mops` to create a Job with an image that simply does not exist.
 
-Alternatively, you can take a look at the link:../src/thds/mops/k8s/image_backoff[machinery] we have
-made available that may help you detect this.
+Alternatively, you can take a look at the
+link:../src/thds/mops/k8s/warn_image_backoff.py[machinery] we have made available that may
+help you detect this.
 
 ## Orchestrator pods
 

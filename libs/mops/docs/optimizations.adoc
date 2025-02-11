@@ -119,7 +119,7 @@ the result data will take place (and no downloads of any kind), as all input dat
 and the output data is already present locally after return.
 
 NOTE: the `source.uri` for a file that **does** exist locally will be a file URI (`file://...`), whereas
-the `source.uri` for a file that **does not** exist locally will be the remote URI (ex `adls://...`).
+the `source.uri` for a file that **does not** exist locally will be the remote URI (e.g., `adls://...`).
 
 NOTE: Again, `Source` is now the standard recommendation for how to pass file-like read-only data into your
 functions, and return it as a value to consumers after creation. As long as your data can be treated as
@@ -152,10 +152,10 @@ runner = MemoizingPicklingRunner(...)
 
 def your_orchestrator(...):
     ...
-	runner.shared(training_x_df, y=training_y_ndarr)
+    runner.shared(training_x_df, y=training_y_ndarr)
 
     ...
-	the_remote_df_func(training_x_df, training_y_ndarr, ...)
+    the_remote_df_func(training_x_df, training_y_ndarr, ...)
 
 
 @use_runner(runner)
