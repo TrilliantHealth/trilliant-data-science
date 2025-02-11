@@ -24,7 +24,7 @@ from .runner_registry import run_named_entry_handler
 logger = getLogger(__name__)
 
 
-def main() -> None:
+def main():
     """Routes the top level remote function call in a new process."""
     start = default_timer()
     start_timestamp = time.time()

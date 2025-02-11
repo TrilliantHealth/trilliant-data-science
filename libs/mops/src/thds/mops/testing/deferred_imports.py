@@ -16,7 +16,7 @@ def module_name_re(modules: ty.Collection[str]) -> ty.Pattern[str]:
 def module_names_from_import_statement(import_stmt: str) -> ty.Set[str]:
     statements = ast.parse(import_stmt).body
 
-    def _extract_imports(imp: ty.Any) -> ty.Iterable[str]:
+    def _extract_imports(imp) -> ty.Iterable[str]:
         names: ty.Iterable[ty.Optional[str]]
         if isinstance(imp, ast.Import):
             names = (n.name for n in imp.names)
@@ -36,7 +36,7 @@ def module_names_from_import_statement(import_stmt: str) -> ty.Set[str]:
 
 
 @contextmanager
-def clear_and_restore_import_cache(module_name_filter: ty.Callable[[str], ty.Any]) -> ty.Iterator[None]:
+def clear_and_restore_import_cache(module_name_filter: ty.Callable[[str], ty.Any]):
     already_imported = [name for name in sys.modules if module_name_filter(name)]
     if already_imported:
         getLogger(__name__).debug(
@@ -51,7 +51,7 @@ def clear_and_restore_import_cache(module_name_filter: ty.Callable[[str], ty.Any
         sys.modules.update(to_restore)
 
 
-def assert_dev_deps_not_imported(import_statement: str, forbidden_modules: ty.Collection[str]) -> None:
+def assert_dev_deps_not_imported(import_statement: str, forbidden_modules: ty.Collection[str]):
     """One of the primary features of `mops` is to provide global memoization of pure function calls
     using remote storage mechanisms. Sometimes, as a library author, you'd like to pre-compute the
     result of such a function call, memoizing it and making it available to downstream users without

@@ -20,13 +20,17 @@ from thds.core.types import StrOrPath
 from ._progress import report_download_progress
 from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from .download_lock import download_lock
-from .errors import MD5MismatchError, translate_azure_error
+from .errors import translate_azure_error
 from .etag import match_etag
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_file
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
 logger = log.getLogger(__name__)
+
+
+class MD5MismatchError(Exception):
+    """Indicates that something needs to be done by the developer to correct a hash mismatch."""
 
 
 @contextlib.contextmanager
