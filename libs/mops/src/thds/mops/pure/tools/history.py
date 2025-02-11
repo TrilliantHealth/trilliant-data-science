@@ -1,6 +1,4 @@
 """Find out how long a run took by looking at outputs to ADLS."""
-
-import typing as ty
 from datetime import timezone
 
 from thds.adls.global_client import get_global_fs_client
@@ -8,7 +6,7 @@ from thds.adls.global_client import get_global_fs_client
 from ..adls._files import yield_files
 
 
-def summarize(sa: str, container: str, pipeline_root_dir: str) -> ty.Dict[str, ty.Any]:
+def summarize(sa: str, container: str, pipeline_root_dir: str):
     times = list()
     durations = list()
     total_functions = 0

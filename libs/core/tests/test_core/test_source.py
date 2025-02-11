@@ -4,9 +4,14 @@ from pathlib import Path
 import pytest
 
 from thds.core.hashing import Hash
-from thds.core.source import Source
-from thds.core.source._construct import from_file, from_uri, to_uri
-from thds.core.source._download import SourceHashMismatchError, _get_download_handler
+from thds.core.source import (
+    Source,
+    SourceHashMismatchError,
+    _get_download_handler,
+    from_file,
+    from_uri,
+    to_uri,
+)
 
 
 def test_source_from_file_is_openable(temp_file):
