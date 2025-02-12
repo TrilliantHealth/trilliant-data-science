@@ -16,7 +16,7 @@ include = [
 
 # PROJECT ENTRY POINTS
 [tool.poetry.scripts]
-krsync = "thds.mops.k8s.orchestrator.krsync:main"
+krsync = "thds.mops.k8s.tools.krsync:main"
 mops-k8s-ns = "thds.mops.k8s.namespace:main"
 mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
