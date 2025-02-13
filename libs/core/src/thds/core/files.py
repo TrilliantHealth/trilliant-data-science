@@ -19,7 +19,7 @@ FILE_SCHEME = "file://"
 logger = getLogger(__name__)
 
 
-def set_read_only(fpath: StrOrPath) -> None:
+def set_read_only(fpath: StrOrPath):
     # thank you https://stackoverflow.com/a/51262451
     logger.debug("Setting '%s' to read-only", fpath)
     perms = stat.S_IMODE(os.lstat(fpath).st_mode)
@@ -87,7 +87,7 @@ def set_file_limit(n: int):
     assert resource.getrlimit(resource.RLIMIT_NOFILE) == (n, n)
 
 
-def bump_limits() -> None:
+def bump_limits():
     """It was common to have to do this manually on our macs. Now that is no longer required."""
     set_file_limit(OPEN_FILES_LIMIT())
 
