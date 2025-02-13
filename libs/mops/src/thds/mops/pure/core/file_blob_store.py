@@ -29,8 +29,6 @@ def _link(path: Path, remote_uri: str) -> None:
 
 def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc) -> None:
     """Write data to a local path. It is very hard to support all the same inputs that ADLS does. :("""
-    assert remote_uri.startswith(FILE_SCHEME)
-
     path = None
     if isinstance(data, str):
         path = Path(data)

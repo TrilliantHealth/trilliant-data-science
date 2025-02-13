@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("n", type=int)
     parser.add_argument(
-        "--blob-store-uri",
+        "--blob-root",
         default=_blob_root() or fibonacci._get_blob_root(),
         help="must be a URI with a scheme:// that is supported by a registered blob store",
     )
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     pure.magic.load_config_file()
 
-    os.environ["URI"] = args.blob_store_uri
+    os.environ["URI"] = args.blob_root
     # the environ thing is a bit of a hack, to make this work recursively across processes.
 
     n = args.n
