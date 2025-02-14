@@ -20,7 +20,7 @@ def find_common_prefix(uris: ty.Iterable[str]) -> ty.List[str]:
 def find(paths: ty.Iterable[str], higher_logical_root: str = "") -> str:
     common = find_common_prefix(paths)
     if not higher_logical_root:
-        return "/".join(common)
+        return "/".join(common)  # lowest common root
 
     # Split higher_logical_root into components
     root_parts = higher_logical_root.split("/")
@@ -28,6 +28,9 @@ def find(paths: ty.Iterable[str], higher_logical_root: str = "") -> str:
     # Look for the sequence of parts in common
     for i in range(len(common) - len(root_parts) + 1):
         if common[i : i + len(root_parts)] == root_parts:
-            return "/".join(common[: i + len(root_parts)])
+            return "/".join(common[: i + 1])
+        # the logical root is the top level directory that corresponds to the
+        # higher_logical_root string, which may have multiple components that needed to
+        # match. So we take the common parts plus 1 to get that top level root.
 
     raise ValueError(f"Higher root '{higher_logical_root}' not found")

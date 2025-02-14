@@ -24,7 +24,7 @@ def test_multi_component_higher_root():
         "adls://duck/horse/hippo/horse/foo/a/c",
         "adls://duck/horse/hippo/horse/foo/bar/quux",
     ]
-    assert logical_root.find(uris, "duck/horse") == "adls://duck/horse"
+    assert logical_root.find(uris, "duck/horse") == "adls://duck"
 
 
 def test_empty_uri_list_returns_empty_str():
