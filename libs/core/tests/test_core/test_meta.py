@@ -223,20 +223,20 @@ def test_format_name_unsupported() -> None:
 
 def test_get_user_from_envvar(caplog) -> None:
     with envvars(THDS_USER=USER_NAME):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.get_user() == USER_NAME
         assert "`get_user` reading from env var." in caplog.text
 
 
 def test_get_hive_user_from_envvar(caplog) -> None:
     with envvars(THDS_USER=USER_NAME):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.get_user(format="hive") == HIVE_USER_NAME
         assert "`get_user` reading from env var." in caplog.text
 
 
 def test_get_user_from_metadata(caplog, mock_read_metadata: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_user(PACKAGE_NAME) == USER_NAME
     assert mock_read_metadata.called
     assert "`get_user` reading from metadata." in caplog.text
@@ -246,7 +246,7 @@ def test_get_user_from_metadata_no_metadata(
     caplog, mock_read_metadata: MagicMock, mock_getuser: MagicMock
 ) -> None:
     mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_user(PACKAGE_NAME) == USER_NAME
     assert mock_getuser.called
     assert "`get_user` reading from metadata." in caplog.text
@@ -254,7 +254,7 @@ def test_get_user_from_metadata_no_metadata(
 
 
 def test_get_user_no_user(caplog, mock_getuser: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_user() == USER_NAME
     assert mock_getuser.called
     assert "`get_user` found no user data - getting system user." in caplog.text
@@ -325,13 +325,13 @@ def test_extract_timestamp_unsupported_version_format() -> None:
 
 def test_get_commit_from_envvar(caplog) -> None:
     with envvars(GIT_COMMIT=COMMIT_HASH):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.get_commit() == COMMIT_HASH
         assert "`get_commit` reading from env var." in caplog.text
 
 
 def test_get_commit_from_git_repo(caplog, mock_git_commit: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.git"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_commit() == COMMIT_HASH
     assert mock_git_commit.called
     assert "`get_commit` reading from Git repo." in caplog.text
@@ -341,7 +341,7 @@ def test_get_commit_from_metadata(
     caplog, mock_git_commit: MagicMock, mock_read_metadata: MagicMock
 ) -> None:
     mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_commit(PACKAGE_NAME) == COMMIT_HASH
     assert mock_git_commit.called
     assert mock_read_metadata.called
@@ -353,7 +353,7 @@ def test_get_commit_from_metadata_no_metadata(
 ) -> None:
     mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
     mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert not meta.get_commit(PACKAGE_NAME)
     assert mock_git_commit.called
     assert mock_read_metadata.called
@@ -363,7 +363,7 @@ def test_get_commit_from_metadata_no_metadata(
 
 def test_get_commit_no_commit(caplog, mock_git_commit: MagicMock) -> None:
     mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.WARNING, logger="thds.core.meta"):
+    with caplog.at_level(logging.WARNING):
         assert not meta.get_commit()
     assert mock_git_commit.called
     assert "`get_commit` found no commit." in caplog.text
@@ -371,20 +371,20 @@ def test_get_commit_no_commit(caplog, mock_git_commit: MagicMock) -> None:
 
 def test_is_clean_from_clean_envvar(caplog) -> None:
     with envvars(GIT_IS_CLEAN="True"):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.is_clean()
         assert "`is_clean` reading from env var." in caplog.text
 
 
 def test_is_clean_from_dirty_envvar(caplog) -> None:
     with envvars(GIT_IS_DIRTY=""):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.is_clean()
         assert "`is_clean` reading from env var." in caplog.text
 
 
 def test_is_clean_from_git_repo(caplog, mock_git_is_clean: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.git"):
+    with caplog.at_level(logging.DEBUG):
         assert not meta.is_clean()
     assert mock_git_is_clean.called
     assert "`is_clean` reading from Git repo." in caplog.text
@@ -394,7 +394,7 @@ def test_is_clean_from_metadata(
     caplog, mock_git_is_clean: MagicMock, mock_read_metadata: MagicMock
 ) -> None:
     mock_git_is_clean.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.is_clean(PACKAGE_NAME)
     assert mock_git_is_clean.called
     assert "`is_clean` reading from metadata." in caplog.text
@@ -405,7 +405,7 @@ def test_is_clean_from_metadata_no_metadata(
 ) -> None:
     mock_git_is_clean.side_effect = subprocess.CalledProcessError(-1, [])
     mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert not meta.is_clean(PACKAGE_NAME)
     assert mock_git_is_clean.called
     assert mock_read_metadata.called
@@ -423,20 +423,20 @@ def test_is_clean_no_dirtiness(caplog, mock_git_is_clean: MagicMock) -> None:
 
 def test_get_branch_from_envvar(caplog) -> None:
     with envvars(GIT_BRANCH=BRANCH_NAME):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.get_branch() == BRANCH_NAME
         assert "`get_branch` reading from env var." in caplog.text
 
 
 def test_get_hive_branch_from_envvar(caplog) -> None:
     with envvars(GIT_BRANCH=BRANCH_NAME):
-        with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+        with caplog.at_level(logging.DEBUG):
             assert meta.get_branch(format="hive") == HIVE_BRANCH_NAME
         assert "`get_branch` reading from env var." in caplog.text
 
 
 def test_get_branch_from_git_repo(caplog, mock_git_branch: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.git"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_branch() == BRANCH_NAME
     assert mock_git_branch.called
     assert "`get_branch` reading from Git repo." in caplog.text
@@ -446,7 +446,7 @@ def test_get_branch_from_metadata(
     caplog, mock_git_branch: MagicMock, mock_read_metadata: MagicMock
 ) -> None:
     mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert meta.get_branch(PACKAGE_NAME) == BRANCH_NAME
     assert mock_git_branch.called
     assert "`get_branch` reading from metadata." in caplog.text
@@ -457,7 +457,7 @@ def test_get_branch_from_metadata_no_metadata(
 ) -> None:
     mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
     mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
+    with caplog.at_level(logging.DEBUG):
         assert not meta.get_branch(PACKAGE_NAME)
     assert mock_git_branch.called
     assert mock_read_metadata.called
