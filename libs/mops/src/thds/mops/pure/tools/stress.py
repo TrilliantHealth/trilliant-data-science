@@ -3,6 +3,7 @@ import time
 import typing as ty
 from timeit import default_timer
 
+from thds.adls import defaults
 from thds.core.log import getLogger
 from thds.mops._utils.colorize import colorized
 from thds.mops.config import max_concurrent_network_ops
@@ -14,13 +15,13 @@ BROWN = colorized(fg="brown", bg="black")
 logger = getLogger(__name__)
 
 
-def _subprocess_remote(args_list):
+def _subprocess_remote(args_list: ty.Sequence[str]) -> None:
     logger.info(f"Invoking 'remote' runner with args {args_list}")
     subprocess.run(args_list)
     logger.info("Completed 'remote' runner")
 
 
-runner = MemoizingPicklingRunner(_subprocess_remote, "adls://thdsscratch/tmp/")
+runner = MemoizingPicklingRunner(_subprocess_remote, defaults.mops_root)
 adls_shell = use_runner(runner)
 
 
@@ -33,7 +34,7 @@ def run_and_sleep(i: int, data: ty.List[float], sleep: int) -> float:
     return the_sum
 
 
-def stress(max_clients: int, n: int, sleep: int):
+def stress(max_clients: int, n: int, sleep: int) -> None:
     """MemoizingPicklingRunner will perform 4 local ADLS operations (1 file
     exists, 1 push, 1 file exists and 1 file pull) per task. The
     remote runner will perform 2 more ADLS operations, which in this

@@ -12,7 +12,7 @@ class Once:
     stored until the entire Once object is disposed.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.lock = threading.Lock()
         self.events: ty.Dict[ty.Hashable, threading.Event] = dict()
 

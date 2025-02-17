@@ -85,7 +85,7 @@ class BlobStore(Protocol):
         The returned file is by definition read-only.
         """
 
-    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes"):
+    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> None:
         """Upload bytes from any stream."""
 
     def putfile(self, __path: Path, __remote_uri: str) -> None:

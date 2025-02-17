@@ -11,7 +11,7 @@ from ..core.serialize_paths import CoordinatingPathSerializer, human_sha256b64_f
 from ..pickling import sha256_b64
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("file", help="Must be an actual file")

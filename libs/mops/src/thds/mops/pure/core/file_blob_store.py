@@ -14,19 +14,19 @@ logger = log.getLogger(__name__)
 
 
 @contextmanager
-def atomic_writable(desturi: str, mode: str = "wb"):
+def atomic_writable(desturi: str, mode: str = "wb") -> ty.Iterator[ty.IO[bytes]]:
     with atomic_write_path(desturi) as temppath:
         with open(temppath, mode) as f:
             yield f
 
 
-def _link(path: Path, remote_uri: str):
+def _link(path: Path, remote_uri: str) -> None:
     dest = path_from_uri(remote_uri)
     dest.parent.mkdir(parents=True, exist_ok=True)
     assert link(path, dest), f"Link {path} to {remote_uri} failed!"
 
 
-def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc):
+def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc) -> None:
     """Write data to a local path. It is very hard to support all the same inputs that ADLS does. :("""
     assert remote_uri.startswith(FILE_SCHEME)
 
@@ -44,7 +44,7 @@ def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc):
             f.write(data)
     elif isinstance(data, str):
         with atomic_writable(remote_uri, "w") as f:
-            f.write(data)
+            f.write(data)  # type: ignore
     else:
         # if this fallback case fails, we may need to admit defeat for now,
         # and follow up by analyzing the failure and adding support for the input data type.
@@ -54,7 +54,7 @@ def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc):
 
 
 class FileBlobStore(BlobStore):
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         assert remote_uri.startswith(FILE_SCHEME)
         with path_from_uri(remote_uri).open("rb") as f:
             shutil.copyfileobj(f, stream)  # type: ignore
@@ -71,12 +71,12 @@ class FileBlobStore(BlobStore):
             raise FileNotFoundError(f"{remote_uri} does not exist")
         return p
 
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes"):
+    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> None:
         """Upload data to a remote path."""
         logger.debug(f"Writing {type_hint} to {remote_uri}")
         _put_bytes_to_file_uri(remote_uri, data)
 
-    def putfile(self, path: Path, remote_uri: str):
+    def putfile(self, path: Path, remote_uri: str) -> None:
         assert remote_uri.startswith(FILE_SCHEME)
         _link(path, remote_uri)
 
