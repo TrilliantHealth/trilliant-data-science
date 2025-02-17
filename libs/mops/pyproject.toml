@@ -60,7 +60,7 @@ build-backend = "setuptools.build_meta"
 [tool.uv.sources]
 thds-adls = { path = "../../libs/adls", editable = true }
 thds-core = { path = "../../libs/core", editable = true }
-thds-humenc = { path = "../../libs/humenc", editable = true}
+thds-humenc = { path = "../../libs/humenc", editable = true }
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
