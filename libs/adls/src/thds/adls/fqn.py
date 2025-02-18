@@ -1,10 +1,9 @@
 import re
 from functools import reduce
-from typing import NamedTuple, TypeVar, Union
+from typing import NamedTuple, Tuple, TypeVar, Union
 
-ADLS_SCHEME = (
-    "adls://"  # this is our invention, but ADLS does not appear to define one suitable for general use.
-)
+ADLS_SCHEME = "adls://"
+# this is our invention, but ADLS does not appear to define one suitable for general use.
 
 
 def join(*parts: str) -> str:
@@ -102,6 +101,13 @@ def parent(fqn: FR) -> FR:
     if "/" not in fqn.path.strip("/"):
         return AdlsFqn(fqn.sa, fqn.container, "")  # type: ignore
     return AdlsFqn(fqn.sa, fqn.container, join(*fqn.path.split("/")[:-1]))  # type: ignore
+
+
+def split(fqn: FR) -> Tuple[str, ...]:
+    if isinstance(fqn, AdlsRoot):
+        return fqn.sa, fqn.container
+    assert isinstance(fqn, AdlsFqn)
+    return tuple(filter(None, (fqn.sa, fqn.container, *fqn.path.split("/"))))
 
 
 SA_REGEX = re.compile(r"^[\w]{3,24}$")
