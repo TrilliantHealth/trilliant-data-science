@@ -24,7 +24,7 @@ R = ty.TypeVar("R")
 
 
 class _MagicConfig:
-    def __init__(self):
+    def __init__(self) -> None:
         # these ConfigTree objects apply configuration to callables wrapped with pure.magic
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
         self.shim_bld = config_tree.ConfigTree[ty.Optional[ShimBuilder]](

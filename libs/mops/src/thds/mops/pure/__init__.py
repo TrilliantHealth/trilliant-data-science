@@ -24,7 +24,7 @@ from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
 from .runner.types import Shim, ShimBuilder  # noqa
 
 
-def _register_things():
+def _register_things() -> None:
     from . import pickling
     from .core.uris import load_plugin_blobstores
 

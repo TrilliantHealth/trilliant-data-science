@@ -28,7 +28,7 @@ def register_blob_store(get_store: GetBlobStoreForUri) -> None:
     _REGISTERED_BLOB_STORES.append(get_store)
 
 
-def load_plugin_blobstores():
+def load_plugin_blobstores() -> None:
     for entry_point in importlib.metadata.entry_points().get("thds.mops.pure.blob_stores", []):
         try:
             register_blob_store(entry_point.load())

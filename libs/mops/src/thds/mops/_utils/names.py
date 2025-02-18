@@ -1,7 +1,7 @@
 import typing as ty
 
 
-def full_name_and_callable(func) -> ty.Tuple[str, ty.Callable]:
+def full_name_and_callable(func: ty.Any) -> ty.Tuple[str, ty.Callable]:
     """return {module}--{name} for an actual (non-wrapped) function or class,
     plus the unwrapped callable itself.
     """
