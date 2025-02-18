@@ -156,6 +156,19 @@ if not logging.getLogger().hasHandlers():
         except Exception as err:
             print(f"Unable to create log directory at '{log_path.parent}' - ERROR: {err}")
 
+        orig_excepthook = sys.excepthook
+
+        def log_exception_to_file(*exc_info):
+            logger = logging.getLogger()
+            console_handler = next(h for h in logger.handlers if isinstance(h, logging.StreamHandler))
+            prev_level = console_handler.level
+            console_handler.setLevel(logging.CRITICAL + 1)  # temporarily disable
+            logger.error("logging uncaught exception to file", exc_info=exc_info)
+            console_handler.setLevel(prev_level)  # restore
+            orig_excepthook(*exc_info)
+
+        sys.excepthook = log_exception_to_file
+
     logging.config.dictConfig(live_config)
     make_th_formatters_safe(logging.getLogger())
 
