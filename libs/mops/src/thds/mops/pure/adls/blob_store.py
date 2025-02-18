@@ -28,7 +28,7 @@ log.getLogger("azure.core").setLevel(logging.WARNING)
 logger = log.getLogger(__name__)
 
 
-def _selective_upload_path(path: Path, fqn: AdlsFqn):
+def _selective_upload_path(path: Path, fqn: AdlsFqn) -> None:
     if path.stat().st_size > _5_MB:
         upload_through_cache(fqn, path)
     else:
@@ -50,7 +50,7 @@ class AdlsBlobStore(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(log.logger_context(download=fqn))
         logger.debug(f"<----- downloading {type_hint}")
@@ -67,14 +67,15 @@ class AdlsBlobStore(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"):
+    def putbytes(
+        self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"
+    ) -> None:
         """Upload data to a remote path."""
         resource.upload(AdlsFqn.parse(remote_uri), data, content_type=type_hint)
-        return remote_uri
 
     @_azure_creds_retry
     @scope.bound
-    def putfile(self, path: Path, remote_uri: str):
+    def putfile(self, path: Path, remote_uri: str) -> None:
         scope.enter(log.logger_context(upload="mops-putfile"))
         _selective_upload_path(path, AdlsFqn.parse(remote_uri))
 
@@ -132,7 +133,7 @@ class DangerouslyCachingStore(AdlsBlobStore):
             return True
         return super().exists(remote_uri)
 
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         # readbytesinto is used for _almost_ everything in mops - but almost everything is a 'control file'
         # of some sort. We use a completely separate cache for all of these things, because
         # in previous implementations, none of these things would have been cached at all.

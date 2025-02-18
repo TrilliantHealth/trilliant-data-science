@@ -101,11 +101,10 @@ def colorized(fg: str, bg: str = "", style: str = "") -> ty.Callable[[str], str]
     return colorize
 
 
-def make_colorized_out(colorized, prefix: str = "", out=print):
-    if prefix[-1] != " ":
-        prefix += " "
-
-    def _out(s: str):
-        out(colorized(prefix + s))
+def make_colorized_out(
+    colorized: ty.Callable[[str], str], *, fmt_str: str = "{}", out: ty.Callable[[str], ty.Any] = print
+) -> ty.Callable[[str], None]:
+    def _out(s: str) -> None:
+        out(colorized(fmt_str.format(s)))
 
     return _out

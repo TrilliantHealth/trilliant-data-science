@@ -9,7 +9,7 @@ def a_function(a, b, c):
 
 
 def test_use_runner_skip_runner(caplog):
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.DEBUG, logger="thds.mops.pure.core.use_runner")
     with mp.Pool() as pool:
         assert 6 == use_runner(pool.apply, skip=lambda: True)(a_function)(1, 2, 3)
 
@@ -17,7 +17,7 @@ def test_use_runner_skip_runner(caplog):
 
 
 def test_use_runner_dont_skip_runner(caplog):
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.DEBUG, logger="thds.mops.pure.core.use_runner")
     with mp.Pool() as pool:
         assert 6 == use_runner(pool.apply)(a_function)(1, 2, 3)
 

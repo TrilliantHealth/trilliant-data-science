@@ -40,7 +40,7 @@ class _ResultExcWithMetadataChannel:
         logger.info(f"Remote code version: {result_metadata.remote_code_version}")
         return metadata.format_result_header(result_metadata).encode("utf-8")
 
-    def _write_metadata_only(self, prefix: str):
+    def _write_metadata_only(self, prefix: str) -> None:
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.
         If you see more than one of these files in a directory, that usually means either
         the success was preceded by a failure, _or_ it means that there was an (unusual) race condition.
@@ -51,7 +51,7 @@ class _ResultExcWithMetadataChannel:
             type_hint="text/plain",
         )
 
-    def return_value(self, r: T):
+    def return_value(self, r: T) -> None:
         return_value_bytes = _pickle.gimme_bytes(self.dumper, r)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.RESULT),
@@ -60,7 +60,7 @@ class _ResultExcWithMetadataChannel:
         )
         self._write_metadata_only("result")
 
-    def exception(self, exc: Exception):
+    def exception(self, exc: Exception) -> None:
         exc_bytes = _pickle.gimme_bytes(self.dumper, exc)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.EXCEPTION),
@@ -79,7 +79,7 @@ def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
     return invocation.func, args, kwargs
 
 
-def run_pickled_invocation(memo_uri: str, *metadata_args: str):
+def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     """The arguments are those supplied by MemoizingPicklingRunner.
 
     As of v3, we now expect a number of (required) metadata arguments with every invocation.

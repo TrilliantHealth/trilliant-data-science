@@ -40,8 +40,15 @@ class Runner(Protocol):
         ...  # pragma: no cover
 
 
-class NoResultAfterInvocationError(Exception):
+class NoResultAfterInvocationError(Exception):  # TODO remove in v4.
     """Runners should raise this if the remotely-invoked function does not provide any result."""
+
+
+class NoResultAfterShellSuccess(NoResultAfterInvocationError):
+    """Raised this if the shell returns with no error, but no result is found in the blob store.
+
+    A better name for NoResultAfterInvocationError.
+    """
 
 
 class NotARunnerContext(Exception):
@@ -78,7 +85,7 @@ class BlobStore(Protocol):
         The returned file is by definition read-only.
         """
 
-    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes"):
+    def putbytes(self, __remote_uri: str, __data: AnyStrSrc, *, type_hint: str = "bytes") -> None:
         """Upload bytes from any stream."""
 
     def putfile(self, __path: Path, __remote_uri: str) -> None:
