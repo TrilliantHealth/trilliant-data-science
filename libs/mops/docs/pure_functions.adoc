@@ -1,7 +1,9 @@
+link:../README.adoc[↑]
+
 # `mops` and Pure functions
 
 The overarching approach of `mops` is to realize the potential for _parallelizing_
-[**_functions_**](https://en.wikipedia.org/wiki/Pure_function) using simple and scalable architectural
+link:https://en.wikipedia.org/wiki/Pure_function[**_functions_**] using simple and scalable architectural
 primitives. A function which depends on nothing but its input parameter(s) and produces no meaningful
 result other than a returned value may be easily transposed into a different runtime context, and is
 therefore easily parallelized. This is the principle behind `multiprocess.Pool`, behind the `MapReduce`
@@ -9,7 +11,7 @@ paradigm, and many other implementations of the same idea.
 
 What this means for the user of this system is that you're going to have an easy time if your computation
 is already encapsulated in a pure function, and a progressively harder time (more work to be done) the
-less [pure](https://en.wikipedia.org/wiki/Pure_function) your existing computation is. You will almost
+less link:https://en.wikipedia.org/wiki/Pure_function[pure] your existing computation is. You will almost
 certainly need to refactor out any existing instances of impurity.
 
 Practically speaking, some things to avoid/remove from your functions:
@@ -19,22 +21,24 @@ Practically speaking, some things to avoid/remove from your functions:
 - Direct use of environment variables (again, pass values instead).
 - Code that modifies input arguments, e.g. a dict or list.
 - Any kind of randomness, including `datetime.now()` and friends.
-- References to files or other state external to the function (with exceptions for certain narrow usages
-  of filesystem primitives as described [here](./optimizations.md#paths))
+- Non-random things that present to link:serialization.adoc[`pickle`] as random, including the built-in `set`.footnote:[We expect to eventually support `set` transparently with a serialization shim, but this has not yet made it to the top of the backlog]
+- References to files or other state external to the function (with exceptions for explicit passing
+  of filesystem primitives as described link:./optimizations.adoc#paths[here], or
+  via link:../../core/src/thds/core/source.py[`core.Source`])
 - References to large amounts of static reference data. If possible, select only the data you need before
   passing it to the function. If not, see the docs on
-  [large shared objects](./optimizations.md#large-shared-objects)
+  link:./optimizations.adoc#large-shared-objects[large shared objects]
 - Returning a result that does not contain _everything you might possibly want to know_ about the
   completed computation.
 
-By implementing truly pure functions, we can keep the **What** (the business logic of your function)
-separate from the [**How**](./basic_usage.md) (the details of what environment it runs on), which not
+By implementing pure functions, we can keep the **What** (the business logic of your function)
+separate from the link:./basic_usage.adoc[**How**] (the details of what environment it runs on), which not
 only enables plug-and-play parallelization but also makes your code much easier to read and reason about.
 
 Ultimately, if your functions are _truly_ pure, you won't even need `mops` in the long run - you'll be
 able to find other off-the-shelf libraries and frameworks that will let you parallelize your computation.
-`mops` itself can be an implementation detail that doesn't fundamentally alter the code that you write,
-which is in itself a valuable 'feature'.
+`mops` itself strives to be an implementation detail that doesn't tie your code to itself, which is in
+itself a valuable 'feature'.
 
 ## Logical (as opposed to theoretical) purity
 

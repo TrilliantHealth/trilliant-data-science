@@ -1,6 +1,8 @@
+link:../README.adoc[↑]
+
 ## Serialization in `mops`
 
-Transferring execution from an [orchestrator](./orchestrator.md) to a [remote](./remote.md) runtime
+Transferring execution from an link:./orchestrator.adoc[orchestrator] to a link:./remote.adoc[remote] runtime
 requires some method of transferring the relevant data to the remote runtime. This is usually called
 serialization/deserialization.
 
@@ -18,14 +20,15 @@ serialization.
 
 ### multi-layer
 
-> This is purely an implementation detail, and is documented only for those who are curious about what is
-> going on under the hood...
+[sidebar]
+This is purely an implementation detail, and is documented only for those who are curious about what is
+going on under the hood...
 
 When we pickle the `(args, kwargs)` to your Python function, or the result from it, our
-[optimizations](./optimizations.md) short-circuit the standard pickling process at defined 'hook points'
-that are dynamically discovered during pickling. In other words, when we discover (recursively) some
-object that we want to handle in a non-standard, optimized way, we do not pickle that object, but instead
-a reference to it.
+link:./optimizations.adoc[optimizations] short-circuit the standard pickling process at defined 'hook
+points' that are dynamically discovered during pickling. In other words, when we discover (recursively)
+some object that we want to handle in a non-standard, optimized way, we do not pickle that object, but
+instead a reference to it.
 
 In general, that reference will actually be a separately-serialized blob stored in the same blob store as
 the invocation or result to which it belongs.

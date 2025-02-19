@@ -1,4 +1,4 @@
-"""This abstraction matches what is required by the BlobStore abstraction in remote.core.uris"""
+"""This abstraction matches what is required by the BlobStore abstraction in pure.core.uris"""
 
 import logging
 import typing as ty
@@ -7,7 +7,7 @@ from pathlib import Path
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.adls import AdlsFqn, download, join, resource, ro_cache
+from thds.adls import ADLS_SCHEME, AdlsFqn, download, join, resource, ro_cache
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_fs_client
@@ -45,6 +45,9 @@ _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9,
 
 
 class AdlsBlobStore(BlobStore):
+    def control_root(self, uri: str) -> str:
+        return str(AdlsFqn.parse(uri).root())
+
     def _client(self, fqn: AdlsFqn) -> DataLakeFileClient:
         return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path)
 
@@ -172,7 +175,11 @@ _DEFAULT_CONTROL_CACHE = config.item(
 )
 
 
-def get_store() -> BlobStore:
+def get_adls_blob_store(uri: str) -> ty.Optional[AdlsBlobStore]:
+    if not uri.startswith(ADLS_SCHEME):
+        return None
+
     if DISABLE_CONTROL_CACHE() or not _DEFAULT_CONTROL_CACHE():
         return AdlsBlobStore()
+
     return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE())

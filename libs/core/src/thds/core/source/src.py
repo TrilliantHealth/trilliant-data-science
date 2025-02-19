@@ -3,7 +3,7 @@ import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import hashing
+from .. import hashing, types
 from . import _download
 
 
@@ -84,3 +84,17 @@ class Source(os.PathLike):
 
     def __fspath__(self) -> str:
         return os.fspath(self.path())
+
+    @staticmethod
+    def from_file(
+        filename: types.StrOrPath, hash: ty.Optional[hashing.Hash] = None, uri: str = ""
+    ) -> "Source":
+        from ._construct import from_file
+
+        return from_file(filename, hash, uri)
+
+    @staticmethod
+    def from_uri(uri: str, hash: ty.Optional[hashing.Hash] = None) -> "Source":
+        from ._construct import from_uri
+
+        return from_uri(uri, hash)
