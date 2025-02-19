@@ -8,7 +8,7 @@ Jump to link:docs/quickstart.adoc[Quickstart] if you +++<del>+++are impatient+++
 
 * link:docs/optimizations.adoc[Efficient] transfer of link:docs/pure_functions.adoc[pure] function execution to link:docs/remote.adoc[remote] execution environments with more &|
   different compute resources
-* Everything in written in standard Python with basic Python primitives; no frameworks, YAML, DSLs...
+* Everything is written in standard Python with basic Python primitives; no frameworks, YAML, DSLs...
 * link:docs/memoization.adoc[Memoization] — i.e. _reproducibility and fault tolerance_ — for individual functions.
 * Droppability: `mops` shouldn't entangle itself with your code, and you should always be able to run your code with or without `mops` in the loop.
 

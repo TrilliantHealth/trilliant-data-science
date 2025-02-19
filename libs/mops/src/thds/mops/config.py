@@ -1,20 +1,9 @@
-"""This entire module is/could be a generic stack-configuration layer
-built over top of static application config that allows it to be
-selectively overridden on a per-stack/thread basis. It would get moved
-to `thds.core` without the `tomli` dependency or the `mops`-specific
-config.
-
-I just need to finish abstracting it and give it a nicer API.
-
-"""
-
 import os
 import typing as ty
 from pathlib import Path
 
-import tomli
-
 from thds.core import config, log
+from thds.mops._compat import tomllib
 
 logger = log.getLogger(__name__)
 
@@ -48,7 +37,7 @@ def first_found_config_file() -> ty.Optional[Path]:
 def load(config_file: ty.Optional[Path], name: str = "mops") -> ty.Dict[str, ty.Any]:
     if config_file:
         logger.debug("Loading %s config from %s", name, config_file)
-        return tomli.load(open(config_file, "rb"))
+        return tomllib.load(open(config_file, "rb"))
     return dict()
 
 

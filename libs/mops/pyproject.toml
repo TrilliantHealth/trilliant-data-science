@@ -32,14 +32,14 @@ azure-identity = "*"
 azure-storage-file-datalake = "*"
 # TODO make azure-* an extra; it's not _truly_ required except by our import structure.
 cachetools = "*"
-tomli = "*"
+tomli = { version = "*", python = "<3.11" }
 
 thds-adls = { path = "../../libs/adls", develop = true }
 thds-core = { path = "../../libs/core", develop = true }
 thds-humenc = { path = "../../libs/humenc", develop = true }
 
 # k8s is extra - there are other shims you can use with mops.pure.magic
-kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
+kubernetes = {version = ">=18.20", optional = true}
 tblib = "^2.0.0"
 
 [tool.poetry.extras]

@@ -230,7 +230,7 @@ def explore(...):
 ----
 
 .`+foo/quux/car.py+`
-[%nowrap,source,python]
+[source,python]
 ----
 from thds.mops import pure, k8s
 
