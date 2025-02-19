@@ -1,8 +1,8 @@
 `mops` is a Python library for ML Operations.
 
 Jump to
-[Quickstart](https://github.com/TrilliantHealth/trilliant-data-science/blob/main/libs/mops/docs/quickstart.adoc))
-if you +++<del>+++are impatient+++</del>+++ prefer examples, like me!
+[Quickstart](https://github.com/TrilliantHealth/trilliant-data-science/blob/main/libs/mops/docs/quickstart.adoc)
+if you ~~are impatient~~ prefer examples, like me!
 
 `mops` solves for three core issues:
 
