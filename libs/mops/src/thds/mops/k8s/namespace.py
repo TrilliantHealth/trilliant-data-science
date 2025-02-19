@@ -13,5 +13,5 @@ def user_namespace() -> str:
         return "CICD-Runner"
 
 
-def main():
+def main() -> None:
     print(user_namespace())

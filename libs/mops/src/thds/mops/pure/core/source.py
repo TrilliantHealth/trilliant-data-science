@@ -177,7 +177,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
     return source_.hash
 
 
-def perform_source_uploads():  # has been replaced by a general work-deferring mechanism.
+def perform_source_uploads() -> None:  # has been replaced by a general work-deferring mechanism.
     deferred_work.perform_all()
 
 

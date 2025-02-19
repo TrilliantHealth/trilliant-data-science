@@ -31,7 +31,7 @@ class K8sJobFailedError(Exception):
 
 
 class Counter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.value = 0
         self._lock = threading.Lock()
 
@@ -198,7 +198,7 @@ def launch(
 def mops_shell(
     container_image: ty.Union[str, ty.Callable[[], str]],
     disable_remote: ty.Callable[[], bool] = lambda: False,
-    **outer_kwargs,
+    **outer_kwargs: ty.Any,
 ) -> ty.Callable[[ty.Sequence[str]], None]:
     """Return a closure that can launch the given configuration and run a mops pure function.
 
@@ -219,11 +219,11 @@ def mops_shell(
         return _threadlocal_shell
 
     if isinstance(container_image, str):
-        get_container_image = lambda: container_image  # noqa: E731
+        get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731
     else:
         get_container_image = container_image
 
-    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
+    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs: ty.Any) -> None:
         assert "args" not in inner_kwargs
         launch(
             get_container_image(),
