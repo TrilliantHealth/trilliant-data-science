@@ -32,7 +32,7 @@ class V1List(ty.Protocol[T]):
 
 
 class K8sList(ty.Protocol[T]):
-    def __call__(self, *args, namespace: str, **kwargs) -> V1List[T]:
+    def __call__(self, *args: ty.Any, namespace: str, **kwargs: ty.Any) -> V1List[T]:
         ...
 
 
@@ -48,7 +48,7 @@ def yield_objects_from_list(
     server_timeout: int = 10,
     object_type_hint: str = "items",
     init: ty.Optional[ty.Callable[[], None]] = None,
-    **kwargs,
+    **kwargs: ty.Any,
 ) -> ty.Iterator[ty.Tuple[str, T]]:
     ex = None
     if init:
@@ -96,7 +96,7 @@ def yield_objects_from_list(
             ex = e
 
 
-def callback_events(on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T]]):
+def callback_events(on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T]]) -> None:
     """Suitable for use with a daemon thread."""
     for namespace, event in event_yielder:
         should_exit = on_event(namespace, event)
@@ -122,11 +122,11 @@ STARTING = colorized(fg="white", bg="orange")
 class OneShotLimiter:
     """Do an action once per provided name. Does not wait for it to complete."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.RLock()
         self._names: ty.Set[str] = set()
 
-    def __call__(self, name: str, shoot: ty.Callable[[str], ty.Any]):
+    def __call__(self, name: str, shoot: ty.Callable[[str], ty.Any]) -> None:
         """Shoot if the name has not already been shot."""
         if name in self._names:
             return
@@ -168,7 +168,7 @@ class WatchingObjectSource(ty.Generic[T]):
         backup_fetch: ty.Optional[ty.Callable[[str, str], T]] = None,
         typename: str = "object",
         starting: ty.Callable[[str], str] = STARTING,
-    ):
+    ) -> None:
         self.get_list_method = get_list_method
         self.get_name = get_name
         self.backup_fetch = backup_fetch
@@ -183,7 +183,7 @@ class WatchingObjectSource(ty.Generic[T]):
         self._last_api_update_time = 0.0
         self._limiter = OneShotLimiter()
 
-    def _start_thread(self, namespace: str):
+    def _start_thread(self, namespace: str) -> None:
         threading.Thread(
             target=callback_events,
             args=(
@@ -211,7 +211,9 @@ class WatchingObjectSource(ty.Generic[T]):
         self._last_seen_time_by_name[name] = time.monotonic()
         self._objs_by_name[name] = obj
 
-    def _get_list_method_on_restart(self, namespace: str, exc: ty.Optional[Exception]):
+    def _get_list_method_on_restart(
+        self, namespace: str, exc: ty.Optional[Exception]
+    ) -> ty.Optional[K8sList[T]]:
         suffix = ""
         if exc:
             too_old = parse_too_old_resource_version(exc)

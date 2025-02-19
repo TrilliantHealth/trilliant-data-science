@@ -36,7 +36,7 @@ def _parse_logic_key(doc: str) -> str:
     return m.group("version") if m else ""
 
 
-def extract_function_logic_key_from_docstr(obj) -> str:
+def extract_function_logic_key_from_docstr(obj: ty.Any) -> str:
     doc = getattr(obj, "__doc__", "") or ""
     return _parse_logic_key(doc)
 
@@ -45,7 +45,7 @@ extract_logic_key_from_docstr = extract_function_logic_key_from_docstr
 
 
 @lru_cache(maxsize=None)
-def make_unique_name_including_docstring_key(f) -> str:
+def make_unique_name_including_docstring_key(f: ty.Any) -> str:
     module = ""
     name = ""
     version = ""

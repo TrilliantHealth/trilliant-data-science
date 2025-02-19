@@ -191,12 +191,12 @@ def _format_metadata(
     Metadata args are of the form key=value, and are separated by commas.
     """
 
-    def to_str(value) -> str:
+    def to_str(value: ty.Any) -> str:
         if isinstance(value, datetime):
             return value.isoformat()
         return str(value)
 
-    def nospaces_to_str(value) -> str:
+    def nospaces_to_str(value: ty.Any) -> str:
         s = to_str(value)
         if " " in s:
             raise ValueError(f"Metadata value {s} contains a space. This is illegal")

@@ -4,6 +4,8 @@ impure, customizable memoization.
 
 import typing as ty
 
+from typing_extensions import ParamSpec
+
 from thds.core import log
 from thds.core.stack_context import StackContext
 
@@ -16,11 +18,13 @@ from ..pure.pickling.mprunner import NO_REDIRECT, MemoizingPicklingRunner, Redir
 logger = log.getLogger(__name__)
 
 
+R = ty.TypeVar("R")
+P = ParamSpec("P")
 F_Args_Kwargs = ty.Tuple[ty.Callable, Args, Kwargs]
 _ORIGINAL_F_ARGS_KWARGS: StackContext[ty.Optional[F_Args_Kwargs]] = StackContext("f_args_kwargs", None)
 
 
-def _perform_original_invocation(*_args, **_kwargs) -> ty.Any:
+def _perform_original_invocation(*_args: ty.Any, **_kwargs: ty.Any) -> ty.Any:
     f_args_kwargs = _ORIGINAL_F_ARGS_KWARGS()
     assert (
         f_args_kwargs is not None
@@ -63,7 +67,7 @@ class KeyedLocalRunner(MemoizingPicklingRunner):
             redirect=lambda _f, _args, _kwargs: _perform_original_invocation,
         )
 
-    def __call__(self, raw_func: ty.Callable, raw_args: Args, raw_kwargs: Kwargs):
+    def __call__(self, raw_func: ty.Callable[P, R], raw_args: P.args, raw_kwargs: P.kwargs) -> R:
         actual_function_to_call = self._pre_pickle_redirect(raw_func, raw_args, raw_kwargs)
         with _ORIGINAL_F_ARGS_KWARGS.set((actual_function_to_call, raw_args, raw_kwargs)):
             return super().__call__(*self._impure_keyfunc(raw_func, raw_args, raw_kwargs))

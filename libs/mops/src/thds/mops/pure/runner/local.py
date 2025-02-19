@@ -9,7 +9,7 @@ from pathlib import Path
 
 from thds.core import config, log, scope
 
-from ..._utils.colorize import colorized
+from ..._utils.colorize import colorized, make_colorized_out
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.partial import unwrap_partial
@@ -32,9 +32,9 @@ _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _Purple = colorized(fg="white", bg="#800080")
 logger = log.getLogger(__name__)
-_LogKnownResult = lambda s: logger.info(_DarkBlue(f" {s} "))  # noqa: E731
-_LogNewInvocation = lambda s: logger.info(_GreenYellow(f" {s} "))  # noqa: E731
-_LogAwaitedResult = lambda s: logger.info(_Purple(f" {s} "))  # noqa: E731
+_LogKnownResult = make_colorized_out(_DarkBlue, out=logger.info, fmt_str=" {} ")
+_LogNewInvocation = make_colorized_out(_GreenYellow, out=logger.info, fmt_str=" {} ")
+_LogAwaitedResult = make_colorized_out(_Purple, out=logger.info, fmt_str=" {} ")
 
 
 def invoke_via_shell_or_return_memoized(  # noqa: C901
@@ -126,7 +126,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:
             return lock.acquire(fs.join(memo_uri, "lock"), expire=timedelta(seconds=88))
 
-        def upload_invocation_and_deps():
+        def upload_invocation_and_deps() -> None:
             # we're just about to transfer to a remote context,
             # so it's time to perform any deferred work
             deferred_work.perform_all()
@@ -137,7 +137,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                 type_hint="application/mops-invocation",
             )
 
-        def debug_required_result_failure():
+        def debug_required_result_failure() -> None:
             # This is entirely for the purpose of making debugging easier. It serves no internal functional purpose.
             #
             # first, upload the invocation as an accessible marker of what was expected to exist.

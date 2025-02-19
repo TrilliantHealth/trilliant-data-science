@@ -94,7 +94,7 @@ class MemoizingPicklingRunner:
 
         self._run_directory = run_summary.create_mops_run_directory()
 
-    def shared(self, *objs: ty.Any, **named_objs: ty.Any):
+    def shared(self, *objs: ty.Any, **named_objs: ty.Any) -> None:
         """Set up memoizing pickle serialization for these objects.
 
         Provided names are used for debugging purposes only.
