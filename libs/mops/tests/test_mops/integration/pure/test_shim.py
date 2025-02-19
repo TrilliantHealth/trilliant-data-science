@@ -8,17 +8,16 @@ from pathlib import Path
 import pytest
 
 from thds.mops import tempdir
-from thds.mops.pure import MemoizingPicklingRunner, set_pipeline_id, use_runner
-from thds.mops.pure.runner import Shell
+from thds.mops.pure import MemoizingPicklingRunner, Shell, set_pipeline_id, use_runner
 
 from ...config import TEST_TMP_URI
-from ._util import _subprocess_remote, adls_shell, clear_cache
+from ._util import _subprocess_remote, adls_shim, clear_cache
 
 # this hopefully keeps the tmp bucket easier to navigate/understand
-set_pipeline_id("test/shell/" + datetime.utcnow().isoformat())
+set_pipeline_id("test/shim/" + datetime.utcnow().isoformat())
 
 
-@adls_shell
+@adls_shim
 def crazy_stuff(a: float, b: float, c: float, d: int):
     print("craaaaazy")
     return a * b / c + d
@@ -33,7 +32,7 @@ def test_crazy_stuff():
     assert val == 7.0
 
 
-@adls_shell
+@adls_shim
 def func_with_paths(a_path: Path, b: int) -> Path:
     # the Path gets transferred as a temp path - we can read its
     # contents but not use it in any other way.
@@ -74,7 +73,7 @@ def test_repeated_pipeline_id_reuses_results(caplog):
     assert exists, [r.msg for r in caplog.records]
 
 
-@adls_shell
+@adls_shim
 def raises_exception():
     raise ValueError("Oh No!")
 
@@ -88,8 +87,8 @@ def add2(i: int) -> int:
     return i + 2
 
 
-def test_shell_builder(caplog):
-    def build_shell(f: ty.Callable, args, kwargs) -> Shell:
+def test_shim_builder(caplog):
+    def build_shim(f: ty.Callable, args, kwargs) -> Shell:
         assert f is add2
         if args[0] == 1:
             return _subprocess_remote
@@ -99,7 +98,7 @@ def test_shell_builder(caplog):
 
         return _just_raise
 
-    a2 = use_runner(MemoizingPicklingRunner(build_shell, TEST_TMP_URI))(add2)  # type: ignore
+    a2 = use_runner(MemoizingPicklingRunner(build_shim, TEST_TMP_URI))(add2)  # type: ignore
 
     with pytest.raises(ValueError):
         assert a2(0) == 2

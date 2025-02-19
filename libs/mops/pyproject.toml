@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "thds.mops"
 # Patch version is a datetime determined upon release
-version = "3.5"
+version = "3.6"
 description = "ML Ops tools for Trilliant Health"
 authors = ["Trilliant Health"]
-readme = "README.md"
+readme = "docs/pypi_readme.md"
 packages = [{include = "thds", from="src"}]
 include = [
     "py.typed",
@@ -16,7 +16,7 @@ include = [
 
 # PROJECT ENTRY POINTS
 [tool.poetry.scripts]
-krsync = "thds.mops.k8s.orchestrator.krsync:main"
+krsync = "thds.mops.k8s.tools.krsync:main"
 mops-k8s-ns = "thds.mops.k8s.namespace:main"
 mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
@@ -30,15 +30,16 @@ ansicolors = "*"
 azure-core = "*"
 azure-identity = "*"
 azure-storage-file-datalake = "*"
+# TODO make azure-* an extra; it's not _truly_ required except by our import structure.
 cachetools = "*"
-tomli = "*"
+tomli = { version = "*", python = "<3.11" }
 
 thds-adls = { path = "../../libs/adls", develop = true }
 thds-core = { path = "../../libs/core", develop = true }
 thds-humenc = { path = "../../libs/humenc", develop = true }
 
-# k8s is extra - there are other shells you can use with mops.use_runner.
-kubernetes = {version = ">=18.20", optional = true}  # 22.6 is the best match for current clusters
+# k8s is extra - there are other shims you can use with mops.pure.magic
+kubernetes = {version = ">=18.20", optional = true}
 tblib = "^2.0.0"
 
 [tool.poetry.extras]
@@ -104,7 +105,7 @@ disallow_untyped_calls = false
 disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/test_mops"]
 addopts = "-v -s"
 markers = ["integration"]
 

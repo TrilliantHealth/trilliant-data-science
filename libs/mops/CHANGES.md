@@ -1,4 +1,16 @@
-### 3.5
+## 3.6
+
+- [New `pure.magic` API for `mops`](docs/magic.adoc). A collection of lessons learned and long wished-for
+  bits of developer-friendliness.
+- `BlobStore` implementations can now be registered dynamically, or as a `thds.mops.pure.blob_stores`
+  entrypoint (via `importlib.metadata`). As before, a BlobStore is chosen by matching a URI.
+- `mops` summary files will be output in the `.mops/summary` directory, to make room for other usage of
+  that directory in the future. Technically this is a 'breaking' change, but in practice it will make no
+  difference to current users.
+- Renaming the `Shell/Builder` concept to `Shim/Builder`, to distance ourselves from other technical
+  concepts that people commonly associate with the word shell.
+
+## 3.5
 
 - Never completely clear the cache of previously-observed K8s Objects during `watch`. Instead, manually
   track the times of updates we receive from the API, both overall and per object. Previously seen
@@ -172,7 +184,7 @@
 - `pipeline-id-mask` in function docstrings will now get applied automatically as long as no other mask
   has been defined. This reduces the boilerplate necessary to use the pipeline id mask concept.
 - You can globally register handlers that can modify the
-  [pipeline memospace](docs/memoization.md#memospace-parts) for a programatically-derived subset of
+  [pipeline memospace](docs/memoization.adoc#memospace-parts) for a programatically-derived subset of
   functions. See `pure.add_pipeline_memospace_handlers` and the provided default implementation,
   `pure.matching_mask_pipeline_id`, which is meant to allow you to override/mask the pipeline id using
   regexes that `re.match` (not `fullmatch`) the fully qualified module path for your functions, e.g.
@@ -184,7 +196,7 @@
 ## 2.3
 
 - `KeyedLocalRunner` provides a memoizing-only interface that acts like a memo-key-selector over top of
-  `MemoizingPicklingRunner`. See [Advanced Memoization](docs/advanced_memoization.md) for details.
+  `MemoizingPicklingRunner`. See [Advanced Memoization](docs/advanced_memoization.adoc) for details.
 
 ## 2.2
 

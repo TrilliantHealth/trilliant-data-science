@@ -36,7 +36,7 @@ def path_from_uri(uri: str) -> Path:
     str_path = remove_file_scheme(uri)
     if not str_path:
         raise ValueError('Cannot convert an empty string to a Path. Did you mean to use "."?')
-    return Path(str_path)
+    return Path(str_path).expanduser().resolve()
 
 
 def to_uri(path: Path) -> str:
