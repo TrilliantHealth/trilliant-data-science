@@ -12,8 +12,8 @@ from thds.core.stack_context import StackContext
 from ..pure.core.memo.keyfunc import ArgsOnlyKeyfunc, Keyfunc, autowrap_args_only_keyfunc
 from ..pure.core.types import Args, Kwargs
 from ..pure.core.uris import UriResolvable
-from ..pure.pickling.memoize_only import _threadlocal_shell
 from ..pure.pickling.mprunner import NO_REDIRECT, MemoizingPicklingRunner, Redirect
+from ..pure.runner.simple_shims import samethread_shim
 
 logger = log.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class KeyedLocalRunner(MemoizingPicklingRunner):
         self._impure_keyfunc = autowrap_args_only_keyfunc(keyfunc)
         self._pre_pickle_redirect = redirect
         super().__init__(
-            _threadlocal_shell,
+            samethread_shim,
             blob_storage_root,
             redirect=lambda _f, _args, _kwargs: _perform_original_invocation,
         )

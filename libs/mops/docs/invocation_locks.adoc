@@ -1,3 +1,5 @@
+link:../README.adoc[↑]
+
 # Invocation Locks/Leases
 
 This feature is currently experimental and may be removed or tweaked as we observe its use.
@@ -19,20 +21,22 @@ capabilities, but it is a practical outcome of the implementation. In other word
 to have the same program or multiple programs arbitrarily call functions and allow them to coordinate on
 invoking those that are not yet running, or awaiting the results of those that do.
 
-> A failure in this system should never affect the _correctness_ of results; only the efficiency with
-> which we use remote resources. Multiple invocations should continue to return equivalent results no
-> matter how many times the function is invoked with the same arguments.
+****
+A failure in this system should never affect the _correctness_ of results; only the efficiency with
+which we use remote resources. Multiple invocations should continue to return equivalent results no
+matter how many times the function is invoked with the same arguments.
+****
 
 ## Basic operation
 
 The orchestrator creates/acquires an expiring lock after checking for an existing
-[memoized](./memoization.md) result, but prior to passing control to the Shell (which starts the remote
+link:./memoization.adoc[memoized] result, but prior to passing control to the runtime shim (which starts the remote
 execution). If the lock cannot be acquired (because it is currently held by another process), then
-instead of calling the Shell, it will enter a loop which sleeps, then checks for an existing result, and
+instead of calling the runtime shim, it will enter a loop which sleeps, then checks for an existing result, and
 finally attempts to acquire the lock again.
 
 If the result is ever found prior to acquiring the lock, the orchestrator returns it. If the lock is ever
-acquired, the Shell will be called to start a remote invocation.
+acquired, the runtime shim will be called to start a remote invocation.
 
 The lock should be maintained by the acquirer to prevent expiration. In practice, this involves spawning
 a separate thread to 'update' the lock's `updated_at` timestamp on a regular schedule. If this timestamp
@@ -48,9 +52,9 @@ The remote process will maintain the lock as well once it has started. This way,
 itself dies, then the lock will not expire until after the remote side exits (whether successfully or
 unsuccessfully).
 
-When a Shell exits (whether successfully or unsuccessfully), the orchestrator will _release_ the lock
+When a runtime shim exits (whether successfully or unsuccessfully), the orchestrator will _release_ the lock
 immediately. This is mostly useful as a debugging indication that the orchestrator continued running
-until Shell exit, since (in successful cases) the presence of a `result` payload will mean that no other
+until runtime shim exit, since (in successful cases) the presence of a `result` payload will mean that no other
 orchestrator will ever even attempt to acquire the lock.
 
 ## Known Limitations
