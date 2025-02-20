@@ -26,7 +26,6 @@ To wrap a logger, simply use the output of `wrap_logger(YOUR_LOGGER)`
 as your logger. It will automatically output profiling information on
 every usage.
 """
-
 import contextlib
 import csv
 import logging
@@ -102,8 +101,8 @@ def _get_cpu_percent(pid: int = -1) -> float:
 
 
 _PID: int = 0
-_CSV_OUT: ty.Any = None
-_CSV_WRITER: ty.Any = None
+_CSV_OUT = None
+_CSV_WRITER = None
 _PROFS_DIR = pathlib.Path("th-profiles")
 
 
@@ -197,7 +196,7 @@ class ThProfiler:
 
 _TH_PROFILER = StackContext(
     "__th_profiler",
-    ThProfiler("." * _TAG_LEN),
+    ThProfiler("." * _TAG_LEN)
     # This root profiler exists simply to make sure that there's
     # always a profiling context even if no function has been
     # annotated with `context`.
