@@ -30,11 +30,14 @@ HIVE_SUB_CHARACTER = "_"
 VERSION_EXCLUSION_REGEX = r"[^\d.]+"
 VERSION_SUB_CHARACTER = ""
 
+CI_TIMESTAMP = "CI_TIMESTAMP"
+CI_USER = "runner"
 DEPLOYING = "DEPLOYING"
 GIT_COMMIT = "GIT_COMMIT"
 GIT_IS_CLEAN = "GIT_IS_CLEAN"
 GIT_IS_DIRTY = "GIT_IS_DIRTY"
 GIT_BRANCH = "GIT_BRANCH"
+MAIN = "main"
 THDS_USER = "THDS_USER"
 
 META_FILE = "meta.json"
@@ -142,6 +145,13 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     )
 
 
+def norm_name(pkg: str) -> str:
+    """Apparently poetry creates slightly different dist-info
+    directories and METADATA files than p-i-p-e-n-v did.
+    """
+    return pkg.replace(".", "_")
+
+
 def _get_pkg_root_filename(pkg: Package) -> str:
     if not isinstance(pkg, str):
         return pkg.__file__ or ""
@@ -162,7 +172,7 @@ def get_version(pkg: Package, orig: str = "") -> str:
         if version_:
             return version_
     try:
-        version_ = version(str(pkg))
+        version_ = version(norm_name(str(pkg)))
     except PackageNotFoundError:
         try:
             version_ = version(str(pkg))
@@ -207,7 +217,7 @@ def get_base_package(pkg: Package) -> str:
         str_pkg = str(pkg)
         if str_pkg == "__main__":
             raise NoBasePackageFromMain(NoBasePackageFromMain.__doc__)
-        _ = version(str_pkg)
+        _ = version(norm_name(str_pkg))
     except PackageNotFoundError:
         try:
             _ = version(str(pkg))
