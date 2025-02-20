@@ -9,7 +9,7 @@ from .global_client import get_global_blob_container_client, get_global_fs_clien
 
 def is_directory(info: FileProperties) -> bool:
     # from https://github.com/Azure/azure-sdk-for-python/issues/24814#issuecomment-1159280840
-    return str(info.get("metadata", dict()).get("hdi_isfolder", "")).lower() == "true"
+    return str(info.metadata.get("hdi_isfolder", "")).lower() == "true"
 
 
 def get_file_properties(fqn: AdlsFqn) -> FileProperties:
