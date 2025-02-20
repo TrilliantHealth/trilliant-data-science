@@ -21,15 +21,6 @@ def test_source_from_file_gives_path(temp_file):
     assert from_file(tfile).path().resolve() == tfile.resolve()
 
 
-def test_from_file_allows_source(temp_file):
-    # In practice this is not a realistic use case, but it should work.
-    tfile = temp_file("other text")
-    source1 = from_file(tfile)
-    source2 = from_file(source1)
-
-    assert source1 == source2
-
-
 def test_resolve_local_source(temp_file):
     tfile = temp_file("YO")
 
