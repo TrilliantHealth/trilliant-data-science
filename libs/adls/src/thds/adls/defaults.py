@@ -1,6 +1,6 @@
 """Prefer using named_containers for new code."""
 
-from thds.core.env import Env, active_env
+from thds.core.env import Env
 
 from . import fqn, named_roots
 
@@ -14,7 +14,7 @@ def env_root(env: Env = "") -> fqn.AdlsRoot:
     """In many cases, you may want to call this with no arguments
     to default to using the THDS_ENV environment variable.
     """
-    return named_roots.require(active_env(env))
+    return named_roots.require(env)
 
 
 def env_root_uri(env: Env = "") -> str:
