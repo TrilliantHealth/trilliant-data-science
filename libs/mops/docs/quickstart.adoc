@@ -31,11 +31,11 @@ Eventually the program prints `fibonacci(30) == 832040`, and it's done!
 
 The second time you run this program... it will emit only a single 'blue' log, and immediately print `fibonacci(30) == 832040`. The very first call was one that it had seen before, and it reused the result directly.
 
-Try a third time, with `python docs/fibonacci.py 21`, and you'll get what you expected - only a single new function invocation, and everything else is reused from the previous runs.
+Try a third time, with `python docs/fibonacci.py 31`, and you'll get what you expected - only a single new function invocation, and everything else is reused from the previous runs.
 
 ## How does this work?
 
-Look inside the `~/.mops/mops2-mpf` directory. You'll see the folder `magic`. This corresponds to the `pipeline-id` set by default with the `pure.magic` decorator. If you link:memoization.adoc#pipeline-id[change] this `pipeline-id`, your previous runs won't be reused, and you'll see a new folder created with the changed pipeline id mask. You can change it in [several ways](pipeline-ids.adoc) depending on your needs.
+Look inside the `~/.mops/mops2-mpf` directory. You'll see the folder `magic`. This corresponds to the `pipeline-id` set by default with the `pure.magic` decorator. If you link:memoization.adoc#pipeline-id[change] this `pipeline-id`, your previous runs won't be reused, and you'll see a new folder created with the changed pipeline id mask. You can change it in link:pipeline-ids.adoc[several ways] depending on your needs.
 
 Look inside `~/.mops/mops2-mpf/magic`. You'll see the folder `+__main__--fibonacci+`. This is the `+{module}--{function.__name__}+` for your function. This keeps each and every function in your system distinct from every other, no matter what.
 
