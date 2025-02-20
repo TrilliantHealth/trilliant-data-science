@@ -1,9 +1,4 @@
-import typing as ty
 from pathlib import Path
-
-from thds.adls import source
-from thds.core.source import Source
-from thds.core.source.tree import SourceTree
 
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
@@ -51,20 +46,3 @@ def download_directory(fqn: AdlsFqn) -> Path:
     fs.fetch_directory(fqn.path, cached_dir_root)
     assert cached_dir_root.is_dir(), "Directory should have been downloaded to the cache."
     return cached_dir_root
-
-
-def upload_directory_through_cache(dest: UriIsh, src_path: Path) -> SourceTree:
-    if not src_path.is_dir():
-        raise ValueError(f"If you want to upload a file, use {upload_through_cache.__name__} instead")
-
-    dest = parse_any(dest)
-
-    def _upload_directory(dir_path: Path) -> ty.Iterable[Source]:
-        for item in dir_path.iterdir():
-            if item.is_dir():  # recur
-                yield from _upload_directory(item)
-            elif item.is_file():  # upload
-                file_dest = dest / str(item.relative_to(src_path))
-                yield source.from_adls(upload_through_cache(file_dest, item))
-
-    return SourceTree(sources=list(_upload_directory(src_path)))
