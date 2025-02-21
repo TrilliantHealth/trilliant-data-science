@@ -23,6 +23,7 @@ from .sauce import P, R
 from .shims import ShimName, ShimOrBuilder, to_shim_builder
 
 _MAGIC_CONFIG: ty.Final = sauce.new_config()
+F = ty.TypeVar("F", bound=ty.Callable)
 
 
 def _get_config() -> sauce._MagicConfig:  # for testing
@@ -49,6 +50,18 @@ class _MagicApi:
         pipeline_id: str = "",
     ) -> ty.Callable[[ty.Callable[P, R]], sauce.Magic[P, R]]:
         return sauce.make_magic(_get_config(), shim_or_builder, blob_root, pipeline_id)
+
+    @staticmethod
+    def deco(
+        shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
+        *,
+        blob_root: uris.UriResolvable = "",
+        pipeline_id: str = "",
+    ) -> ty.Callable[[F], F]:  # cleaner type for certain use cases
+        return ty.cast(
+            ty.Callable[[F], F],
+            _MagicApi.__call__(shim_or_builder, blob_root=blob_root, pipeline_id=pipeline_id),
+        )
 
     @staticmethod
     def blob_root(
