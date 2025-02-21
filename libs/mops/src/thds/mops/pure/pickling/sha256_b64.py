@@ -23,7 +23,7 @@ T = ty.TypeVar("T")
 
 
 class Sha256B64PathStream:
-    def local_to_remote(self, path: Path, sha256: str):
+    def local_to_remote(self, path: Path, sha256: str) -> None:
         """Return fully qualified remote information after put."""
         # lazily fetches the active storage root.
         full_remote_sha256 = storage_content_addressed(sha256, "sha256")
@@ -34,7 +34,7 @@ class Sha256B64PathStream:
 
 
 def _pickle_obj_and_upload_to_content_addressed_path(
-    obj, debug_name: str = ""
+    obj: object, debug_name: str = ""
 ) -> UnpickleSimplePickleFromUri:
     # active_storage_root is lazily fetched because we may want to register the pickler
     # somewhere before settling on the final destination of objects pickled.

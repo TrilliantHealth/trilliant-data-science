@@ -9,7 +9,7 @@ from kubernetes import client
 
 from thds.core import scope
 from thds.core.log import logger_context
-from thds.mops.pure.pickling.memoize_only import _threadlocal_shell
+from thds.mops.pure.runner.simple_shims import samethread_shim
 
 from .._utils.colorize import colorized
 from . import config
@@ -31,7 +31,7 @@ class K8sJobFailedError(Exception):
 
 
 class Counter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.value = 0
         self._lock = threading.Lock()
 
@@ -195,16 +195,16 @@ def launch(
         logger.info(COMPLETE(f"Job {job_num} Complete! {counts()}"))
 
 
-def mops_shell(
+def shim(
     container_image: ty.Union[str, ty.Callable[[], str]],
     disable_remote: ty.Callable[[], bool] = lambda: False,
-    **outer_kwargs,
+    **outer_kwargs: ty.Any,
 ) -> ty.Callable[[ty.Sequence[str]], None]:
     """Return a closure that can launch the given configuration and run a mops pure function.
 
     Now supports callables that return a container image name; the
     goal being to allow applications to perform this lazily on the
-    first actual use of the k8s shell. The passed callable will be
+    first actual use of the k8s runtime shim. The passed callable will be
     called each time, so if you want it to be called only once, you'll
     need to wrap it yourself.
 
@@ -216,14 +216,14 @@ def mops_shell(
     ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
 
     if disable_remote():
-        return _threadlocal_shell
+        return samethread_shim
 
     if isinstance(container_image, str):
-        get_container_image = lambda: container_image  # noqa: E731
+        get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731
     else:
         get_container_image = container_image
 
-    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs):
+    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs: ty.Any) -> None:
         assert "args" not in inner_kwargs
         launch(
             get_container_image(),
