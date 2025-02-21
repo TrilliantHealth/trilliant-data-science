@@ -1,0 +1,25 @@
+link:../README.adoc[↑]
+
+# Tools & Debugging Applications Using `mops`
+
+NOTE: Remember that all `mops` functions are Python functions. If your function is failing to execute, (where possible) the best first step is to - temporarily - stop wrapping your function with `mops` and run the function locally. You'll avoid any build steps required by the Shim, you can use a debugger, etc.
+
+If you're using `@pure.magic`, you can call `pure.magic.off(your_func)` after the function definition, or use the link:magic.adoc#config-file[config file].
+
+## Tools
+
+### `mops-inspect`
+
+A tool for inspecting the `(args, kwargs)` of a given `mops` function invocation.
+
+
+If you got an unexpected memoization, or you're wondering why you didn't get memoization, or your code
+ran remotely but seems to have produced an unexpected result or error, first find the
+memoization/`invocation` URI. Pass the full memo URI to the tool, e.g. `mops-inspect adls://yoursa/cont/mops2-mpf/...`.
+
+** If you want to debug why your function ran a second time, try `--diff-memospace` (see `--help` for more details).
+
+### `mops-summarize`
+
+Summarize an entire application run with multiple `mops` function invocations. See
+ the full link:../src/thds/mops/pure/tools/summarize/README.md[README here].
