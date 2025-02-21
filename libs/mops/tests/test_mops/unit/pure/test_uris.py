@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from thds.adls.fqn import AdlsFqn, AdlsRoot
 from thds.mops.pure.core.uris import to_lazy_uri
 
@@ -7,3 +9,8 @@ def test_to_lazy_uri():
     assert to_lazy_uri(AdlsFqn("thds", "tmp", "foobar/baz"))() == "adls://thds/tmp/foobar/baz"
     assert to_lazy_uri("adls://thds/tmp/foobar/baz")() == "adls://thds/tmp/foobar/baz"
     assert to_lazy_uri(lambda: "adls://thds/tmp/foobar/baz")() == "adls://thds/tmp/foobar/baz"
+
+
+def test_path_is_urish():
+    p = Path("foo/bar")
+    assert to_lazy_uri(p)() == str(p.resolve())

@@ -47,7 +47,7 @@ def acquire_and_hold_once(
     lock_owned.release()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lock_uri", help="URI to the lockfile")
     parser.add_argument(

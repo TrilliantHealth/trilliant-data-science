@@ -6,6 +6,22 @@ from thds.core import generators, log
 logger = log.getLogger(__name__)
 
 
+def _format_bad_data(bad_item: ty.Any) -> str:
+    if isinstance(bad_item, dict):
+
+        def _format_dict():
+            for k, v in bad_item.items():
+                yield f"COL {k}: {v}\n       {type(v)}"
+
+        return "\n".join(_format_dict())
+
+    def _format_seq():
+        for i, v in enumerate(bad_item, 1):
+            yield f"COL {i}: {v}\n       {type(v)}"
+
+    return "\n".join(_format_seq())
+
+
 def run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[ty.Any]):
     if not batch:
         return
@@ -18,9 +34,7 @@ def run_batch_and_isolate_failures(cursor, query: str, batch: ty.List[ty.Any]):
             run_batch_and_isolate_failures(cursor, query, batch[: len(batch) // 2])
             run_batch_and_isolate_failures(cursor, query, batch[len(batch) // 2 :])
         else:
-            bad_data = ""
-            for i, col in enumerate(batch[0], 1):
-                bad_data += f"COL {i}: {col}\n      {type(col)}\n"
+            bad_data = _format_bad_data(batch[0])
             logger.exception(
                 f"Failed during insertion; ***QUERY***\n{query} \n***FAILED-DATA***\n{bad_data}"
             )

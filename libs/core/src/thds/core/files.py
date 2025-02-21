@@ -19,7 +19,7 @@ FILE_SCHEME = "file://"
 logger = getLogger(__name__)
 
 
-def set_read_only(fpath: StrOrPath):
+def set_read_only(fpath: StrOrPath) -> None:
     # thank you https://stackoverflow.com/a/51262451
     logger.debug("Setting '%s' to read-only", fpath)
     perms = stat.S_IMODE(os.lstat(fpath).st_mode)
@@ -36,7 +36,7 @@ def path_from_uri(uri: str) -> Path:
     str_path = remove_file_scheme(uri)
     if not str_path:
         raise ValueError('Cannot convert an empty string to a Path. Did you mean to use "."?')
-    return Path(str_path)
+    return Path(str_path).expanduser().resolve()
 
 
 def to_uri(path: Path) -> str:
@@ -87,7 +87,7 @@ def set_file_limit(n: int):
     assert resource.getrlimit(resource.RLIMIT_NOFILE) == (n, n)
 
 
-def bump_limits():
+def bump_limits() -> None:
     """It was common to have to do this manually on our macs. Now that is no longer required."""
     set_file_limit(OPEN_FILES_LIMIT())
 

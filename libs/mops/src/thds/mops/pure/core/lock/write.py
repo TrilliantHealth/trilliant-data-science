@@ -59,7 +59,7 @@ class LockfileWriter:
         *,
         debug: bool = True,
         writer_name: str = "",
-    ):
+    ) -> None:
         self.writer_id = lock_writer_id
         self.lock_dir_uri = lock_dir_uri
         self.blob_store, self.lock_uri = _funcs.store_and_lock_uri(lock_dir_uri)
@@ -69,7 +69,7 @@ class LockfileWriter:
         self.writer_name = writer_name
         self.first_acquired_at: ty.Optional[datetime] = None
 
-    def mark_acquired(self):
+    def mark_acquired(self) -> None:
         assert not self.first_acquired_at
         self.first_acquired_at = _funcs.utc_now()
         logger.debug("Acquired lock %s", self.lock_uri)
