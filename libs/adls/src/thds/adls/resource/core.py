@@ -46,7 +46,7 @@ def from_source(source: source.Source) -> AdlsHashedResource:
 def to_source(resource: AdlsHashedResource) -> source.Source:
     return source.from_uri(
         str(resource.fqn),
-        hash=hashing.Hash("md5", hashing.db64(resource.md5b64)),
+        hash=source.Hash("md5", hashing.db64(resource.md5b64)),
     )
 
 

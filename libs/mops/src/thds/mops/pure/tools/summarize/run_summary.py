@@ -13,7 +13,7 @@ from thds.mops.pure.core.types import T
 
 from ...core import metadata
 
-MOPS_SUMMARY_DIR = config.item("thds.mops.summary.dir", default=Path(".mops/summary"), parse=Path)
+MOPS_SUMMARY_DIR = config.item("thds.mops.summary.dir", default=Path(".mops"), parse=Path)
 RUN_NAME = config.item(
     "thds.mops.summary.run_name",
     default=f"{dt.datetime.utcnow().isoformat()}-pid{os.getpid()}-{get_invoked_by()}",

@@ -46,7 +46,7 @@ def _check_if_c_in_ab(a: Path, b: source.Source, c: Path) -> bool:
     return c_txt in two_paths.read_text()
 
 
-def test_threadlocal_shim_can_do_deferred_work():
+def test_threadlocal_shell_can_do_deferred_work():
     with tmp.tempdir_same_fs() as work_dir:
         apath = work_dir / "a.txt"
         bpath = work_dir / "b.txt"

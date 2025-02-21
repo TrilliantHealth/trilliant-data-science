@@ -1,5 +1,4 @@
 import functools
-import typing as ty
 from threading import Lock, RLock
 from typing import Optional, Union
 
@@ -12,12 +11,7 @@ except ImportError:
     from cachetools import _CacheInfo  # type: ignore
 
 
-F = ty.TypeVar("F", bound=ty.Callable)
-
-
-def locked_cached(
-    cache: ty.Any, typed: bool = False, lock: Optional[Union[RLock, Lock]] = None
-) -> ty.Callable[[F], F]:
+def locked_cached(cache, typed: bool = False, lock: Optional[Union[RLock, Lock]] = None):
     """Like cachetools.func._cache, except it locks the actual
     function call but does _not_ lock reading from the cache the first
     time, so most of the time, cache hits are nearly free, but you
@@ -25,12 +19,12 @@ def locked_cached(
     """
     maxsize = cache.maxsize
 
-    def decorator(func: F) -> F:
+    def decorator(func):
         key = keys.typedkey if typed else keys.hashkey
         hits = misses = 0
         _lock = lock or RLock()
 
-        def wrapper(*args, **kwargs):  # type: ignore
+        def wrapper(*args, **kwargs):
             nonlocal hits, misses
             k = key(*args, **kwargs)
 
@@ -55,13 +49,13 @@ def locked_cached(
                     except ValueError:
                         return v  # value too large
 
-        def cache_info() -> _CacheInfo:
+        def cache_info():
             with _lock:
                 maxsize = cache.maxsize
                 currsize = cache.currsize
             return _CacheInfo(hits, misses, maxsize, currsize)
 
-        def cache_clear() -> None:
+        def cache_clear():
             nonlocal hits, misses
             with _lock:
                 try:
@@ -73,6 +67,6 @@ def locked_cached(
         wrapper.cache_clear = cache_clear  # type: ignore
         wrapper.cache_parameters = lambda: {"maxsize": maxsize, "typed": typed}  # type: ignore
         functools.update_wrapper(wrapper, func)
-        return ty.cast(F, wrapper)
+        return wrapper
 
     return decorator

@@ -16,8 +16,8 @@ from ..core import memo, uris
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, F, Kwargs, Serializer, T
-from ..runner import local, shim_builder
-from ..runner.types import Shim, ShimBuilder
+from ..runner import local, shell_builder
+from ..runner.types import Shell, ShellBuilder
 from ..tools.summarize import run_summary
 from . import _pickle, pickles, sha256_b64
 
@@ -29,8 +29,8 @@ _KWARGS_CONTEXT = StackContext[ty.Mapping]("args_kwargs", dict())
 logger = log.getLogger(__name__)
 
 
-def mp_shim(base_shim: Shim, shim_args: ty.Sequence[str]) -> ty.Any:
-    return base_shim((RUNNER_NAME, *shim_args))
+def mp_shell(base_shell: Shell, shell_args: ty.Sequence[str]) -> ty.Any:
+    return base_shell((RUNNER_NAME, *shell_args))
 
 
 def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
@@ -39,20 +39,20 @@ def _runner_prefix_for_pickled_functions(storage_root: str) -> str:
 
 class MemoizingPicklingRunner:
     """
-    Runs callables in a process as defined by the Shim.
-    This is often a remote process, however a local shim may be provided.
+    Runs callables in a process as defined by the Shell.
+    This is often a remote process, however a local shell may be provided.
     """
 
     def __init__(
         self,
-        shim: ty.Union[ShimBuilder, Shim],
+        shell: ty.Union[ShellBuilder, Shell],
         blob_storage_root: uris.UriResolvable,
         *,
         rerun_exceptions: bool = True,
         serialization_registry: ByIdRegistry[ty.Any, Serializer] = ByIdRegistry(),  # noqa: B008
         redirect: Redirect = NO_REDIRECT,
     ):
-        """Construct a memoizing shim runner.
+        """Construct a memoizing shell runner.
 
         Transmitted Path resources will be content-hash-addressed
         below the runner_prefix to save storage and increase chances
@@ -62,12 +62,12 @@ class MemoizingPicklingRunner:
         inferring whether their associated code is safely content-addressable
         across runs.
 
-        The Shim must forward control in the remote environment to a
+        The Shell must forward control in the remote environment to a
         wrapper that will pull the function and arguments from the URI(s).
 
-        A ShimBuilder will receive the original function and its
+        A ShellBuilder will receive the original function and its
         original arguments, which you can use to determine which
-        concrete Shim implementation to return for the given function
+        concrete Shell implementation to return for the given function
         call.
 
         `rerun_exceptions` will cause a pre-existing `exception`
@@ -86,7 +86,7 @@ class MemoizingPicklingRunner:
         therefore the memoization key, especially where they're not
         picklable at all.
         """
-        self._shim_builder = shim_builder.make_builder(shim)
+        self._shell_builder = shell_builder.make_builder(shell)
         self._get_storage_root = uris.to_lazy_uri(blob_storage_root)
         self._rerun_exceptions = rerun_exceptions
         self._by_id_registry = serialization_registry
@@ -94,7 +94,7 @@ class MemoizingPicklingRunner:
 
         self._run_directory = run_summary.create_mops_run_directory()
 
-    def shared(self, *objs: ty.Any, **named_objs: ty.Any) -> None:
+    def shared(self, *objs: ty.Any, **named_objs: ty.Any):
         """Set up memoizing pickle serialization for these objects.
 
         Provided names are used for debugging purposes only.
@@ -139,14 +139,14 @@ class MemoizingPicklingRunner:
             ),
         )
 
-    def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> Shim:
-        base_shim = self._shim_builder(func, args, kwargs)
-        return partial(mp_shim, base_shim)
+    def _wrap_shell_builder(self, func: F, args: Args, kwargs: Kwargs) -> Shell:
+        base_shell = self._shell_builder(func, args, kwargs)
+        return partial(mp_shell, base_shell)
 
     def __call__(self, func: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:
-        """Return result of running this function remotely via the shim.
+        """Return result of running this function remotely via the shell.
 
-        Passes data to shim process via pickles in a Blob Store.
+        Passes data to shell process via pickles in a Blob Store.
 
         May return cached (previously-computed) results found via the
         derived function memo URI, which contains the determinstic
@@ -154,12 +154,12 @@ class MemoizingPicklingRunner:
         additional namespacing including pipeline_id as documented
         in memo.function_memospace.py.
         """
-        logger.debug("Preparing to run function via remote shim")
+        logger.debug("Preparing to run function via remote shell")
         with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs):
-            return local.invoke_via_shim_or_return_memoized(
+            return local.invoke_via_shell_or_return_memoized(
                 self._serialize_args_kwargs,
                 self._serialize_invocation,
-                self._wrap_shim_builder,
+                self._wrap_shell_builder,
                 _pickle.read_metadata_and_object,
                 self._run_directory,
             )(

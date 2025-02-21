@@ -15,10 +15,6 @@ class BlobNotFoundError(HttpResponseError):
         super().__init__(f"{type_hint} not found: {fqn}")
 
 
-class MD5MismatchError(Exception):
-    """Indicates that something needs to be done by the developer to correct a hash mismatch."""
-
-
 def is_blob_not_found(exc: Exception) -> bool:
     return (isinstance(exc, HttpResponseError) and exc.status_code == 404) or isinstance(
         exc, BlobNotFoundError
