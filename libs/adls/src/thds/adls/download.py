@@ -293,7 +293,7 @@ def _prep_download_coroutine(
     DataLakeFileClient,
 ]:
     co = _download_or_use_verified_cached_coroutine(
-        AdlsFqn(fs_client.account_name, fs_client.file_system_name, remote_key),
+        AdlsFqn(ty.cast(str, fs_client.account_name), fs_client.file_system_name, remote_key),
         local_path,
         md5b64=md5b64,
         cache=cache,
