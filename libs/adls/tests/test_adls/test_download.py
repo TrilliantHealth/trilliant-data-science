@@ -1,4 +1,5 @@
 import concurrent.futures
+import io
 import logging
 import typing as ty
 from pathlib import Path
@@ -9,7 +10,7 @@ import pytest
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, FileSystemClient, aio
 
-from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy
+from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot
 from thds.adls.cached_up_down import download_to_cache
 from thds.adls.download import (
     MD5MismatchError,
@@ -49,8 +50,8 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64(test_dest: Path):
     # we need to know whether to skip the download.
 
     wfp = co.send(FileProperties())
-    assert isinstance(wfp, azcopy.download.DownloadRequest)
-    wfp.writer.write(b"ello")
+    assert isinstance(wfp, io.IOBase)
+    wfp.write(b"ello")
 
     with pytest.raises(StopIteration) as si:
         co.send(None)
@@ -252,19 +253,3 @@ def test_clean_download_locks(caplog: pytest.LogCaptureFixture):
 
     for record in caplog.records:
         assert not record.getMessage().startswith("Failed to clean download locks directory.")
-
-
-def test_dont_use_azcopy_if_present(global_test_fs_client: FileSystemClient, test_dest: Path):
-    with azcopy.download.DONT_USE_AZCOPY.set_local(True):
-        # this is a weird test. we dynamically use azcopy if it's available because it's faster in high-bandwidth situations.
-        # but we also have a fallback to the download_file part of the SDK.
-        # what we are doing here is explicitly testing that code,
-        # but weirdly, it may turn out not to matter, because if you're running this code in an environment without azcopy,
-        # then all the integration tests above are testing the fallback code anyway.
-        # Whatever. we just want to make sure all the code paths are tested wherever they can be.
-        real = "test/read-only/DONT_DELETE_THESE_FILES.txt"
-        md5b64 = "U3vtigRGuroWtJFEQ5dKoQ=="
-        lcl = test_dest / "dont_use_azcopy_DONT_DELETE_THESE_FILES.txt"
-        hit = download_or_use_verified(global_test_fs_client, real, lcl, md5b64)
-        assert not hit
-        assert lcl.exists()
