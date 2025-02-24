@@ -457,7 +457,7 @@ class ADLSFileSystem:
         incl_subdirs: bool = False,
         batch_size: Optional[int] = None,
         recursive: bool = True,
-        path_filter: Optional[Callable[[FileProperties], bool]] = None,
+        path_filter: Optional[Callable[[PathProperties], bool]] = None,
     ) -> List[FileProperties]:
         """Returns a list of `FileProperties` for files in a remote directory.
 
