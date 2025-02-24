@@ -4,7 +4,7 @@ Jump to
 [Quickstart](https://github.com/TrilliantHealth/trilliant-data-science/blob/main/libs/mops/docs/quickstart.adoc)
 if you ~~are impatient~~ prefer examples, like me!
 
-`mops` solves for three core issues:
+`mops` solves for four core design goals:
 
 - [Efficient](https://github.com/TrilliantHealth/trilliant-data-science/blob/main/libs/mops/docs/optimizations.adoc)
   transfer of
