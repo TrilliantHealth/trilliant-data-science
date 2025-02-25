@@ -1,3 +1,4 @@
+import typing as ty
 from threading import RLock
 
 from cachetools import TTLCache
@@ -10,7 +11,7 @@ from .._utils.locked_cache import locked_cached
 logger = log.getLogger(__name__)
 
 
-def _retry_config(exc: Exception):
+def _retry_config(exc: Exception) -> bool:
     if isinstance(exc, config.ConfigException):
         logger.debug("Retrying config load...")
         return True
@@ -24,7 +25,7 @@ _AUTH_RLOCK = RLock()
 
 # load_config gets called all over the place and way too often.
 @locked_cached(TTLCache(1, ttl=120), lock=_AUTH_RLOCK)
-def load_config():
+def load_config() -> None:
     logger.debug("Loading Kubernetes config...")
     try:
         empty_config_retry(config.load_config)()
@@ -33,7 +34,7 @@ def load_config():
 
 
 @scope.bound
-def upsert_namespace(namespace: str, created_cache=set()):  # noqa: B006
+def upsert_namespace(namespace: str, created_cache: ty.Set[str] = set()) -> None:  # noqa: B006
     scope.enter(_AUTH_RLOCK)
     if namespace in created_cache:
         return

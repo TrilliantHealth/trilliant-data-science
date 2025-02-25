@@ -9,11 +9,11 @@ from pathlib import Path
 
 from thds.core import config, log, scope
 
-from ..._utils.colorize import colorized
+from ..._utils.colorize import colorized, make_colorized_out
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.partial import unwrap_partial
-from ..core.types import Args, Kwargs, NoResultAfterInvocationError, T
+from ..core.types import Args, Kwargs, NoResultAfterShimSuccess, T
 from ..tools.summarize import run_summary
 from . import strings, types
 
@@ -24,28 +24,28 @@ MAINTAIN_LOCKS = config.item("thds.mops.pure.local.maintain_locks", default=True
 # underlying client and allowing it to randomly order the operations
 # such that it takes longer to get a full unit of work complete.
 _BEFORE_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
-# _OUT prioritizes uploading a single invocation and its dependencies so the Shell can start running.
+# _OUT prioritizes uploading a single invocation and its dependencies so the Shim can start running.
 _AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
-# _IN prioritizes retrieving the result of a Shell that has completed.
+# _IN prioritizes retrieving the result of a Shim that has completed.
 
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _Purple = colorized(fg="white", bg="#800080")
 logger = log.getLogger(__name__)
-_LogKnownResult = lambda s: logger.info(_DarkBlue(f" {s} "))  # noqa: E731
-_LogNewInvocation = lambda s: logger.info(_GreenYellow(f" {s} "))  # noqa: E731
-_LogAwaitedResult = lambda s: logger.info(_Purple(f" {s} "))  # noqa: E731
+_LogKnownResult = make_colorized_out(_DarkBlue, out=logger.info, fmt_str=" {} ")
+_LogNewInvocation = make_colorized_out(_GreenYellow, out=logger.info, fmt_str=" {} ")
+_LogAwaitedResult = make_colorized_out(_Purple, out=logger.info, fmt_str=" {} ")
 
 
-def invoke_via_shell_or_return_memoized(  # noqa: C901
+def invoke_via_shim_or_return_memoized(  # noqa: C901
     serialize_args_kwargs: types.SerializeArgsKwargs,
     serialize_invocation: types.SerializeInvocation,
-    shell_builder: types.ShellBuilder,
+    shim_builder: types.ShimBuilder,
     get_meta_and_result: types.GetMetaAndResult,
     run_directory: ty.Optional[Path] = None,
 ) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], T]:
     @scope.bound
-    def run_shell_via_blob_store_(
+    def create_invocation__check_result__wait_shim(
         rerun_exceptions: bool,
         function_memospace: str,
         # by allowing the caller to set the function memospace, we allow 'redirects' to look up an old result by name.
@@ -54,6 +54,15 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         args_: Args,
         kwargs_: Kwargs,
     ) -> T:
+        """This is the generic local runner. Its core abstractions are:
+
+        - serializers of some sort (for the function and its arguments)
+        - a runtime shim of some sort (can start a Python process somewhere else)
+        - a result and metadata deserializer
+        - URIs that are supported by a registered BlobStore implementation.
+
+        It uses a mops-internal locking mechanism to prevent concurrent invocations for the same function+args.
+        """
         invoked_at = datetime.now(tz=timezone.utc)
         # capture immediately, because many things may delay actual start.
         storage_root = uris.get_root(function_memospace)
@@ -117,7 +126,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:
             return lock.acquire(fs.join(memo_uri, "lock"), expire=timedelta(seconds=88))
 
-        def upload_invocation_and_deps():
+        def upload_invocation_and_deps() -> None:
             # we're just about to transfer to a remote context,
             # so it's time to perform any deferred work
             deferred_work.perform_all()
@@ -128,7 +137,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                 type_hint="application/mops-invocation",
             )
 
-        def debug_required_result_failure():
+        def debug_required_result_failure() -> None:
             # This is entirely for the purpose of making debugging easier. It serves no internal functional purpose.
             #
             # first, upload the invocation as an accessible marker of what was expected to exist.
@@ -153,7 +162,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
             lock_owned = acquire_lock()
             # if no result exists, the vastly most common outcome here will be acquiring
             # the lock on the first try.  this will lead to breaking out of
-            # the LOCK LOOP directly below and going on to the shell invocation.
+            # the LOCK LOOP directly below and going on to the shim invocation.
             # still, we release the semaphore b/c we can't sleep while holding a lock.
 
         # LOCK LOOP: entering this loop (where we attempt to acquire the lock) is the common non-memoized case
@@ -163,7 +172,7 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                     release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
                 else:
                     release_lock = lock_owned.release
-                break  # we own the invocation - invoke the shell ourselves (below)
+                break  # we own the invocation - invoke the shim ourselves (below)
 
             # getting to this point ONLY happens if we failed to acquire the lock, which
             # is not expected to be the usual situation. We log a differently-colored
@@ -195,10 +204,10 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
                 _LogNewInvocation(f"Invoking {memo_uri}")
                 upload_invocation_and_deps()
 
-            # can't hold the semaphore while we block on the shell, though.
-            shell_ex = None
-            shell = shell_builder(func, args_, kwargs_)
-            shell(  # ACTUAL INVOCATION (handoff to remote shell) HAPPENS HERE
+            # can't hold the semaphore while we block on the shim, though.
+            shim_ex = None
+            shim = shim_builder(func, args_, kwargs_)
+            shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
                 (
                     memo_uri,
                     *metadata.format_invocation_cli_args(
@@ -210,8 +219,8 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
             # network or similar errors are very common and hard to completely eliminate.
             # We know that if a result (or error) exists, then the network failure is
             # not important, because results in blob storage are atomically populated (either fully there or not)
-            logger.exception("Error awaiting shell. Optimistically checking for result.")
-            shell_ex = ex
+            logger.exception("Error awaiting shim. Optimistically checking for result.")
+            shim_ex = ex
 
         finally:
             release_lock()
@@ -220,9 +229,11 @@ def invoke_via_shell_or_return_memoized(  # noqa: C901
         with _AFTER_INVOCATION_SEMAPHORE:
             value_or_error = memo.results.check_if_result_exists(memo_uri)
             if not value_or_error:
-                if shell_ex:
-                    raise shell_ex  # re-raise the underlying exception rather than making up our own.
-                raise NoResultAfterInvocationError(memo_uri)
+                if shim_ex:
+                    raise shim_ex  # re-raise the underlying exception rather than making up our own.
+                raise NoResultAfterShimSuccess(
+                    f"The shim for {memo_uri} exited cleanly, but no result or exception was found."
+                )
             return unwrap_value_or_error(ResultAndInvocationType(value_or_error, "invoked"))
 
-    return run_shell_via_blob_store_
+    return create_invocation__check_result__wait_shim

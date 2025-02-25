@@ -8,8 +8,10 @@ import logging.config
 from copy import copy
 from typing import Any, Dict, MutableMapping, Optional
 
+from .. import config
 from ..stack_context import StackContext
 
+LOGLEVEL = config.item("thds.core.log.level", logging.INFO, parse=logging.getLevelName)
 _LOGGING_KWARGS = ("exc_info", "stack_info", "stacklevel", "extra")
 # These are the officially accepted keyword-arguments for a call to
 # log something with the logger. Anything passed with these names
@@ -72,6 +74,9 @@ def getLogger(name: Optional[str] = None) -> logging.LoggerAdapter:
     when configuring logging yourself, just put a "%(th_context)s" format specifier somewhere in your
     log message format.
     """
+    logger = logging.getLogger(name)
+    if logger.level == logging.NOTSET:
+        logger.setLevel(LOGLEVEL())
     return KwLogger(logging.getLogger(name), dict())
 
 
