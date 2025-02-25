@@ -9,19 +9,16 @@ Projects are directories with their own `pyproject.toml` and `src` subdirectory.
 publishable Python package.
 
 Projects can depend on other projects, and within the monorepo they express that as an
-editable/from-source dependency.
+editable/from-source dependency. When built using our internal (not source-available) tooling, they
+define their dependencies using the conventional by-name approach.
 
 ## Usage
 
-We use `poetry` to manage virtual environments for each project.
+All projects here are installable via PyPI: `pip install thds.<pkg-name>` should do the trick.
 
-Currently we have not set up publishing to PyPi. The code is available for use under the terms of its
-license.
+The code is available for use under the terms of its license.
 
-In order to make use of one project depending on another project (e.g. `atacama` depending on `core`),
-you will need to bundle the source code together. The simplest way of doing this is to copy all the
-source code of the upstream projects into the project you want to use, then modify the `pyproject.toml`
-to include all of those projects, and finally run `python -m build sdist` or some form of wheel build.
+We use `poetry` to manage virtual environments for each project for development purposes.
 
 ## Testing
 

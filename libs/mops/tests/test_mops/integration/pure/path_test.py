@@ -5,10 +5,10 @@ import pytest
 from thds.mops import tempdir
 from thds.mops.pure.core.serialize_paths import NotAFileError
 
-from ._util import adls_shell
+from ._util import adls_shim
 
 
-@adls_shell
+@adls_shim
 def _consume_a_path_and_return_one(path: Path) -> Path:
     tmp_out = tempdir() / "out"
     with open(path) as p:

@@ -36,6 +36,9 @@ def is_job_succeeded(job: client.models.V1Job) -> bool:
     if not job.status:
         return False
 
+    if not job.status.completion_time:
+        return False
+
     for condition in job.status.conditions or tuple():
         if condition.type == "Complete" and condition.status == "True":
             return True

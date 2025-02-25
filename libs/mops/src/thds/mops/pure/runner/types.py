@@ -3,20 +3,20 @@ import typing as ty
 from ..core.metadata import ResultMetadata
 from ..core.types import Args, F, Kwargs
 
-Shell = ty.Callable[[ty.Sequence[str]], ty.Any]
-"""A Shell is a way of getting back into a Python process with enough
+Shim = ty.Callable[[ty.Sequence[str]], ty.Any]
+"""A runner Shim is a way of getting back into a Python process with enough
 context to download the uploaded function and its arguments from the
 location where a runner placed it, and then invoke the function. All
 arguments are strings because it is assumed that this represents some
 kind of command line invocation.
 
-The Shell must be a blocking call, and its result(s) must be available
+The Shim must be a blocking call, and its result(s) must be available
 immediately after its return.
 """
 
 
-class ShellBuilder(ty.Protocol):
-    def __call__(self, __f: F, __args: Args, __kwargs: Kwargs) -> Shell:
+class ShimBuilder(ty.Protocol):
+    def __call__(self, __f: F, __args: Args, __kwargs: Kwargs) -> Shim:
         ...  # pragma: no cover
 
 
