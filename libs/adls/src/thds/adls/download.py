@@ -208,7 +208,8 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         # we don't know what we expect, so attempt to retrieve an
         # expectation from ADLS itself.
         file_properties = yield _IoRequest.FILE_PROPERTIES
-        md5b64 = _remote_md5b64(file_properties)
+        md5b64 = _remote_md5b64(file_properties)  # type: ignore[arg-type]
+        # TODO - check above type ignore
 
     def attempt_cache_hit() -> ty.Optional[_FileResult]:
         if not md5b64:
@@ -259,7 +260,8 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     file_properties = yield _IoRequest.FILE_PROPERTIES
     # no point in downloading if we've asked for hash X but ADLS only has hash Y.
     with _verify_md5s_before_and_after_download(
-        _remote_md5b64(file_properties),
+        _remote_md5b64(file_properties),  # type: ignore[arg-type]
+        # TODO - check above type ignore
         md5b64,
         fqn,
         local_path,
@@ -306,7 +308,8 @@ def _set_md5_if_missing(
 ) -> ty.Optional[ContentSettings]:
     if not file_properties or file_properties.content_settings.content_md5:
         return None
-    file_properties.content_settings.content_md5 = b64decode(md5b64)
+    file_properties.content_settings.content_md5 = b64decode(md5b64)  # type: ignore[assignment]
+    # TODO - check above type ignore
     return file_properties.content_settings
 
 
@@ -370,7 +373,8 @@ async def async_download_or_use_verified(
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
                     # only fetch these if they haven't already been requested
-                    file_properties = await dl_file_client.get_file_properties()
+                    file_properties = await dl_file_client.get_file_properties()  # type: ignore[misc]
+                    # TODO - check above type ignore
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
@@ -384,7 +388,10 @@ async def async_download_or_use_verified(
             try:
                 logger.info(f"Setting missing MD5 for {remote_key}")
                 assert file_properties
-                await dl_file_client.set_http_headers(cs, **match_etag(file_properties))
+                await dl_file_client.set_http_headers(  # type: ignore[misc]
+                    cs, **match_etag(file_properties)
+                )
+                # TODO - check above type ignore
             except HttpResponseError as hre:
                 logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
         return si.value.hit
