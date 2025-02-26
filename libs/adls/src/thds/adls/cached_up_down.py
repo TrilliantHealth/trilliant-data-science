@@ -54,7 +54,7 @@ def download_directory(fqn: AdlsFqn) -> Path:
 
 
 def upload_directory_through_cache(dest: UriIsh, src_path: Path) -> SourceTree:
-    if src_path.is_dir():
+    if not src_path.is_dir():
         raise ValueError(f"If you want to upload a file, use {upload_through_cache.__name__} instead")
 
     dest = parse_any(dest)
