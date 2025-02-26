@@ -89,17 +89,10 @@ def _parse_azcopy_json_output(line: str) -> AzCopyJsonLine:
 
 @contextmanager
 def _track_azcopy_progress(http_url: str) -> ty.Iterator[ty.Callable[[str], None]]:
-    """Context manager that tracks progress from AzCopy JSON lines.
-
-    Usage:
-        with azcopy_progress_tracker(url) as track:
-            for line in process.stdout:
-                track(line)
-    """
+    """Context manager that tracks progress from AzCopy JSON lines. This works for both async and sync impls."""
     tracker = _progress.get_global_download_tracker()
     adls_uri = urllib.parse.unquote(str(uri.parse_uri(http_url)))
 
-    # Create the inner tracking function
     def track(line: str):
         if not line:
             return
@@ -111,12 +104,7 @@ def _track_azcopy_progress(http_url: str) -> ty.Iterator[ty.Callable[[str], None
         except json.JSONDecodeError:
             pass
 
-    # No setup needed beyond creating the function
-    try:
-        yield track
-    finally:
-        # No cleanup needed
-        pass
+    yield track
 
 
 def sync_fastpath(
