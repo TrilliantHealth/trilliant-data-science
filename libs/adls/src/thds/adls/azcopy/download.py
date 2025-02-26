@@ -8,6 +8,7 @@
 # a better user experience to disable this globally.
 import asyncio
 import json
+import os
 import subprocess
 import typing as ty
 import urllib.parse
@@ -107,6 +108,10 @@ def _track_azcopy_progress(http_url: str) -> ty.Iterator[ty.Callable[[str], None
     yield track
 
 
+def _restrict_mem() -> dict:
+    return dict(os.environ, AZCOPY_BUFFER_GB="0.3")
+
+
 def sync_fastpath(
     dl_file_client: DataLakeFileClient,
     download_request: DownloadRequest,
@@ -119,6 +124,7 @@ def sync_fastpath(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                env=_restrict_mem(),
             )
             assert process.stdout
             with _track_azcopy_progress(dl_file_client.url) as track:
@@ -150,6 +156,7 @@ async def async_fastpath(
                 *_azcopy_download_command(dl_file_client, download_request.temp_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=_restrict_mem(),
             )
             assert copy_proc.stdout
 
