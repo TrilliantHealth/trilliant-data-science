@@ -17,10 +17,10 @@ from thds.core import log, scope, tmp
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
+from . import azcopy
 from ._progress import report_download_progress
-from .conf import CONNECTION_TIMEOUT, DOWNLOAD_FILE_MAX_CONCURRENCY
 from .download_lock import download_lock
-from .errors import translate_azure_error
+from .errors import MD5MismatchError, translate_azure_error
 from .etag import match_etag
 from .fqn import AdlsFqn
 from .md5 import check_reasonable_md5b64, md5_file
@@ -29,21 +29,19 @@ from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 logger = log.getLogger(__name__)
 
 
-class MD5MismatchError(Exception):
-    """Indicates that something needs to be done by the developer to correct a hash mismatch."""
-
-
 @contextlib.contextmanager
 def _atomic_download_and_move(
     fqn: AdlsFqn,
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
-) -> ty.Iterator[ty.IO[bytes]]:
+) -> ty.Iterator[azcopy.download.DownloadRequest]:
     with tmp.temppath_same_fs(dest) as dpath:
         with open(dpath, "wb") as f:
             known_size = (properties.size or 0) if properties else 0
             logger.debug("Downloading %s", fqn)
-            yield report_download_progress(f, str(dest), known_size)
+            yield azcopy.download.DownloadRequest(
+                report_download_progress(f, str(fqn), known_size), dpath
+            )
         try:
             os.rename(dpath, dest)  # will succeed even if dest is read-only
         except OSError as oserr:
@@ -143,7 +141,7 @@ class _IoRequest(enum.Enum):
     FILE_PROPERTIES = "file_properties"
 
 
-IoRequest = ty.Union[_IoRequest, ty.IO[bytes]]
+IoRequest = ty.Union[_IoRequest, azcopy.download.DownloadRequest]
 IoResponse = ty.Union[FileProperties, None]
 
 
@@ -336,12 +334,12 @@ def download_or_use_verified(
                     # only fetch these if they haven't already been requested
                     file_properties = dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
-            else:  # needs file object
-                dl_file_client.download_file(
-                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY(),
-                    connection_timeout=CONNECTION_TIMEOUT(),
-                ).readinto(co_request)
+            elif isinstance(co_request, azcopy.download.DownloadRequest):
+                # coroutine is requesting download
+                azcopy.download.sync_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
+            else:
+                raise ValueError(f"Unexpected coroutine request: {co_request}")
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
@@ -374,13 +372,13 @@ async def async_download_or_use_verified(
                     # only fetch these if they haven't already been requested
                     file_properties = await dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
-            else:  # needs file object
-                reader = await dl_file_client.download_file(
-                    max_concurrency=DOWNLOAD_FILE_MAX_CONCURRENCY(),
-                    connection_timeout=CONNECTION_TIMEOUT(),
-                )
-                await reader.readinto(co_request)
+            elif isinstance(co_request, azcopy.download.DownloadRequest):
+                # coroutine is requesting download
+                await azcopy.download.async_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
+            else:
+                raise ValueError(f"Unexpected coroutine request: {co_request}")
+
     except StopIteration as si:
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:

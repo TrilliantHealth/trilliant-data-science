@@ -1,0 +1,313 @@
+link:../README.adoc[↑]
+
+# pure.magic
+
+Magic is a new API that we're trialling for `mops`. This ties together a lot of
+functionality that has already been available in `mops.pure`, but the hope is to provide
+an interface that makes it a lot simpler for users to move between development workflows
+and production ones, including running your functions locally with mops in the loop, and
+running your functions locally with mops xref:#off[completely out of the loop]. Each of
+these approaches is the right choice for specific situations, and setting things up for
+this to work should be as easy as we can make it.
+
+NOTE: The `pure.magic` group of APIs is designed to be used at the module level, during
+import, as it modifies the global state of your `mops` configuration. For stack-local
+modifications, a future API is envisioned.
+
+== `@pure.magic` - the easy button
+
+When you're getting started, you can apply `@pure.magic()` to your function directly as a decorator,
+without any other config. By default, your function will now:
+
+- run in the same thread where it was called, just like a normal Python function.
+- be memoized underneath `~/.mops` on your local machine.
+
+Using this decorator sets you up to be able to configure 3 core pieces of `mops` based on
+module trees, in whatever combinations suit your application, and even to modify that
+config based on a xref:config-file[configuration file loaded inside your CLI]. Those core
+pieces are:
+
+1. the xref:runtime-shim[runtime shim] (which defaults to `'samethread'`)
+2. the xref:blob-root[blob root] (which defaults to `+file://~/.mops+`)
+3. the xref:pipeline-id[pipeline id] (which defaults to `'magic'`)
+
+[[runtime-shim]]
+== `pure.magic.shim` - Set the runtime shim (f.k.a. Shell)
+
+If you want your function to run with a different runtime shim, use
+`+pure.magic.shim(...)+` as function at the module level, or pass a shim as the
+first argument to `@pure.magic(your_shim)`.
+
+Valid arguments in addition to actual Shim objects are ``ShimBuilder`` callables, the
+special-cased string names `'subprocess'` and `'samethread'`, and `'off'`, which
+disable `mops` entirely.
+
+Shims can be applied to a single function, all functions in a leaf module, or all in a module tree.
+
+.`foo/bar/baz.py`
+[source, python]
+----
+from .k8s_conf import k8s_shim
+
+@pure.magic()
+def your_func(...):
+    ...
+
+# these only apply to your_func
+pure.magic.shim('subprocess', your_func)
+# or
+pure.magic.shim(k8s_shim(cpus=4), your_func)
+----
+
+.`foo/bar/baz.py`
+[source, python]
+----
+pure.magic.shim('subprocess')
+# this applies to everything in this module...
+
+@pure.magic()
+def func1(...):
+    ...
+
+@pure.magic()
+def func2(...):
+    ...
+
+# ...except func3, which has a more specific configuration applied directly to it.
+@pure.magic('samethread')
+def func3(...):
+    ...
+
+pure.magic.shim('samethread', func3)
+# this is an alternate approach that accomplishes _exactly_
+# the same thing as the decorator version immediately above.
+----
+
+.`+foo/bar/__init__.py+`
+[source,python]
+----
+pure.magic.shim(k8s_shim(cpus=8))
+# applies to everything under foo.bar. However,
+# it would _not_ override anything in foo.bar.baz above, which has a more specific config.
+----
+
+=== mask=True
+
+Finally, if you _do_ need to _override_ an entire branch of the module tree, you can use
+`mask=True` - but do this carefully! It is intended that you would use `mask` for
+temporary, development workflows, whereas for the 'standard' or 'production' setup, you
+would generally prefer having the configuration as close as possible to the site of use,
+and not impose overrides with mask.
+
+.`+foo/bar/__init__.py+`
+[source,python]
+----
+pure.magic.shim('off', mask=True)
+----
+
+[[off]]
+=== Turning `mops` off for a module tree or a function
+
+`shim('off')` turns off `mops` - `magic` will not run your function through mops at all.
+
+`+pure.magic.off(...)+` is an alias for `shim('off', ...)`
+
+[[blob-root]]
+== `pure.magic.blob_root` - Set the blob root
+
+If you want to customize that blob store root to be something else, like an ADLS container, you
+can use `blob_root`, again either as a parameter to the decorator, or as a module-level
+call.
+
+.`foo/bar/baz.py`
+[source,python]
+----
+@pure.magic(blob_root='adls://bell/rings')
+def your_func(...):
+    ...
+
+# is equivalent to:
+pure.magic.blob_root('adls://bell/rings', your_func)
+----
+
+[[pipeline-id]]
+== `pure.magic.pipeline_id` - Set the link:pipeline-ids.adoc[pipeline id]
+
+This is like the blob root or shims above. It can be set for a given function, or for a
+leaf module or module tree.
+
+.`foo/bar/baz.py`
+[source, python]
+----
+pure.magic.pipeline_id('doors/time')
+# this applies to everything in this module...
+
+@pure.magic()
+def func1(...):
+    ...
+
+# ...except func2, which has a more specific configuration applied directly to it.
+@pure.magic(pipeline_id='thousand/years')
+def func2(...):
+    ...
+----
+
+`mask=True` is supported for `blob_root` and `pipeline_id` as well.
+
+== Recommendations
+
+=== blob root - near the root of your project
+
+It's unlikely you'll want different ``blob_root``s for different functions within your
+application. Just set that once, near the root of your application module tree in an
+`+__init__.py+` somewhere, and leave it.
+
+=== shims - on the functions themselves
+
+For advanced runtime shims, it's quite likely that different functions will have different
+resource requirements, and if you're running remotely (e.g. on Kubernetes), it's the shim
+that provides the specification to the remote environment.
+
+A fairly readable way to match resource requirements directly with functions is to have a
+function that creates shims based on resource arguments, e.g. the toy `k8s_shim(cpus=8)`
+in the example earlier.  This would mean passing the shim directly to the decorator, as
+`@pure.magic(k8s_shim(cpus=8))` - this makes it clear to readers how much computation you
+expect your function to do.
+
+Specifying this on a per-function basis is likely your best option for a lot of scenarios,
+and it doesn't lock you out from later choosing to run one or more of these with a
+different shim, or entirely outside of mops - remember, you can always apply
+`pure.magic.shim('off', your_func)` later on to drop `mops` entirely, or to set a different
+shim as desired.
+
+=== pipeline id - logical groupings of your code
+
+Pipeline is a grouping mechanism, so use it like one. Put `pure.magic.pipeline_id` at
+points in the module tree that make sense as high-level group names within your
+application. Use pipeline ids with an appropriate but not excessive amount of
+hierarchy. Find something that works well for your team and stick to it.
+
+=== module config - at the top of the module
+
+If you're setting a module-wide value, set that near the top of your module. It's nice to
+be able to see that sort of 'broad config' near the top with other types of globals that
+are consumed in the rest of the module.
+
+== Putting it all together
+
+.`+foo/__init__.py+`
+[source,python]
+----
+from thds.mops import pure
+
+pure.magic.blob_store('adls://lazing/sunday')
+----
+
+.`+foo/bar/__init__.py+`
+[source,python]
+----
+from thds.mops import pure
+
+pure.magic.pipeline_id('app/bar')
+----
+
+.`+foo/quux/__init__.py+`
+[source,python]
+----
+from thds.mops import pure
+
+pure.magic.pipeline_id('app/quux')
+----
+
+.`+foo/bar/forty_nine.py+`
+[source,python]
+----
+from thds.mops import pure
+
+@pure.magic('subprocess')
+def explore(...):
+    ...
+----
+
+.`+foo/quux/car.py+`
+[source,python]
+----
+from thds.mops import pure, k8s
+
+@pure.magic(
+    k8s.shim(
+        'docker.io/royal-image:latest',
+        node_narrowing=dict(cpus=8)
+    ),
+    pipeline_id='scaramouche',
+    blob_root='adls://thunderbolt/lightning',
+)
+def fandango(...):
+    ...
+----
+
+[[config-file]]
+== Config external to code
+
+Several things that `mops.pure.magic` does can also be configured outside the code, though
+none of them will work without first applying the `@pure.magic` decorator to your
+function.
+
+For many use cases, the Python APIs will be the best bet, but for more complex scenarios,
+or for developer convenience in trying something different without modifying the code, you
+can create a `.mops.toml` file at an appropriate place in your codebase. Call
+`pure.magic.load_config_file()` in your `+__main__+` to look 'up' from the current working
+directory of the process, and load config from the link:../src/thds/mops/config.py[first
+`.mops.toml` file that it finds].
+
+NOTE: Configuration loaded at the time of calling `pure.magic.load_config_file()` will
+override any configuration expressed statically through use of `pure.magic....` calls at
+the roots of your modules - unless those modules are imported after loading
+the config file. It is up to you to deal with the order of operations when loading config files.
+
+A `.mops.toml` can express anything that the static calls to `pure.magic....` express, using
+the syntax shown below:
+
+.`+.mops.toml+`
+[source,toml]
+----
+[foo]
+mops.pure.magic.blob_root = "adls://secret/harmonies"
+
+[foo.bar]
+mops.pure.magic.blob_root = "adls://secret/bar"
+__mask.mops.pure.magic.shim = 'off'
+
+[foo.bar.baz.func1]
+mops.pure.magic.shim = 'sameprocess'
+----
+
+The above would be exactly equivalent to the following `pure.magic` usage:
+
+.`+foo/__init__.py+`
+[source,python]
+----
+pure.magic.blob_root('adls://secret/harmonies')
+----
+
+.`+foo/bar/__init__.py+`
+[source,python]
+----
+pure.magic.blob_root('adls://secret/bar')
+pure.magic.shim('off', mask=True)
+----
+
+.`foo/bar/baz.py`
+[source,python]
+----
+
+@pure.magic()
+def func1(...):
+    ...
+
+pure.magic.shim('sameprocess')
+----
+
+NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `sameprocess` shim for
+`func1` will not be used - everything under `foo.bar` would be a non-mops passthrough
+function call.
