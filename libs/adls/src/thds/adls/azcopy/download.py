@@ -178,7 +178,8 @@ async def async_fastpath(
         except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
 
-    reader = await dl_file_client.download_file(
+    reader = await dl_file_client.download_file(  # type: ignore[misc]
+        # TODO - check above type ignore
         max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
         connection_timeout=conf.CONNECTION_TIMEOUT(),
     )

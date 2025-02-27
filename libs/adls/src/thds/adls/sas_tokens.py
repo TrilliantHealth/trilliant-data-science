@@ -43,6 +43,8 @@ def gen_blob_sas_token(
 
     `expiry` is in seconds.
     """
+    expiry_datetime: ty.Union[ty.Optional[str], datetime.datetime]
+
     if isinstance(account_key, UserDelegationKey):
         expiry_datetime = account_key.signed_expiry
     else:
