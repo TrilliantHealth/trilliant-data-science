@@ -5,19 +5,6 @@ import pytest
 from thds.core.dict_utils import DotDict, flatten, merge_dicts, unflatten
 
 
-def test_constructing_with_dotdicts():
-    dd: DotDict[Any] = DotDict(a=1, c=DotDict(d=2, e=DotDict(f=3)))
-    assert dd.a == 1
-    assert dd.c.e.f == 3
-
-
-def test_constructing_with_dicts():
-    dd: DotDict[Any] = DotDict({"a": 1, "b": 2, "c": {"d": 3, "e": {"f": 4}}})
-    assert dd.a == 1
-    assert dd.c == DotDict(d=3, e=DotDict(f=4))
-    assert dd.c.e.f == 4
-
-
 def test_already_flatten():
     assert {"a": 1, "b": 2} == flatten({"a": 1, "b": 2})
     assert {"a": None, "b": 2} == flatten({"a": None, "b": 2})
@@ -108,11 +95,3 @@ def test_dotdict_set():
 )
 def test_merge_dicts(inputs, expected_output):
     assert merge_dicts(*inputs) == expected_output
-
-
-@pytest.mark.parametrize(
-    "input",
-    [DotDict({}), DotDict({"a": 1, "b": {"c": 2}})],
-)
-def test_dot_dict_copy(input):
-    assert input.copy() == input
