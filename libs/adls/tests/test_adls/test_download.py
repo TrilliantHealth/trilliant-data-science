@@ -64,9 +64,7 @@ def test_integration_download_to_local_and_reuse_from_there(
     global_test_fs_client: FileSystemClient, test_dest: Path
 ):
     real = "test/read-only/DONT_DELETE_THESE_FILES.txt"
-    fqn = AdlsFqn(
-        ty.cast(str, global_test_fs_client.account_name), global_test_fs_client.file_system_name, real
-    )
+    fqn = AdlsFqn(global_test_fs_client.account_name, global_test_fs_client.file_system_name, real)
     md5b64 = "U3vtigRGuroWtJFEQ5dKoQ=="
     lcl = test_dest / "DONT_DELETE_THESE_FILES.txt"
     hit = download_or_use_verified(global_test_fs_client, real, lcl, md5b64)
@@ -84,9 +82,7 @@ def test_integration_download_to_cache_with_no_expected_md5_and_reuse_from_there
     global_test_fs_client: FileSystemClient, test_dest: Path
 ):
     remote = "test/read-only/DONT_DELETE_THESE_FILES.txt"
-    fqn = AdlsFqn(
-        ty.cast(str, global_test_fs_client.account_name), global_test_fs_client.file_system_name, remote
-    )
+    fqn = AdlsFqn(global_test_fs_client.account_name, global_test_fs_client.file_system_name, remote)
     md5b64 = ""
     lcl = test_dest / "DONT_DELETE_THESE_FILES----use-cache.txt"
     hit = download_or_use_verified(global_test_fs_client, remote, lcl, md5b64, cache=_TEST_CACHE)
@@ -113,9 +109,7 @@ def test_integration_handles_emoji_and_long_key(
     # local filesystems can accept.  therefore, we must truncate it in
     # a reliably-discoverable way.
     remote = "test/read-only/😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # noqa
-    fqn = AdlsFqn(
-        ty.cast(str, global_test_fs_client.account_name), global_test_fs_client.file_system_name, remote
-    )
+    fqn = AdlsFqn(global_test_fs_client.account_name, global_test_fs_client.file_system_name, remote)
     md5b64 = "gEL83AfKoP2e3O1Y4RsBqQ=="
     lcl = test_dest / "benchmark_hashing.py"
     hit = download_or_use_verified(global_test_fs_client, remote, lcl, md5b64, cache=_TEST_CACHE)
@@ -186,7 +180,6 @@ async def test_file_missing_md5_gets_one_assigned_after_download(
     assert not cache_hit
 
     fp = await file_client.get_file_properties()
-    assert fp.content_settings.content_md5
     assert b64(fp.content_settings.content_md5) == "8Wz15VCq6d73Z0+KUDNqVg=="
 
     # should not error since the md5 should be correct
