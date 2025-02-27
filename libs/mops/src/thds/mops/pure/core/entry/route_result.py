@@ -36,7 +36,7 @@ def route_return_value_or_exception(
     do_work_return_value: ty.Callable[[], T_contra],
     pipeline_id: str = "",
     pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
-):
+) -> None:
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     _routing_scope.enter(deferred_work.push_non_context())
     # deferred work can be requested during result serialization, but because we don't want

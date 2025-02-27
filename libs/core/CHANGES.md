@@ -1,3 +1,8 @@
+## 1.32
+
+- Add `source.tree.SourceTree` dataclass and the related `logical_root` utility, in order to be able to
+  represent potentially remote directories deterministically.
+
 ### 1.31.20250124
 
 - Print a traceback in `core.parallel.yield_results`, along with the type of the Exception, so that we're

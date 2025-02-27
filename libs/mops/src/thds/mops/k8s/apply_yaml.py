@@ -3,11 +3,11 @@ import tempfile
 from kubernetes import client, utils
 
 
-def format_yaml(yaml_template_str: str, **template_values: str):
+def format_yaml(yaml_template_str: str, **template_values: str) -> str:
     return yaml_template_str.format(**template_values)
 
 
-def create_yaml_template(yaml_str: str, **template_values: str):
+def create_yaml_template(yaml_str: str, **template_values: str) -> None:
     """Format a YAML template with the given keyword arguments, then apply it to the Kubernetes cluster.
 
     You must already have set up your SDK config.

@@ -48,7 +48,7 @@ class JobLogWatcher:
     some spurious logging messages.
     """
 
-    def __init__(self, job_name: str, num_pods_expected: int = 1):
+    def __init__(self, job_name: str, num_pods_expected: int = 1) -> None:
         self.job_name = job_name
         self.num_pods_expected = num_pods_expected
         self.pods_being_scraped: ty.Set[str] = set()
@@ -57,7 +57,7 @@ class JobLogWatcher:
 
     @k8s_sdk_retry()
     @core.scope.bound
-    def start(self, failed_pod_name: str = ""):
+    def start(self, failed_pod_name: str = "") -> None:
         """Call this one time - it will spawn threads as needed."""
         if NO_K8S_LOGS():
             return
@@ -88,7 +88,9 @@ class JobLogWatcher:
                 # don't start new threads for pods we've already previously discovered - they have their own thread.
                 self.pods_being_scraped.add(pod_name)
                 if pod_name not in self.pod_colors:
-                    self.pod_colors[pod_name] = make_colorized_out(colorized(fg=next_color()), pod_name)
+                    self.pod_colors[pod_name] = make_colorized_out(
+                        colorized(fg=next_color()), fmt_str=pod_name + " {}"
+                    )
                 log_thread = threading.Thread(
                     target=_scrape_pod_logs,
                     args=(
@@ -178,7 +180,7 @@ def _scrape_pod_logs(
     out: ty.Callable[[str], ty.Any],
     pod_name: str,
     failure_callback: ty.Callable[[str], ty.Any],
-):
+) -> None:
     """Contains its own retry error boundary b/c this is notoriously unreliable."""
     core.scope.enter(logger_context(log=pod_name))
 
@@ -198,10 +200,10 @@ def _scrape_pod_logs(
         # what we want to try next.
     )
 
-    def get_retry_kwargs(_: int):
+    def get_retry_kwargs(_: int) -> ty.Tuple[tuple, dict]:
         return tuple(), dict(base_kwargs, since_seconds=int(default_timer() - last_scraped_at))
 
-    def scrape_logs(*_args, **kwargs):
+    def scrape_logs(*_args: ty.Any, **kwargs: ty.Any) -> None:
         nonlocal last_scraped_at
         _await_pod_phases(
             {K8sPodStatus.RUNNING, K8sPodStatus.SUCCEEDED, K8sPodStatus.FAILED},

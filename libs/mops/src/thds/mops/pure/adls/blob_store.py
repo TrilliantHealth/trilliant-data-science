@@ -1,4 +1,4 @@
-"""This abstraction matches what is required by the BlobStore abstraction in remote.core.uris"""
+"""This abstraction matches what is required by the BlobStore abstraction in pure.core.uris"""
 
 import logging
 import typing as ty
@@ -7,7 +7,7 @@ from pathlib import Path
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.adls import AdlsFqn, download, join, resource, ro_cache
+from thds.adls import ADLS_SCHEME, AdlsFqn, download, join, resource, ro_cache
 from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_fs_client
@@ -28,7 +28,7 @@ log.getLogger("azure.core").setLevel(logging.WARNING)
 logger = log.getLogger(__name__)
 
 
-def _selective_upload_path(path: Path, fqn: AdlsFqn):
+def _selective_upload_path(path: Path, fqn: AdlsFqn) -> None:
     if path.stat().st_size > _5_MB:
         upload_through_cache(fqn, path)
     else:
@@ -45,12 +45,15 @@ _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9,
 
 
 class AdlsBlobStore(BlobStore):
+    def control_root(self, uri: str) -> str:
+        return str(AdlsFqn.parse(uri).root())
+
     def _client(self, fqn: AdlsFqn) -> DataLakeFileClient:
         return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path)
 
     @_azure_creds_retry
     @scope.bound
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         fqn = AdlsFqn.parse(remote_uri)
         scope.enter(log.logger_context(download=fqn))
         logger.debug(f"<----- downloading {type_hint}")
@@ -67,14 +70,15 @@ class AdlsBlobStore(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"):
+    def putbytes(
+        self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"
+    ) -> None:
         """Upload data to a remote path."""
         resource.upload(AdlsFqn.parse(remote_uri), data, content_type=type_hint)
-        return remote_uri
 
     @_azure_creds_retry
     @scope.bound
-    def putfile(self, path: Path, remote_uri: str):
+    def putfile(self, path: Path, remote_uri: str) -> None:
         scope.enter(log.logger_context(upload="mops-putfile"))
         _selective_upload_path(path, AdlsFqn.parse(remote_uri))
 
@@ -132,7 +136,7 @@ class DangerouslyCachingStore(AdlsBlobStore):
             return True
         return super().exists(remote_uri)
 
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes"):
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         # readbytesinto is used for _almost_ everything in mops - but almost everything is a 'control file'
         # of some sort. We use a completely separate cache for all of these things, because
         # in previous implementations, none of these things would have been cached at all.
@@ -171,7 +175,11 @@ _DEFAULT_CONTROL_CACHE = config.item(
 )
 
 
-def get_store() -> BlobStore:
+def get_adls_blob_store(uri: str) -> ty.Optional[AdlsBlobStore]:
+    if not uri.startswith(ADLS_SCHEME):
+        return None
+
     if DISABLE_CONTROL_CACHE() or not _DEFAULT_CONTROL_CACHE():
         return AdlsBlobStore()
+
     return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE())
