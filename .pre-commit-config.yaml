@@ -42,21 +42,21 @@ repos:
         language: system
         require_serial: true
         types: [python]
-        entry: uv run isort
+        entry: poetry run isort
 
       - id: black
         name: black
         language: system
         require_serial: true
         types: [python]
-        entry: uv run black --config pyproject.toml
+        entry: poetry run black --config pyproject.toml
 
       - id: flake8
         name: flake8
         language: system
         require_serial: true
         types: [python]
-        entry: uv run flake8 --config .flake8
+        entry: poetry run flake8 --config .flake8
 
       - id: project-mypys
         name: project-mypys
@@ -68,4 +68,4 @@ repos:
         files: ^(libs/.*|apps/.*)
         # have to pass --only-changed here and *no* filenames to ensure running against projects with deleted files
         # only run on non-merge commits - assume that main has already performed these checks
-        entry: ./scripts/run-if-not-merge.sh uv run mono typecheck --skip-setup --include-downstream --only-changed
+        entry: ./scripts/run-if-not-merge.sh poetry run mono typecheck --skip-setup --include-downstream --only-changed
