@@ -94,6 +94,18 @@ def dict_map_values(values: Callable[[V1], V2]) -> TuplesToDict[K1, V1, K1, V2]:
     return mapped
 
 
+def todate(x: datetime.date) -> datetime.date:
+    return x.date() if isinstance(x, datetime.datetime) else x
+
+
+def postprocessor_for_pyarrow_value_type(value_type: pyarrow.DataType) -> Optional[Callable]:
+    # Only for entries in arrays/maps; some newer versions of pyarrow load date types as datetime there.
+    # Not for scalar columns, where we'll just allow the more efficient pandas datetime/timestamp dtypes
+    if value_type in (pyarrow.date32(), pyarrow.date64()):
+        return todate
+    return postprocessor_for_pyarrow_type(value_type)
+
+
 @singledispatch
 def postprocessor_for_pyarrow_type(t: pyarrow.DataType) -> Optional[Callable]:
     return None
@@ -101,7 +113,7 @@ def postprocessor_for_pyarrow_type(t: pyarrow.DataType) -> Optional[Callable]:
 
 @postprocessor_for_pyarrow_type.register(pyarrow.ListType)
 def postprocessor_for_pyarrow_array(t: pyarrow.Array) -> IterableToList:
-    pproc = postprocessor_for_pyarrow_type(t.value_type)
+    pproc = postprocessor_for_pyarrow_value_type(t.value_type)
     if pproc is None:
         return tolist
     return list_map(pproc)
@@ -109,8 +121,8 @@ def postprocessor_for_pyarrow_array(t: pyarrow.Array) -> IterableToList:
 
 @postprocessor_for_pyarrow_type.register(pyarrow.MapType)
 def postprocessor_for_pyarrow_map(t: pyarrow.MapType) -> TuplesToDict:
-    key_pproc = postprocessor_for_pyarrow_type(t.key_type)
-    val_pproc = postprocessor_for_pyarrow_type(t.item_type)
+    key_pproc = postprocessor_for_pyarrow_value_type(t.key_type)
+    val_pproc = postprocessor_for_pyarrow_value_type(t.item_type)
     if key_pproc is None:
         if val_pproc is None:
             return dict

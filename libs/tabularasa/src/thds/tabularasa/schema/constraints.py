@@ -255,13 +255,19 @@ class MatchesRegex(StrConstraint):
 
             def check_fn(s: pd.Series):
                 return s.str.fullmatch(
-                    re.compile(self.matches.pattern), case=self.case_sensitive, na=True
+                    re.compile(self.matches.pattern), case=self.case_sensitive, na=True  # type: ignore[arg-type]
                 )
 
         else:
 
             def check_fn(s: pd.Series):
-                return s.str.match(case=self.case_sensitive, na=True)
+                return s.str.match(
+                    re.compile(self.matches.pattern),  # type: ignore[arg-type]
+                    case=self.case_sensitive,
+                    na=True,
+                )
+
+        # TODO - check above type ignores
 
         return pa.Check(check_fn, name=check_name)
 

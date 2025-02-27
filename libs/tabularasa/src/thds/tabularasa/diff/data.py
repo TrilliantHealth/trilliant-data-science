@@ -247,7 +247,7 @@ class DataFrameDiff:
             columns=ColumnDiffSummary._fields,
         )
         df.index.name = "column"
-        percent_df = df.rename(columns="{}_percent".format, copy=False).applymap(
+        percent_df = df.rename(columns="{}_percent".format, copy=False).applymap(  # type: ignore[operator]
             lambda v: _percent(v, len(self.common_keys))
         )
         df = pd.concat([df, percent_df], axis=1)

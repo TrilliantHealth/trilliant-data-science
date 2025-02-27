@@ -106,10 +106,10 @@ class PandasCSVLoader:
                 dtype=self.dtypes_for_csv_read,
                 parse_dates=self.parse_date_cols,
                 converters=self.converters,
-                skiprows=deps.skiprows,
+                skiprows=deps.skiprows or 0,
                 encoding=deps.encoding,
                 dialect=deps.csv_dialect,
-                na_values=self.na_values,
+                na_values={k: sorted(v) for k, v in self.na_values.items()},
                 # without this, pandas adds in its own extensive set of strings to interpret as null.
                 # we force the user to be explicit about the values they want to parse as null.
                 keep_default_na=False,

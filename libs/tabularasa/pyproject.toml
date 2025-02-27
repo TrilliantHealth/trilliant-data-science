@@ -1,85 +1,100 @@
-[tool.poetry]
+[project]
 name = "thds.tabularasa"
-# Patch version is a datetime determined upon release
-version = "0.9.0"
-authors = ["Trilliant Health"]
-description = "Trillant Health reference data build system."
+version = "0.9.1"
+description = "Trilliant Health reference data build system."
 readme = "README.md"
-packages = [{ include = "thds", from = "src" }]
-include = ["meta.json", "py.typed"]
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.9"
+dependencies = [
+  "attrs>=22.2",
+  "cattrs>=22.2",
+  "networkx>=3.0",
+  "numpy<2.0",  # >2.0 and pandas<2.0 can have issues
+  "pandas~=1.4",
+  "pandera~=0.7.1",  # 0.8 breaks us
+  "pydantic>=1.10.9,<2.0",
+  # V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin,
+  # see here: https://github.com/python/mypy/issues/15485.
+  "pyarrow>=10.0",
+  "pyyaml>=6.0.1",
+  "setuptools>=66.1.1",
+  "thds-adls",
+  "thds-core",
+  "typing-extensions",
+]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-
-attrs = ">=22.2.0"
-cattrs = ">=22.2.0"
-networkx = ">=3.0"
-numpy = "*"
-pandas = "^1.4"
-pandera = "~0.7.1"          # 0.8 breaks us
-pydantic = ">=1.10.9, <2.0"
-# V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin
-# see here: https://github.com/python/mypy/issues/15485
-pyarrow = ">=10.0.0"
-pyyaml = ">=6.0.1"
-setuptools = ">=66.1.1"
-typing-extensions = "*"
-
-thds-adls = { path = "../../libs/adls", develop = true }
-thds-core = { path = "../../libs/core", develop = true }
-
-# optional/extras dependencies
-"bourbaki.application" = { version = ">=0.10.12", optional = true }
-# `bourbaki.application` has issues with Python>=3.9 prior to these versions
-black = { version = "*", optional = true }
-isort = { version = "*", optional = true }
-pygraphviz = { version = "*", optional = true }
-"ruamel.yaml" = { version = "*", optional = true }
-tabulate = { version = "*", optional = true }
-typing-inspect = { version = ">=0.9.0", optional = true }
-# `typing-inspect` has issues with Python>=3.9 prior to these versions
-
-[tool.poetry.group.dev.dependencies]
-# type checks
-mypy = "1.11"
-mypy-extensions = "^1.0"
-pandas-stubs = "*"
-types-pkg-resources = "*"
-types-pyyaml = "*"
-types-setuptools = "*"
-types-tabulate = "*"
-typing-inspect = "*"
-# tests
-pytest = "^7.2"
-pytest-cov = "^4.0"
-# ipython
-ipykernel = "*"
-ipython = "*"
-jupyter = "*"
-# docs
-sphinx = "*"
-sphinx-autodoc-typehints = "*"
-sphinx-rtd-theme = "*"
-# data build
-# CLI/code generation ("cli" extra)
-"bourbaki.application" = "*"
-black = "*"
-isort = "*"
-"ruamel.yaml" = "*"
-tabulate = "*"
-
-[tool.poetry.extras]
-# support for CLI operations - code and data generation
-cli = ["bourbaki.application", "ruamel.yaml", "tabulate", "typing-inspect"]
-autoformat = ["black", "isort"]
-# support for visualizing computational/dependency DAGs
+[project.optional-dependencies]
+autoformat = [
+  "black",
+  "isort",
+]
+cli = [
+  "bourbaki.application>=0.10.12",
+  "ruamel.yaml",
+  "tabulate",
+  "typing-inspect",
+  # `typing-inspect` has issues with Python>=3.9 prior to these versions.
+]
+# Support for CLI operations - code and data generation.
 viz = ["pygraphviz"]
+# Support for visualizing computational/dependency DAGs.
 
-[tool.poetry.scripts]
-"tabularasa" = "thds.tabularasa.__main__:main"
+[project.scripts]
+tabularasa = "thds.tabularasa.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+[dependency-groups]
+dev = [
+  # type checks
+  "mypy~=1.11.0",
+  "mypy-extensions~=1.0",
+  "pandas-stubs",
+  "types-pyyaml",
+  "types-setuptools",
+  "types-tabulate",
+  # tests
+  "pytest~=7.2",
+  "pytest-cov~=4.0",
+  # ipython
+  "ipykernel",
+  "ipython",
+  "jupyter",
+  # docs
+  "sphinx",
+  "sphinx-autodoc-typehints",
+  "sphinx-rtd-theme",
+  # data build
+  # CLI/code generation ("cli" extra)
+  "bourbaki.application>=0.10.12",
+  "black",
+  "isort",
+  "ruamel.yaml",
+  "tabulate",
+  "typing-inspect"
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-adls = { path = "../../libs/adls", editable = true }
+thds-core = { path = "../../libs/core", editable = true }
 
 [tool.mono]
 omit_extras = ["viz"]
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.tabularasa"]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.mypy]
 mypy_path = "src"
@@ -95,48 +110,17 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-  "azure",
-  "black",
   "bourbaki.*",
-  "fastjsonschema",
-  "matplotlib.*",
   "networkx",
-  "pandas.*",
   "pyarrow.*",
   "pygraphviz",
   "pysqlite3",
   "ruamel.*",
-  "setuptools",
   "typing_inspect",
 ]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-# temporary fix for mypy error: Function has duplicate type signatures
-# related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
-module = ["azure.storage.filedatalake.*"]
-follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-m", "not integration"]
 markers = "integration"
-
-[tool.coverage.paths]
-source = ["src", "*/site-packages"]
-
-[tool.coverage.run]
-branch = true
-source = ["thds.tabularasa"]
-
-[tool.coverage.report]
-show_missing = true
-
-[build-system]
-requires = ["poetry-core<2.0"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
