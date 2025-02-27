@@ -5,7 +5,7 @@ import typing as ty
 from thds.mops.pure.core import metadata
 from thds.mops.pure.pickling._pickle import read_metadata_and_object
 
-from ._util import adls_shell
+from ._util import adls_shim
 
 
 def extract_memo_uris(caplog_records) -> ty.Iterator[str]:
@@ -26,7 +26,7 @@ def extract_memo_uris(caplog_records) -> ty.Iterator[str]:
     ), "Could not find memo URI in logs - are we missing 'new invocation for...'?"
 
 
-@adls_shell
+@adls_shim
 def makes_some_metadata(foo: str) -> int:
     return int(foo)
 

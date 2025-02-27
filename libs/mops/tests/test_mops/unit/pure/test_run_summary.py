@@ -34,9 +34,9 @@ def test_create_mops_directory(run_directory: Path) -> None:
 
 
 def test_memoizing_pickling_runner_init() -> None:
-    mock_shell = MagicMock()
+    mock_shim = MagicMock()
     storage_root = "file:///mock_storage_root"
-    runner = MemoizingPicklingRunner(shell=mock_shell, blob_storage_root=storage_root)
+    runner = MemoizingPicklingRunner(mock_shim, blob_storage_root=storage_root)
     assert runner._run_directory.exists()
     assert runner._run_directory.is_dir()
 
