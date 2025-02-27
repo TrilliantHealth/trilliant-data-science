@@ -18,10 +18,10 @@ All projects here are installable via PyPI: `pip install thds.<pkg-name>` should
 
 The code is available for use under the terms of its license.
 
-We use `poetry` to manage virtual environments for each project for development purposes.
+We use `uv` to manage virtual environments for each project for development purposes.
 
 ## Testing
 
 All of this code is tested during continuous integration at Trilliant Health. You can run the tests
-yourself once you have the virtual environment set up, with `poetry run pytest tests` in the project
+yourself once you have the virtual environment set up, with `uv run pytest tests` in the project
 directory.
