@@ -1,40 +1,34 @@
-[tool.poetry]
+[project]
 name = "thds.humenc"
-# Patch version is a datetime determined upon release
 version = "1.0"
+# Patch version is a datetime determined upon release
 description = "Binary to string encoding for human readers."
-authors = ["Trilliant Health"]
 readme = "README.md"
-packages = [{include = "thds", from="src"}]
-include = ["py.typed", "meta.json"]
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.8"
+dependencies = [
+    "thds-core",
+    "wordybin>=0.2.0"
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/ds-monorepo"
 
-wordybin = ">=0.2.0"
+[dependency-groups]
+dev = [
+    "mypy~=1.11.0",
+    "mypy-extensions~=1.0",
+    "pytest~=7.2",
+    "pytest-cov~=4.0",
+    "pytest-mock~=3.10",
+]
 
-#################
-# Runtime dependencies should have as low a bound as the library can
-# handle, and generally should have no upper bound unless actual
-# breakage is found, since that allows applications and other
-# libraries maximum flexibility.
-#################
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
 
-thds-core = {path = "../../libs/core", develop = true}
-
-[tool.poetry.group.dev.dependencies]
-#################
-# If you don't mind, please specify fairly strong bounds for dev dependencies.
-#
-# The reasoning is that we never want our tests/linting to break after `poetry lock`
-# because of a backward-incompatible change to something like mypy or pytest
-# that we didn't explicitly opt into by bumping a version.
-#################
-mypy = "1.11"
-mypy-extensions = "^1.0"
-pytest = "^7.2"
-pytest-cov = "^4.0"
-pytest-mock = "^3.10"
+[tool.uv.sources]
+thds-core = { path = "../../libs/core", editable = true }
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -57,25 +51,8 @@ exclude = '''(?x)(
 )'''
 check_untyped_defs = true
 
-[[tool.mypy.overrides]]
-module = [
-    "azure",
-    "ruamel.*",
-    "setuptools",
-]
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 # do not run integration test by default, but CI will pick it up
 addopts = "-m 'not integration'"
 markers = ["integration"]
 testpaths = ["tests"]
-
-[build-system]
-requires = ["poetry-core<2.0"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
