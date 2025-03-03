@@ -26,7 +26,7 @@ def _get_checksum_content_settings(data: AnyStrSrc) -> ty.Optional[ContentSettin
     """
     md5 = try_md5(data)
     if md5:
-        return ContentSettings(content_md5=md5)
+        return ContentSettings(content_md5=bytearray(md5))
     return None
 
 
