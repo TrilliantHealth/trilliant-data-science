@@ -138,11 +138,13 @@ class Tracker:
         self._reporter(list(self._progresses.values()))
         return self, key
 
-    def __call__(self, key: str, written: int):
+    def __call__(self, key: str, written: int = 0, total_written: int = 0):
         assert written >= 0, "cannot write negative bytes: {written}"
         try:
             start, total, n = self._progresses[key]
-            self._progresses[key] = ProgressState(start, total, n + written)
+            if not total_written:
+                total_written = n + written
+            self._progresses[key] = ProgressState(start, total, total_written)
             self._reporter(list(self._progresses.values()))
             if self._progresses[key].n >= total:
                 del self._progresses[key]
@@ -153,6 +155,10 @@ class Tracker:
 _GLOBAL_DN_TRACKER = Tracker(TqdmReporter("thds.adls downloading"))
 _GLOBAL_UP_TRACKER = Tracker(TqdmReporter("thds.adls uploading"))
 T = ty.TypeVar("T", bound=ty.IO)
+
+
+def get_global_download_tracker() -> Tracker:
+    return _GLOBAL_DN_TRACKER
 
 
 def _proxy_io(io_type: str, stream: T, key: str, total_len: int) -> T:
