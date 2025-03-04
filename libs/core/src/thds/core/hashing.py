@@ -74,7 +74,7 @@ def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
         return None
 
 
-def b64(digest: bytes) -> str:
+def b64(digest: ty.ByteString) -> str:
     """The string representation commonly used by Azure utilities.
 
     We use it in cases where we want to represent the same hash that
@@ -88,7 +88,7 @@ def db64(s: str) -> bytes:
     return base64.b64decode(s)
 
 
-def _repr_bytes(bs: bytes) -> str:
+def _repr_bytes(bs: ty.ByteString) -> str:
     return f"db64('{b64(bs)}')"
 
 

@@ -6,7 +6,7 @@ from functools import cached_property
 from thds.core import log, scope
 
 from ..._utils.once import Once
-from ..core import lock, metadata, set_pipeline_id, uris
+from ..core import lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.pipeline_id_mask import pipeline_id_mask
@@ -87,7 +87,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     started_at = datetime.now(tz=timezone.utc)  # capture this timestamp right at the outset.
     invocation_metadata = metadata.parse_invocation_metadata_args(metadata_args)
     metadata.INVOKED_BY.set_global(invocation_metadata.invoked_by)
-    set_pipeline_id(invocation_metadata.pipeline_id)
+    pipeline_id.set_pipeline_id(invocation_metadata.pipeline_id)
     fs = uris.lookup_blob_store(memo_uri)
 
     # any recursively-called functions that use metadata will retain the original invoker.

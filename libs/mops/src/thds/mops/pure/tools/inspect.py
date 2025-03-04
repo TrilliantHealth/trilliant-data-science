@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from pprint import pprint
 
-from thds.adls.uri import parse_uri
+from thds import adls
 from thds.core import log, scope, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
@@ -70,12 +70,13 @@ def _unpickle_object_for_debugging(uri: str) -> ty.Any:
 def _resolved_uri(uri: str) -> str:
     if not uri:
         return ""
-    return str(parse_uri(uri))
+    if fqn := adls.uri.resolve_uri(uri):
+        return str(fqn)
+    return uri
 
 
-_KNOWN_CONTROL_FILES = list(
-    map(lambda cf: "/" + cf, [strings.INVOCATION, results.RESULT, results.EXCEPTION])
-)
+_KNOWN_CONTROL_FILES = [strings.INVOCATION, results.RESULT, results.EXCEPTION]
+
 # prefix with forward-slash because these live in a blob store 'directory'
 
 
@@ -91,7 +92,7 @@ _NOTHING = object()
 
 def _control_uri(uri: str) -> str:
     for control_file in _KNOWN_CONTROL_FILES:
-        if uri.endswith(control_file):
+        if uri.endswith("/" + control_file):
             return control_file
     return ""
 
@@ -108,7 +109,7 @@ def get_control_file(uri: str) -> ty.Any:
     if not _control_uri(uri):
         fs = uris.lookup_blob_store(uri)
         logger.debug(f"Attempting to fetch all control files for {uri}")
-        return IRE(**{cf.lstrip("/"): get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
+        return IRE(**{cf: get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
 
     has_storage_root = bool(uris.ACTIVE_STORAGE_ROOT())
     try:
