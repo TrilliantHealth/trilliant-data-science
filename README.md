@@ -1,4 +1,4 @@
-# Trilliant Health Data Science Open Source Monorepo
+# Trilliant Health Machine Learning Open Source Monorepo
 
 A subset of our work is published here in the hopes that it will be useful. New projects may be added
 over time.
