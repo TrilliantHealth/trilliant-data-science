@@ -1,5 +1,3 @@
-import typing as ty
-
 from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.storage.blob import BlobProperties
 from azure.storage.filedatalake import FileProperties
@@ -15,10 +13,7 @@ def is_directory(info: FileProperties) -> bool:
 
 
 def get_file_properties(fqn: AdlsFqn) -> FileProperties:
-    with get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path) as file_client:
-        # The file client is a context manager to ensure proper resource cleanup
-        # and to avoid keeping connections open longer than necessary.
-        return file_client.get_file_properties()
+    return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
 
 
 def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
@@ -27,19 +22,6 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
         .get_blob_client(fqn.path)
         .get_blob_properties()
     )
-
-
-class ContentSettingsP(ty.Protocol):
-    content_md5: ty.Optional[bytearray]
-
-
-class PropertiesP(ty.Protocol):
-    name: ty.Any
-    metadata: ty.Any
-
-    @property
-    def content_settings(self) -> ContentSettingsP:
-        pass
 
 
 # At some point it may make sense to separate file and blob property modules,

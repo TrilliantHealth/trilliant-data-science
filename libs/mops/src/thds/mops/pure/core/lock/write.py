@@ -1,6 +1,5 @@
 import os
 import typing as ty
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from thds.core import hostname, log
@@ -11,36 +10,37 @@ from .types import LockContents
 logger = log.getLogger(__name__)
 
 
-@dataclass
-class LockEmitter:
-    writer_id: str
-    expire: timedelta
+def make_lock_contents(
+    writer_id: str, expire: timedelta
+) -> ty.Callable[[ty.Optional[datetime]], LockContents]:
+    """Impure - Resets written_at to 'right now' to keep the lock 'live'."""
+    write_count = 0
+    first_written_at = ""
 
-    write_count: int = 0
-    first_written_at: str = ""
+    assert (
+        "/" not in writer_id
+    ), f"{writer_id} should not contain a slash - maybe you passed a URI instead?"
 
-    def __post_init__(self) -> None:
-        assert (
-            "/" not in self.writer_id
-        ), f"{self.writer_id} should not contain a slash - maybe you passed a URI instead?"
-
-    def __call__(self, first_acquired_at: ty.Optional[datetime]) -> LockContents:
-        self.write_count += 1
+    def lock_contents(first_acquired_at: ty.Optional[datetime]) -> LockContents:
+        nonlocal write_count, first_written_at
+        write_count += 1
         now = _funcs.utc_now().isoformat()
-        self.first_written_at = self.first_written_at or now
+        first_written_at = first_written_at or now
 
         return {
-            "writer_id": self.writer_id,
+            "writer_id": writer_id,
             "written_at": now,
-            "expire_s": self.expire.total_seconds(),
+            "expire_s": expire.total_seconds(),
             # debug stuff:
-            "write_count": self.write_count,
+            "write_count": write_count,
             "hostname": hostname.friendly(),
             "pid": str(os.getpid()),
-            "first_written_at": self.first_written_at,
+            "first_written_at": first_written_at,
             "first_acquired_at": first_acquired_at.isoformat() if first_acquired_at else "",
             "released_at": "",
         }
+
+    return lock_contents
 
 
 class LockfileWriter:

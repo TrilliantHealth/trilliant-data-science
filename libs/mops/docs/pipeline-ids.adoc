@@ -12,13 +12,8 @@ its intended semantics.
 The pipeline id is chosen for each `mops` wrapped function at the time of call. It can be
 set in many ways - probably too many ways. :)
 
-This list is in order of least-specific to most-specific; i.e., approaches later in the
-list will override the pipeline ids from higher in the list.
-
-  - if no pipeline id is set, and `pure.magic` is not being used, then a datetime plus a
-    git commit hash (if available) is a shared default pipeline id within a given process.
-  - `@pure.magic` sets a default pipeline id of `magic`. It is not advised to retain this pipeline id for non-toy use cases.
   - it can be set for an entire module or module tree link:magic.adoc#pipeline-id[with `@pure.magic.pipeline_id('baz')`]
+  - `@pure.magic` sets a default pipeline id of `magic`.
   - it can be passed to the decorator: `@pure.magic(pipeline_id='baz')`
   - it can be set in the function docstring:
 +
@@ -39,6 +34,7 @@ def foobar(...):
 ----
 pure.pipeline_id_mask('baz')(foobar)(*args)
 ----
+  - Each of the above will override a usage above it in the list.
 
 NOTE: Often there is no reason to change the pipeline id, once defined for a given
 application.  It's mostly a set-it-and-forget-it configuration.

@@ -1,6 +1,7 @@
 """Utilities built around pickle for the purpose of transferring large amounts of on-disk
 data and also functions."""
 
+import inspect
 import io
 import pickle
 import typing as ty
@@ -9,7 +10,7 @@ from functools import partial
 # so we can pickle and re-raise exceptions with remote tracebacks
 from tblib import pickling_support  # type: ignore
 
-from thds.core import hashing, inspect, log, source
+from thds.core import hashing, log, source
 
 from ..core import memo, metadata
 from ..core.source import prepare_source_argument, prepare_source_result
@@ -79,7 +80,7 @@ def gimme_bytes(pickle_dump: ty.Callable[[object, ty.IO], None], obj: object) ->
         return bio.read()
 
 
-def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, bytes]:
+def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
     # in order to be forward-compatible with v3 of mops, we're introducing a new
     # wrinkle in the read. Instead of assuming that the data at the URI
     # _begins_ with a pickle, we are looking for the first possible pickle
@@ -87,12 +88,11 @@ def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, bytes]:
     # non-pickle metadata and embedding it at the beginning of the file.
     first_pickle_pos = full_bytes.find(b"\x80")
     if first_pickle_pos == -1:
-        raise ValueError(f"Unable to find a pickle in bytes of length {len(full_bytes)}")
-    return full_bytes[:first_pickle_pos], full_bytes[first_pickle_pos:]
-
-
-def _unpickle_with_callable(pickle_bytes: bytes) -> ty.Any:
-    return CallableUnpickler(io.BytesIO(pickle_bytes)).load()
+        raise ValueError("Unable to find a pickle in the bytes")
+    return (
+        full_bytes[:first_pickle_pos],
+        CallableUnpickler(io.BytesIO(full_bytes[first_pickle_pos:])).load(),
+    )
 
 
 H = ty.TypeVar("H")
@@ -102,11 +102,8 @@ def make_read_header_and_object(
     type_hint: str, xf_header: ty.Optional[ty.Callable[[bytes], H]] = None
 ) -> ty.Callable[[str], ty.Tuple[H, ty.Any]]:
     def read_object(uri: str) -> ty.Tuple[H, ty.Any]:
-        uri_bytes = get_bytes(uri, type_hint=type_hint)
-        if not uri_bytes:
-            raise ValueError(f"{uri} exists but is empty - something is very wrong.")
-        header, first_pickle = read_partial_pickle(uri_bytes)
-        return (xf_header or (lambda h: h))(header), _unpickle_with_callable(first_pickle)  # type: ignore
+        header, unpickled = read_partial_pickle(get_bytes(uri, type_hint=type_hint))
+        return (xf_header or (lambda h: h))(header), unpickled  # type: ignore
 
     return read_object
 
@@ -129,7 +126,8 @@ def freeze_args_kwargs(dumper: Dumper, f: ty.Callable, args: Args, kwargs: Kwarg
 
     Also binds default arguments, for maximum determinism/explicitness.
     """
-    bound_arguments = inspect.bind_arguments(f, *args, **kwargs)
+    bound_arguments = inspect.signature(f).bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
     return gimme_bytes(dumper, (bound_arguments.args, bound_arguments.kwargs))
 
 
@@ -163,18 +161,9 @@ class SourceArgumentPickler:
 class SourceResultPickler:
     """Only for use on the remote side, when serializing the result."""
 
-    def __init__(self) -> None:
-        """There will be one of these per remote function call."""
-        self._basenames_seen: set[str] = set()
-        # 'basename' is no longer a good name for what is being collected here,
-        # but we are not changing it to preserve backwards compatibility with existing results.
-        # We use this instead to collect URIs that _may_ have been uploaded by `mops`.
-
     def __call__(self, maybe_source: ty.Any) -> ty.Optional[_DeserSource]:
         if isinstance(maybe_source, source.Source):
-            src_res = prepare_source_result(maybe_source, self._basenames_seen)
-            self._basenames_seen.add(src_res.remote_uri)
-            return ty.cast(_DeserSource, UnpickleSourceResult(*src_res))
+            return ty.cast(_DeserSource, UnpickleSourceResult(*prepare_source_result(maybe_source)))
 
         return None
 

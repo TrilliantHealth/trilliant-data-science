@@ -11,16 +11,17 @@ functions themselves.
 """
 
 import hashlib
-import sys
+import os
 from pathlib import Path
+from typing import Any
 
 from . import config, files
-from .hashing import Hash, Hasher, get_hasher, hash_using
+from .hashing import Hash, hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
 
-CACHE_HASH_DIR = config.item("directory", HOMEDIR() / ".thds/core/hash-cache", parse=Path)
+CACHE_HASH_DIR = config.item("directory", HOMEDIR() / ".hash-cache", parse=Path)
 _1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
 
 
@@ -51,7 +52,7 @@ def _is_no_older_than(file: Path, other: Path) -> bool:
     return file.stat().st_mtime >= other.stat().st_mtime
 
 
-def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
+def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
     """Hashes a file with the given hashlib hasher. If we've already previously computed
     the given hash for the file and the file hasn't changed (according to filesystem
     mtime) since we stored that hash, we'll just return the cached hash.
@@ -72,22 +73,14 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
         # I want to know how often we're finding 'outdated' hashes; those should be rare.
         log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}{hash_cached}")
 
-    if hasattr(hasher, "update_mmap"):
-        # a special case for the blake3 module, which has deadlocked in the past
-        logger.warning("DEBUG starting update_mmap for blake3")
-        hasher.update_mmap(filepath)
-        hash_bytes = hasher.digest()
-        logger.info("DEBUG finished update_mmap")
-    else:
-        hash_bytes = hash_using(resolved_path, hasher).digest()
-
+    hash_bytes = hash_using(resolved_path, hasher).digest()
     cached_hash_path.parent.mkdir(parents=True, exist_ok=True)
     with files.atomic_binary_writer(cached_hash_path) as f:
         f.write(hash_bytes)
     return hash_bytes
 
 
-def filehash(algo: str, pathlike: StrOrPath) -> Hash:
+def filehash(algo: str, pathlike: os.PathLike) -> Hash:
     """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
     of the hash algorithm used."""
-    return Hash(sys.intern(algo), hash_file(pathlike, get_hasher(algo)))
+    return Hash(algo, hash_file(pathlike, hashlib.new(algo)))
