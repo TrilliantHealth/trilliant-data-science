@@ -1,3 +1,8 @@
+### 0.9.2
+
+- `data-diff` now errors when passed table names which are not in the schema.
+- `data-diff` now shows metadata changes for diff-able tables.
+
 ### 0.9.1
 
 - Migrating from `poetry` -> `uv` for project management + some typing fixes.

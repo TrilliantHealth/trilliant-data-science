@@ -184,6 +184,16 @@ def markdown_dataframe_diff_summary(
             index=False, tablefmt=tablefmt, floatfmt=_floatfmt_from_df(table, floatfmt)
         )
 
+    meta_changes = dataframe_diff.meta_diff
+    if meta_changes is not None and len(meta_changes):
+        if table_name and not heading:
+            yield markdown_heading(heading_level + 1, code_literal(table_name))
+            heading = True
+        yield markdown_heading(heading_level + 2, "Metadata Changes:")
+        yield meta_changes.to_markdown(
+            index=True, tablefmt=tablefmt, floatfmt=_floatfmt_from_df(meta_changes, floatfmt)
+        )
+
     def _drop_zero_cols(df: ty.Optional[pd.DataFrame]) -> ty.Optional[pd.DataFrame]:
         if df is None:
             return None

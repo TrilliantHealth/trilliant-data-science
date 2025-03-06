@@ -1023,6 +1023,11 @@ class ReferenceDataManager:
         :return: an iterator of tuples of table names and their corresponding `DataFrameDiff`s. These
           may be consumed lazily, allowing for memory-efficient processing of large data diffs.
         """
+        if tables:
+            unknown = set(tables).difference(self.schema.tables.keys())
+            if unknown:
+                raise KeyError(f"Unknown tables: {', '.join(unknown)}")
+
         s_diff = self.schema_diff(base_ref, base_schema_path=base_schema_path)
         before_blob_store = s_diff.before.remote_blob_store
         after_blob_store = s_diff.after.remote_blob_store
@@ -1038,6 +1043,7 @@ class ReferenceDataManager:
             if table_diff.before.md5 == table_diff.after.md5:
                 self.logger.info(f"{table_name}: Matching md5 hashes; no data diff detected")
                 continue
+
             if not (pkb := table_diff.before.primary_key) or not (pka := table_diff.after.primary_key):
                 self.logger.warning(f"{table_name}: Can't diff without primary keys")
                 continue

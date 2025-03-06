@@ -4,6 +4,7 @@ from functools import cached_property
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 from ..data_dependencies.adls import sync_adls_data
 from ..loaders.util import PandasParquetLoader
@@ -20,7 +21,8 @@ def load_historical_data(table: Table, blob_store: RemoteBlobStoreSpec):
     results = sync_adls_data(remote_data_spec)
     assert len(results) == 1
     local_path = results[0].local_path
-    return loader(local_path)
+    meta = pq.read_metadata(local_path)
+    return loader(local_path), meta
 
 
 T_Tabular = ty.TypeVar("T_Tabular", pd.Series, pd.DataFrame)
@@ -167,6 +169,8 @@ class ColumnDiff:
 class DataFrameDiff:
     before: pd.DataFrame
     after: pd.DataFrame
+    before_meta: ty.Optional[pq.FileMetaData] = None
+    after_meta: ty.Optional[pq.FileMetaData] = None
 
     def __post_init__(self):
         self._column_diffs: ty.Dict[str, ColumnDiff] = dict()
@@ -297,9 +301,28 @@ class DataFrameDiff:
             added_columns=len(self.added_columns),
         )
 
+    @cached_property
+    def meta_diff(self):
+        if self.before_meta is None or self.after_meta is None:
+            return pd.DataFrame(columns=["before", "after"], dtype=object)
+
+        before = self.before_meta.to_dict()
+        after = self.after_meta.to_dict()
+        return pd.DataFrame.from_dict(
+            {
+                name: [before[name], after[name]]
+                for name in before
+                if (name != "row_groups") and (before[name] != after[name])
+            },
+            orient="index",
+            columns=["before", "after"],
+            dtype=object,
+        )
+
     def __bool__(self) -> bool:
         return bool(
-            len(self.dropped_keys)
+            len(self.meta_diff)
+            or len(self.dropped_keys)
             or len(self.added_keys)
             or len(self.dropped_columns)
             or len(self.added_columns)
@@ -313,7 +336,11 @@ class DataFrameDiff:
         before_blob_store: RemoteBlobStoreSpec,
         after_blob_store: RemoteBlobStoreSpec,
     ) -> "DataFrameDiff":
+        before_df, before_meta = load_historical_data(before, before_blob_store)
+        after_df, after_meta = load_historical_data(after, after_blob_store)
         return DataFrameDiff(
-            load_historical_data(before, before_blob_store),
-            load_historical_data(after, after_blob_store),
+            before=before_df,
+            after=after_df,
+            before_meta=before_meta,
+            after_meta=after_meta,
         )
