@@ -4,7 +4,7 @@ from azure.storage.filedatalake import DataLakeServiceClient, FileSystemClient
 
 from thds.core import cache, config
 
-from . import _fork_protector, conf
+from . import conf
 from .shared_credential import SharedCredential
 
 DEFAULT_CONNECTION_POOL_SIZE = config.item("default_connection_pool_size", default=100, parse=int)
@@ -53,7 +53,9 @@ best approach for all applications.
 This avoids creating a client at a module level and is
 thread-safe.
 """
-get_global_fs_client = _fork_protector.fork_safe_cached(cache.locking, adls_fs_client)
+get_global_client = cache.locking(adls_fs_client)
+# deprecated name - prefer get_global_fs_client
+get_global_fs_client = get_global_client
 
 
 def adls_blob_service_client(
@@ -82,6 +84,4 @@ def adls_blob_container_client(
     return get_global_blob_service_client(storage_account, connpool_size).get_container_client(container)
 
 
-get_global_blob_container_client = _fork_protector.fork_safe_cached(
-    cache.locking, adls_blob_container_client
-)
+get_global_blob_container_client = cache.locking(adls_blob_container_client)

@@ -6,9 +6,10 @@ yet will not be downloaded (if non-local) until it is actually opened or unwrapp
 import typing as ty
 from pathlib import Path
 
+from .. import log
 from ..files import is_file_uri, path_from_uri
+from ..hash_cache import filehash
 from ..hashing import Hash
-from ._construct import hash_file
 
 
 class Downloader(ty.Protocol):
@@ -72,7 +73,9 @@ class SourceHashMismatchError(ValueError):
 
 
 def _check_hash(expected_hash: ty.Optional[Hash], path: Path) -> Hash:
-    computed_hash = hash_file(path)
+    hash_algo = expected_hash.algo if expected_hash else "sha256"
+    with log.logger_context(hash_for=f"source-{hash_algo}"):
+        computed_hash = filehash(hash_algo, path)
     if expected_hash and expected_hash != computed_hash:
         raise SourceHashMismatchError(
             f"{expected_hash.algo} mismatch for {path};"

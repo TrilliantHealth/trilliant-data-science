@@ -1,11 +1,10 @@
 import typing as ty
-from datetime import datetime, timezone
 
 from kubernetes import client
 
 from ._shared import logger
 from .retry import k8s_sdk_retry
-from .watch import EventType, WatchingObjectSource, watch_forever
+from .watch import WatchingObjectSource
 
 
 @k8s_sdk_retry()
@@ -25,10 +24,6 @@ _JOB_SOURCE = WatchingObjectSource(
 )
 
 
-def job_source() -> WatchingObjectSource[client.models.V1Job]:
-    return _JOB_SOURCE
-
-
 def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1Job]:
     return _JOB_SOURCE.get(job_name, namespace=namespace)
 
@@ -37,26 +32,18 @@ def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1J
 # https://kubernetes.io/docs/concepts/workloads/controllers/job/#terminal-job-conditions
 
 
-def job_completion_time(job: client.models.V1Job) -> ty.Optional[datetime]:
+def is_job_succeeded(job: client.models.V1Job) -> bool:
     if not job.status:
-        return None
+        return False
 
-    if job.status.completion_time:
-        return job.status.completion_time
+    if not job.status.completion_time:
+        return False
 
     for condition in job.status.conditions or tuple():
         if condition.type == "Complete" and condition.status == "True":
-            return (
-                condition.last_transition_time
-                if condition.last_transition_time
-                else datetime.now(tz=timezone.utc)
-            )
+            return True
 
-    return None
-
-
-def is_job_succeeded(job: client.models.V1Job) -> bool:
-    return bool(job_completion_time(job))
+    return False
 
 
 def is_job_failed(job: client.models.V1Job) -> bool:
@@ -68,49 +55,3 @@ def is_job_failed(job: client.models.V1Job) -> bool:
             return True
 
     return False
-
-
-def watch_jobs(
-    namespace: str, timeout: ty.Optional[int] = None
-) -> ty.Iterator[ty.Tuple[client.models.V1Job, EventType]]:
-    yield from watch_forever(
-        lambda _, __: client.BatchV1Api().list_namespaced_job,
-        namespace,
-        typename="Job",
-        timeout=timeout,
-    )
-
-
-def watch_jobs_cli() -> None:
-    import argparse
-    from datetime import datetime
-
-    parser = argparse.ArgumentParser(description="Watch Kubernetes jobs")
-    parser.add_argument("namespace", help="Kubernetes namespace to watch")
-    parser.add_argument("--timeout", type=int, help="Timeout in seconds", default=None)
-    args = parser.parse_args()
-
-    for job, event_type in watch_jobs(args.namespace, timeout=args.timeout):
-        completion_time = job_completion_time(job)
-        creation_time = job.metadata.creation_timestamp
-
-        status = ""
-        if is_job_failed(job):
-            status = "FAILED"
-        elif completion_time := job_completion_time(job):
-            job_duration = completion_time - creation_time
-            status = f"completed_after={job_duration}"
-        else:
-            status = "incomplete" + " " * 20
-
-        print(
-            datetime.now().isoformat(),
-            f"{event_type:<10}",
-            f"{job.metadata.name:<64}",
-            job.metadata.creation_timestamp,
-            status,
-        )
-
-
-if __name__ == "__main__":
-    watch_jobs_cli()

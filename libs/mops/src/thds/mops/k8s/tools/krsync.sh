@@ -11,19 +11,12 @@ namespace=''
 pod=$1
 shift
 
-# something seems to have changed about rsync...?
-# If rsync uses pod@namespace format, parse it
-if [[ "$pod" == *"@"* ]]; then
-    namespace="-n ${pod#*@}"
-    pod="${pod%@*}"
-# If uses -l pod namespace format
-elif [ "X$pod" = "X-l" ]; then
+# If use uses pod@namespace rsync passes as: {us} -l pod namespace ...
+if [ "X$pod" = "X-l" ]; then
     pod=$1
     shift
     namespace="-n $1"
     shift
 fi
-
-# echo "pod: $pod  ; namespace: $namespace" > .krsync.log
 
 exec kubectl $namespace exec -i $pod --container "${KRSYNC_CONTAINER}" -- "$@"

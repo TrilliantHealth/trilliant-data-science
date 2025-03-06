@@ -1,3 +1,4 @@
+import importlib.metadata
 import io
 import typing as ty
 from pathlib import Path
@@ -5,7 +6,6 @@ from typing import Callable, Union
 
 from thds.adls import AdlsFqn, AdlsRoot
 from thds.core.stack_context import StackContext
-from thds.mops._compat import importlib_metadata
 
 from ..adls.blob_store import get_adls_blob_store
 from .file_blob_store import get_file_blob_store
@@ -29,7 +29,7 @@ def register_blob_store(get_store: GetBlobStoreForUri) -> None:
 
 
 def load_plugin_blobstores() -> None:
-    for entry_point in importlib_metadata.entry_points(group="thds.mops.pure.blob_stores"):
+    for entry_point in importlib.metadata.entry_points().get("thds.mops.pure.blob_stores", []):
         try:
             register_blob_store(entry_point.load())
         except Exception as e:

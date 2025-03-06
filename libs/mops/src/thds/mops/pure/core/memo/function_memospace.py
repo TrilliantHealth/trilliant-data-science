@@ -140,10 +140,13 @@ import typing as ty
 from thds import humenc
 from thds.core import config
 
-from ..pipeline_id import get_pipeline_id_for_stack
-from ..pipeline_id_mask import extract_from_docstr, get_pipeline_id_mask, pipeline_id_mask
+from ..pipeline_id_mask import (
+    extract_from_docstr,
+    get_pipeline_id,
+    get_pipeline_id_mask,
+    pipeline_id_mask,
+)
 from ..uris import lookup_blob_store
-from . import calls
 from .unique_name_for_function import make_unique_name_including_docstring_key, parse_unique_name
 
 
@@ -183,7 +186,7 @@ def matching_mask_pipeline_id(pipeline_id: str, callable_regex: str) -> _Pipelin
     def _handler(callable_name: str, runner_prefix: str) -> ty.Optional[str]:
         if re.match(callable_regex, callable_name):
             return lookup_blob_store(runner_prefix).join(
-                runner_prefix, pipeline_id or get_pipeline_id_for_stack(), callable_name
+                runner_prefix, pipeline_id or get_pipeline_id(), callable_name
             )
         return None
 
@@ -224,7 +227,6 @@ class MemoUriComponents(ty.NamedTuple):
     function_module: str
     function_name: str
     function_logic_key: str
-    calls_functions: ty.List[str]
     args_hash: str
 
 
@@ -245,12 +247,8 @@ def parse_memo_uri(
 
     runner_prefix = runner_prefix.rstrip(separator)
     rest, args_hash = memo_uri.rsplit(separator, 1)  # args hash is last component
-
-    remaining_prefix, full_function_name, calls_functions = calls.split_off_calls_strings(
-        rest, separator
-    )
-
-    pipeline_id = remaining_prefix[len(runner_prefix) :]
+    rest, full_function_name = rest.rsplit(separator, 1)
+    pipeline_id = rest[len(runner_prefix) :]
     pipeline_id = pipeline_id.strip(separator)
 
     function_parts = parse_unique_name(full_function_name)
@@ -261,7 +259,6 @@ def parse_memo_uri(
         function_parts.module,
         function_parts.name,
         function_parts.function_logic_key,
-        calls_functions,
         args_hash,
     )
 

@@ -8,11 +8,9 @@ but if you're reading this in the distant future - those are its limitations.
 
 import argparse
 import functools
-import io
 import os
 import re
 import subprocess
-import sys
 import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +28,6 @@ from thds.mops.pure.pickling._pickle import (
 )
 from thds.mops.pure.pickling.pickles import Invocation
 from thds.mops.pure.runner import strings
-
-from . import _pickle_dis
 
 logger = log.getLogger(__name__)
 
@@ -63,7 +59,6 @@ def _unpickle_object_for_debugging(uri: str) -> ty.Any:
             invoc = ty.cast(Invocation, invoc_raw)
             args, kwargs = unfreeze_args_kwargs(invoc.args_kwargs_pickle, PartialViewingUnpickler)
             return Thunk(getattr(invoc, "f", None) or invoc.func, *args, **kwargs)
-
         header, obj = read_metadata_and_object("output", uri)
         return obj, header
     except ImportError as ie:
@@ -103,7 +98,7 @@ def _control_uri(uri: str) -> str:
 
 
 @scope.bound
-def get_control_file(uri: str, unpickle: bool = True) -> ty.Any:
+def get_control_file(uri: str) -> ty.Any:
     """Returns _NOTHING if 'normal' errors occur."""
     try:
         uri = _resolved_uri(uri)
@@ -114,27 +109,18 @@ def get_control_file(uri: str, unpickle: bool = True) -> ty.Any:
     if not _control_uri(uri):
         fs = uris.lookup_blob_store(uri)
         logger.debug(f"Attempting to fetch all control files for {uri}")
-        return IRE(
-            **{cf: get_control_file(fs.join(uri, cf), unpickle=unpickle) for cf in _KNOWN_CONTROL_FILES}
-        )
+        return IRE(**{cf: get_control_file(fs.join(uri, cf)) for cf in _KNOWN_CONTROL_FILES})
 
     has_storage_root = bool(uris.ACTIVE_STORAGE_ROOT())
     try:
         scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(uri)))
-        if unpickle:
-            return _unpickle_object_for_debugging(uri)
-        else:
-            return _pickle_dis.get_meta_and_pickle(uri)
-    except ImportError:
-        return None
+        return _unpickle_object_for_debugging(uri)
     except Exception as e:
         if uris.lookup_blob_store(uri).is_blob_not_found(e):
             if has_storage_root or uri not in str(e):
                 logger.warning(str(e))
             return None
-        logger.exception(
-            f"Unexpected error {e} while {'unpickling' if unpickle else 'processing'} the object at {uri}"
-        )
+        logger.exception("Unexpected error while unpickling the object.")
         raise
 
 
@@ -150,31 +136,22 @@ def _embed(o: object) -> None:
 
 
 def _pprint(obj: object, file: ty.Any = None, uri: str = "") -> None:
-    final_out_stream = file or sys.stdout
-
     if uri:
-        print(uri, file=final_out_stream)
-
-    # Always capture the pretty-printed output to an in-memory buffer first
-    output_buffer = io.StringIO()
+        print(uri, file=file)
 
     try:
-        # Attempt to use rich for pretty-printing into the buffer
-        from rich import console, pretty  # type: ignore[import-not-found]
+        from rich import console, pretty  # type: ignore[import]
 
-        console.Console(file=output_buffer, color_system=None).print(pretty.Pretty(obj), crop=False)
+        if file:
+            console.Console(file=file, color_system=None).print(
+                pretty.Pretty(
+                    obj,  # highlighter=lambda x: x if file else None
+                )
+            )
+        else:
+            pretty.pprint(obj)
     except ModuleNotFoundError:
-        pprint(obj, indent=4, width=60, sort_dicts=False, stream=output_buffer)
-
-    formatted_string = output_buffer.getvalue()
-    # Unescape the literal '\n' sequences into actual newlines
-    processed_string = re.sub(r"(?<!\\)\\n", "\n", formatted_string)
-
-    # Use print with end='' for stdout to avoid double newlines
-    if final_out_stream is sys.stdout:
-        print(processed_string, end="")
-    else:
-        final_out_stream.write(processed_string)
+        pprint(obj, indent=4, width=60, sort_dicts=False, stream=file)
 
 
 def inspect(uri: str, embed: bool = False) -> ty.Any:
@@ -278,25 +255,6 @@ def _write_ire_to_path(ire: IRE, path: Path, uri: str) -> None:
         _pprint(ire, file=wf, uri=uri)
 
 
-@scope.bound
-def pickle_diff_two_uris(uri1: str, uri2: str) -> None:
-    """Diff two pickled objects, using the diff tool specified in DIFF_TOOL."""
-    _check_diff_tool()
-    uri1 = _resolved_uri(uri1)
-    uri2 = _resolved_uri(uri2)
-
-    path1 = scope.enter(tmp.temppath_same_fs())
-    path2 = scope.enter(tmp.temppath_same_fs())
-
-    ire1 = get_control_file(uri1, unpickle=False)
-    ire2 = get_control_file(uri2, unpickle=False)
-
-    _write_ire_to_path(ire1, path1, uri1)
-    _write_ire_to_path(ire2, path2, uri2)
-
-    _run_diff_tool(path1, path2)
-
-
 def _diff_memospace(uri: str, new_control: IRE) -> None:
     """Diff all siblings in the memospace against the new invocation.
 
@@ -390,11 +348,6 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--diff-pickle-ops",
-        "-p",
-        help="""Diff against the provided memo URI, but emit pickle opcodes rather than unpickling.""",
-    )
-    parser.add_argument(
         "--loop",
         action="store_true",
         help="Keep prompting for URIs to inspect - basically just an embedded while loop.",
@@ -402,22 +355,16 @@ def main() -> None:
     parser.add_argument("--embed", action="store_true", help="Embed an IPython shell after inspection.")
     args = parser.parse_args()
     args.uri = args.uri.rstrip("/")
-    if args.diff_memospace or args.diff_pickle_ops:
+    if args.diff_memospace:
         _check_diff_tool()
 
-    if args.diff_pickle_ops:
-        pickle_diff_two_uris(args.uri, args.diff_pickle_ops)
-    else:
-        _inspect_uri(args.uri, args.diff_memospace, args.embed)
+    _inspect_uri(args.uri, args.diff_memospace, args.embed)
 
     if args.loop:
         prompt = "\nEnter another URI to inspect, or empty string to exit: "
         uri = input(prompt)
         while uri:
-            if args.diff_pickle_ops:
-                pickle_diff_two_uris(args.uri, uri)
-            else:
-                _inspect_uri(uri, args.diff_memospace, args.embed)
+            _inspect_uri(uri, args.diff_memospace, args.embed)
             uri = input(prompt)
 
 

@@ -12,7 +12,6 @@ Ask me how long it took to figure out what was going on there...
 
 import argparse
 import os
-import sys
 import time
 from timeit import default_timer
 
@@ -29,11 +28,7 @@ def main() -> None:
     """Routes the top level remote function call in a new process."""
     start = default_timer()
     start_timestamp = time.time()
-    remote_proc_log = f"Entering remote process {os.getpid()} with installed mops version {__version__}"
-    if remote_code_version := metadata.get_remote_code_version(""):
-        remote_proc_log += f" and remote code version {remote_code_version}"
-    logger.info(remote_proc_log)
-    logger.info("mops full sys.argv: " + " ".join(sys.argv))
+    logger.info(f"Entering remote process {os.getpid()} with installed mops version {__version__}")
     parser = argparse.ArgumentParser(description="Unknown arguments will be passed to the named runner.")
     parser.add_argument(
         "runner_name",
