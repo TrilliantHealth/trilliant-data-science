@@ -1,6 +1,5 @@
 # portions copyright Desert contributors - see LICENSE_desert.md
 import enum
-import logging
 import typing as ty
 from functools import partial
 
@@ -20,7 +19,8 @@ class VariadicTuple(marshmallow.fields.List):
 
 
 T = ty.TypeVar("T")
-logger = logging.getLogger(__name__)
+NoneType = type(None)
+
 
 # most kwargs for a field belong to the surrounding context,
 # e.g. the name and the aggregation that this field lives in.
@@ -36,7 +36,6 @@ def generate_field(
     schema_generator: ty.Callable[[type], ty.Type[marshmallow.Schema]],
     typ: type,
     field_kwargs: ty.Mapping[str, ty.Any] = dict(),  # noqa: [B006]
-    debug_name: str = "",
 ) -> marshmallow.fields.Field:
     """Return a Marshmallow Field or Schema.
 
@@ -105,9 +104,6 @@ def generate_field(
             nested_schema = schema_generator(typ)
         except RecursionError:
             nested_schema = lambda: schema_generator(typ)  # type: ignore # noqa: E731
-        except Exception:
-            logger.exception(f"Failed to generate schema for {debug_name}={typ}")
-            raise
         return marshmallow.fields.Nested(nested_schema, **field_kwargs)
 
     return generic_types_dispatch(

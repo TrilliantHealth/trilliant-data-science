@@ -4,11 +4,6 @@ link:../README.adoc[↑]
 
 This feature is currently experimental and may be removed or tweaked as we observe its use.
 
-NOTE: To the extent possible, it's best not to _rely_ on these locks - instead, you
-should wrap `mops` functions which may be called concurrently with separate wrapper
-functions that themselves have a `core.cache.locking` or `core.lazy.lazy` or other
-process-local coordination mechanism.
-
 No configuration or code changes are necessary to use this feature. It is baked directly into the
 `MemoizingPicklingRunner`.
 
@@ -43,31 +38,12 @@ finally attempts to acquire the lock again.
 If the result is ever found prior to acquiring the lock, the orchestrator returns it. If the lock is ever
 acquired, the runtime shim will be called to start a remote invocation.
 
-The lock should be maintained by the acquirer to prevent expiration. In practice, this
-involves adding the lock to a daemon thread that will periodically 'update' the lock's
-`written_at` timestamp on a regular schedule. If this timestamp is not updated for longer
-than the expiration time,footnote:[Note well - the times in view here are inherently,
-unavoidably, untrustworthy. For this to work at all, all systems taking the lock must have
-quite similar notions of 'what time it is'. Usually NTP will ensure this to a sufficient
-degree for us, but in cases where inexplicable things happen, one consideration should be
-whether the various systems have different notions of time. Also, we make no attempt to
-deal with leap seconds or time running backwards because of network time syncs - it is
-hoped that this will resolve to noise with the relatively large time periods being used
-for the leases.] the lock is considered to have expired without release, and the next
-attempt to acquire it will succeed.
+The lock should be maintained by the acquirer to prevent expiration. In practice, this involves spawning
+a separate thread to 'update' the lock's `updated_at` timestamp on a regular schedule. If this timestamp
+is not updated for longer than the expiration time, the lock is considered to have expired without
+release, and the next attempt to acquire it will succeed.
 
-NOTE: The lock may be added to the maintenance daemon mulitple times. It will always
-be added immediately before calling the shim (which is assumed to take a long time to even
-get started, and may or may not be synchronous, i.e. wait until the actual function has
-run in full). But, if the shim was in fact a FutureShim, returning a Future that
-represents that it was an async shim, the lock will be re-added to maintenance as soon as
-the LazyFuture returned by the Runner is first "activated" (via .result or similar
-methods). This allows invocations to be created (and shims to be called) in a process pool
-worker, but the eventual maintenance to be resumed by some central owning 'orchestrator'
-process, since those process pool workers will eventually die (and their maintenance
-daemon(s) along with them).
-
-The `MemoizingPicklingRunner` also passes the lock writer id to the remote. On the remote side, early in
+The `MemoizingPicklingRunner` passes the lock writer id to the remote. On the remote side, early in
 startup, the remote will identify the current lock writer id, and only if it matches will it continue to
 execute. This allows a form of "last writer wins" to break ties in cases where the acquirer did not
 maintain the lock (perhaps due to failure of the orchestrator process).
