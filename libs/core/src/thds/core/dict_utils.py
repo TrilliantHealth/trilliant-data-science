@@ -54,7 +54,7 @@ def flatten(d: Mapping, parent_key: str = "", sep: str = DEFAULT_SEP) -> Dict[st
     return dict(_flatten_gen(d, parent_key, sep))
 
 
-class DotDict(MutableMapping[str, VT]):
+class DotDict(dict, MutableMapping[str, VT]):
     """A python dictionary that acts like an object."""
 
     _new_to_orig_keys: Dict[str, str] = dict()
@@ -87,13 +87,16 @@ class DotDict(MutableMapping[str, VT]):
             self._construct(mapping=kwargs)
 
     def __getattr__(self, key: str) -> VT:
-        return self[key]
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
 
-    def __setitem__(self, key: str, value: VT):
-        self.__dict__.update({key: value})
+    def __setitem__(self, key, value):
+        super(DotDict, self).__setitem__(key, value)
 
     def __delattr__(self, key: str) -> None:
         self.__delitem__(key)
@@ -101,15 +104,6 @@ class DotDict(MutableMapping[str, VT]):
     def __delitem__(self, key: str) -> None:
         super(DotDict, self).__delitem__(key)
         del self.__dict__[key]
-
-    def __getitem__(self, key: str) -> VT:
-        return self.__dict__[key]
-
-    def __iter__(self):
-        return iter(self.__dict__)
-
-    def __len__(self) -> int:
-        return len(self.__dict__)
 
     def to_dict(self, orig_keys: bool = False) -> Dict[str, VT]:
         convert_keys_to_identifiers = self._get_hidden_data("convert_keys_to_identifiers")
