@@ -95,7 +95,7 @@ class DotDict(dict, MutableMapping[str, VT]):
     def __setattr__(self, key: str, value: VT) -> None:
         self.__setitem__(key, value)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: VT):
         super(DotDict, self).__setitem__(key, value)
 
     def __delattr__(self, key: str) -> None:
