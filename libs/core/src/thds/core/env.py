@@ -6,7 +6,7 @@ from .stack_context import StackContext
 
 THDS_ENV = "THDS_ENV"
 
-Env = ty.Literal["", "prod", "dev", "ua-prod"]
+Env = ty.Literal["", "prod", "dev"]
 
 _TEMP_ENV: StackContext[Env] = StackContext("thds-env", "")
 
