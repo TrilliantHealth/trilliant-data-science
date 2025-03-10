@@ -355,7 +355,7 @@ wheels = [
 
 [[package]]
 name = "thds-core"
-version = "1.33"
+version = "1.32"
 source = { editable = "../core" }
 dependencies = [
     { name = "attrs" },
@@ -378,7 +378,6 @@ dev = [
     { name = "mypy", specifier = "~=1.11.0" },
     { name = "mypy-extensions", specifier = "~=1.0" },
     { name = "pytest", specifier = "~=7.2" },
-    { name = "pytest-asyncio", specifier = ">=0.23.8" },
     { name = "pytest-cov", specifier = "~=4.0" },
     { name = "pytest-mock", specifier = "~=3.10" },
 ]

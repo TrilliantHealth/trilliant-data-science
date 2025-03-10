@@ -412,7 +412,7 @@ wheels = [
 
 [[package]]
 name = "thds-atacama"
-version = "1.1"
+version = "1.0"
 source = { editable = "." }
 dependencies = [
     { name = "marshmallow", version = "3.22.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -452,7 +452,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.33"
+version = "1.32"
 source = { editable = "../core" }
 dependencies = [
     { name = "attrs" },
@@ -475,7 +475,6 @@ dev = [
     { name = "mypy", specifier = "~=1.11.0" },
     { name = "mypy-extensions", specifier = "~=1.0" },
     { name = "pytest", specifier = "~=7.2" },
-    { name = "pytest-asyncio", specifier = ">=0.23.8" },
     { name = "pytest-cov", specifier = "~=4.0" },
     { name = "pytest-mock", specifier = "~=3.10" },
 ]
