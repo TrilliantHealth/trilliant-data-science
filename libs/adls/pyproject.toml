@@ -1,38 +1,47 @@
-[tool.poetry]
+[project]
 name = "thds.adls"
 version = "3.1"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
-authors = ["Trilliant Health"]
 readme = "README.md"
-packages = [{include = "thds", from="src"}]
-include = ["py.typed", "meta.json"]
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+    "aiohttp>=3.8.1",
+    "aiostream>=0.4.5",
+    "azure-identity>=1.9",
+    "azure-storage-file-datalake>=12.6",
+    "filelock>=3.0",
+    "thds-core",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-
-aiohttp = ">=3.8.1"
-aiostream = ">=0.4.5"
-azure-identity = ">=1.9"
-azure-storage-file-datalake = ">=12.6"
-filelock = ">=3.0"
-
-thds-core = {path = "../../libs/core", develop = true}
-
-[tool.poetry.group.dev.dependencies]
-mypy = "1.14"
-mypy-extensions = "^1.0"
-pytest = "^7.2"
-pytest-asyncio = "^0.21.0"
-pytest-cov = "^4.0"
-pytest-mock = "^3.10"
-pytest-xdist = "^3.3.1"
-types-requests = "^2.32.0.20241016"
-
-[tool.poetry.scripts]
+[project.scripts]
 adls-download-uri = "thds.adls.tools.download:main"
 adls-ls-uri = "thds.adls.tools.ls:main"
 adls-upload-uri = "thds.adls.tools.upload:main"
+
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
+
+[dependency-groups]
+dev = [
+    "mypy~=1.14.0",
+    "mypy-extensions~=1.0",
+    "pytest~=7.2",
+    "pytest-asyncio~=0.21",
+    "pytest-cov~=4.0",
+    "pytest-mock~=3.10",
+    "pytest-xdist>=3.3.1,<4.0.0",
+    "types-requests",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-core = { path = "../../libs/core", editable = true }
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -56,27 +65,8 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = [
-    "aiostream",
-    "azure",
-    "setuptools",
-]
+module = ["azure"]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-# temporary fix for mypy error: Function has duplicate type signatures
-# related issue: https://github.com/Azure/azure-sdk-for-python/issues/21223
-module = ["azure.storage.filedatalake.*"]
-follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[build-system]
-requires = ["poetry-core<2.0"]
-build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
-
-# TOOLING CONFIG
