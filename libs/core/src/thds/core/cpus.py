@@ -31,7 +31,9 @@ def _try_read_value(config_path: Path, parse: ty.Callable[[str], T]) -> ty.Optio
                 # if the file exists but we can't parse the contents, something is very wrong with our assumptions;
                 # better to fail loudly than risk silent CPU oversubscription
                 raise e
-            logger.info(f"Read value {value} from {config_path}")
+            else:
+                logger.info(f"Read value {value} from {config_path}")
+                return value
     return None
 
 
@@ -69,9 +71,11 @@ def available_cpu_count() -> int:
     elif cpu_shares_ := _try_read_value(_CPU_SHARES_PATH, int):
         cpu_shares = int(cpu_shares_ / 1024)
     else:
-        cpu_shares = None
-
-    if cpu_shares is None:
+        logger.info(f"Using naive CPU count: {cpu_count}")
         return cpu_count
-    else:
-        return min(cpu_shares, cpu_count)
+
+    logger.info(
+        f"Determined CPU shares from quota and period: {cpu_shares}; returning lesser of this and naive "
+        f"CPU count: {cpu_count}"
+    )
+    return min(cpu_shares, cpu_count)
