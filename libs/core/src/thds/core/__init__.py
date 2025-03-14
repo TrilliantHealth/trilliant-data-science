@@ -1,4 +1,4 @@
-"""Trilliant Health data science team core utils"""
+"""Trilliant Health Machine Learning team core utils"""
 
 from . import (  # noqa: F401
     ansi_esc,
