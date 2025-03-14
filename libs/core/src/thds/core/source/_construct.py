@@ -1,25 +1,26 @@
+import os
 import typing as ty
 from functools import partial
 from pathlib import Path
 
 from ..files import is_file_uri, path_from_uri, to_uri
 from ..hashing import Hash
-from ..types import StrOrPath
 from . import _download
 from .src import Source
 
 # Creation from local Files or from remote URIs
 
 
-def from_file(filename: StrOrPath, hash: ty.Optional[Hash] = None, uri: str = "") -> Source:
+def from_file(
+    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = ""
+) -> Source:
     """Create a read-only Source from a local file that already exists.
 
     If URI is passed, the local file will be read and hashed, but the final URI in the
     Source will be the one provided explicitly. NO UPLOAD IS PERFORMED. It is your
     responsibility to ensure that your file has been uploaded to the URI you provide.
     """
-    path = path_from_uri(filename) if isinstance(filename, str) else filename
-    assert isinstance(path, Path)
+    path = path_from_uri(filename) if isinstance(filename, str) else Path(filename)
     if not path.exists():
         raise FileNotFoundError(path)
 
@@ -40,6 +41,7 @@ class FromUri(ty.Protocol):
         and the hash will be included in the Source object regardless, and will
         be validated (if non-nil) at the time of source data access.
         """
+        ...
 
 
 class FromUriHandler(ty.Protocol):
@@ -47,6 +49,7 @@ class FromUriHandler(ty.Protocol):
         """Returns a FromUri object containing the URI if this URI can be handled.  Returns
         None if this URI cannot be handled.
         """
+        ...
 
 
 def register_from_uri_handler(key: str, handler: FromUriHandler):
