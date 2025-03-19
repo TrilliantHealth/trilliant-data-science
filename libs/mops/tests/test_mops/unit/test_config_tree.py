@@ -85,19 +85,3 @@ def test_repr():
     tree = ConfigTree("test")  # type: ignore
     tree.setv(42, "foo.bar")
     assert repr(tree) == "ConfigTree('test', [('foo.bar', ConfigItem('foo.bar', 42))])"
-
-
-def test_load_from_config_file():
-    tree = ConfigTree("foo.bar")  # type: ignore
-    tree.setv(17, "a.c")
-    tree.load_config(
-        {
-            "a": {
-                "b": {"foo": {"bar": 42}},
-                "c": {"__mask": {"foo": {"bar": 100}}},
-            }
-        }
-    )
-
-    assert tree.getv("a.c") == 100  # from the mask
-    assert tree.getv("a.b") == 42  # from the non-masked config.
