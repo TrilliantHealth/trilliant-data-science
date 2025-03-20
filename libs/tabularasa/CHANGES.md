@@ -1,3 +1,8 @@
+### 0.9.3
+
+- Removed some annoying module-level CLI-related warnings from the main module, and improved the error
+  message when required CLI dependencies are not installed.
+
 ### 0.9.2
 
 - `data-diff` now errors when passed table names which are not in the schema.

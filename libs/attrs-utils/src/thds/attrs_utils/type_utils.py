@@ -45,6 +45,7 @@ MAPPING_TYPES = set(
             typing.MutableMapping,
             typing.DefaultDict,
             typing.OrderedDict,
+            typing.Counter,
         ],
     )
 )

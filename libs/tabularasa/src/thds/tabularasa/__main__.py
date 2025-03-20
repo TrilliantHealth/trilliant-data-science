@@ -4,7 +4,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import warnings
 from copy import copy
 from enum import Enum
 from functools import partial
@@ -45,7 +44,6 @@ from thds.tabularasa.schema.util import all_predecessors, all_successors
 try:
     from bourbaki.application.cli import CommandLineInterface, cli_spec
 except ImportError:
-    warnings.warn("bourbaki.application unavailable; CLI undefined")
 
     # stand-in decorators
     def noop_decorator(obj):
@@ -86,10 +84,7 @@ else:
 try:
     from ruamel.yaml import YAML
 except ImportError:
-    warnings.warn(
-        "ruamel.yaml unvavailable; schema yaml round trips (e.g. for file hash updates) will "
-        "not preserve style and comments"
-    )
+
     import yaml
 
     load_yaml = yaml.safe_load
@@ -1079,7 +1074,9 @@ class ReferenceDataManager:
 
 def main():
     if cli is None:
-        raise RuntimeError("Install bourbaki.application to use the reference-data CLI")
+        raise RuntimeError(
+            "CLI requirements not installed; include the 'cli' extra to use the tabularasa CLI"
+        )
 
     cli.run()
 
