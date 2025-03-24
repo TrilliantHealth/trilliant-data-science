@@ -6,14 +6,14 @@ executions, including details on total calls, cache hits, and execution timestam
 
 ## Usage
 
-The Mops Summarize Tool can be run using `poetry run`. The tool accepts an optional argument specifying
-the run directory. If no directory is provided, the tool will automatically select the latest run
-directory based on the timestamp in the directory names.
+The Mops Summarize Tool can be run using `uv run`. The tool accepts an optional argument specifying the
+run directory. If no directory is provided, the tool will automatically select the latest run directory
+based on the timestamp in the directory names.
 
 ### Command
 
 ```bash
-poetry run mops-summarize [run_directory] [--sort-by name|time]
+mops-summarize [run_directory] [--sort-by name|time]
 ```
 
 ### Arguments
@@ -27,16 +27,16 @@ poetry run mops-summarize [run_directory] [--sort-by name|time]
 
 ```bash
 # Run the summarizer for the latest run directory, sorted by function name (default)
-poetry run mops-summarize
+mops-summarize
 
 # Run the summarizer for the latest run directory, sorted by the first call time
-poetry run mops-summarize --sort-by time
+mops-summarize --sort-by time
 
 # Run the summarizer for a specific run directory, sorted by function name
-poetry run mops-summarize .mops/2024-05-30T10:33:39.012334Z-12345
+mops-summarize .mops/2024-05-30T10:33:39.012334Z-12345
 
 # Run the summarizer for a specific run directory, sorted by the first call time
-poetry run mops-summarize .mops/2024-05-30T10:33:39.012334Z-12345 --sort-by time
+mops-summarize .mops/2024-05-30T10:33:39.012334Z-12345 --sort-by time
 ```
 
 ### Configuration
@@ -78,5 +78,5 @@ The tool reads each JSON log file in the specified run directory, processes the 
 the data to generate the summary report. Each log file contains a single log entry, with the filename
 including a timestamp and a short UUID for uniqueness.
 
-To use the tool, ensure you have your environment set up with `poetry`, navigate to the `libs/mops`
+To use the tool, ensure you have your environment set up with `uv`, navigate to the `libs/mops`
 directory, and run the commands as described above.
