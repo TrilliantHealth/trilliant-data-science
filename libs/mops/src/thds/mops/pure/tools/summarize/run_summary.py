@@ -137,7 +137,7 @@ def log_function_execution(
 
     try:
         assert not log_file.exists(), f"Log file '{log_file}' should not already exist"
-        with log_file.open("w+") as f:
+        with log_file.open("w") as f:
             json.dump(log_entry, f, indent=2)
     except Exception:
         logger.exception(f"Unable to write mops function invocation log file at '{log_file}'")
