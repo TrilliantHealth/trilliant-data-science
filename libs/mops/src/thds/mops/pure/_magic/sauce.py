@@ -68,7 +68,6 @@ class Magic(ty.Generic[P, R]):
         self,
         func: ty.Callable[P, R],
         config: _MagicConfig,
-        calls: ty.Collection[ty.Callable] = frozenset(),
     ):
         functools.update_wrapper(self, func)
         self._func_config_path = full_name_and_callable(func)[0].replace("--", ".")
@@ -81,7 +80,6 @@ class Magic(ty.Generic[P, R]):
             str(func) + "_SHIM", None  # none means nothing has been set stack-local
         )
         self.runner = MemoizingPicklingRunner(self._shimbuilder, self._get_blob_root)
-        self.runner.calls(func, *calls)
         self._func = use_runner(self.runner, self._is_off)(func)
         self.__doc__ = f"{func.__doc__}\n\nMagic class info:\n{self.__class__.__doc__}"
         self.__wrapped__ = func
@@ -140,7 +138,6 @@ def make_magic(
     shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None],
     blob_root: uris.UriResolvable,
     pipeline_id: str,
-    calls: ty.Collection[ty.Callable],
 ) -> ty.Callable[[ty.Callable[P, R]], Magic[P, R]]:
     def deco(func: ty.Callable[P, R]) -> Magic[P, R]:
         fully_qualified_name = full_name_and_callable(func)[0].replace("--", ".")
@@ -150,6 +147,6 @@ def make_magic(
             config.blob_root[fully_qualified_name] = uris.to_lazy_uri(blob_root)
         if pipeline_id:  # could be empty string
             config.pipeline_id[fully_qualified_name] = pipeline_id
-        return Magic(func, config, calls)
+        return Magic(func, config)
 
     return deco
