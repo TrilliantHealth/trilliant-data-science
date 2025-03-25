@@ -5,17 +5,15 @@ import shutil
 import typing as ty
 from base64 import b64decode
 
-import aiohttp.http_exceptions
 from azure.core.exceptions import AzureError, HttpResponseError
 from azure.storage.filedatalake import (
     ContentSettings,
     DataLakeFileClient,
     FileProperties,
     FileSystemClient,
-    aio,
 )
 
-from thds.core import fretry, log, scope, tmp
+from thds.core import log, scope, tmp
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
@@ -315,24 +313,6 @@ def _set_md5_if_missing(
     return file_properties.content_settings
 
 
-def _excs_to_retry() -> ty.Callable[[Exception], bool]:
-    """These are exceptions that we observe to be spurious failures worth retrying."""
-    return fretry.is_exc(
-        *list(
-            filter(
-                None,
-                (
-                    aiohttp.http_exceptions.ContentLengthError,
-                    aiohttp.client_exceptions.ClientPayloadError,
-                    getattr(
-                        aiohttp.client_exceptions, "SocketTimeoutError", None
-                    ),  # not present in aiohttp < 3.10 - Databricks installs 3.8.
-                ),
-            )
-        )
-    )
-
-
 @_dl_scope.bound
 def download_or_use_verified(
     fs_client: FileSystemClient,
@@ -359,10 +339,7 @@ def download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-                fretry.retry_regular(_excs_to_retry(), fretry.n_times(2))(
-                    # retry n_times(2) means _retry_ twice.
-                    azcopy.download.sync_fastpath
-                )(dl_file_client, co_request)
+                azcopy.download.sync_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
@@ -381,7 +358,7 @@ def download_or_use_verified(
 
 @_dl_scope.bound
 async def async_download_or_use_verified(
-    fs_client: aio.FileSystemClient,
+    fs_client: FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
     md5b64: str = "",
@@ -401,15 +378,7 @@ async def async_download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-
-                await fretry.retry_regular_async(
-                    _excs_to_retry(), fretry.iter_to_async(fretry.n_times(2))
-                )(
-                    # retry n_times(2) means _retry_ twice.
-                    azcopy.download.async_fastpath
-                )(
-                    dl_file_client, co_request
-                )
+                await azcopy.download.async_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")

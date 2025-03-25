@@ -59,8 +59,6 @@ def allow_already_parsed(typ: ty.Type, mm_field: FieldT) -> FieldT:
     )
 
 
-NoneType = type(None)
-
 NATIVE_TO_MARSHMALLOW: LeafTypeMapping = {
     float: marshmallow.fields.Float,
     int: marshmallow.fields.Integer,
@@ -74,7 +72,6 @@ NATIVE_TO_MARSHMALLOW: LeafTypeMapping = {
     uuid.UUID: marshmallow.fields.UUID,
     ty.Union[int, float]: marshmallow.fields.Number,
     ty.Any: _field_with_default_kwargs(marshmallow.fields.Raw, allow_none=True),
-    NoneType: _field_with_default_kwargs(marshmallow.fields.Constant, constant=None, allow_none=True),
 }
 
 

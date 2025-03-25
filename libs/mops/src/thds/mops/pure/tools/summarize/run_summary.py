@@ -108,16 +108,9 @@ def log_function_execution(
         return
 
     log_file = _generate_log_filename(run_directory)
-    try:
-        func_module = func.__module__
-        func_name = func.__name__
-        full_function_name = f"{func_module}:{func_name}"
-    except AttributeError:
-        # this is incompatible with callables that aren't defs, e.g. callable objects
-        # you can make this work by using functools.wraps/update_wrapper, but then `mops` will unpickle your
-        # callable using `__module__` and `__name__`, which just gives you back the wrapped, and the wrapper is lost
-        logger.warning("couldn't extract function module and name from %s", func)
-        full_function_name = str(func)
+    func_module = func.__module__
+    func_name = func.__name__
+    full_function_name = f"{func_module}:{func_name}"
 
     parts = function_memospace.parse_memo_uri(memo_uri, runner_prefix)
 
@@ -144,7 +137,7 @@ def log_function_execution(
 
     try:
         assert not log_file.exists(), f"Log file '{log_file}' should not already exist"
-        with log_file.open("w") as f:
+        with log_file.open("w+") as f:
             json.dump(log_entry, f, indent=2)
     except Exception:
         logger.exception(f"Unable to write mops function invocation log file at '{log_file}'")

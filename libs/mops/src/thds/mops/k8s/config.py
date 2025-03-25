@@ -16,22 +16,9 @@ k8s_job_retry_count = config.item("mops.k8s.job.retry_count", 6, parse=int)
 k8s_job_cleanup_ttl_seconds_after_completion = config.item(
     "mops.k8s.job.cleanup_ttl_seconds", int(timedelta(minutes=60).total_seconds()), parse=int
 )
-
-# https://github.com/kubernetes-client/python/blob/master/examples/watch/timeout-settings.md
-k8s_watch_server_timeout_seconds = config.item(
-    "mops.k8s.watch.server_timeout", int(timedelta(hours=1).total_seconds()), parse=int
+k8s_job_timeout_seconds = config.item(
+    "mops.k8s.job.timeout_seconds", int(timedelta(minutes=3).total_seconds()), parse=int
 )
-k8s_watch_connection_timeout_seconds = config.item(
-    "mops.k8s.watch.connection_timeout", int(timedelta(seconds=5).total_seconds()), parse=int
-)
-k8s_watch_read_timeout_seconds = config.item(
-    "mops.k8s.watch.read_timeout", int(timedelta(seconds=20).total_seconds()), parse=int
-)
-# the above values are designed to retry aggressively if we're not receiving events; from
-# what I've read online, k9s exhibits similar behavior (though I don't know what their
-# values are, and it's not 100% clear to me that they have different types of timeouts
-# from trying to grep their codebase.).
-
 k8s_monitor_delay = config.item("mops.k8s.monitor.delay_seconds", 5, parse=int)
 k8s_monitor_max_attempts = config.item("mops.k8s.monitor.max_attempts", 100, parse=int)
 
