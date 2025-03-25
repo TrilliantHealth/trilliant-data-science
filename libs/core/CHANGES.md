@@ -1,9 +1,3 @@
-## 1.33
-
-- `calgitver.calgitver()` is now `lru_cached`. Which is to say, it is no longer possible to have an
-  application get two different results for this; so don't change your git repo while your application is
-  running.
-
 ## 1.32
 
 - Add `source.tree.SourceTree` dataclass and the related `logical_root` utility, in order to be able to
