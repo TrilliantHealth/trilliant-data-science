@@ -43,7 +43,6 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
     shim_builder: types.ShimBuilder,
     get_meta_and_result: types.GetMetaAndResult,
     run_directory: ty.Optional[Path] = None,
-    calls_registry: ty.Mapping[ty.Callable, ty.Collection[ty.Callable]] = dict(),  # noqa: B006
 ) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], T]:
     @scope.bound
     def create_invocation__check_result__wait_shim(
@@ -81,12 +80,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         scope.enter(deferred_work.open_context())  # optimize Source objects during serialization
 
         args_kwargs_bytes = serialize_args_kwargs(storage_root, func, args, kwargs)
-        memo_uri = fs.join(
-            function_memospace,
-            *memo.calls.combine_function_logic_keys(memo.calls.resolve(calls_registry, func)),
-            # ^ these will embedded as extra nesting.
-            memo.args_kwargs_content_address(args_kwargs_bytes),
-        )
+        memo_uri = fs.join(function_memospace, memo.args_kwargs_content_address(args_kwargs_bytes))
 
         # Define some important and reusable 'chunks of work'
 
