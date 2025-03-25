@@ -1,7 +1,3 @@
-### 3.6.20250328
-
-- Fixes a bug where `mops.pure.magic` config would not be correctly loaded when it was a `__mask` config.
-
 ## 3.6
 
 - [New `pure.magic` API for `mops`](docs/magic.adoc). A collection of lessons learned and long wished-for
