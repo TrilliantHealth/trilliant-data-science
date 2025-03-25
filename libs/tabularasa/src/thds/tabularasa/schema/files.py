@@ -3,7 +3,7 @@ import datetime
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Union
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 
 import pkg_resources
 from pydantic import AnyUrl, BaseModel, Extra, Field
@@ -18,16 +18,29 @@ class CSVQuotingConvention(Enum):
     QUOTE_MINIMAL = "quote_minimal"
 
 
-UpdateFrequency = Literal["Yearly", "Quarterly", "Monthly"]
+UpdateFrequency = Literal["Yearly", "Quarterly", "Monthly", "Biannual"]
 
 
-def quarter(date: datetime.date):
+def quarter(date: datetime.date) -> int:
     return (date.month - 1) // 3 + 1
 
 
-def _date_tuple(date: datetime.date, freq: UpdateFrequency) -> tuple[int, ...]:
-    tail = () if freq == "Yearly" else (quarter(date),) if freq == "Quarterly" else (date.month,)
-    return (date.year, *tail)
+def half(date: datetime.date) -> int:
+    return (date.month - 1) // 6 + 1
+
+
+def _get_tail(freq: UpdateFrequency, date: datetime.date) -> Tuple[int, ...]:
+    if freq == "Yearly":
+        return ()
+    if freq == "Quarterly":
+        return (quarter(date),)
+    if freq == "Monthly":
+        return (date.month,)
+    return (half(date),)
+
+
+def _date_tuple(date: datetime.date, freq: UpdateFrequency) -> Tuple[int, ...]:
+    return (date.year, *_get_tail(freq, date))
 
 
 current_date = datetime.date.today()

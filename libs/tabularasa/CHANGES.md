@@ -1,3 +1,8 @@
+### 0.9.4
+
+- Added tests for `FileSourceMixin.needs_update`.
+- Added a new valid value, `Biannual`, for a table's `update_frequency`.
+
 ### 0.9.3
 
 - Removed some annoying module-level CLI-related warnings from the main module, and improved the error
