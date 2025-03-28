@@ -1,11 +1,11 @@
-from thds.core.calgitver import calgitver, parse_calgitver
+from thds.core import calgitver
 
 from .test_meta import envvars
 
 
 def test_calgitver():
     """This is not an exhaustive test by any means. It's just a sanity check for some fairly simple code."""
-    cgv = calgitver()
+    cgv = calgitver.uncached()
     print(cgv)
     chd = cgv.split("-")
     if len(chd) == 3:
@@ -23,7 +23,7 @@ def test_calgitver():
 
 
 def test_parse_calgitver():
-    gd = parse_calgitver("20021130.0804-34afb29-dirty").groupdict()
+    gd = calgitver.parse_calgitver("20021130.0804-34afb29-dirty").groupdict()
     assert gd == dict(
         year="2002",
         month="11",
@@ -34,11 +34,11 @@ def test_parse_calgitver():
         dirty="-dirty",
     )
 
-    n = parse_calgitver("20021130.0804-34afb29")
+    n = calgitver.parse_calgitver("20021130.0804-34afb29")
     assert n.group("dirty") == ""
 
 
 def test_calgitver_respects_envvar():
     # first, set a temporary environment variable
     with envvars(CALGITVER="20240101.0000-abcdef1"):
-        assert calgitver() == "20240101.0000-abcdef1"
+        assert calgitver.uncached() == "20240101.0000-abcdef1"
