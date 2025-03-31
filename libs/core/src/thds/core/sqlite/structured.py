@@ -9,7 +9,7 @@ from thds.core.log import getLogger
 from thds.core.types import StrOrPath
 
 from .connect import row_connect
-from .meta import column_names, primary_key_cols
+from .meta import column_names, get_tables, primary_key_cols
 from .read import matching
 from .types import T, TableSource
 
@@ -109,6 +109,10 @@ def autometa_factory(
         def _get_table_meta():
             db_path, table_name = src()
             conn = row_connect(db_path)
+            # test if table even exists:
+            if table_name not in get_tables(conn):
+                raise ValueError(f"Table {table_name} not found in {db_path}")
+
             pk_cols = set(primary_key_cols(table_name, conn))
             if not pk_cols:
                 raise BadPrimaryKey(f"Found no primary key cols for table {table_name}")

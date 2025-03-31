@@ -57,7 +57,7 @@ calgitver = cached
 
 
 def is_clean(cgv: str) -> bool:
-    return not cgv.endswith("-dirty")
+    return bool(cgv and not cgv.endswith("-dirty"))
 
 
 def clean_calgitver() -> str:
