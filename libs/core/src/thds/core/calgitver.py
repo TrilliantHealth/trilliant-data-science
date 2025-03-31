@@ -56,13 +56,17 @@ cached = lru_cache(maxsize=1)(uncached)
 calgitver = cached
 
 
+def is_clean(cgv: str) -> bool:
+    return not cgv.endswith("-dirty")
+
+
 def clean_calgitver() -> str:
     """Only allow CalGitVer computed from a clean repository.
 
     Particularly useful for strict production environments.
     """
     cgv = calgitver()
-    if cgv.endswith("-dirty"):
+    if not is_clean(cgv):
         raise ValueError(f"CalGitVer {cgv} was computed from a dirty repository!")
     return cgv
 
