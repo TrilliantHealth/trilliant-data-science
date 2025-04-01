@@ -3,7 +3,6 @@
 This is a general-purpose fix for using watchers in a thread reliably.
 """
 
-import queue
 import threading
 import time
 import typing as ty
@@ -40,23 +39,17 @@ class K8sList(ty.Protocol[T]):
 # If this does not return a K8sList API method, the loop will exit
 GetListMethod = ty.Callable[[str, ty.Optional[Exception]], ty.Optional[K8sList[T]]]
 # if this returns True, the loop will exit.
-EventType = ty.Literal["FETCH", "ADDED", "MODIFIED", "DELETED"]
-OnEvent = ty.Callable[[str, T, EventType], ty.Optional[bool]]
+OnEvent = ty.Callable[[str, T], ty.Optional[bool]]
 
 
 def yield_objects_from_list(
     namespace: str,
     get_list_method: GetListMethod[T],
-    *,
-    server_timeout: int = config.k8s_watch_server_timeout_seconds(),
-    connection_timeout: int = config.k8s_watch_connection_timeout_seconds(),
-    read_timeout: int = config.k8s_watch_read_timeout_seconds(),
-    # connection and read timeout should generally be fairly aggressive so that we retry
-    # quickly if we don't hear anything for a while, and the config defaults are.
+    server_timeout: int = 10,
     object_type_hint: str = "items",
     init: ty.Optional[ty.Callable[[], None]] = None,
     **kwargs: ty.Any,
-) -> ty.Iterator[ty.Tuple[str, T, EventType]]:
+) -> ty.Iterator[ty.Tuple[str, T]]:
     ex = None
     if init:
         init()
@@ -65,15 +58,14 @@ def yield_objects_from_list(
             load_config()
             list_method = get_list_method(namespace, ex)
             if not list_method:
-                logger.debug(f"Stopped watching {object_type_hint} events in namespace: {namespace}")
-                return
-
+                logger.debug(f"No longer watching {object_type_hint} events in namespace: {namespace}")
+                break
             initial_list = list_method(namespace=namespace)
             logger.debug(
                 f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}"
             )
             for object in initial_list.items:
-                yield namespace, object, "FETCH"
+                yield namespace, object
 
             if initial_list.metadata._continue:
                 logger.warning(
@@ -84,12 +76,11 @@ def yield_objects_from_list(
                 namespace=namespace,
                 resource_version=initial_list.metadata.resource_version,
                 **kwargs,
-                timeout_seconds=server_timeout,
-                _request_timeout=(connection_timeout, read_timeout),
+                _request_timeout=(server_timeout, config.k8s_job_timeout_seconds()),
             ):
                 object = evt.get("object")
                 if object:
-                    yield namespace, object, evt["type"]
+                    yield namespace, object
                 # once we've received events, let the resource version
                 # be managed automatically if possible.
         except urllib3.exceptions.ProtocolError:
@@ -105,12 +96,10 @@ def yield_objects_from_list(
             ex = e
 
 
-def callback_events(
-    on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T, EventType]]
-) -> None:
+def callback_events(on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T]]) -> None:
     """Suitable for use with a daemon thread."""
-    for namespace, obj, event in event_yielder:
-        should_exit = on_event(namespace, obj, event)
+    for namespace, event in event_yielder:
+        should_exit = on_event(namespace, event)
         if should_exit:
             break
 
@@ -127,7 +116,7 @@ def _default_get_namespace(obj: ty.Any) -> str:
     return obj.metadata.namespace
 
 
-STARTING = colorized(fg="black", bg="orange")
+STARTING = colorized(fg="white", bg="orange")
 
 
 class OneShotLimiter:
@@ -160,67 +149,6 @@ def is_stale(api_last_update_time: float, obj_last_seen_time: float) -> bool:
         return False  # false positives aren't worth it
 
     return (time_since_obj_update := now - obj_last_seen_time) > allowed_stale_seconds  # noqa: F841
-
-
-def _wrap_get_list_method_with_too_old_check(
-    typename: str,
-    get_list_method: GetListMethod[T],
-) -> GetListMethod[T]:
-    def wrapped_get_list_method(namespace: str, exc: ty.Optional[Exception]) -> ty.Optional[K8sList[T]]:
-        suffix = ""
-        if exc:
-            too_old = parse_too_old_resource_version(exc)
-            if not too_old:
-                logger.exception(f"Not fatal, but sleeping before we retry {typename} scraping...")
-                time.sleep(config.k8s_monitor_delay())
-                suffix = f" after {type(exc).__name__}: {exc}"
-                logger.info(f"Watching {typename}s in namespace: {namespace}{suffix}")
-        return get_list_method(namespace, exc)
-
-    return wrapped_get_list_method
-
-
-def create_watch_thread(
-    get_list_method: GetListMethod[T],
-    callback: ty.Callable[[str, T, EventType], None],
-    namespace: str,
-    *,
-    typename: str = "object",
-) -> threading.Thread:
-    return threading.Thread(
-        target=callback_events,
-        args=(
-            callback,
-            yield_objects_from_list(
-                namespace,
-                _wrap_get_list_method_with_too_old_check(typename, get_list_method),
-                # arguably this wrapper could be composed externally, but i see no use cases so far where we'd want that.
-                object_type_hint=typename + "s",
-                init=lambda: logger.info(STARTING(f"Watching {typename}s in {namespace}")),
-            ),
-        ),
-        daemon=True,
-    )
-
-
-def watch_forever(
-    get_list_method: GetListMethod[T],
-    namespace: str,
-    *,
-    typename: str = "object",
-    timeout: ty.Optional[int] = None,
-) -> ty.Iterator[ty.Tuple[T, EventType]]:
-    q: queue.Queue[ty.Tuple[T, EventType]] = queue.Queue()
-
-    def put_queue(namespace: str, obj: T, event_type: EventType) -> None:
-        q.put((obj, event_type))
-
-    create_watch_thread(get_list_method, put_queue, namespace, typename=typename).start()
-    while True:
-        try:
-            yield q.get(timeout=timeout)
-        except queue.Empty:
-            break
 
 
 class WatchingObjectSource(ty.Generic[T]):
@@ -256,11 +184,21 @@ class WatchingObjectSource(ty.Generic[T]):
         self._limiter = OneShotLimiter()
 
     def _start_thread(self, namespace: str) -> None:
-        create_watch_thread(
-            self.get_list_method, self._add_object, namespace, typename=self.typename
+        threading.Thread(
+            target=callback_events,
+            args=(
+                self._add_object,
+                yield_objects_from_list(
+                    namespace,
+                    self._get_list_method_on_restart,
+                    object_type_hint=self.typename + "s",
+                    init=lambda: logger.info(STARTING(f"Watching {self.typename}s in {namespace}")),
+                ),
+            ),
+            daemon=True,
         ).start()
 
-    def _add_object(self, namespace: str, obj: T, _event_type: EventType) -> None:
+    def _add_object(self, namespace: str, obj: T) -> None:
         """This is where we receive updates from the k8s API."""
         self._last_api_update_time = time.monotonic()
 
@@ -272,6 +210,19 @@ class WatchingObjectSource(ty.Generic[T]):
         logger.debug(f"{self.typename} {name} updated")
         self._last_seen_time_by_name[name] = time.monotonic()
         self._objs_by_name[name] = obj
+
+    def _get_list_method_on_restart(
+        self, namespace: str, exc: ty.Optional[Exception]
+    ) -> ty.Optional[K8sList[T]]:
+        suffix = ""
+        if exc:
+            too_old = parse_too_old_resource_version(exc)
+            if not too_old:
+                logger.exception(f"Not fatal, but sleeping before we retry {self.typename} scraping...")
+                time.sleep(config.k8s_monitor_delay())
+                suffix = f" after {type(exc).__name__}: {exc}"
+                logger.info(f"Watching {self.typename}s in namespace: {namespace}{suffix}")
+        return self.get_list_method(namespace, exc)
 
     def _is_stale(self, name: str) -> bool:
         return is_stale(self._last_api_update_time, self._last_seen_time_by_name.get(name) or 0)
@@ -299,7 +250,7 @@ class WatchingObjectSource(ty.Generic[T]):
             # doing a lot of manual fetches may indicate that the k8s API is having trouble keeping up...
             try:
                 if obj := self.backup_fetch(namespace, obj_name):
-                    self._add_object(namespace, obj, "FETCH")  # updates last seen, too
+                    self._add_object(namespace, obj)  # updates last seen, too
                     return obj
 
             except Exception:
