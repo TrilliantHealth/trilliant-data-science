@@ -141,7 +141,11 @@ class Timer:
 
     @property
     def secs_per_call(self) -> float:
-        return (self.secs / self.calls) if self.calls > 0 else float("nan")
+        return (self.secs / self.calls) / 60.0 if self.calls > 0 else float("nan")
+
+    @property
+    def mins(self) -> float:
+        return self.secs / 60.0
 
     def pct_of_total(self, total: float) -> float:
         return (self.secs / total) * 100
@@ -196,7 +200,6 @@ class TimeTracker:
 
     def __exit__(self, *args, **kwargs):
         cmpnt = self.tracked_times[self._names.pop()]
-        cmpnt.calls += 1
         cmpnt.secs += time.perf_counter() - self._start_times.pop()
 
     @property

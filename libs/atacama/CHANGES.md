@@ -1,7 +1,3 @@
-## 1.2
-
-- Requires `python>=3.9` now.
-
 ## 1.1
 
 - Limited support for Generic types.

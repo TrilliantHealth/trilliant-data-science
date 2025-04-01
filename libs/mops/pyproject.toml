@@ -1,11 +1,11 @@
 [project]
 name = "thds.mops"
-version = "3.7"
+version = "3.6"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
 readme = "docs/pypi_readme.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = [
     "ansicolors",
     "azure-core",
@@ -20,8 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-k8s = ["kubernetes>=18.20,!=32.0.0"]
-# 32.0.0 has this bug https://github.com/kubernetes-client/python/issues/2356
+k8s = ["kubernetes>=18.20"]
 
 [project.scripts]
 krsync = "thds.mops.k8s.orchestrator.krsync:main"

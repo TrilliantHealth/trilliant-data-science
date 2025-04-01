@@ -5,7 +5,6 @@ import shutil
 import typing as ty
 from base64 import b64decode
 
-import aiohttp.http_exceptions
 from azure.core.exceptions import AzureError, HttpResponseError
 from azure.storage.filedatalake import (
     ContentSettings,
@@ -14,7 +13,7 @@ from azure.storage.filedatalake import (
     FileSystemClient,
 )
 
-from thds.core import fretry, log, scope, tmp
+from thds.core import log, scope, tmp
 from thds.core.hashing import b64
 from thds.core.types import StrOrPath
 
@@ -314,13 +313,6 @@ def _set_md5_if_missing(
     return file_properties.content_settings
 
 
-def _excs_to_retry() -> ty.Callable[[Exception], bool]:
-    """These are exceptions that we observe to be spurious failures worth retrying."""
-    return fretry.is_exc(
-        aiohttp.http_exceptions.ContentLengthError, aiohttp.client_exceptions.ClientPayloadError
-    )
-
-
 @_dl_scope.bound
 def download_or_use_verified(
     fs_client: FileSystemClient,
@@ -347,10 +339,7 @@ def download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-                fretry.retry_regular(_excs_to_retry(), fretry.n_times(2))(
-                    # retry n_times(2) means _retry_ twice.
-                    azcopy.download.sync_fastpath
-                )(dl_file_client, co_request)
+                azcopy.download.sync_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
@@ -389,15 +378,7 @@ async def async_download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-
-                await fretry.retry_regular_async(
-                    _excs_to_retry(), fretry.iter_to_async(fretry.n_times(2))
-                )(
-                    # retry n_times(2) means _retry_ twice.
-                    azcopy.download.async_fastpath
-                )(
-                    dl_file_client, co_request
-                )
+                await azcopy.download.async_fastpath(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
