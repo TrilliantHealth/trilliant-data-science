@@ -3,6 +3,8 @@ import typing as ty
 import attrs
 import marshmallow
 
+from . import _typevars
+
 T = ty.TypeVar("T")
 
 
@@ -38,8 +40,8 @@ class Attribute(ty.NamedTuple):
 
 
 def yield_attributes(attrs_class: type) -> ty.Iterator[Attribute]:
-    hints = ty.get_type_hints(attrs_class)
-    for attribute in attrs.fields(attrs_class):
+    base_class, hints = _typevars.base_class_and_hints(attrs_class)
+    for attribute in attrs.fields(base_class):
         yield Attribute(
             attribute.name,
             hints.get(attribute.name, attribute.type),
