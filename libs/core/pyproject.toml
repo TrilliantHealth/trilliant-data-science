@@ -33,6 +33,7 @@ dev= [
     "mypy~=1.11.0",
     "mypy-extensions~=1.0",
     "pytest~=7.2",
+    "pytest-asyncio>=0.23.8",
     "pytest-cov~=4.0",
     "pytest-mock~=3.10",
 ]
