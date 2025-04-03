@@ -40,7 +40,8 @@ class K8sList(ty.Protocol[T]):
 # If this does not return a K8sList API method, the loop will exit
 GetListMethod = ty.Callable[[str, ty.Optional[Exception]], ty.Optional[K8sList[T]]]
 # if this returns True, the loop will exit.
-OnEvent = ty.Callable[[str, T], ty.Optional[bool]]
+EventType = ty.Literal["FETCH", "ADDED", "MODIFIED", "DELETED"]
+OnEvent = ty.Callable[[str, T, EventType], ty.Optional[bool]]
 
 
 def yield_objects_from_list(
@@ -55,7 +56,7 @@ def yield_objects_from_list(
     object_type_hint: str = "items",
     init: ty.Optional[ty.Callable[[], None]] = None,
     **kwargs: ty.Any,
-) -> ty.Iterator[ty.Tuple[str, T]]:
+) -> ty.Iterator[ty.Tuple[str, T, EventType]]:
     ex = None
     if init:
         init()
@@ -72,7 +73,7 @@ def yield_objects_from_list(
                 f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}"
             )
             for object in initial_list.items:
-                yield namespace, object
+                yield namespace, object, "FETCH"
 
             if initial_list.metadata._continue:
                 logger.warning(
@@ -88,7 +89,7 @@ def yield_objects_from_list(
             ):
                 object = evt.get("object")
                 if object:
-                    yield namespace, object
+                    yield namespace, object, evt["type"]
                 # once we've received events, let the resource version
                 # be managed automatically if possible.
         except urllib3.exceptions.ProtocolError:
@@ -104,10 +105,12 @@ def yield_objects_from_list(
             ex = e
 
 
-def callback_events(on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T]]) -> None:
+def callback_events(
+    on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T, EventType]]
+) -> None:
     """Suitable for use with a daemon thread."""
-    for namespace, event in event_yielder:
-        should_exit = on_event(namespace, event)
+    for namespace, obj, event in event_yielder:
+        should_exit = on_event(namespace, obj, event)
         if should_exit:
             break
 
@@ -179,7 +182,7 @@ def _wrap_get_list_method_with_too_old_check(
 
 def create_watch_thread(
     get_list_method: GetListMethod[T],
-    callback: ty.Callable[[str, T], None],
+    callback: ty.Callable[[str, T, EventType], None],
     namespace: str,
     *,
     typename: str = "object",
@@ -206,11 +209,11 @@ def watch_forever(
     *,
     typename: str = "object",
     timeout: ty.Optional[int] = None,
-) -> ty.Iterator[T]:
-    q: queue.Queue[T] = queue.Queue()
+) -> ty.Iterator[ty.Tuple[T, EventType]]:
+    q: queue.Queue[ty.Tuple[T, EventType]] = queue.Queue()
 
-    def put_queue(namespace: str, obj: T) -> None:
-        q.put(obj)
+    def put_queue(namespace: str, obj: T, event_type: EventType) -> None:
+        q.put((obj, event_type))
 
     create_watch_thread(get_list_method, put_queue, namespace, typename=typename).start()
     while True:
@@ -257,7 +260,7 @@ class WatchingObjectSource(ty.Generic[T]):
             self.get_list_method, self._add_object, namespace, typename=self.typename
         ).start()
 
-    def _add_object(self, namespace: str, obj: T) -> None:
+    def _add_object(self, namespace: str, obj: T, _event_type: EventType) -> None:
         """This is where we receive updates from the k8s API."""
         self._last_api_update_time = time.monotonic()
 
@@ -296,7 +299,7 @@ class WatchingObjectSource(ty.Generic[T]):
             # doing a lot of manual fetches may indicate that the k8s API is having trouble keeping up...
             try:
                 if obj := self.backup_fetch(namespace, obj_name):
-                    self._add_object(namespace, obj)  # updates last seen, too
+                    self._add_object(namespace, obj, "FETCH")  # updates last seen, too
                     return obj
 
             except Exception:
