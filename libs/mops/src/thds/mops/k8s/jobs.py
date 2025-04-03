@@ -4,7 +4,7 @@ from kubernetes import client
 
 from ._shared import logger
 from .retry import k8s_sdk_retry
-from .watch import WatchingObjectSource
+from .watch import WatchingObjectSource, watch_forever
 
 
 @k8s_sdk_retry()
@@ -55,3 +55,33 @@ def is_job_failed(job: client.models.V1Job) -> bool:
             return True
 
     return False
+
+
+def watch_jobs(namespace: str, timeout: ty.Optional[int] = None) -> ty.Iterator[client.models.V1Job]:
+    yield from watch_forever(
+        lambda _, __: client.BatchV1Api().list_namespaced_job,
+        namespace,
+        typename="Job",
+        timeout=timeout,
+    )
+
+
+def watch_jobs_cli() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Watch Kubernetes jobs")
+    parser.add_argument("namespace", help="Kubernetes namespace to watch")
+    parser.add_argument("--timeout", type=int, help="Timeout in seconds", default=None)
+    args = parser.parse_args()
+
+    for job in watch_jobs(args.namespace, timeout=args.timeout):
+        print(
+            f"{job.metadata.name:<63}",
+            job.metadata.creation_timestamp,
+            f"completed={is_job_succeeded(job)}",
+            f"failed={is_job_failed(job)}",
+        )
+
+
+if __name__ == "__main__":
+    watch_jobs_cli()
