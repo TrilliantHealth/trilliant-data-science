@@ -20,8 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-k8s = ["kubernetes>=18.20,!=32.0.0"]
-# 32.0.0 has this bug https://github.com/kubernetes-client/python/issues/2356
+k8s = ["kubernetes>=18.20"]
 
 [project.scripts]
 krsync = "thds.mops.k8s.orchestrator.krsync:main"
