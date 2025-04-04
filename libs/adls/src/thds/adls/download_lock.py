@@ -1,4 +1,4 @@
-import stat
+import random
 import time
 from datetime import timedelta
 from pathlib import Path
@@ -11,8 +11,6 @@ from .md5 import hex_md5_str
 
 DOWNLOAD_LOCKS_DIR = config.item("dir", home.HOMEDIR() / ".adls-md5-download-locks", parse=Path)
 _CLEAN_UP_LOCKFILES_AFTER_TIME = timedelta(hours=24)
-_CLEAN_UP_LOCKFILES_EVERY = timedelta(hours=1).total_seconds()
-_LAST_CLEANED_BY_THIS_PROCESS = time.monotonic() - _CLEAN_UP_LOCKFILES_EVERY
 logger = log.getLogger(__name__)
 
 
@@ -21,8 +19,7 @@ def _clean_download_locks() -> int:
     deletion_threshold = time.time() - _CLEAN_UP_LOCKFILES_AFTER_TIME.total_seconds()
     try:
         for f in DOWNLOAD_LOCKS_DIR().iterdir():
-            fstat = f.stat()
-            if stat.S_ISREG(fstat.st_mode) and fstat.st_mtime < deletion_threshold:
+            if f.is_file() and f.stat().st_mtime < deletion_threshold:
                 f.unlink()
                 deleted += 1
     except Exception:
@@ -34,11 +31,8 @@ def _clean_download_locks() -> int:
 
 
 def _occasionally_clean_download_locks():
-    global _LAST_CLEANED_BY_THIS_PROCESS
-    # do this about once an hour
-    if time.monotonic() > _LAST_CLEANED_BY_THIS_PROCESS + _CLEAN_UP_LOCKFILES_EVERY:
-        _LAST_CLEANED_BY_THIS_PROCESS = time.monotonic()
-        # minor race condition with other threads but it doesn't really matter.
+    if random.random() < 0.005:  # do this about every 200 downloads
+        # random.random is considered to be very fast, and we have no need of cryptographic quality.
         _clean_download_locks()
 
 
