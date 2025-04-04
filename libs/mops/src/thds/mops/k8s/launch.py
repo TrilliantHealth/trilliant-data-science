@@ -41,6 +41,19 @@ class Counter:
             return self.value
 
 
+def construct_job_name(user_prefix: str, job_num: str) -> str:
+    # we want some consistency here, but also some randomness in case the prefixes don't exist or aren't unique.
+    mops_name_part = "-".join([str(os.getpid()), job_num, str(uuid.uuid4())[:8]]).lstrip("-")
+    if len(mops_name_part) > 63:
+        # this should be _impossible_, because having a job num longer than even 20 digits would be an impossibly large
+        # number of jobs. but just in case, we'll truncate it to the last 63 characters.
+        mops_name_part = mops_name_part[-63:]  # keep the most random part, to avoid collisions
+    name = f"{user_prefix[:63 - (len(mops_name_part) + 1)]}-{mops_name_part}"
+    name = "".join([c if c.isalnum() or c == "-" else "-" for c in name.lower()])
+    assert len(name) <= 63, f"Job name `{name}` is too long; max length is 63 characters."
+    return name
+
+
 _LAUNCH_COUNT = Counter()
 _FINISH_COUNT = Counter()
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
@@ -80,7 +93,7 @@ def launch(
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
     job_num = f"{_LAUNCH_COUNT.inc():0>3}"
-    name = "-".join([name_prefix, str(os.getpid()), job_num, str(uuid.uuid4())[:8]]).lstrip("-")
+    name = construct_job_name(name_prefix, job_num)
     scope.enter(logger_context(job=name))
     node_narrowing = node_narrowing or dict()
 

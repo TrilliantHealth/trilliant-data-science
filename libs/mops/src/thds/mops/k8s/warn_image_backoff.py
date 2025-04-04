@@ -24,7 +24,7 @@ def _emit_basic(event: client.CoreV1Event) -> None:
 def _warn_image_pull_backoff(namespace: str, on_backoff: OnCoreEvent = _emit_basic) -> None:
     """Log scary errors when ImagePullBackoff is observed."""
     start_dt = datetime.now(tz=timezone.utc)
-    for _ns, obj in yield_objects_from_list(
+    for _ns, obj, _event_type in yield_objects_from_list(
         namespace,
         lambda _, __: ty.cast(
             # do NOT use client.EventsV1Api here - for some reason
