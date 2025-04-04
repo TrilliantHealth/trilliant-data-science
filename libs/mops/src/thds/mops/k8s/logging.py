@@ -161,7 +161,10 @@ def _get_pod_phase(pod_name: str) -> str:
         .read_namespaced_pod(
             namespace=config.k8s_namespace(),
             name=pod_name,
-            _request_timeout=(10, config.k8s_job_timeout_seconds()),
+            _request_timeout=(
+                config.k8s_watch_connection_timeout_seconds(),
+                config.k8s_watch_read_timeout_seconds(),
+            ),
         )
         .status.phase
     )
@@ -188,7 +191,10 @@ def _scrape_pod_logs(
     base_kwargs = dict(
         name=pod_name,
         namespace=config.k8s_namespace(),
-        _request_timeout=(10, config.k8s_job_timeout_seconds()),
+        _request_timeout=(
+            config.k8s_watch_connection_timeout_seconds(),
+            config.k8s_watch_read_timeout_seconds(),
+        ),
         # i'm occasionally seeing the `stream()` call below hang
         # indefinitely if logs don't come back from the pod for a
         # while. Which is ironic, since most of this code is here to
