@@ -3,7 +3,7 @@ import typing as ty
 import marshmallow  # type: ignore
 from typing_extensions import Protocol
 
-from ._attrs import generate_attrs_post_load, is_attrs_class, yield_attributes
+from ._attrs import Attribute, generate_attrs_post_load, is_attrs_class, yield_attributes
 from ._cache import GenSchemaCachingDeco
 from ._config import PerGenerationConfigContext, _GenConfig
 from ._meta import SchemaMeta
@@ -142,7 +142,9 @@ class SchemaGenerator:
                 ),
             )
 
-    def _named_field_discriminator(self, attribute, named_field: NamedField) -> marshmallow.fields.Field:
+    def _named_field_discriminator(
+        self, attribute: Attribute, named_field: NamedField
+    ) -> marshmallow.fields.Field:
         """When we are given a field name with a provided value, there are 4 possibilities."""
         # 1. A Field. This should be plugged directly into the Schema
         # without being touched.  Recursion ends here.
@@ -161,6 +163,7 @@ class SchemaGenerator:
                 lambda _s: ty.cast(ty.Type[marshmallow.Schema], named_field),
                 attribute.type,
                 _set_default(attribute.default),
+                debug_name=attribute.name,
             )
         # 3. A nested Schema Generator, with inner keyword
         # arguments. This would be used in the case where you want the
@@ -173,7 +176,11 @@ class SchemaGenerator:
         # .nested on the current SchemaGenerator.
         if isinstance(named_field, _NestedSchemaGenerator):
             return generate_field(
-                self._leaf_types, named_field, attribute.type, named_field.field_kwargs
+                self._leaf_types,
+                named_field,
+                attribute.type,
+                named_field.field_kwargs,
+                debug_name=attribute.name,
             )
         # 4. A partial Field with some 'inner' keyword arguments for
         # the Field only. Recursion continues - simply adds keyword
@@ -188,6 +195,7 @@ class SchemaGenerator:
             self,
             attribute.type,
             dict(_set_default(attribute.default), **named_field.field_kwargs),
+            debug_name=attribute.name,
         )
 
     def _gen_fields(
