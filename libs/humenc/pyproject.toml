@@ -1,11 +1,11 @@
 [project]
 name = "thds.humenc"
-version = "1.1"
+version = "1.0"
 # Patch version is a datetime determined upon release
 description = "Binary to string encoding for human readers."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = [
     "thds-core",
     "wordybin>=0.2.0"
