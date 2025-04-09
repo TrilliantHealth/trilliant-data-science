@@ -1,12 +1,3 @@
-## 3.8
-
-- Adds `calls` API to `pure.magic` and `MemoizingPicklingRunner`, which serves as a way to have inner
-  `function-logic-key`s invalidate memoization for functions which are known to call them.
-
-## 3.7
-
-- `requires-python>=3.9`.
-
 ### 3.6.20250409
 
 - Fixes a bug in Kubernetes Job name generation when no user prefix was supplied.
