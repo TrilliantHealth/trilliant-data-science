@@ -155,13 +155,27 @@ class ConfigTree(ty.Generic[V]):
         self.setv(value, pathable=key)
 
     def load_config(self, config: ty.Mapping[str, ty.Any]) -> None:
-        """Loads things with an inner key matching this name into the config."""
+        """Loads things with an inner key matching this name into the config.
+
+        The config looks something like this:
+
+        thds.modulea.foobar.funcname.(?__mask).mops.pure.magic.pipeline_id = 'force-rerun'
+
+        The end part must correspond to the 'name' of this ConfigTree, e.g. mops.pure.magic.pipeline_id,
+        so that we can identify which part of this config is relevant to us.
+
+        We then split off that part, plus any __mask prefix that might or might not be present.
+        The remaining part (from the beginning) is then the 'pathable' - the part of the tree
+        that this config value applies to. The value is, of course, the value for that tree.
+        """
         mask_name = f".__mask.{self.registry.name}"
-        conf_name = f".{self.registry.name}"
+        conf_name = f".{self.registry.name}"  # e.g. .mops.pure.magic.pipeline_id
         logger.debug("Loading config for %s", self.registry.name)
         for key, value in core.config.flatten_config(config).items():
-            if key.endswith(conf_name):
-                self.setv(value, key[: -len(conf_name)], mask=key.endswith(mask_name))
+            if key.endswith(conf_name):  # then this is for us.
+                mask = key.endswith(mask_name)  # then this is a mask
+                pathable = key[: -len(mask_name if mask else conf_name)]
+                self.setv(value, pathable, mask=mask)
 
     def __repr__(self) -> str:
         return f"ConfigTree('{self.registry.name}', {list(self.registry.items())})"

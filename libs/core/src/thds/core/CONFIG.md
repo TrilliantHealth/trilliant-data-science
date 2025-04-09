@@ -66,8 +66,7 @@ print(config.get_all_config())
 or
 
 ```bash
-poetry install  # to ensure that the CLI is properly installed
-poetry run show-thds-config your.root.module
+show-thds-config your.root.module
 ```
 
 ## Loading config from a file programmatically
