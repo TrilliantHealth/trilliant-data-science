@@ -1232,7 +1232,7 @@ wheels = [
 
 [[package]]
 name = "thds-adls"
-version = "3.1"
+version = "3.2"
 source = { editable = "../adls" }
 dependencies = [
     { name = "aiohttp" },
@@ -1267,7 +1267,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.33"
+version = "1.34"
 source = { editable = "../core" }
 dependencies = [
     { name = "attrs" },
@@ -1296,7 +1296,7 @@ dev = [
 
 [[package]]
 name = "thds-humenc"
-version = "1.0"
+version = "1.1"
 source = { editable = "../humenc" }
 dependencies = [
     { name = "thds-core" },
