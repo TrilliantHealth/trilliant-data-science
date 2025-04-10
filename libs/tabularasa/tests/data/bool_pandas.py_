@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
 import thds.tabularasa.loaders.util
 
 bools_schema = pa.DataFrameSchema(

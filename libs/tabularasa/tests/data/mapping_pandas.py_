@@ -1,6 +1,7 @@
 import numpy as np
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
 import thds.tabularasa.loaders.util
 
 mappings_schema = pa.DataFrameSchema(
@@ -8,7 +9,7 @@ mappings_schema = pa.DataFrameSchema(
         string_to_int_mapping=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
         int_to_string_mapping=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
     ),
-    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="pk",),
+    index=pa.Index(thds.tabularasa.compat.resolve_numeric_np_index_dtype_for_pd_version(np.dtype("int16")), checks=None, nullable=False, unique=True, name="pk",),
     checks=None,
     coerce=False,
     strict=True,

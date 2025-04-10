@@ -299,6 +299,20 @@ class UniqueColumnsConstraint(BaseModel, extra=Extra.forbid):
     def sqlite(self) -> str:
         return f'UNIQUE ({", ".join(self.unique)})'
 
+    @staticmethod
+    def make_pandera_check_expr(unique: IdTuple) -> str:
+        return f"pa.{pa.Check.__name__}.unique_across_columns({list(unique)!r})"
+
+    def pandera_check_expr(self) -> str:
+        return self.make_pandera_check_expr(self.unique)
+
+    @staticmethod
+    def make_pandera_check(unique: IdTuple) -> pa.Check:
+        return pa.Check.unique_across_columns(list(unique))
+
+    def pandera_check(self) -> pa.Check:
+        return self.make_pandera_check(self.unique)
+
 
 # this allows the recursive types above
 _RawArrayType.update_forward_refs()
@@ -549,7 +563,14 @@ class Column(_RawColumn):
 
     def pandas_dtype_literal(self, index: bool = False) -> str:
         dtype = self.pandas(index=index)
-        return render_dtype(dtype)
+        rendered = render_dtype(dtype)
+
+        if index and isinstance(dtype, np.dtype) and dtype.kind in "iuf":
+            return f"thds.tabularasa.compat.resolve_numeric_np_index_dtype_for_pd_version({rendered})"
+            # we actually need to render these dtypes wrapped in this compat function so that we can
+            # render schemas using pandas>=2.0, but they will still work with pandas<2.0
+
+        return rendered
 
     @property
     def python(self) -> Type:
@@ -780,7 +801,7 @@ def render_pandera_schema(
         else:
             constructor = _MultiIndexSchemaProxy if as_str else pa.MultiIndex
             index_def = constructor(
-                indexes=[expr for name, expr in index_defs],
+                indexes=[expr for _name, expr in index_defs],
                 strict=True,
             )
     else:
@@ -792,12 +813,18 @@ def render_pandera_schema(
         unique_constraints.append(table.primary_key)
 
     if unique_constraints:
-        from thds.tabularasa.loaders.util import CheckUnique
+        from thds.tabularasa.loaders.util import unique_across_columns  # noqa: F401
 
-        _df_check_exprs = [
-            CheckUnique(list(map(snake_case, constraint))) for constraint in unique_constraints
+        # Importing the above to ensure the custom pandera check is registered.
+        # Ideally, custom pandera checks would be registered in a more central location.
+        df_check_exprs = [
+            (
+                UniqueColumnsConstraint.make_pandera_check_expr(constraint)
+                if as_str
+                else UniqueColumnsConstraint.make_pandera_check(constraint)
+            )
+            for constraint in unique_constraints
         ]
-        df_check_exprs = list(map(repr, _df_check_exprs)) if as_str else _df_check_exprs
     else:
         df_check_exprs = None
 

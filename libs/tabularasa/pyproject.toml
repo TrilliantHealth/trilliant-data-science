@@ -1,17 +1,18 @@
 [project]
 name = "thds.tabularasa"
-version = "0.9.4"
+version = "0.10.0"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "attrs>=22.2",
   "cattrs>=22.2",
   "networkx>=3.0",
-  "numpy<2.0",  # >2.0 and pandas<2.0 can have issues
-  "pandas~=1.4",
-  "pandera~=0.7.1",  # 0.8 breaks us
+  "numpy",
+  "packaging",
+  "pandas>=1.5",
+  "pandera>=0.20",
   "pydantic>=1.10.9,<2.0",
   # V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin,
   # see here: https://github.com/python/mypy/issues/15485.
@@ -110,7 +111,9 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
+  "azure",
   "bourbaki.*",
+  "google",
   "networkx",
   "pyarrow.*",
   "pygraphviz",

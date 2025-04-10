@@ -17,7 +17,7 @@ TuplesToDict = Callable[[Iterable[Tuple[K1, V1]]], Dict[K2, V2]]
 IterableToList = Callable[[Iterable[V1]], List[V2]]
 DictToList = Callable[[Dict[K1, V1]], List[Tuple[K2, V2]]]
 
-PANDAS_NULL_VALUES = {None, np.NaN, pd.NA}
+PANDAS_NULL_VALUES = {None, np.nan, pd.NA}
 NONHASHABLE_TYPES = {dict, list, np.ndarray}
 
 

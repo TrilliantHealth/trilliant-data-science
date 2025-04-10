@@ -1,11 +1,11 @@
 import pandas as pd
 import pyarrow as pa
 import pytest
-from pandera import DataFrameSchema
+from pandera import Check, DataFrameSchema
 from pandera.errors import SchemaError
 
 from thds.tabularasa.loaders.parquet_util import TypeCheckLevel, pyarrow_type_compatible
-from thds.tabularasa.loaders.util import CheckUnique
+from thds.tabularasa.loaders.util import unique_across_columns  # noqa: F401
 
 
 def test_unique_constraint_passes():
@@ -15,7 +15,7 @@ def test_unique_constraint_passes():
             b=["a", "a", "b", "b"],
         )
     )
-    schema = DataFrameSchema(checks=[CheckUnique(["a", "b"])])
+    schema = DataFrameSchema(checks=[Check.unique_across_columns(["a", "b"])])
 
     schema.validate(df)
     schema.validate(df.set_index("a"))
@@ -29,20 +29,12 @@ def test_unique_constraint_fails():
             b=["a", "a", "b", "b"],
         )
     )
-    schema = DataFrameSchema(checks=[CheckUnique(["a", "b"])])
+    schema = DataFrameSchema(checks=[Check.unique_across_columns(["a", "b"])])
 
     with pytest.raises(SchemaError):
         schema.validate(df)
 
-    # TODO: change this back to old behavior once we update pandera
-    #  see core PR #32
-    #  On pandera 0.6.5 instead of getting the expected SchemaError pandera
-    #   will raise a ValueError due to a bug. Catching ValueError here
-    #   not only makes the test pass it makes sure the test will fail
-    #   once we update pandera to a version without said bug. When that happens,
-    #   make sure to revert this test back to catching SchemaError
-    # with pytest.raises(SchemaError):
-    with pytest.raises(ValueError):
+    with pytest.raises(SchemaError):
         schema.validate(df.set_index("a"))
 
 

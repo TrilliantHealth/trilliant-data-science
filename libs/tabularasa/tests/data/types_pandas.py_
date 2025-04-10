@@ -1,6 +1,8 @@
 import numpy as np
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
+
 table_schema = pa.DataFrameSchema(
     columns=dict(
         foo=pa.Column(

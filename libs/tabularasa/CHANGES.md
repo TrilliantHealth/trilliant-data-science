@@ -1,3 +1,19 @@
+## 0.10.0
+
+- `requires-python>=3.10`.
+- Take upper-bounds off of `pandas`, `pandera`, and `numpy`.
+  - Increases `pandas` lower-bound to `>=1.5`.
+  - Increases `pandera` lower-bound to `>=0.20`.
+- Renames `loaders.util.unique` to `loaders.util.unique_across_columns` and registers this as a custom
+  `pandas` check in `pandera`.
+- No longer coerces numeric numpy index dtypes to 64-bit when using `pandas>=2.0`.
+- Enforces the use of nanosecond datetime precision across pyarrow and (numpy-based) pandas datetime
+  types for consistent behavior.
+  - `pandas<2.0` only supported nanosecond precision, so sticking with that for for simplicity across
+    `pandas` versions.
+- Adds a `compat` module with some code that gets rendered (to be called) on `numpy` numeric types set as
+  indices in `pandas.DataFrame`s.
+
 ### 0.9.4
 
 - Added tests for `FileSourceMixin.needs_update`.

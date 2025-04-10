@@ -142,14 +142,18 @@ def render_attrs_loaders(
                     package=package,
                     data_dir=data_dir,
                     md5=table.md5,
-                    blob_store=None
-                    if schema.remote_blob_store is None or table.md5 is None
-                    else VarName(REMOTE_BLOB_STORE_VAR_NAME),
-                    pyarrow_schema=VarName(
-                        f"{PYARROW_SCHEMAS_QUALIFIED_IMPORT}.{table.snake_case_name}_pyarrow_schema"
-                    )
-                    if render_pyarrow_schemas
-                    else None,
+                    blob_store=(
+                        None
+                        if schema.remote_blob_store is None or table.md5 is None
+                        else VarName(REMOTE_BLOB_STORE_VAR_NAME)
+                    ),
+                    pyarrow_schema=(
+                        VarName(
+                            f"{PYARROW_SCHEMAS_QUALIFIED_IMPORT}.{table.snake_case_name}_pyarrow_schema"
+                        )
+                        if render_pyarrow_schemas
+                        else None
+                    ),
                 ),
                 var_name=f"load_{table.snake_case_name}",
             )
@@ -213,7 +217,7 @@ def _render_attrs_schema(
     if loader_defs.code:
         import_lines.append(f"import {thds.tabularasa.loaders.util.__name__}\n")
     if schema.remote_blob_store is not None:
-        import_lines.append(f"import {thds.tabularasa.schema.metaschema.__name__}\n")
+        import_lines.append(f"import {thds.tabularasa.schema.files.__name__}\n")
 
     import_lines.extend(type_defs.tabularasa_imports)
     import_lines.extend(loader_defs.tabularasa_imports)

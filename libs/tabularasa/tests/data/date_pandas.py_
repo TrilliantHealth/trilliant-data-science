@@ -1,6 +1,7 @@
 import numpy as np
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
 import thds.tabularasa.loaders.util
 
 dates_schema = pa.DataFrameSchema(
@@ -21,8 +22,8 @@ dates_schema = pa.DataFrameSchema(
         ordered=True,
     ),
     checks=[
-        thds.tabularasa.loaders.util.CheckUnique(["datetime1", "datetime2"]),
-        thds.tabularasa.loaders.util.CheckUnique(["date1", "datetime2"]),
+        pa.Check.unique_across_columns(["datetime1", "datetime2"]),
+        pa.Check.unique_across_columns(["date1", "datetime2"]),
     ],
     coerce=False,
     strict=True,

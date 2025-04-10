@@ -1,6 +1,7 @@
 import numpy as np
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
 import thds.tabularasa.loaders.util
 
 arrays_schema = pa.DataFrameSchema(
@@ -9,7 +10,7 @@ arrays_schema = pa.DataFrameSchema(
         nested_string_array=pa.Column(np.dtype("object"), checks=None, nullable=True, unique=False,),
         nested_date_array=pa.Column(np.dtype("object"), checks=None, nullable=False, unique=False,),
     ),
-    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="pk",),
+    index=pa.Index(thds.tabularasa.compat.resolve_numeric_np_index_dtype_for_pd_version(np.dtype("int64")), checks=None, nullable=False, unique=True, name="pk",),
     checks=None,
     coerce=False,
     strict=True,

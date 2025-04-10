@@ -1,3 +1,7 @@
+## 1.4
+
+- Requires `python>=3.9` now.
+
 ## 1.3
 
 - Added a `try_bases` helper for compositional use with `TypeRecursion` to enable a fallback method for

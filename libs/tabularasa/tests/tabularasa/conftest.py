@@ -340,10 +340,10 @@ date_dataframes = dict(
     )
     .astype(
         dict(
-            date1="datetime64[D]",
-            date2="datetime64[D]",
-            datetime1="datetime64[s]",
-            datetime2="datetime64[s]",
+            date1="datetime64[ns]",
+            date2="datetime64[ns]",
+            datetime1="datetime64[ns]",
+            datetime2="datetime64[ns]",
         ),
     )
     .set_index(["date1", "datetime2"]),

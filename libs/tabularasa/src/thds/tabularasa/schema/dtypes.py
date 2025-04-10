@@ -8,6 +8,8 @@ import pandas as pd
 import pyarrow
 from pandas.core.dtypes import base as pd_dtypes
 
+from thds.tabularasa.compat import PANDAS_VERSION_LT_2_0
+
 from .util import EnumList, Identifier
 
 AnyDtype = Union[pd_dtypes.ExtensionDtype, np.dtype]
@@ -66,7 +68,7 @@ class DType(Enum):
         if enum:
             return pd.CategoricalDtype(enum, ordered=ordered)
         elif self == DType.DATE or self == DType.DATETIME:
-            # pandas supports *only* nanosecond datetimes
+            # pandas <2.0 *only* supports nanosecond datetimes so we're safe to use this
             return np.dtype("datetime64[ns]")
         elif self == DType.BOOL:
             return pd.BooleanDtype() if nullable else np.dtype("bool")
@@ -82,8 +84,8 @@ class DType(Enum):
                 return _dtype_name_to_pd_dtype[self.value]
             else:
                 # non-nullable ints or floats
-                if index:
-                    # no low-resolution types on indexes
+                if index and PANDAS_VERSION_LT_2_0:
+                    # no low-resolution types on indexes with pandas<2.0
                     if self.is_float_type:
                         return np.dtype("float")
                     else:
@@ -138,7 +140,7 @@ class DType(Enum):
         elif self == DType.BOOL:
             return pyarrow.bool_()
         elif self is DType.DATETIME:
-            return pyarrow.timestamp("ms")
+            return pyarrow.timestamp("ns")
         elif self is DType.DATE:
             return pyarrow.date32()
         else:

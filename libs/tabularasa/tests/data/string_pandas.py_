@@ -50,7 +50,7 @@ strings_schema = pa.DataFrameSchema(
         unique=True,
         name="lowercase",
     ),
-    checks=[thds.tabularasa.loaders.util.CheckUnique(["uppercase", "lowercase"])],
+    checks=[pa.Check.unique_across_columns(["uppercase", "lowercase"])],
     coerce=False,
     strict=True,
     ordered=False,

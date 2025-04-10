@@ -1,5 +1,4 @@
 import os
-from functools import partial
 from logging import getLogger
 from pathlib import Path
 from typing import (
@@ -11,6 +10,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -92,18 +92,7 @@ def package_data_path(filename: str, data_dir: str, as_package_data: bool = True
     )
 
 
-class CheckUnique(pa.Check):
-    def __init__(self, colnames: List[str]):
-        self.colnames = list(colnames)
-        check_func = partial(check_unique, self.colnames)
-        name = "Unique({})".format(",".join(self.colnames))
-        super(CheckUnique, self).__init__(check_func, name=name, element_wise=False)
-
-    def __repr__(self):
-        return f"{__name__}.{type(self).__name__}({self.colnames!r})"
-
-
-def check_unique(colnames: List[str], df: pd.DataFrame) -> pd.Series:
+def unique_across_columns(df: pd.DataFrame, colnames: Sequence[str]) -> pd.Series:
     index_cols = [c for c in colnames if c in df.index.names]
     cols = [c for c in colnames if c in df.columns]
     if not index_cols:
@@ -125,6 +114,20 @@ def check_unique(colnames: List[str], df: pd.DataFrame) -> pd.Series:
         duped = duped.values  # type: ignore
 
     return pd.Series(~duped, index=df.index)
+
+
+def _register_unique_across_columns() -> None:
+    # make sure the registration runs once
+    # forced re-importing with `mops.testing.deferred_imports.assert_dev_deps_not_imported` raises an error
+    if hasattr(pa.Check, "unique_across_columns"):
+        return None
+
+    pa.extensions.register_check_method(statistics=["colnames"], supported_types=pd.DataFrame)(
+        unique_across_columns
+    )
+
+
+_register_unique_across_columns()
 
 
 class _PackageDataOrFileInterface:
@@ -264,7 +267,7 @@ class AttrsParquetLoader(Generic[Record], _ParquetPackageDataOrFileInterface):
         if type_check is not None and self.pyarrow_schema is None:
             raise ValueError(f"Can't type check table {self.table_name} with no pyarrow schema")
 
-        with (self._resource_stream() if path is None else open(path, "rb")) as f:
+        with self._resource_stream() if path is None else open(path, "rb") as f:
             col_order = [col.name for col in attr.fields(self.type_)]
             parquet_file = pq.ParquetFile(f)
             schema = parquet_file.schema.to_arrow_schema()
@@ -381,7 +384,7 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
 
         logger = getLogger(__name__)
 
-        with (self._resource_stream() if path is None else open(path, "rb")) as f:
+        with self._resource_stream() if path is None else open(path, "rb") as f:
             pq_file = pyarrow.parquet.ParquetFile(f)
             schema = pq_file.schema.to_arrow_schema()
             if type_check is not None:
@@ -480,21 +483,23 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
 
         for name, col in all_cols:
             assert isinstance(name, str)
-            if isinstance(col.dtype, pd_dtypes.ExtensionDtype):
-                casts[name] = col.dtype
-            elif isinstance(getattr(col.dtype, "type", None), pd_dtypes.ExtensionDtype):
-                casts[name] = col.dtype.type
-            elif isinstance(col.dtype, pa.dtypes.Int) and (  # type: ignore
-                (not col.dtype.signed) or col.dtype.bit_width not in (32, 64)
+            dtype = col.dtype.type if isinstance(col.dtype, pa.DataType) else col.dtype
+
+            if isinstance(dtype, pd_dtypes.ExtensionDtype):
+                casts[name] = dtype
+            elif isinstance(dtype, pa.dtypes.Int) and (  # type: ignore
+                (not dtype.signed) or dtype.bit_width not in (32, 64)
             ):
-                typename = f"{'' if col.dtype.signed else 'u'}int{col.dtype.bit_width}"
+                typename = f"{'' if dtype.signed else 'u'}int{dtype.bit_width}"
                 casts[name] = np.dtype(typename)
+            elif isinstance(dtype, np.dtypes.DateTime64DType):
+                casts[name] = np.dtype("datetime64[ns]")
 
         return cls(
             table_name,
             schema=schema,
             pyarrow_schema=pyarrow_schema,
-            columns=[name for name, col in all_cols],
+            columns=[name for name, _col in all_cols],
             index_columns=index_columns,
             casts=casts,
             package=package,

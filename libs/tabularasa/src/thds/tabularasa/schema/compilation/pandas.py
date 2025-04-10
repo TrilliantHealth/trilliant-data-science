@@ -163,15 +163,17 @@ def render_pandera_loaders(
                     schema=VarName(f"{table.snake_case_name}_schema"),
                     package=package,
                     data_dir=data_dir,
-                    blob_store=None
-                    if schema.remote_blob_store is None
-                    else VarName(REMOTE_BLOB_STORE_VAR_NAME),
+                    blob_store=(
+                        None if schema.remote_blob_store is None else VarName(REMOTE_BLOB_STORE_VAR_NAME)
+                    ),
                     md5=table.md5,
-                    pyarrow_schema=VarName(
-                        f"{qualified_pyarrow_module_name}.{table.snake_case_name}_pyarrow_schema"
-                    )
-                    if render_pyarrow_schemas
-                    else None,
+                    pyarrow_schema=(
+                        VarName(
+                            f"{qualified_pyarrow_module_name}.{table.snake_case_name}_pyarrow_schema"
+                        )
+                        if render_pyarrow_schemas
+                        else None
+                    ),
                 ),
                 var_name=f"load_{table.snake_case_name}",
             )
@@ -213,19 +215,24 @@ def render_pandera_module(
         for table in schema.package_tables
     )
 
+    any_np_dtypes = any(isinstance(dt, np.dtype) for dt in all_dtypes)
+
     import_lines = ["import " + modname + "\n" for modname in required_stdlib_modules]
     if import_lines:
         import_lines.append("\n")
-    if any(isinstance(dt, np.dtype) for dt in all_dtypes):
+    if any_np_dtypes:
         import_lines.append("import numpy as np\n")
     if any(isinstance(dt, pd_dtypes.ExtensionDtype) for dt in all_dtypes):
         import_lines.append("import pandas as pd\n")
     import_lines.append("import pandera as pa\n")
     import_lines.append("\n")
+    if any_np_dtypes:
+        import_lines.append(f"import {thds.tabularasa.compat.__name__}  # noqa: F401\n")
+        # is there an effective way to check if we have any np numeric dtypes as indices so I can leave out the 'noqa'?
     if loader_defs:
         import_lines.append(f"import {thds.tabularasa.loaders.util.__name__}\n")
     if schema.remote_blob_store is not None:
-        import_lines.append(f"import {thds.tabularasa.schema.metaschema.__name__}\n")
+        import_lines.append(f"import {thds.tabularasa.schema.files.__name__}\n")
 
     if loader_defs:
         import_lines += loader_defs.imports

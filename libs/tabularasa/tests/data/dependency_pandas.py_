@@ -1,6 +1,7 @@
 import numpy as np
 import pandera as pa
 
+import thds.tabularasa.compat  # noqa: F401
 import thds.tabularasa.loaders.util
 
 sequences_schema = pa.DataFrameSchema(
@@ -10,7 +11,7 @@ sequences_schema = pa.DataFrameSchema(
         triangular=pa.Column(np.dtype("int16"), checks=None, nullable=False, unique=True,),
         is_fibonacci=pa.Column(np.dtype("bool"), checks=None, nullable=False, unique=False,),
     ),
-    index=pa.Index(np.dtype("int64"), checks=None, nullable=False, unique=True, name="n",),
+    index=pa.Index(thds.tabularasa.compat.resolve_numeric_np_index_dtype_for_pd_version(np.dtype("int16")), checks=None, nullable=False, unique=True, name="n",),
     checks=None,
     coerce=False,
     strict=True,
