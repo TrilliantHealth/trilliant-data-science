@@ -1,3 +1,11 @@
+## 3.7
+
+- `requires-python>=3.9`.
+
+### 3.6.20250409
+
+- Fixes a bug in Kubernetes Job name generation when no user prefix was supplied.
+
 ### 3.6.20250328
 
 - Fixes a bug where `mops.pure.magic` config would not be correctly loaded when it was a `__mask` config.
