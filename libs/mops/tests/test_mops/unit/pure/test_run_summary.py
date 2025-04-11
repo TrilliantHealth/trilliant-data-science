@@ -78,7 +78,7 @@ def test_log_function_execution_invalid_json(run_directory: Path) -> None:
     def test_function() -> None:
         pass
 
-    log_file = run_summary._generate_log_filename(run_directory)
+    log_file = run_directory / "invalid.json"
 
     # Create an invalid JSON file
     with log_file.open("w") as f:
