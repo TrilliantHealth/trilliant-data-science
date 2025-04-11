@@ -43,6 +43,7 @@ class LogEntry(LogEntryV1, total=False):
     invoker_code_version: str
     remote_code_version: str
 
+    uris_in_args_kwargs: ty.List[str]
     uris_in_rvalue: ty.List[str]
 
 
@@ -102,6 +103,7 @@ def log_function_execution(
     runner_prefix: str = "",
     was_error: bool = False,
     return_value: ty.Any = None,
+    args_kwargs: ty.Any = None,
 ) -> None:
     if not run_directory:
         logger.debug("Not writing function summary for %s", memo_uri)
@@ -139,6 +141,8 @@ def log_function_execution(
         log_entry["remote_code_version"] = metadata.remote_code_version
         # we don't bother with invoked_at or remote_started_at because they can be
         # inferred from the timestamp and the wall times
+    if source_uris := _extract_source_uris(args_kwargs):
+        log_entry["uris_in_args_kwargs"] = sorted(source_uris)
     if source_uris := _extract_source_uris(return_value):
         log_entry["uris_in_rvalue"] = sorted(source_uris)
 

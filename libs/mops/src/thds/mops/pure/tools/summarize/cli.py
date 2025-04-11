@@ -28,6 +28,7 @@ class FunctionSummary(TypedDict):
     total_runtime_minutes: List[float]  # minutes
     remote_runtime_minutes: List[float]  # minutes
     uris_in_rvalue: List[str]
+    uris_in_args_kwargs: List[str]
 
 
 def _empty_summary() -> FunctionSummary:
@@ -46,6 +47,7 @@ def _empty_summary() -> FunctionSummary:
         "total_runtime_minutes": list(),
         "remote_runtime_minutes": list(),
         "uris_in_rvalue": list(),
+        "uris_in_args_kwargs": list(),
     }
 
 
@@ -77,6 +79,7 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         summary["error_count"] += int(log_entry.get("was_error") or 0)
         summary["timestamps"].append(log_entry["timestamp"])
         summary["uris_in_rvalue"].extend(log_entry.get("uris_in_rvalue") or tuple())
+        summary["uris_in_args_kwargs"].extend(log_entry.get("uris_in_args_kwargs") or tuple())
 
         mu_parts = parse_memo_uri(
             log_entry["memo_uri"], runner_prefix=log_entry.get("runner_prefix", "")
@@ -124,6 +127,7 @@ def _combine_summaries(
         acc[function_name]["pipeline_ids"].update(data["pipeline_ids"])
         acc[function_name]["function_logic_keys"].update(data["function_logic_keys"])
         acc[function_name]["uris_in_rvalue"].extend(data["uris_in_rvalue"])
+        acc[function_name]["uris_in_args_kwargs"].extend(data["uris_in_args_kwargs"])
 
         for key in (
             "invoked_by",
@@ -219,6 +223,12 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
                 remote_code_version=", ".join(sorted(set(data["remote_code_version"]))),
             )
         )
+        args_uris = and_more(
+            sorted(data["uris_in_args_kwargs"]),
+            max_count=uri_limit if uri_limit >= 0 else sys.maxsize,
+        ).replace(", ", "\n     ")
+        if args_uris:
+            report_lines.append(f"  URIs in args/kwargs:\n     {args_uris}\n")
         n_uris = and_more(
             sorted(data["uris_in_rvalue"]),
             max_count=uri_limit if uri_limit >= 0 else sys.maxsize,
