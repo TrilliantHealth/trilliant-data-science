@@ -7,23 +7,25 @@ from pathlib import Path
 from thds.core import files, hashing, log, types
 
 from . import _construct
+from ._download import SHA256
 from .src import Source
 
 _SHA256_B64 = "sha256b64"
 _MD5_B64 = "md5b64"
+MD5 = "md5"
 
 logger = log.getLogger(__name__)
 
 
 def _from_sha256b64(d: dict) -> ty.Optional[hashing.Hash]:
     if "sha256b64" in d:
-        return hashing.Hash(algo="sha256", bytes=hashing.db64(d[_SHA256_B64]))
+        return hashing.Hash(algo=SHA256, bytes=hashing.db64(d[_SHA256_B64]))
     return None
 
 
 def _from_md5b64(d: dict) -> ty.Optional[hashing.Hash]:
     if "md5b64" in d:
-        return hashing.Hash(algo="md5", bytes=hashing.db64(d[_MD5_B64]))
+        return hashing.Hash(algo=MD5, bytes=hashing.db64(d[_MD5_B64]))
     return None
 
 
@@ -51,8 +53,8 @@ def _generic_hash_serializer(
     return None
 
 
-_to_sha256b64 = partial(_generic_hash_serializer, "sha256", hashing.b64, _SHA256_B64)
-_to_md5b64 = partial(_generic_hash_serializer, "md5", hashing.b64, _MD5_B64)
+_to_sha256b64 = partial(_generic_hash_serializer, SHA256, hashing.b64, _SHA256_B64)
+_to_md5b64 = partial(_generic_hash_serializer, MD5, hashing.b64, _MD5_B64)
 
 HashSerializer = ty.Callable[[hashing.Hash], ty.Optional[dict]]
 _BASE_HASH_SERIALIZERS: ty.Tuple[HashSerializer, ...] = (_to_md5b64, _to_sha256b64)  # type: ignore
