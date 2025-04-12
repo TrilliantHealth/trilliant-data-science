@@ -238,8 +238,11 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
     return "\n".join(report_lines)
 
 
-def _auto_find_run_directory() -> ty.Optional[Path]:
-    mops_root = run_summary.MOPS_SUMMARY_DIR()
+def auto_find_run_directory(start_dir: ty.Optional[Path] = None) -> Path:
+    if start_dir is None:
+        mops_root = run_summary.MOPS_SUMMARY_DIR()
+    else:
+        mops_root = start_dir / run_summary.MOPS_SUMMARY_DIR()
     if not mops_root.exists():
         raise ValueError(f"No mops summary root directory found at {mops_root}.")
     if not mops_root.is_dir():
@@ -252,16 +255,13 @@ def _auto_find_run_directory() -> ty.Optional[Path]:
             # needs to have some files for it to count for anything
             return directory
 
-    print("No pipeline run directories found.")
-    return None
+    raise ValueError(f"No pipeline run directories found in {mops_root}.")
 
 
 def summarize(
     run_directory: Optional[str] = None, sort_by: SortOrder = "name", uri_limit: int = 10
 ) -> None:
-    run_directory_path = Path(run_directory) if run_directory else _auto_find_run_directory()
-    if not run_directory_path:
-        return
+    run_directory_path = Path(run_directory) if run_directory else auto_find_run_directory()
 
     print(f"Summarizing pipeline run '{run_directory_path}'\n")
     log_files = list(run_directory_path.glob("*.json"))
@@ -300,4 +300,7 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
-    summarize(args.run_directory, args.sort_by, args.uri_limit)
+    try:
+        summarize(args.run_directory, args.sort_by, args.uri_limit)
+    except ValueError as e:
+        print(f"Error: {e}")

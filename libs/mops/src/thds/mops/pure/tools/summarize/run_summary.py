@@ -80,20 +80,32 @@ def _generate_log_filename(
 
 
 def _extract_source_uris(result: ty.Any) -> ty.Set[str]:
-    sources: ty.List[source.Source] = list()
+    uris: ty.Set[str] = set()
 
-    def extract_source(unknown: ty.Any) -> None:
+    def extract_uri(unknown: ty.Any) -> None:
+        if hasattr(unknown, "stored_uri") and isinstance(unknown.stored_uri, str):
+            uris.add(unknown.stored_uri)
         if isinstance(unknown, source.Source):
-            sources.append(unknown)
+            uris.add(unknown.uri)
+        if hasattr(unknown, "sa") and hasattr(unknown, "container") and hasattr(unknown, "path"):
+            uris.add(str(unknown))
+        if isinstance(unknown, str) and (unknown.startswith("adls://") or unknown.startswith("file://")):
+            uris.add(unknown)
+        if hasattr(unknown, "material"):
+            material = unknown.material
+            if callable(material):
+                mat = material()
+                for uri in _extract_source_uris(mat):
+                    uris.add(uri)
 
     try:
-        pickle_visit.recursive_visit(extract_source, result)
+        pickle_visit.recursive_visit(extract_uri, result)
     except pickle.PicklingError:
         pass
     except Exception as exc:
-        logger.warning(f'Unexpected error trying to extract source URIs from "%s"; {exc}', result)
+        logger.warning(f'Unexpected error trying to extract URIs from "%s"; {exc}', result)
 
-    return {source.uri for source in sources}
+    return uris
 
 
 def log_function_execution(
@@ -145,4 +157,6 @@ def log_function_execution(
         with log_file.open("w") as f:
             json.dump(log_entry, f, indent=2)
     except Exception:
-        logger.exception(f"Unable to write mops function invocation log file at '{log_file}'")
+        logger.info(
+            f"Unable to write mops function invocation log file at '{log_file}' - you may have multiple callers for the same invocation"
+        )
