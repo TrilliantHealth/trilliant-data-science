@@ -492,7 +492,7 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
             ):
                 typename = f"{'' if dtype.signed else 'u'}int{dtype.bit_width}"
                 casts[name] = np.dtype(typename)
-            elif isinstance(dtype, np.dtypes.DateTime64DType):
+            elif np.issubdtype(dtype, np.datetime64):
                 casts[name] = np.dtype("datetime64[ns]")
 
         return cls(

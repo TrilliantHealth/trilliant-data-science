@@ -17,9 +17,17 @@ def resolve_numeric_np_index_dtype_for_pd_version(dtype: str | np.dtype) -> np.d
     if not PANDAS_VERSION_LT_2_0:
         return dtype_
 
-    if dtype_.kind == "i":
-        return np.dtypes.Int64DType()
-    elif dtype_.kind == "u":
-        return np.dtypes.UInt64DType()
-    else:  # already type-narrowed `dtype_` so we know it is a float type at this point
+    if hasattr(np, "dtypes"):  # 2.x introduces .dtypes
+        # NumPy 2.x
+        if dtype_.kind == "i":
+            return np.dtypes.Int64DType()
+        elif dtype_.kind == "u":
+            return np.dtypes.UInt64DType()
         return np.dtypes.Float64DType()
+
+    # NumPy 1.x fallback
+    if dtype_.kind == "i":
+        return np.dtype("int64")
+    elif dtype_.kind == "u":
+        return np.dtype("uint64")
+    return np.dtype("float64")

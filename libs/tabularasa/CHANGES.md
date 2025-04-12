@@ -1,3 +1,7 @@
+### 0.10.1
+
+- Fix bug in use of `numpy.dtypes`, which does not exist in numpy\<1.25.
+
 ## 0.10.0
 
 - `requires-python>=3.10`.
