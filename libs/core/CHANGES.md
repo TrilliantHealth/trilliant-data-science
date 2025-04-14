@@ -1,9 +1,3 @@
-## 1.34.20250408
-
-- Fixes bug in `core.source.SourceTree` when `SourceTree.sources` contains only one `Source` - in that
-  event, we want the single file's parent directory, not the file itself as the logical root.
-- Adds `source.tree_from_directory(dirpath: str | os.PathLike) -> SourceTree` function.
-
 ## 1.34
 
 - `requires-python>=3.9`.
@@ -64,7 +58,7 @@
 ## 1.27
 
 - Add `ThdsJsonFormatter` and `ThdsLogfmter` (which is based on
-  <https://github.com/jteppinette/python-logfmter/tree/main>) so that we can have more parsable and
+  https://github.com/jteppinette/python-logfmter/tree/main) so that we can have more parsable and
   queryable logs in production. Use `THDS_CORE_LOG_FORMAT` to configure.
 
 ## 1.26.20240905
