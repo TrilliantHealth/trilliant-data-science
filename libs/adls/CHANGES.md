@@ -1,3 +1,7 @@
+## 3.3
+
+- `requires-python>=3.9`.
+
 ## 3.2
 
 - Adds `adls.source_tree.from_path(<adls_uri_or_fqn>)` so that we can determinstically represent
