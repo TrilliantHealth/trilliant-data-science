@@ -1,3 +1,7 @@
+## 1.34
+
+- `requires-python>=3.9`.
+
 ## 1.33
 
 - `calgitver.calgitver()` is now `lru_cached`. Which is to say, it is no longer possible to have an
