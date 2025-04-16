@@ -1,3 +1,7 @@
+## 1.35
+
+- Remove patch version from core.
+
 ### 1.34.20250415
 
 - Fixes a bug in `timer.Timer` where `secs_per_call` was erroneously being divided by 60, and ensured
