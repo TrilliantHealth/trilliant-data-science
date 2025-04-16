@@ -1,8 +1,3 @@
-### 1.35.20250416
-
-- Adds util function to `cpus` that returns `4` if `"CI" in os.environ`, and otherwise returns
-  `available_cpu_count()`
-
 ## 1.35
 
 - Remove patch version from core.
