@@ -1,4 +1,13 @@
-## 1.34.20250408
+## 1.35
+
+- Remove patch version from core.
+
+### 1.34.20250415
+
+- Fixes a bug in `timer.Timer` where `secs_per_call` was erroneously being divided by 60, and ensured
+  that `calls` was incremented when using the context manager method for time tracking.
+
+### 1.34.20250408
 
 - Fixes bug in `core.source.SourceTree` when `SourceTree.sources` contains only one `Source` - in that
   event, we want the single file's parent directory, not the file itself as the logical root.
