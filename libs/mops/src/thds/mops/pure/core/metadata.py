@@ -176,11 +176,8 @@ def parse_result_metadata(metadata_keyvals: ty.Sequence[str]) -> ResultMetadata:
     """
 
     def to_arg(kv: str) -> str:
-        try:
-            key, value = kv.split("=", 1)
-            return f"--{key.replace('_', '-')}={value}"
-        except ValueError:
-            raise ValueError(f"Unable to parse metadata key-value pair {kv}. Must be key=value.")
+        key, value = kv.split("=", 1)
+        return f"--{key.replace('_', '-')}={value}"
 
     metadata = result_metadata_parser().parse_args([to_arg(kv) for kv in metadata_keyvals if kv])
     return ResultMetadata(**vars(metadata))

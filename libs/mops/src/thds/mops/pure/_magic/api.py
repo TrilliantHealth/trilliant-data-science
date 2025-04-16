@@ -48,9 +48,8 @@ class _MagicApi:
         *,
         blob_root: uris.UriResolvable = "",
         pipeline_id: str = "",
-        calls: ty.Collection[ty.Callable] = tuple(),
     ) -> ty.Callable[[ty.Callable[P, R]], sauce.Magic[P, R]]:
-        return sauce.make_magic(_get_config(), shim_or_builder, blob_root, pipeline_id, calls)
+        return sauce.make_magic(_get_config(), shim_or_builder, blob_root, pipeline_id)
 
     @staticmethod
     def deco(
