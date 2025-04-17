@@ -317,9 +317,18 @@ def _set_md5_if_missing(
 def _excs_to_retry() -> ty.Callable[[Exception], bool]:
     """These are exceptions that we observe to be spurious failures worth retrying."""
     return fretry.is_exc(
-        aiohttp.http_exceptions.ContentLengthError,
-        aiohttp.client_exceptions.ClientPayloadError,
-        aiohttp.client_exceptions.SocketTimeoutError,
+        *list(
+            filter(
+                None,
+                (
+                    aiohttp.http_exceptions.ContentLengthError,
+                    aiohttp.client_exceptions.ClientPayloadError,
+                    getattr(
+                        aiohttp.client_exceptions, "SocketTimeoutError", None
+                    ),  # not present in aiohttp < 3.10 - Databricks installs 3.8.
+                ),
+            )
+        )
     )
 
 
