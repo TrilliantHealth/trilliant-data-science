@@ -93,8 +93,15 @@ class SourceTree(os.PathLike):
                     )
                 )
             ]
-            local_logical_root = Path(logical_root.find(map(str, local_paths), self.higher_logical_root))
-            assert local_logical_root.is_dir()
+
+            if len(local_paths) == 1:
+                local_logical_root = local_paths[0].parent.resolve()
+            else:
+                local_logical_root = Path(
+                    logical_root.find(map(str, local_paths), self.higher_logical_root)
+                )
+                assert local_logical_root.is_dir()
+
             if not dest_dir:
                 return local_logical_root
 
