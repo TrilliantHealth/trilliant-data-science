@@ -12,6 +12,7 @@ from azure.storage.filedatalake import (
     DataLakeFileClient,
     FileProperties,
     FileSystemClient,
+    aio,
 )
 
 from thds.core import fretry, log, scope, tmp
@@ -380,7 +381,7 @@ def download_or_use_verified(
 
 @_dl_scope.bound
 async def async_download_or_use_verified(
-    fs_client: FileSystemClient,
+    fs_client: aio.FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
     md5b64: str = "",
