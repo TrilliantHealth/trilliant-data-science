@@ -12,6 +12,7 @@ from azure.storage.filedatalake import (
     DataLakeFileClient,
     FileProperties,
     FileSystemClient,
+    aio,
 )
 
 from thds.core import fretry, log, scope, tmp
@@ -317,9 +318,18 @@ def _set_md5_if_missing(
 def _excs_to_retry() -> ty.Callable[[Exception], bool]:
     """These are exceptions that we observe to be spurious failures worth retrying."""
     return fretry.is_exc(
-        aiohttp.http_exceptions.ContentLengthError,
-        aiohttp.client_exceptions.ClientPayloadError,
-        aiohttp.client_exceptions.SocketTimeoutError,
+        *list(
+            filter(
+                None,
+                (
+                    aiohttp.http_exceptions.ContentLengthError,
+                    aiohttp.client_exceptions.ClientPayloadError,
+                    getattr(
+                        aiohttp.client_exceptions, "SocketTimeoutError", None
+                    ),  # not present in aiohttp < 3.10 - Databricks installs 3.8.
+                ),
+            )
+        )
     )
 
 
@@ -371,7 +381,7 @@ def download_or_use_verified(
 
 @_dl_scope.bound
 async def async_download_or_use_verified(
-    fs_client: FileSystemClient,
+    fs_client: aio.FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
     md5b64: str = "",
