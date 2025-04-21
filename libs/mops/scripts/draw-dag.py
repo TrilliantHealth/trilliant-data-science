@@ -12,6 +12,7 @@ import sys
 import typing as ty
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import hjson  # type: ignore
 import networkx as nx  # type: ignore
@@ -30,7 +31,8 @@ def load_all_log_entries(log_dir: Path) -> ty.List[run_summary.LogEntry]:
 
 
 def create_dag(
-    log_entries: ty.List[run_summary.LogEntry], xform_node_name: ty.Callable[[str], str]
+    log_entries: ty.List[run_summary.LogEntry],
+    xform_node_name: ty.Callable[[str], str],
 ) -> nx.DiGraph:
     g = nx.DiGraph()
     # each log entry file is a node - we use the function_name as the node name.  the
@@ -75,6 +77,46 @@ def create_dag(
     for node in g.nodes():
         g.nodes[node]["label"] = xform_node_name(node)
 
+    return g
+
+
+def add_edges(edges_to_add: ty.Collection[ty.Sequence[str]], g: nx.DiGraph) -> nx.DiGraph:
+    for edge in edges_to_add:
+        if len(edge) != 2:
+            raise ValueError(f"Invalid edge: {edge}. Must be a pair of node names.")
+        g.add_edge(edge[0], edge[1])
+    return g
+
+
+class SubgraphConfig(ty.TypedDict):
+    name: str
+    patterns: list[str]
+    parent: ty.Optional[str]
+    fillcolor: str
+
+
+def apply_subgraph_config(subgraph_config: ty.Mapping[str, SubgraphConfig], g: nx.DiGraph) -> nx.DiGraph:
+    for node in g.nodes():
+        for sg in subgraph_config.values():
+            if any(re.match(p, node) for p in sg["patterns"]):
+                g.nodes[node]["subgraph"] = sg["name"]
+                g.nodes[node]["fillcolor"] = sg["fillcolor"]
+                break
+    return g
+
+
+class Coordinates(ty.TypedDict):
+    x: float
+    y: float
+
+
+def apply_fixed_coordinates(
+    fixed_coordinates: ty.Mapping[str, Coordinates], g: nx.DiGraph
+) -> nx.DiGraph:
+    for node, coords in fixed_coordinates.items():
+        g.nodes[node]["x"] = coords["x"]
+        g.nodes[node]["y"] = coords["y"]
+        g.nodes[node]["fixed"] = True
     return g
 
 
@@ -279,6 +321,157 @@ def graphviz_render(
         return False
 
 
+def nx_to_echarts_graph(
+    graph: nx.DiGraph,
+    *,  # Enforces keyword-only arguments after this
+    default_symbol_size: int = 20,
+    tooltip_formatter: str = "",
+    force_config: ty.Optional[dict[str, Any]] = None,
+    default_category_name: str = "Other",
+    default_category_color: str = "#cccccc",
+) -> dict[str, ty.Any]:
+    """
+    Converts a NetworkX DiGraph into an ECharts graph option dictionary,
+    dynamically discovering categories from node attributes.
+
+    Args:
+        graph: The input NetworkX DiGraph. Nodes are expected to potentially
+               have 'subgraph' (str), 'fillcolor' (str), 'label' (str),
+               'x', 'y', and 'fixed' attributes.
+        default_symbol_size: The default size for graph nodes.
+        tooltip_formatter: A JavaScript function string for custom tooltips.
+                           An empty string uses the ECharts default formatter.
+        force_config: Optional dictionary for ECharts 'force' layout settings
+                      (e.g., {"repulsion": 180, "edgeLength": 80}).
+
+    Returns:
+        A dictionary representing the ECharts option object suitable for
+        JSON serialization or direct use in a JS environment.
+    """
+
+    echarts_nodes: list[dict[str, Any]] = []
+    echarts_links: list[dict[str, str]] = []
+    discovered_categories: dict[str, dict[str, Any]] = {}  # name -> {index: int, color: str}
+    category_name_list: list[str] = []
+    next_category_index = 0
+
+    # --- Discover Categories and Prepare Nodes ---
+    has_default_category = False
+    for node_id, attrs in graph.nodes(data=True):
+        subgraph_name = attrs.get("subgraph")
+        node_category_index: int
+
+        if subgraph_name:
+            if subgraph_name not in discovered_categories:
+                # First time seeing this subgraph, assign index and color
+                fill_color = attrs.get("fillcolor", default_category_color)
+                discovered_categories[subgraph_name] = {
+                    "index": next_category_index,
+                    "color": fill_color,
+                }
+                category_name_list.append(subgraph_name)
+                node_category_index = next_category_index
+                next_category_index += 1
+            else:
+                # Existing subgraph
+                node_category_index = discovered_categories[subgraph_name]["index"]
+        else:
+            # Node belongs to the default category
+            if not has_default_category:
+                # Create the default category if it doesn't exist yet
+                discovered_categories[default_category_name] = {
+                    "index": next_category_index,
+                    "color": default_category_color,
+                }
+                category_name_list.append(default_category_name)
+                node_category_index = next_category_index
+                next_category_index += 1
+                has_default_category = True
+            else:
+                # Default category already exists
+                node_category_index = discovered_categories[default_category_name]["index"]
+
+        # --- Create Echarts Node Entry ---
+        node_entry: dict[str, Any] = {
+            "id": node_id,
+            "name": attrs.get("label", node_id),  # Use label if present, else ID
+            "category": node_category_index,
+            "symbolSize": attrs.get("symbolSize", default_symbol_size),
+        }
+        # Add optional positional hints or fixed status
+        if "x" in attrs:
+            node_entry["x"] = attrs["x"]
+        if "y" in attrs:
+            node_entry["y"] = attrs["y"]
+        if attrs.get("fixed", False):  # Check if 'fixed' attribute is True
+            node_entry["fixed"] = True
+
+        echarts_nodes.append(node_entry)
+
+    # --- Build Echarts Categories list ---
+    echarts_categories: list[dict[str, Any]] = [{} for _ in range(next_category_index)]
+    for name, cat_data in discovered_categories.items():
+        echarts_categories[cat_data["index"]] = {"name": name, "itemStyle": {"color": cat_data["color"]}}
+
+    # --- Process Edges ---
+    for u, v in graph.edges():
+        # Assume all nodes u, v exist in the graph and were processed.
+        # If graph integrity is not guaranteed, add checks here.
+        echarts_links.append({"source": u, "target": v})
+
+    # --- Assemble ECharts Option Structure ---
+    tooltip_config: dict[str, Any] = {
+        "enterable": True,  # Important for clickable links
+        "triggerOn": "mousemove|click",
+        "leaveDelay": 100,
+    }
+    # Only set formatter if it's not empty, otherwise let ECharts use default
+    if tooltip_formatter:
+        tooltip_config["formatter"] = tooltip_formatter
+
+    # Default force layout if none provided
+    final_force_config = force_config or {
+        "repulsion": 300,
+        # "edgeLength": 40,
+        "gravity": 0.05,
+        "layoutAnimation": False,
+        "friction": 1.5,
+    }
+
+    echarts_option: dict[str, Any] = {
+        "tooltip": tooltip_config,
+        "legend": [{"data": category_name_list}],  # Use discovered names
+        "series": [
+            {
+                "type": "graph",
+                "layout": "force",
+                "animation": True,
+                "roam": True,
+                "draggable": True,
+                "label": {
+                    "show": True,
+                    "position": "bottom",  # Position of the label
+                    "formatter": "{b}",  # Use node name ('label' or ID)
+                },
+                "edgeSymbol": ["none", "arrow"],
+                "edgeSymbolSize": 10,
+                "focusNodeAdjacency": True,
+                "categories": echarts_categories,  # Use discovered categories
+                "data": echarts_nodes,
+                "links": echarts_links,
+                "force": final_force_config,
+            }
+        ],
+    }
+
+    return echarts_option
+
+
+def save_echart_json(echart_option: dict) -> None:
+    with open("echart_graph.json", "w") as f:
+        json.dump(echart_option, f, indent=4)
+
+
 def xform_node_name(name: str) -> str:
     if name.startswith("thds."):
         name = name[5:]
@@ -289,7 +482,7 @@ def xform_node_name(name: str) -> str:
     return f"{module}\n{function_name}({args})"
 
 
-def is_uninteresting_regexes(regexes: ty.List[str]) -> ty.Callable[[Node], bool]:
+def is_uninteresting_regexes(regexes: list[str]) -> ty.Callable[[Node], bool]:
     def is_uninteresting(node: Node) -> bool:
         for regex in regexes:
             if re.match(regex, node):
@@ -303,6 +496,8 @@ def create_and_visualize_dag(
     run_dir: Path,
     remove_nodes: list[str],
     subgraph_config: dict,
+    fixed_coordinates: ty.Mapping[str, Coordinates],
+    edges_to_add: ty.Collection[ty.Sequence[str]],
 ) -> None:
     dag = create_dag(load_all_log_entries(auto_find_run_directory(run_dir)), xform_node_name)
     if remove_nodes:
@@ -310,8 +505,22 @@ def create_and_visualize_dag(
             is_uninteresting_regexes(remove_nodes),
             dag,
         )
+    dag = add_edges(edges_to_add, dag)
+    dag = apply_subgraph_config(subgraph_config, dag)
+    if fixed_coordinates:
+        dag = apply_fixed_coordinates(fixed_coordinates, dag)
     try:
-        dagviz_render(dag) or graphviz_render(dag, subgraph_config) or pyvis_render(dag)
+        save_echart_json(nx_to_echarts_graph(dag))
+        next(
+            filter(
+                None,
+                (
+                    dagviz_render(dag),
+                    graphviz_render(dag, subgraph_config),
+                    pyvis_render(dag),
+                ),
+            )
+        )
     except Exception:
         print(nx.find_cycle(dag))
 
@@ -334,6 +543,8 @@ def main():
         args.run_dir,
         config.get("remove_nodes") or list(),
         {sg["name"]: sg for sg in config.get("subgraphs") or list()},
+        config.get("fixed") or dict(),
+        config.get("add_edges") or list(),
     )
 
 
