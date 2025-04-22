@@ -128,10 +128,6 @@ def barbaz():
    ...
 ----
 +
-If link:./calls.adoc[your function calls another memoized function], you will need to use
-the `calls=[...]` API to make sure that changes to the inner `function-logic-key`
-invalidate calls to the outer function.
-+
 Function logic keys MUST NOT contain spaces - any whitespace character will be interpreted as the end
 of the key.
 +
