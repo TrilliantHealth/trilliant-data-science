@@ -1320,7 +1320,7 @@ dev = [
 
 [[package]]
 name = "thds-mops"
-version = "3.8"
+version = "3.7"
 source = { editable = "." }
 dependencies = [
     { name = "ansicolors" },
