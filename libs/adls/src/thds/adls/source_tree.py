@@ -1,7 +1,7 @@
 import typing as ty
 from dataclasses import dataclass
 
-from azure.storage.blob import ContainerClient
+from azure.storage.blob import BlobProperties, ContainerClient
 
 from thds.core import hashing
 from thds.core.source.tree import SourceTree
@@ -16,6 +16,18 @@ class BlobMeta:
     md5: ty.Optional[hashing.Hash]
 
 
+def to_blob_meta(blob_props: BlobProperties) -> BlobMeta:
+    return BlobMeta(
+        blob_props.name,
+        blob_props.size,
+        (
+            hashing.Hash("md5", bytes(blob_props.content_settings.content_md5))
+            if blob_props.content_settings.content_md5
+            else None
+        ),
+    )
+
+
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.containerclient?view=azure-python#azure-storage-blob-containerclient-list-blobs
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobproperties?view=azure-python
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.contentsettings?view=azure-python
@@ -24,19 +36,11 @@ def list_blob_meta(
 ) -> ty.List[BlobMeta]:
     """Gets the path (relative to the SA/container root), size, and MD5 hash of all blobs in a directory."""
     return [
-        BlobMeta(
-            blob_props.name,  # type: ignore
-            blob_props.size,  # type: ignore
-            (
-                hashing.Hash("md5", bytes(blob_props.content_settings.content_md5))
-                if blob_props.content_settings.content_md5
-                else None
-            ),
-        )
+        to_blob_meta(blob_props)
         for blob_props in container_client.list_blobs(name_starts_with=root_dir)
-        if blob_props.size > 0  # type: ignore
+        if blob_props.size > 0
         # container client lists directories as blobs with size 0
-        and blob_props.name.endswith(match_suffix)  # type: ignore
+        and blob_props.name.endswith(match_suffix)
     ]
 
 
