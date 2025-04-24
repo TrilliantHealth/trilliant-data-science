@@ -79,3 +79,7 @@ def available_cpu_count() -> int:
         f"CPU count: {cpu_count}"
     )
     return min(cpu_shares, cpu_count)
+
+
+def ci_sensitive_cpu_count(default_num_workers_for_ci: int = 4) -> int:
+    return default_num_workers_for_ci if "CI" in os.environ else available_cpu_count()
