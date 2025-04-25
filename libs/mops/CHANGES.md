@@ -1,3 +1,8 @@
+### 3.8.20250425
+
+- Fix incompatibility with Python 3.12+ because of backward-incompatible change made by
+  `importlib.metadata` in Python 3.12.
+
 ## 3.8
 
 - Adds `calls` API to `pure.magic` and `MemoizingPicklingRunner`, which serves as a way to have inner
