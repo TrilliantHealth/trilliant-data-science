@@ -147,6 +147,7 @@ from ..pipeline_id_mask import (
     pipeline_id_mask,
 )
 from ..uris import lookup_blob_store
+from . import calls
 from .unique_name_for_function import make_unique_name_including_docstring_key, parse_unique_name
 
 
@@ -227,6 +228,7 @@ class MemoUriComponents(ty.NamedTuple):
     function_module: str
     function_name: str
     function_logic_key: str
+    calls_functions: ty.List[str]
     args_hash: str
 
 
@@ -247,8 +249,12 @@ def parse_memo_uri(
 
     runner_prefix = runner_prefix.rstrip(separator)
     rest, args_hash = memo_uri.rsplit(separator, 1)  # args hash is last component
-    rest, full_function_name = rest.rsplit(separator, 1)
-    pipeline_id = rest[len(runner_prefix) :]
+
+    remaining_prefix, full_function_name, calls_functions = calls.split_off_calls_strings(
+        rest, separator
+    )
+
+    pipeline_id = remaining_prefix[len(runner_prefix) :]
     pipeline_id = pipeline_id.strip(separator)
 
     function_parts = parse_unique_name(full_function_name)
@@ -259,6 +265,7 @@ def parse_memo_uri(
         function_parts.module,
         function_parts.name,
         function_parts.function_logic_key,
+        calls_functions,
         args_hash,
     )
 
