@@ -88,7 +88,7 @@ def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
     # non-pickle metadata and embedding it at the beginning of the file.
     first_pickle_pos = full_bytes.find(b"\x80")
     if first_pickle_pos == -1:
-        raise ValueError("Unable to find a pickle in the bytes")
+        raise ValueError(f"Unable to find a pickle in bytes of length {len(full_bytes)}")
     return (
         full_bytes[:first_pickle_pos],
         CallableUnpickler(io.BytesIO(full_bytes[first_pickle_pos:])).load(),
@@ -102,7 +102,10 @@ def make_read_header_and_object(
     type_hint: str, xf_header: ty.Optional[ty.Callable[[bytes], H]] = None
 ) -> ty.Callable[[str], ty.Tuple[H, ty.Any]]:
     def read_object(uri: str) -> ty.Tuple[H, ty.Any]:
-        header, unpickled = read_partial_pickle(get_bytes(uri, type_hint=type_hint))
+        uri_bytes = get_bytes(uri, type_hint=type_hint)
+        if not uri_bytes:
+            raise ValueError(f"{uri} exists but is empty - something is very wrong.")
+        header, unpickled = read_partial_pickle(uri_bytes)
         return (xf_header or (lambda h: h))(header), unpickled  # type: ignore
 
     return read_object
