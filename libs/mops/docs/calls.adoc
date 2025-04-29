@@ -1,0 +1,67 @@
+link:../README.adoc[↑]
+
+= calls=[...]
+
+When memoizing results, there are two things that can change - the code, or the
+data. ``mops``'s `MemoizingPicklingRunner` tracks changes to your data without further
+effort because your function arguments are serialized and can then be hashed. Tracking
+changes to code requires developer input - you set a `function-logic-key` in the function
+docstring whenever you make a change - a good pattern for this is an opaque date plus a
+descriptive string, e.g. `250420-fooed-the-bar`.
+
+But what if your memoized function calls _another_ memoized function? Should they both
+share the same function-logic-key? Do you need to remember to update it in both places
+each time? What if your function calls _multiple_ other functions? Some of which might be
+called by other functions - must we invalidate everything all at once?
+
+NOTE: Nested memoization is in some ways an antipattern. In the common case where you're running
+on cloud infrastructure, you're going to be paying for the outer worker to do nothing but
+_wait_ for the inner workers. This is inefficient to a degree proportional to `wait_time *
+fraction_of_resources_consumed_by_outer_worker`. In many cases, if you can instead use a
+flattened structure, where the link:orchestrator.adoc[orchestrator] launches your inner
+job(s), and then calls a follow-up function to process those results, you will have better
+efficiency and a cleaner overall flow for your system. However, there may be cases where
+the tradeoff makes sense for your use case. Consider asking for design advice if you are
+faced with a situation that seems to call for nested memoized functions.
+
+`mops` offers the `calls=[...]` API, which allows you to specify that an outer
+function will call an inner function (or functions). The inner function name and
+function-logic-key becomes part of the `memo_uri` for your outer function. This way, the
+cached results for both the inner and outer functions can be invalidated by a change to
+the inner logic key.
+
+When using `pure.magic`, the API looks like this:
+
+[source,python]
+----
+@pure.magic()
+def _internal_quux_func(...):
+    """
+    function-logic-key: 250420-improvements
+    """
+    ...
+
+
+@pure.magic(
+    calls=[_internal_quux_func]
+)
+def foo_the_bar(...) -> Sthing:
+    ...
+    _internal_quux_func(...)
+    ...
+----
+
+When using `MemoizingPicklingRunner` directly, you'll need to register the functions on
+the same Runner that will be handling your function call:
+
+[source,python]
+----
+_MPR = MemoizingPicklingRunner(...)
+
+@pure.use_runner(_MPR)
+def foo_the_bar(...) -> Sthing:
+    _internal_quux_func(...)
+    ...
+
+_MPR.calls(foo_the_bar, _internal_quux_func)
+----
