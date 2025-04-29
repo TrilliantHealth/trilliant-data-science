@@ -6,7 +6,10 @@ See runner.local.py for the core runner implementation.
 """
 
 import typing as ty
+from collections import defaultdict
 from functools import partial
+
+from typing_extensions import Self
 
 from thds.core import cache, log
 from thds.core.stack_context import StackContext
@@ -94,6 +97,23 @@ class MemoizingPicklingRunner:
 
         self._run_directory = run_summary.create_mops_run_directory()
 
+        self._calls_registry: dict[ty.Callable, list[ty.Callable]] = defaultdict(list)
+
+    def calls(self, caller: ty.Callable, *callees: ty.Callable) -> Self:
+        """Register that the first Callable calls the provided Callables(s).
+
+        This is (currently) used to ensure that function-logic-keys on the callees affect
+        the memoization of the caller. Callees that do not have a function-logic-key will
+        be ignored for this purpose; however there are no known reasons why your
+        underlying Callable should not have a function-logic-key, unless it has never been
+        modified since its creation.
+
+        The interface is more general and could in theory be used for other purposes in
+        the future.
+        """
+        self._calls_registry[caller].extend(callees)
+        return self  # returns self mainly to faciliate use with use_runner.
+
     def shared(self, *objs: ty.Any, **named_objs: ty.Any) -> None:
         """Set up memoizing pickle serialization for these objects.
 
@@ -162,6 +182,7 @@ class MemoizingPicklingRunner:
                 self._wrap_shim_builder,
                 _pickle.read_metadata_and_object,
                 self._run_directory,
+                self._calls_registry,
             )(
                 self._rerun_exceptions,
                 memo.make_function_memospace(
