@@ -148,7 +148,7 @@ def is_variadic_tuple_type(type_: Type) -> bool:
 
 
 def is_builtin_type(type_: Type) -> bool:
-    return getattr(type_, "__module__", None) == "builtins"
+    return getattr(type_, "__module__", None) == "builtins" and not get_args(type_)
 
 
 def concrete_constructor(type_: Type[T]) -> Callable[..., T]:

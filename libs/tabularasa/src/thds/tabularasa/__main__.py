@@ -14,6 +14,7 @@ from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tu
 import networkx as nx
 import pkg_resources
 
+from thds.core import parallel
 from thds.tabularasa.data_dependencies.adls import (
     ADLSFileIntegrityError,
     ADLSFileSystem,
@@ -852,7 +853,12 @@ class ReferenceDataManager:
             return True
 
     def sync_blob_store(
-        self, *, up: bool = False, down: bool = False, no_fail_if_absent: bool = False
+        self,
+        *,
+        up: bool = False,
+        down: bool = False,
+        no_fail_if_absent: bool = False,
+        tables: Optional[Set[str]] = None,
     ) -> List[str]:
         """Sync the local built files to the remote blob store, if one is defined.
         It is assumed that the hashes in the schema file are the source of truth rather than the hashes
@@ -866,6 +872,7 @@ class ReferenceDataManager:
         :param no_fail_if_absent: when passed, don't fail an upload for lack of a local file being
           present with the expected hash for a version-controlled table. This is useful in development
           workflows where you just want to regenerate/sync a particular table that you've updated.
+        :param tables: optional collection of table names to sync; all will be synced if not passed.
         :return: list of table names that were synced successfully
         :raises FileNotExistsError: if a local or remote file was not available for sync
         """
@@ -878,18 +885,28 @@ class ReferenceDataManager:
         if not (down or up):
             raise ValueError("Must indicate syncing either down, up, or both from blob store")
 
-        self.logger.info(
-            f"Syncing with remote blob store {blob_store.adls_account}/{blob_store.adls_filesystem}"
-        )
-        synced = []
-        failed = []
+        tables_to_sync = []
         for table in self.schema.build_time_package_tables:
             if table.md5 is None:
                 self.logger.warning(
                     f"No md5 hash defined for package table {table.name}; no remote blob to sync to or from"
                 )
-                continue
+            else:
+                tables_to_sync.append(table)
 
+        if tables is not None:
+            known_tables = {t.name for t in tables_to_sync}
+            if unknown_tables := tables.difference(known_tables):
+                msg = f"Can't sync unknown or non-version-controlled tables: {', '.join(unknown_tables)}"
+                self.logger.error(msg)
+                raise KeyError(msg)
+            tables_to_sync = [t for t in tables_to_sync if t.name in tables]
+
+        self.logger.info(
+            f"Syncing with remote blob store {blob_store.adls_account}/{blob_store.adls_filesystem}"
+        )
+
+        def inner(table: metaschema.Table) -> Optional[str]:
             sync_data = self.table_sync_data(table)
             local_file_md5 = sync_data.local_file_md5()
             if local_file_md5 == table.md5:
@@ -899,12 +916,12 @@ class ReferenceDataManager:
                 )
                 if up:
                     if self.sync_up(sync_data):
-                        synced.append(table.name)
+                        return table.name
                     else:
-                        failed.append(table.name)
+                        raise IOError(table.name)
                 else:
                     # file is present locally with expected hash; no need to sync down
-                    synced.append(table.name)
+                    return table.name
             else:
                 # check remote; download to get hash and link if good
                 addendum = "" if local_file_md5 is None else f" matching expected hash {table.md5}"
@@ -913,15 +930,23 @@ class ReferenceDataManager:
                     self.logger.info(
                         f"Skipping sync to remote blob store of local file for table {table.name}"
                     )
-                    continue
+                    return None
 
                 # only link the downloaded file into the build dir if we're syncing down; else just download
                 # the file to check that it has the correct hash
                 success = self.sync_down(sync_data, link_build=down)
                 if success:
-                    synced.append(table.name)
+                    return table.name
                 else:
-                    failed.append(table.name)
+                    raise IOError(table.name)
+
+        failed: List[str] = []
+        synced: List[str] = []
+        for table_name, res in parallel.yield_all([(t.name, partial(inner, t)) for t in tables_to_sync]):
+            if isinstance(res, parallel.Error):
+                failed.append(table_name)
+            elif res is not None:
+                synced.append(table_name)
 
         if failed:
             raise RuntimeError(f"Sync failed for tables {', '.join(failed)}")
@@ -937,12 +962,13 @@ class ReferenceDataManager:
             else ""
         )
         addendum = f"{down_} and {up_}" if down and up else down_ or up_
-        self.logger.info(f"Success - all build-time package data tables synced {addendum}")
+        tables_ = f" {', '.join(tables)}" if tables else ""
+        self.logger.info(f"Success - build-time package data tables{tables_} synced {addendum}")
         return synced
 
-    def pull(self):
+    def pull(self, tables: Optional[Set[str]] = None):
         """Download all remote blobs to the local data directory, with integrity checks."""
-        self.sync_blob_store(down=True)
+        self.sync_blob_store(down=True, tables=tables)
 
     def push(self, no_fail_if_absent: bool = False):
         """Upload all local data files to the remote blob store, with integrity checks.

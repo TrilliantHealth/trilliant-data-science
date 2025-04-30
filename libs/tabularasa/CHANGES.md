@@ -1,3 +1,8 @@
+### 0.11.0
+
+- `tabularasa pull` and `tabularasa sync-blob-store` now both accept optional `--tables` to allow for
+  syncing only a subset of tables, and use multithreading for parallel I/O operations.
+
 ### 0.10.1
 
 - Fix bug in use of `numpy.dtypes`, which does not exist in numpy\<1.25.
