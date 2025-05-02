@@ -80,7 +80,7 @@ def gimme_bytes(pickle_dump: ty.Callable[[object, ty.IO], None], obj: object) ->
         return bio.read()
 
 
-def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
+def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, bytes]:
     # in order to be forward-compatible with v3 of mops, we're introducing a new
     # wrinkle in the read. Instead of assuming that the data at the URI
     # _begins_ with a pickle, we are looking for the first possible pickle
@@ -89,10 +89,11 @@ def read_partial_pickle(full_bytes: bytes) -> ty.Tuple[bytes, ty.Any]:
     first_pickle_pos = full_bytes.find(b"\x80")
     if first_pickle_pos == -1:
         raise ValueError(f"Unable to find a pickle in bytes of length {len(full_bytes)}")
-    return (
-        full_bytes[:first_pickle_pos],
-        CallableUnpickler(io.BytesIO(full_bytes[first_pickle_pos:])).load(),
-    )
+    return full_bytes[:first_pickle_pos], full_bytes[first_pickle_pos:]
+
+
+def _unpickle_with_callable(pickle_bytes: bytes) -> ty.Any:
+    return CallableUnpickler(io.BytesIO(pickle_bytes)).load()
 
 
 H = ty.TypeVar("H")
@@ -105,8 +106,8 @@ def make_read_header_and_object(
         uri_bytes = get_bytes(uri, type_hint=type_hint)
         if not uri_bytes:
             raise ValueError(f"{uri} exists but is empty - something is very wrong.")
-        header, unpickled = read_partial_pickle(uri_bytes)
-        return (xf_header or (lambda h: h))(header), unpickled  # type: ignore
+        header, first_pickle = read_partial_pickle(uri_bytes)
+        return (xf_header or (lambda h: h))(header), _unpickle_with_callable(first_pickle)  # type: ignore
 
     return read_object
 
