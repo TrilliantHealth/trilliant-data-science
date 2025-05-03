@@ -12,6 +12,9 @@ dependencies = [
     "azure-identity",
     "azure-storage-file-datalake",
     "cachetools",
+    "importlib_metadata>=3.6 ; python_version < '3.10'",
+    # importlib.metadata made evil backward-incompatible changes to their API in 3.12, so
+    # we're 'failing forward' to those changes, but we still need a way to use that API in 3.9.
     "tblib~=2.0",
     "thds-adls",
     "thds-core",
