@@ -654,6 +654,18 @@ wheels = [
 ]
 
 [[package]]
+name = "importlib-metadata"
+version = "8.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "zipp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/08/c1395a292bb23fd03bdf572a1357c5a733d3eecbab877641ceacab23db6e/importlib_metadata-8.6.1.tar.gz", hash = "sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580", size = 55767 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/9d/0fb148dc4d6fa4a7dd1d8378168d9b4cd8d4560a6fbf6f0121c5fc34eb68/importlib_metadata-8.6.1-py3-none-any.whl", hash = "sha256:02a89390c1e15fdfdc0d7c6b25cb3e62650d0494005c97d6f148bf5b9787525e", size = 26971 },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1328,6 +1340,7 @@ dependencies = [
     { name = "azure-identity" },
     { name = "azure-storage-file-datalake" },
     { name = "cachetools" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "tblib" },
     { name = "thds-adls" },
     { name = "thds-core" },
@@ -1360,6 +1373,7 @@ requires-dist = [
     { name = "azure-identity" },
     { name = "azure-storage-file-datalake" },
     { name = "cachetools" },
+    { name = "importlib-metadata", marker = "python_full_version < '3.10'", specifier = ">=3.6" },
     { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=18.20,!=32.0.0" },
     { name = "tblib", specifier = "~=2.0" },
     { name = "thds-adls", editable = "../adls" },
@@ -1567,4 +1581,13 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/81/d5/6e0460292d6299ac3919945f912b16b104f4e81ab20bf53e0872a1296daf/yarl-1.18.3-cp39-cp39-win32.whl", hash = "sha256:ac36703a585e0929b032fbaab0707b75dc12703766d0b53486eabd5139ebadd5", size = 84833 },
     { url = "https://files.pythonhosted.org/packages/b2/fc/a8aef69156ad5508165d8ae956736d55c3a68890610834bd985540966008/yarl-1.18.3-cp39-cp39-win_amd64.whl", hash = "sha256:ba87babd629f8af77f557b61e49e7c7cac36f22f871156b91e10a6e9d4f829e9", size = 90968 },
     { url = "https://files.pythonhosted.org/packages/f5/4b/a06e0ec3d155924f77835ed2d167ebd3b211a7b0853da1cf8d8414d784ef/yarl-1.18.3-py3-none-any.whl", hash = "sha256:b57f4f58099328dfb26c6a771d09fb20dbbae81d20cfb66141251ea063bd101b", size = 45109 },
+]
+
+[[package]]
+name = "zipp"
+version = "3.21.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/50/bad581df71744867e9468ebd0bcd6505de3b275e06f202c2cb016e3ff56f/zipp-3.21.0.tar.gz", hash = "sha256:2c9958f6430a2040341a52eb608ed6dd93ef4392e02ffe219417c1b28b5dd1f4", size = 24545 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/1a/7e4798e9339adc931158c9d69ecc34f5e6791489d469f5e50ec15e35f458/zipp-3.21.0-py3-none-any.whl", hash = "sha256:ac1bbe05fd2991f160ebce24ffbac5f6d11d83dc90891255885223d42b3cd931", size = 9630 },
 ]
