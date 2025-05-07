@@ -5,6 +5,7 @@
 import os
 import subprocess as sp
 import typing as ty
+from functools import lru_cache
 from pathlib import Path
 
 from . import log
@@ -82,5 +83,6 @@ def get_commit_datetime_str(commit_hash: str, date_format: str = CALGITVER_NO_SE
     )
 
 
+@lru_cache(None)
 def get_repo_root() -> Path:
-    return Path(_simple_run(["git", "rev-parse", "--show-toplevel"]).strip())
+    return Path(_simple_run(["git", "rev-parse", "--show-toplevel"]))
