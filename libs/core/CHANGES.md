@@ -1,3 +1,8 @@
+### 1.35.20250507
+
+- Adds `core.git.get_repo_root() -> Path`, which returns an absolute Path to the repo-root on your local
+  machine
+
 ### 1.35.20250416
 
 - Adds util function to `cpus` that returns `4` if `"CI" in os.environ`, and otherwise returns
