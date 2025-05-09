@@ -36,6 +36,7 @@ if __name__ == "__main__":
         "mb",
         type=int,
         default=DEFAULT_MB,
+        required=False,
         help=f"The number of megabytes of random data to generate. (default: {DEFAULT_MB})",
     )
     args = parser.parse_args()
