@@ -1,4 +1,4 @@
-### 1.35.20250507
+### 1.36
 
 - Adds `core.git.get_repo_root() -> Path`, which returns an absolute Path to the repo-root on your local
   machine
