@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import atexit
 import os
 import random
 import secrets
@@ -7,6 +8,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from thds import adls
 from thds.core import log, source
 from thds.mops import pure
 
@@ -15,11 +17,12 @@ BYTES_PER_MB = 1024 * 1024
 DEFAULT_MB = 16
 
 
-@pure.magic("samethread")
+@pure.magic("samethread", blob_root=adls.AdlsRoot("thdsscratch", "tmp"))
 def random_bytes(seed: int, mb: int) -> source.Source:
     _LOGGER.info("Generating %d MB of random bytes with seed %d", mb, seed)
     random.seed(seed)
     path = Path(tempfile.mkdtemp()) / "random_bytes"
+    atexit.register(lambda: os.remove(path))
     _LOGGER.info("Writing %d MB of random bytes to %s", mb, path)
     with open(path, "wb") as f:
         for _ in range(mb):
@@ -53,5 +56,6 @@ if __name__ == "__main__":
     runtime = toc - tic
 
     print(
-        f"Generated {os.stat(src).st_size} random bytes at {src.path()} and memoized to ADLS in {runtime:.3f}s."
+        f"Generated {os.stat(src).st_size} random bytes at {src.path()} "
+        f"and memoized to ADLS in {runtime:.3f}s ({mb / runtime:.3f}MB/s)."
     )
