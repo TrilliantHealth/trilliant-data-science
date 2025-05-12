@@ -1,3 +1,7 @@
+### 0.11.1
+
+- internally uses `thds.core.git.get_repo_root()`
+
 ### 0.11.0
 
 - `tabularasa pull` and `tabularasa sync-blob-store` now both accept optional `--tables` to allow for

@@ -1,25 +1,12 @@
 import contextlib
-import itertools
 import os
 import subprocess
 import typing as ty
 from pathlib import Path
 
+from thds.core import git
+
 StrOrPath = ty.Union[str, os.PathLike]
-
-
-class NotAGitRepo(Exception):
-    pass
-
-
-def find_repo_root() -> Path:
-    """Traces up from the current path searching for the monorepo root based on the presence of '.repoconf/cofig'."""
-    origin = Path().resolve()
-    for path in itertools.chain([origin], origin.parents):
-        if (path / ".git").is_dir():
-            return path
-
-    raise NotAGitRepo(f"No .git/ dir was found on the search path of: {origin}.")
 
 
 def relative_to_root(path: StrOrPath) -> Path:
@@ -27,7 +14,7 @@ def relative_to_root(path: StrOrPath) -> Path:
     which case it's assumed to be relative to the current working directory. Note: paths which have
     already been relativized to the repo root should *not* be passed here - that will only be correct
     if the working directory *is* the repo root"""
-    return Path(path).resolve().relative_to(find_repo_root())
+    return Path(path).resolve().relative_to(git.get_repo_root())
 
 
 @contextlib.contextmanager
