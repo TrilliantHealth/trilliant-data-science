@@ -5,8 +5,10 @@
 import os
 import subprocess as sp
 import typing as ty
+from pathlib import Path
 
 from . import log
+from .lazy import lazy
 
 LOGGER = log.getLogger(__name__)
 CALGITVER_NO_SECONDS_FORMAT = "%Y%m%d.%H%M"
@@ -79,3 +81,8 @@ def get_commit_datetime_str(commit_hash: str, date_format: str = CALGITVER_NO_SE
         f"git log -n 1 --date=format-local:{date_format} --format=format:'%cd' {commit_hash}",
         env=dict(os.environ, TZ="UTC0"),
     )
+
+
+@lazy
+def get_repo_root() -> Path:
+    return Path(_simple_run(["git", "rev-parse", "--show-toplevel"]))
