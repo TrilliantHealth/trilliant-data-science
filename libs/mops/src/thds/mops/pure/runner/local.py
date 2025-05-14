@@ -127,7 +127,6 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     runner_prefix=function_memospace.split(pipeline_id)[0],
                     was_error=not isinstance(result, memo.results.Success),
                     return_value=value_t,
-                    args_kwargs=(args, kwargs),
                 )
 
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:

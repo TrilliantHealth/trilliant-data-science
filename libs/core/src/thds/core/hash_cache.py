@@ -12,7 +12,6 @@ functions themselves.
 
 import hashlib
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -84,4 +83,4 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
 def filehash(algo: str, pathlike: os.PathLike) -> Hash:
     """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
     of the hash algorithm used."""
-    return Hash(sys.intern(algo), hash_file(pathlike, hashlib.new(algo)))
+    return Hash(algo, hash_file(pathlike, hashlib.new(algo)))
