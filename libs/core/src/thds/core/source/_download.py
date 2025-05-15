@@ -3,6 +3,7 @@
 yet will not be downloaded (if non-local) until it is actually opened or unwrapped.
 """
 
+import sys
 import typing as ty
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from .. import log
 from ..files import is_file_uri, path_from_uri
 from ..hash_cache import filehash
 from ..hashing import Hash
+
+SHA256 = "sha256"  # this hopefully interns the string which makes sure that all our pickles reuse the reference
 
 
 class Downloader(ty.Protocol):
@@ -73,7 +76,7 @@ class SourceHashMismatchError(ValueError):
 
 
 def _check_hash(expected_hash: ty.Optional[Hash], path: Path) -> Hash:
-    hash_algo = expected_hash.algo if expected_hash else "sha256"
+    hash_algo = sys.intern(expected_hash.algo if expected_hash else SHA256)
     with log.logger_context(hash_for=f"source-{hash_algo}"):
         computed_hash = filehash(hash_algo, path)
     if expected_hash and expected_hash != computed_hash:

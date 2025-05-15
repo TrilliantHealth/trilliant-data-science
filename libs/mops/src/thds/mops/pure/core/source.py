@@ -33,6 +33,7 @@ have a Source object returned to it while it performs low-level deserialization.
 """
 
 import io
+import sys
 import typing as ty
 from functools import partial
 from pathlib import Path
@@ -174,7 +175,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
             partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri),
         )
 
-    return source_.hash
+    return hashing.Hash(algo=sys.intern(source_.hash.algo), bytes=source_.hash.bytes)
 
 
 def perform_source_uploads() -> None:  # has been replaced by a general work-deferring mechanism.
