@@ -122,11 +122,12 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     raise exc
             finally:
                 run_summary.log_function_execution(
-                    *(run_directory, func, memo_uri, result_and_itype.invoc_type),
+                    *(run_directory, memo_uri, result_and_itype.invoc_type),
                     metadata=metadata,
                     runner_prefix=function_memospace.split(pipeline_id)[0],
                     was_error=not isinstance(result, memo.results.Success),
                     return_value=value_t,
+                    args_kwargs=(args, kwargs),
                 )
 
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:
