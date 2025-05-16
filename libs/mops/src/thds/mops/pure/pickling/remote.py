@@ -9,7 +9,6 @@ from ..._utils.once import Once
 from ..core import lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
-from ..core.pipeline_id_mask import pipeline_id_mask
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, BlobStore, Kwargs, T
@@ -124,7 +123,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     def do_work_return_result() -> object:
         # ONLY failures in this code should transmit an EXCEPTION
         # back to the orchestrator side.
-        return pipeline_id_mask(invocation_metadata.pipeline_id)(func)(*args, **kwargs)
+        return func(*args, **kwargs)
 
     route_return_value_or_exception(
         _ResultExcWithMetadataChannel(

@@ -8,14 +8,18 @@ from functools import lru_cache
 
 from thds.core.stack_context import StackContext
 
-from .pipeline_id import get_pipeline_id
+from .pipeline_id import get_pipeline_id_for_stack
 
 _PIPELINE_ID_MASK = StackContext("PIPELINE_ID_MASK", "")
 
 
 def get_pipeline_id_mask() -> str:
-    """Returns the 'current' pipeline id, preferring a mask over the global."""
-    return _PIPELINE_ID_MASK() or get_pipeline_id()
+    """Returns the 'current' pipeline id, preferring:
+    - the mask
+    - the stack local
+    - the global
+    """
+    return _PIPELINE_ID_MASK() or get_pipeline_id_for_stack()
 
 
 @contextmanager
