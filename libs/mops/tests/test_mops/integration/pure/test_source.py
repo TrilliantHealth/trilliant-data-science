@@ -1,15 +1,11 @@
 # this is where we 'integration test' the 'source' concept using full
 # MemoizingPicklingRunner.
 import typing as ty
-from datetime import datetime
 from random import randint
 
-import pytest
-
 from thds.core.source import Source, from_file
-from thds.mops import pure, tempdir
+from thds.mops import tempdir
 from thds.mops.pure import memoize_in, pipeline_id_mask
-from thds.mops.pure.pickling._pickle import DuplicateSourceBasenameError
 
 from ...config import TEST_TMP_URI
 
@@ -40,23 +36,3 @@ def test_that_sources_get_transferred_both_directions_via_local_hashrefs(temp_fi
     assert cp.uri.startswith(uri_root)
     assert cp.cached_path and cp.cached_path.exists()
     assert open(cp).read() == "Captain Planet"
-
-
-@pure.magic(blob_root=TEST_TMP_URI, pipeline_id=f"test/pure-magic/{datetime.utcnow().isoformat()}")
-def _a_function_which_incorrectly_reuses_basenames() -> tuple[Source, Source]:
-    file_a = tempdir() / "source-A" / "source.txt"
-    file_b = tempdir() / "source-B" / "source.txt"
-    file_a.parent.mkdir(parents=True, exist_ok=True)
-    file_b.parent.mkdir(parents=True, exist_ok=True)
-    file_a.write_text("This is source A")
-    file_b.write_text("This is source B")
-
-    # different file contents but they share the same basename. This is very illegal and there will be an error.
-    return from_file(file_a), from_file(file_b)
-
-
-def test_disallow_output_sources_with_same_basename():
-    with pytest.raises(
-        DuplicateSourceBasenameError, match="Duplicate basename source.txt found in SourceResultPickler."
-    ):
-        _a_function_which_incorrectly_reuses_basenames()

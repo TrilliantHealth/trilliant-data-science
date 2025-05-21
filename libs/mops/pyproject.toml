@@ -7,6 +7,7 @@ readme = "docs/pypi_readme.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
 requires-python = ">=3.9"
 dependencies = [
+    "ansicolors",
     "azure-core",
     "azure-identity",
     "azure-storage-file-datalake",
@@ -18,7 +19,6 @@ dependencies = [
     "thds-adls",
     "thds-core",
     "thds-humenc",
-    "thds-termtool",
     "tomli",
 ]
 
@@ -27,7 +27,7 @@ k8s = ["kubernetes>=18.20,!=32.0.0"]
 # 32.0.0 has this bug https://github.com/kubernetes-client/python/issues/2356
 
 [project.scripts]
-krsync = "thds.mops.k8s.tools.krsync:main"
+krsync = "thds.mops.k8s.orchestrator.krsync:main"
 mops-k8s-ns = "thds.mops.k8s.namespace:main"
 mops-exit-after = "thds.core.exit_after:main"
 mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
@@ -65,7 +65,6 @@ build-backend = "setuptools.build_meta"
 thds-adls = { path = "../../libs/adls", editable = true }
 thds-core = { path = "../../libs/core", editable = true }
 thds-humenc = { path = "../../libs/humenc", editable = true }
-thds-termtool = { path = "../../libs/termtool", editable = true }
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
