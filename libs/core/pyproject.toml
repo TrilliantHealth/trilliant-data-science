@@ -1,13 +1,15 @@
 [project]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "1.39"
+version = "1.36"
 description = "Core utilities."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
 license = {text = "MIT"}
 requires-python = ">=3.9"
 dependencies = [
+    "attrs>=22.2.0",
+    "cattrs>=22.2.0",
     "setuptools",
     # setuptools is no longer included in Python >= 3.12 venvs by default,
     # and `uv` does not include `setuptools`, (or `pip` for that matter), in any project venvs
