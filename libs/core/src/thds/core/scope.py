@@ -37,13 +37,11 @@ wrapping function, which is higher than a `with` statement.
 
 """
 
-import asyncio
 import atexit
 import contextlib
 import inspect
 import sys
 import typing as ty
-from collections import defaultdict
 from functools import wraps
 from logging import getLogger
 from uuid import uuid4
@@ -51,57 +49,35 @@ from uuid import uuid4
 from .inspect import get_caller_info
 from .stack_context import StackContext
 
-K = ty.TypeVar("K")
-V = ty.TypeVar("V")
-
-
-class _keydefaultdict(defaultdict[K, V]):
-    def __init__(self, default_factory: ty.Callable[[K], V], *args, **kwargs):
-        super().__init__(default_factory, *args, **kwargs)  # type: ignore
-        self.key_default_factory = default_factory
-
-    def __missing__(self, key: K) -> V:
-        ret = self[key] = self.key_default_factory(key)
-        return ret
-
-
-_KEYED_SCOPE_CONTEXTS: dict[str, StackContext[contextlib.ExitStack]] = _keydefaultdict(
-    lambda key: StackContext(key, contextlib.ExitStack())
-)
-_KEYED_SCOPE_ASYNC_CONTEXTS: dict[str, StackContext[contextlib.AsyncExitStack]] = _keydefaultdict(
-    lambda key: StackContext(key, contextlib.AsyncExitStack())
-)
+_KEYED_SCOPE_CONTEXTS: ty.Dict[str, StackContext[contextlib.ExitStack]] = dict()
 # all non-nil ExitStacks will be closed at application exit
 
 
 def _close_root_scopes_atexit():
     for name, scope_sc in _KEYED_SCOPE_CONTEXTS.items():
-        exit_stack_cm = scope_sc()
-        if exit_stack_cm:
+        scope = scope_sc()
+        if scope:
             try:
-                exit_stack_cm.__exit__(None, None, None)
-            except Exception as exc:
-                print(f"Unable to exit scope '{name}' at exit because {exc}", file=sys.stderr)
-
-    async def do_async_cleanup():
-        for name, scope_sc in _KEYED_SCOPE_ASYNC_CONTEXTS.items():
-            exit_stack_cm = scope_sc()
-            if exit_stack_cm:
-                try:
-                    await exit_stack_cm.__aexit__(None, None, None)
-                except Exception as exc:
-                    print(f"Unable to exit async scope '{name}' at exit because {exc}", file=sys.stderr)
-
-    if _KEYED_SCOPE_ASYNC_CONTEXTS:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(do_async_cleanup())
-        finally:
-            loop.close()
+                scope.close()
+            except ValueError as ve:
+                print(f"Unable to close scope '{name}' at exit because {ve}", file=sys.stderr)
 
 
 atexit.register(_close_root_scopes_atexit)
+
+
+def _init_sc(key: str, val: contextlib.ExitStack):
+    """This should only ever be called at the root of/during import of a
+    module. It is _not_ threadsafe.
+    """
+    # normally you shouldn't create a StackContext except as a
+    # global.  in this case, we're dynamically storing _in_ a
+    # global dict, which is equivalent.
+    if key in _KEYED_SCOPE_CONTEXTS:
+        getLogger(__name__).warning(
+            f"Scope {key} already exists! If this is not importlib.reload, you have a problem."
+        )
+    _KEYED_SCOPE_CONTEXTS[key] = StackContext(key, val)
 
 
 F = ty.TypeVar("F", bound=ty.Callable)
@@ -116,6 +92,9 @@ def _bound(key: str, func: F) -> F:
 
         @wraps(func)
         def __scope_boundary_generator_wrap(*args, **kwargs):
+            if key not in _KEYED_SCOPE_CONTEXTS:
+                _init_sc(key, contextlib.ExitStack())  # this root stack will probably not get used
+
             with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
                 with scoped_exit_stack:  # enter and exit the ExitStack itself
                     ret = yield from func(*args, **kwargs)
@@ -127,6 +106,9 @@ def _bound(key: str, func: F) -> F:
 
         @wraps(func)
         async def __scope_boundary_async_generator_wrap(*args, **kwargs):
+            if key not in _KEYED_SCOPE_CONTEXTS:
+                _init_sc(key, contextlib.ExitStack())
+
             with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
                 with scoped_exit_stack:
                     async for ret in func(*args, **kwargs):
@@ -138,6 +120,9 @@ def _bound(key: str, func: F) -> F:
 
         @wraps(func)
         async def __scope_boundary_coroutine_wrap(*args, **kwargs):
+            if key not in _KEYED_SCOPE_CONTEXTS:
+                _init_sc(key, contextlib.ExitStack())
+
             with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
                 with scoped_exit_stack:
                     return await func(*args, **kwargs)
@@ -146,38 +131,14 @@ def _bound(key: str, func: F) -> F:
 
     @wraps(func)
     def __scope_boundary_wrap(*args, **kwargs):
+        if key not in _KEYED_SCOPE_CONTEXTS:
+            _init_sc(key, contextlib.ExitStack())  # this root stack will probably not get used
+
         with _KEYED_SCOPE_CONTEXTS[key].set(contextlib.ExitStack()) as scoped_exit_stack:
             with scoped_exit_stack:  # enter and exit the ExitStack itself
                 return func(*args, **kwargs)
 
     return ty.cast(F, __scope_boundary_wrap)
-
-
-def _async_bound(key: str, func: F) -> F:
-    """A decorator that establishes a scope boundary for context managers
-    that can now be `aenter`ed, and will then be aexited when this
-    boundary is returned to.
-    """
-    if inspect.isasyncgenfunction(func):
-
-        @wraps(func)
-        async def __scope_boundary_async_generator_wrap(*args, **kwargs):
-            with _KEYED_SCOPE_ASYNC_CONTEXTS[key].set(contextlib.AsyncExitStack()) as scoped_exit_stack:
-                async with scoped_exit_stack:
-                    async for ret in func(*args, **kwargs):
-                        yield ret
-
-        return ty.cast(F, __scope_boundary_async_generator_wrap)
-
-    assert inspect.iscoroutinefunction(func), "You should not use async_bound on non-async functions."
-
-    @wraps(func)
-    async def __scope_boundary_coroutine_wrap(*args, **kwargs):
-        with _KEYED_SCOPE_ASYNC_CONTEXTS[key].set(contextlib.AsyncExitStack()) as scoped_exit_stack:
-            async with scoped_exit_stack:
-                return await func(*args, **kwargs)
-
-    return ty.cast(F, __scope_boundary_coroutine_wrap)
 
 
 class NoScopeFound(Exception):
@@ -196,14 +157,7 @@ def _enter(key: str, context: ty.ContextManager[M]) -> M:
     scope_context = _KEYED_SCOPE_CONTEXTS.get(key)
     if scope_context:
         return scope_context().enter_context(context)
-    raise NoScopeFound(f"No scope with the key {key} was found - did you call .bound()?")
-
-
-async def _async_enter(key: str, context: ty.AsyncContextManager[M]) -> M:
-    scope_context = _KEYED_SCOPE_ASYNC_CONTEXTS.get(key)
-    if scope_context:
-        return await scope_context().enter_async_context(context)
-    raise NoScopeFound(f"No async scope with the key {key} was found - did you call .async_bound()?")
+    raise NoScopeFound(f"No scope with the key {key} was found.")
 
 
 class Scope:
@@ -227,12 +181,7 @@ class Scope:
     def __init__(self, key: str = ""):
         caller_info = get_caller_info(skip=1)
         self.key = caller_info.module + "+" + (key or uuid4().hex)
-        if self.key in _KEYED_SCOPE_CONTEXTS:
-            getLogger(__name__).warning(
-                f"Scope with key '{self.key}' already exists! If this is not importlib.reload, you have a problem."
-            )
-        else:
-            _KEYED_SCOPE_CONTEXTS[self.key] = StackContext(self.key, contextlib.ExitStack())
+        _init_sc(self.key, contextlib.ExitStack())  # add root boundary
 
     def bound(self, func: F) -> F:
         """Add a boundary to this function which will close all of the
@@ -245,43 +194,6 @@ class Scope:
         return _enter(self.key, context)
 
 
-class AsyncScope:
-    """See docs for Scope - but this is the one you use when you have async context
-    managers.
-
-    These should be module-level/global objects under all
-    circumstances, as they share an internal global namespace.
-
-    """
-
-    def __init__(self, key: str = ""):
-        caller_info = get_caller_info(skip=1)
-        self.key = caller_info.module + "+" + (key or uuid4().hex)
-        if self.key in _KEYED_SCOPE_ASYNC_CONTEXTS:
-            getLogger(__name__).warning(
-                f"Async scope with key '{self.key}' already exists! If this is not importlib.reload, you have a problem."
-            )
-        else:
-            _KEYED_SCOPE_ASYNC_CONTEXTS[self.key] = StackContext(self.key, contextlib.AsyncExitStack())
-
-    def async_bound(self, func: F) -> F:
-        """Add an async context management boundary to this function - it will _only_
-        use async context managers, i.e. __aenter__ and __aexit__ methods.
-
-        You can wrap an async function with a synchronous bound and use synchronous
-        context managers with it, but there's no point to wrapping your sync function
-        with an async_bound because you won't be able to enter the context within it.
-        """
-        return _async_bound(self.key, func)
-
-    async def async_enter(self, context: ty.AsyncContextManager[M]) -> M:
-        """Enter the provided Context with a future exit at the nearest boundary for this Scope."""
-        return await _async_enter(self.key, context)
-
-
 default = Scope("__default_scope_stack")
 bound = default.bound
 enter = default.enter
-default_async = AsyncScope("__default_async_scope_stack")
-async_bound = default_async.async_bound
-async_enter = default_async.async_enter

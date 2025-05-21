@@ -2,9 +2,8 @@ import typing as ty
 from pathlib import Path
 
 from thds.adls import source
-from thds.core import parallel
+from thds.core.source import Source
 from thds.core.source.tree import SourceTree
-from thds.core.thunks import thunking
 
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
@@ -54,30 +53,18 @@ def download_directory(fqn: AdlsFqn) -> Path:
     return cached_dir_root
 
 
-def _yield_all_file_paths(dir_path: Path) -> ty.Iterator[Path]:
-    for item in dir_path.iterdir():
-        if item.is_dir():  # recur
-            yield from _yield_all_file_paths(item)
-        elif item.is_file():  # yield
-            yield item
-
-
 def upload_directory_through_cache(dest: UriIsh, src_path: Path) -> SourceTree:
     if not src_path.is_dir():
         raise ValueError(f"If you want to upload a file, use {upload_through_cache.__name__} instead")
 
     dest = parse_any(dest)
 
-    upload_thunks = [
-        thunking(upload_through_cache)(dest / str(file_path.relative_to(src_path)), file_path)
-        for file_path in _yield_all_file_paths(src_path)
-    ]
+    def _upload_directory(dir_path: Path) -> ty.Iterable[Source]:
+        for item in dir_path.iterdir():
+            if item.is_dir():  # recur
+                yield from _upload_directory(item)
+            elif item.is_file():  # upload
+                file_dest = dest / str(item.relative_to(src_path))
+                yield source.from_adls(upload_through_cache(file_dest, item))
 
-    return SourceTree(
-        sources=list(
-            map(
-                source.from_adls,
-                parallel.yield_results(upload_thunks, named="upload_directory_through_cache"),
-            )
-        )
-    )
+    return SourceTree(sources=list(_upload_directory(src_path)))

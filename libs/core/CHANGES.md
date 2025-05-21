@@ -1,20 +1,3 @@
-## 1.39
-
-- Adds helpers to `core.inspect` for dynamically getting arguments by name, internally using
-  `inspect.signature(func).find(*args, **kwargs)`.
-
-## 1.38
-
-- Remove dependencies on `attrs` and `cattrs`, which were lightly used anyway.
-- Remove the bulk of the code having to do with reading and writing a `meta.json` file, which we have not
-  used for a while. Technically this is a backward incompatible change, but since it required no
-  downstream changes I think it's safe enough to pretend that it wasn't.
-
-## 1.37
-
-- `core.scope` now provides a parallel API for AsyncContextManagers, i.e. scopes with `__aenter__` and
-  `__aexit__`.
-
 ### 1.36
 
 - Adds `core.git.get_repo_root() -> Path`, which returns an absolute Path to the repo-root on your local
