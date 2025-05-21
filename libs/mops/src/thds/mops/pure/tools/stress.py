@@ -5,10 +5,10 @@ from timeit import default_timer
 
 from thds.adls import defaults
 from thds.core.log import getLogger
+from thds.mops._utils.colorize import colorized
 from thds.mops.config import max_concurrent_network_ops
 from thds.mops.parallel import Thunk, parallel_yield_results
 from thds.mops.pure import MemoizingPicklingRunner, use_runner
-from thds.termtool.colorize import colorized
 
 BROWN = colorized(fg="brown", bg="black")
 
