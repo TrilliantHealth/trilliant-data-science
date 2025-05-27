@@ -37,17 +37,12 @@ def _atomic_download_and_move(
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[azcopy.download.DownloadRequest]:
-    known_size = (properties.size or 0) if properties else 0
     with tmp.temppath_same_fs(dest) as dpath:
         with open(dpath, "wb") as f:
+            known_size = (properties.size or 0) if properties else 0
             logger.debug("Downloading %s", fqn)
             yield azcopy.download.DownloadRequest(
                 report_download_progress(f, str(fqn), known_size), dpath
-            )
-        if known_size and os.path.getsize(dpath) != known_size:
-            raise ValueError(
-                f"Downloaded file {dpath} has size {os.path.getsize(dpath)}"
-                f" but expected {known_size}."
             )
         try:
             os.rename(dpath, dest)  # will succeed even if dest is read-only
