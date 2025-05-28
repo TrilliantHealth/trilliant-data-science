@@ -140,8 +140,12 @@ import typing as ty
 from thds import humenc
 from thds.core import config
 
-from ..pipeline_id import get_pipeline_id_for_stack
-from ..pipeline_id_mask import extract_from_docstr, get_pipeline_id_mask, pipeline_id_mask
+from ..pipeline_id_mask import (
+    extract_from_docstr,
+    get_pipeline_id,
+    get_pipeline_id_mask,
+    pipeline_id_mask,
+)
 from ..uris import lookup_blob_store
 from . import calls
 from .unique_name_for_function import make_unique_name_including_docstring_key, parse_unique_name
@@ -183,7 +187,7 @@ def matching_mask_pipeline_id(pipeline_id: str, callable_regex: str) -> _Pipelin
     def _handler(callable_name: str, runner_prefix: str) -> ty.Optional[str]:
         if re.match(callable_regex, callable_name):
             return lookup_blob_store(runner_prefix).join(
-                runner_prefix, pipeline_id or get_pipeline_id_for_stack(), callable_name
+                runner_prefix, pipeline_id or get_pipeline_id(), callable_name
             )
         return None
 

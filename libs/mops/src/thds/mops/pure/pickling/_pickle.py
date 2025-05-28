@@ -3,7 +3,6 @@ data and also functions."""
 
 import inspect
 import io
-import os
 import pickle
 import typing as ty
 from functools import partial
@@ -163,35 +162,12 @@ class SourceArgumentPickler:
         return None
 
 
-class DuplicateSourceBasenameError(ValueError):
-    pass
-
-
 class SourceResultPickler:
     """Only for use on the remote side, when serializing the result."""
 
-    def __init__(self) -> None:
-        """There will be one of these per remote function call."""
-        self._basenames_seen: set[str] = set()
-
     def __call__(self, maybe_source: ty.Any) -> ty.Optional[_DeserSource]:
         if isinstance(maybe_source, source.Source):
-            src_res = prepare_source_result(maybe_source)
-            if src_res.file_uri:
-                # we need to check to make sure that this file_uri is not a duplicate
-                # - if it is, this indicates that this single function is attempting to return
-                # two Source objects that have not yet been uploaded but will be uploaded to the same name.
-                file_basename = os.path.basename(src_res.file_uri)
-                if file_basename in self._basenames_seen:
-                    raise DuplicateSourceBasenameError(
-                        f"Duplicate basename {os.path.basename(src_res.file_uri)} found in SourceResultPickler."
-                        " This is usually an indication that you have two files with the same name in two different directories,"
-                        " and are trying to convert them into Source objects with automatically-assigned URIs."
-                        " Per the documentation, all output Source objects without explicitly assigned remote URIs must be provided"
-                        " with unique basenames, in order to allow retention of the basename for usability and debugging."
-                    )
-                self._basenames_seen.add(file_basename)
-            return ty.cast(_DeserSource, UnpickleSourceResult(*src_res))
+            return ty.cast(_DeserSource, UnpickleSourceResult(*prepare_source_result(maybe_source)))
 
         return None
 

@@ -1109,7 +1109,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.37"
+version = "1.36"
 source = { editable = "../core" }
 dependencies = [
     { name = "attrs" },

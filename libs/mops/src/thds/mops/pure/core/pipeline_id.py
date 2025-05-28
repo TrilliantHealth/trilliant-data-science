@@ -1,11 +1,9 @@
 # This file must not import anything else from `remote.core` - it is a 'leaf' of our tree
 # because it is depended upon by so many other things.
 import os
-import typing as ty
-from contextlib import contextmanager
 from datetime import datetime
 
-from thds.core import hostname, log, meta, stack_context
+from thds.core import hostname, log, meta
 
 from ..._utils.colorize import colorized
 
@@ -62,16 +60,3 @@ def set_pipeline_id(new_pipeline_id: str) -> None:
         return  # quietly disallow empty strings, since we always want a value here.
     global _PIPELINE_ID
     _PIPELINE_ID = new_pipeline_id
-
-
-_STACK_LOCAL_PIPELINE_ID = stack_context.StackContext("STACK_LOCAL_PIPELINE_ID", "")
-
-
-@contextmanager
-def set_pipeline_id_for_stack(new_pipeline_id: str) -> ty.Iterator[str]:
-    with _STACK_LOCAL_PIPELINE_ID.set(new_pipeline_id):
-        yield new_pipeline_id
-
-
-def get_pipeline_id_for_stack() -> str:
-    return _STACK_LOCAL_PIPELINE_ID() or get_pipeline_id()

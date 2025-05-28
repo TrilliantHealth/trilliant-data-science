@@ -37,17 +37,12 @@ def _atomic_download_and_move(
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[azcopy.download.DownloadRequest]:
-    known_size = (properties.size or 0) if properties else 0
     with tmp.temppath_same_fs(dest) as dpath:
         with open(dpath, "wb") as f:
+            known_size = (properties.size or 0) if properties else 0
             logger.debug("Downloading %s", fqn)
             yield azcopy.download.DownloadRequest(
                 report_download_progress(f, str(fqn), known_size), dpath
-            )
-        if known_size and os.path.getsize(dpath) != known_size:
-            raise ValueError(
-                f"Downloaded file {dpath} has size {os.path.getsize(dpath)}"
-                f" but expected {known_size}."
             )
         try:
             os.rename(dpath, dest)  # will succeed even if dest is read-only
@@ -356,7 +351,6 @@ def download_or_use_verified(
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
         )
-        _dl_scope.enter(dl_file_client)  # on __exit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
@@ -385,11 +379,7 @@ def download_or_use_verified(
         translate_azure_error(fs_client, remote_key, err)
 
 
-_async_dl_scope = scope.AsyncScope("adls.download.async")
-
-
 @_dl_scope.bound
-@_async_dl_scope.async_bound
 async def async_download_or_use_verified(
     fs_client: aio.FileSystemClient,
     remote_key: str,
@@ -402,9 +392,6 @@ async def async_download_or_use_verified(
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
         )
-        await _async_dl_scope.async_enter(
-            dl_file_client  # type: ignore[arg-type]
-        )  # on __aexit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:

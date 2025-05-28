@@ -9,7 +9,7 @@ from typing_extensions import ParamSpec
 from thds.core import stack_context
 from thds.mops._utils import config_tree
 
-from ..core import file_blob_store, pipeline_id, pipeline_id_mask, uris
+from ..core import file_blob_store, pipeline_id_mask, uris
 from ..core.memo.unique_name_for_function import full_name_and_callable
 from ..core.use_runner import use_runner
 from ..pickling.mprunner import MemoizingPicklingRunner
@@ -125,7 +125,7 @@ class Magic(ty.Generic[P, R]):
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """This is the wrapped function."""
-        with pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+        with pipeline_id_mask.pipeline_id_mask(self._pipeline_id):
             return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
