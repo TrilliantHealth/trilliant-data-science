@@ -1,3 +1,8 @@
+## 3.9
+
+- Adds helpers to `mops.pure.runner.shim_builder` for dynamically getting arguments by name, internally
+  using `inspect.signature(func).find(*args, **kwargs)`.
+
 ### 3.8.20250602
 
 - Now raising an error instead of silently overwriting when duplicate basenames are used as output
@@ -401,7 +406,7 @@ Big changes to consistency and usability of memoization.
 
 Initial re-release as `mops`.
 
-# Ancient History (`trilliant-ml-ops`) versions below:
+# Ancient History (`trilliant-ml-ops`) versions below
 
 ## 30000003.7.0
 
