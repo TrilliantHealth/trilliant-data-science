@@ -1,3 +1,7 @@
+### 3.8.20250529
+
+- Restore previous values for log watching timeouts in `mops.k8s`.
+
 ### 3.8.20250516
 
 - Removed stack-local context that will not mask nested pipeline ids defined in the various ways they may
