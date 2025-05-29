@@ -1,12 +1,3 @@
-### 3.8.20250602
-
-- Now raising an error instead of silently overwriting when duplicate basenames are used as output
-  `Source`s. See [docs](docs/optimizations.adoc#thds.core.source) for details.
-
-### 3.8.20250529
-
-- Restore previous values for log watching timeouts in `mops.k8s`.
-
 ### 3.8.20250516
 
 - Removed stack-local context that will not mask nested pipeline ids defined in the various ways they may

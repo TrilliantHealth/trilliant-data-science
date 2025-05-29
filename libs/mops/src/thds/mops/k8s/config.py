@@ -32,15 +32,6 @@ k8s_watch_read_timeout_seconds = config.item(
 # values are, and it's not 100% clear to me that they have different types of timeouts
 # from trying to grep their codebase.).
 
-# whereas the below values are designed to timeout slowly, since many k8s pods don't emit logs
-# on a regular basis.
-k8s_logs_watch_connection_timeout_seconds = config.item(
-    "mops.k8s.logs.watch.connection_timeout", int(timedelta(seconds=10).total_seconds()), parse=int
-)
-k8s_logs_watch_read_timeout_seconds = config.item(
-    "mops.k8s.logs.watch.read_timeout", int(timedelta(seconds=180).total_seconds()), parse=int
-)
-
 k8s_monitor_delay = config.item("mops.k8s.monitor.delay_seconds", 5, parse=int)
 k8s_monitor_max_attempts = config.item("mops.k8s.monitor.max_attempts", 100, parse=int)
 
