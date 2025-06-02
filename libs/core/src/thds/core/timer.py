@@ -161,7 +161,7 @@ class TimeTracker:
         self._start_times = []
 
     def to_json(self) -> Iterator[str]:
-        if SINGLE_LINE_JSON_TIMERS:
+        if SINGLE_LINE_JSON_TIMERS():
             for name, timer in sorted(self.tracked_times.items(), key=lambda x: x[0]):
                 yield json.dumps({name: dict(timer)}, indent=None)
         else:
