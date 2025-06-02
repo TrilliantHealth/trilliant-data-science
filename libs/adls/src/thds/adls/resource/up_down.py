@@ -13,7 +13,6 @@ from .._upload import metadata_for_upload, upload_decision_and_settings
 from ..conf import UPLOAD_FILE_MAX_CONCURRENCY
 from ..download import download_or_use_verified
 from ..errors import BlobNotFoundError
-from ..file_properties import get_file_properties
 from ..fqn import AdlsFqn
 from ..global_client import get_global_blob_container_client, get_global_fs_client
 from ..ro_cache import Cache, global_cache
@@ -167,7 +166,11 @@ def upload(
 
 def verify_remote_md5(resource: AdlsHashedResource) -> bool:
     try:
-        props = get_file_properties(resource.fqn)
+        props = (
+            get_global_fs_client(resource.fqn.sa, resource.fqn.container)
+            .get_file_client(resource.fqn.path)
+            .get_file_properties()
+        )
         if props.content_settings.content_md5:
             return hashing.b64(props.content_settings.content_md5) == resource.md5b64
     except HttpResponseError:

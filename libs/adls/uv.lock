@@ -207,6 +207,20 @@ wheels = [
 ]
 
 [[package]]
+name = "cattrs"
+version = "24.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/65/af6d57da2cb32c076319b7489ae0958f746949d407109e3ccf4d115f147c/cattrs-24.1.2.tar.gz", hash = "sha256:8028cfe1ff5382df59dd36474a86e02d817b06eaf8af84555441bac915d2ef85", size = 426462 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/d5/867e75361fc45f6de75fe277dd085627a9db5ebb511a87f27dc1396b5351/cattrs-24.1.2-py3-none-any.whl", hash = "sha256:67c7495b760168d931a10233f979b28dc04daf853b30752246f4f8471c6d68d0", size = 66446 },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.1.31"
 source = { registry = "https://pypi.org/simple" }
@@ -1095,15 +1109,19 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.38"
+version = "1.36"
 source = { editable = "../core" }
 dependencies = [
+    { name = "attrs" },
+    { name = "cattrs" },
     { name = "setuptools" },
     { name = "typing-extensions" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "attrs", specifier = ">=22.2.0" },
+    { name = "cattrs", specifier = ">=22.2.0" },
     { name = "setuptools" },
     { name = "typing-extensions" },
 ]
