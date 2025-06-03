@@ -356,6 +356,7 @@ def download_or_use_verified(
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
         )
+        _dl_scope.enter(dl_file_client)  # on __exit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
@@ -393,6 +394,7 @@ async def async_download_or_use_verified(
     cache: ty.Optional[Cache] = None,
 ) -> bool:
     file_properties = None
+    dl_file_client = None
     try:
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, md5b64, cache
@@ -423,7 +425,7 @@ async def async_download_or_use_verified(
         if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
             try:
                 logger.info(f"Setting missing MD5 for {remote_key}")
-                assert file_properties
+                assert file_properties and dl_file_client
                 await dl_file_client.set_http_headers(  # type: ignore[misc]
                     cs, **match_etag(file_properties)
                 )
@@ -433,3 +435,6 @@ async def async_download_or_use_verified(
         return si.value.hit
     except AzureError as err:
         translate_azure_error(fs_client, remote_key, err)
+    finally:
+        if dl_file_client:
+            dl_file_client.close()
