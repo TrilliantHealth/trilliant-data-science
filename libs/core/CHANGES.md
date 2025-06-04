@@ -1,3 +1,8 @@
+## 1.37
+
+- `core.scope` now provides a parallel API for AsyncContextManagers, i.e. scopes with `__aenter__` and
+  `__aexit__`.
+
 ### 1.36
 
 - Adds `core.git.get_repo_root() -> Path`, which returns an absolute Path to the repo-root on your local
