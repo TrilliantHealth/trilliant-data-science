@@ -1,8 +1,9 @@
 import inspect
-from dataclasses import dataclass
+
+import attrs
 
 
-@dataclass(frozen=True)
+@attrs.frozen
 class CallerInfo:
     module: str = ""
     klass: str = ""
