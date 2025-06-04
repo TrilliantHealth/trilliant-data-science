@@ -192,8 +192,10 @@ def _scrape_pod_logs(
         name=pod_name,
         namespace=config.k8s_namespace(),
         _request_timeout=(
-            config.k8s_watch_connection_timeout_seconds(),
-            config.k8s_watch_read_timeout_seconds(),
+            config.k8s_logs_watch_connection_timeout_seconds(),
+            config.k8s_logs_watch_read_timeout_seconds(),
+            # we want these numbers fairly high, otherwise a pod that's temporarily silent
+            # will cause the stream to end, which is noisy and inefficient.
         ),
         # i'm occasionally seeing the `stream()` call below hang
         # indefinitely if logs don't come back from the pod for a
