@@ -13,7 +13,10 @@ def is_directory(info: FileProperties) -> bool:
 
 
 def get_file_properties(fqn: AdlsFqn) -> FileProperties:
-    return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path).get_file_properties()
+    with get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path) as file_client:
+        # The file client is a context manager to ensure proper resource cleanup
+        # and to avoid keeping connections open longer than necessary.
+        return file_client.get_file_properties()
 
 
 def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
