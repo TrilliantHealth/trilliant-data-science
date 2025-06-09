@@ -1265,7 +1265,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.38"
+version = "1.39"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },
@@ -1314,7 +1314,7 @@ dev = [
 
 [[package]]
 name = "thds-mops"
-version = "3.9"
+version = "3.8"
 source = { editable = "." }
 dependencies = [
     { name = "azure-core" },
