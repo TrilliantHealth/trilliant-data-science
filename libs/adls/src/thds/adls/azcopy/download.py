@@ -21,7 +21,7 @@ from thds.core import cache, config, log
 
 from .. import _progress, conf, uri
 
-DONT_USE_AZCOPY = config.item("dont_use", default=False, parse=config.tobool)
+DONT_USE_AZCOPY = config.item("dont_use", default=True, parse=config.tobool)
 
 _AZCOPY_LOGIN_WORKLOAD_IDENTITY = "azcopy login --login-type workload".split()
 _AZCOPY_LOGIN_LOCAL_STATUS = "azcopy login status".split()
