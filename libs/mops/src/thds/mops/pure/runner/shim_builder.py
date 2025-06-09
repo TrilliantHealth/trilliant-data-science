@@ -23,13 +23,3 @@ def make_builder(shim: ty.Union[Shim, ShimBuilder]) -> ShimBuilder:
         return ty.cast(ShimBuilder, shim)
 
     return _static_shim_builder(ty.cast(Shim, shim))
-
-
-def bind_arguments(func: ty.Callable, *args: Args, **kwargs: Kwargs) -> inspect.BoundArguments:
-    bound = inspect.signature(func).bind(*args, **kwargs)
-    bound.apply_defaults()
-    return bound
-
-
-def get_argument(arg_name: str, bound_arguments: inspect.BoundArguments) -> ty.Any:
-    return bound_arguments.arguments[arg_name]
