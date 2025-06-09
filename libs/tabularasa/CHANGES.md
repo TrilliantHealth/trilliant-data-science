@@ -1,3 +1,7 @@
+### 0.11.2
+
+- upper bound on `pandera` version due to changes with `pandas` dependencies in that release
+
 ### 0.11.1
 
 - internally uses `thds.core.git.get_repo_root()`
