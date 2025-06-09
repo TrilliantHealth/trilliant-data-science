@@ -1,3 +1,7 @@
+### 3.8.20250609
+
+- Uses `core.inspect.bind_arguments` internally.
+
 ### 3.8.20250602
 
 - Now raising an error instead of silently overwriting when duplicate basenames are used as output
