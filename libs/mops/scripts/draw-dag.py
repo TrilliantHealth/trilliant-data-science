@@ -30,91 +30,9 @@ def load_all_log_entries(log_dir: Path) -> ty.List[run_summary.LogEntry]:
     return log_entries
 
 
-def _xform_memo_uri_into_node_id(
-    memo_uri: str, runner_prefix: str, pipeline_id: str, function_logic_key: str
-) -> str:
-    """
-    Transform a memo URI into a node ID by removing the runner prefix, pipeline ID,
-    and function logic key, and stripping trailing numeric bits of the hash.
-    """
-    memo_uri = memo_uri.replace(runner_prefix, "")
-    memo_uri = memo_uri.replace(pipeline_id, "")
-    memo_uri = memo_uri.replace("@" + function_logic_key, "")
-    memo_uri = memo_uri.strip("/")
-    return memo_uri[:-40]  # get rid of the numeric bits of the hash
-
-
-NodeIdTransformer = ty.Callable[[str, str, str, str], str]
-
-
-class SafeNodeIdTransformer:
-    """
-    Transforms and sanitizes node IDs while ensuring no collisions are introduced.
-
-    This class applies a series of substring replacements to node IDs and validates
-    that the transformation process does not cause two different original IDs to
-    be mapped to the same sanitized ID, which would break the graph structure.
-    """
-
-    def __init__(self, substring_replacements: ty.Mapping[str, str]):
-        """
-        Initializes the transformer with a set of replacement rules.
-
-        Args:
-            substring_replacements: A dictionary where keys are the substrings
-                to find and values are the strings to replace them with.
-        """
-        self.replacements = substring_replacements
-        self.transformed_ids: dict[str, set[str]] = defaultdict(set)
-
-    def __call__(
-        self,
-        memo_uri: str,
-        runner_prefix: str,
-        pipeline_id: str,
-        function_logic_key: str,
-    ) -> str:
-        """
-        Applies the full transformation and sanitization process to a single ID.
-
-        Args:
-            memo_uri: The original, unique identifier for the node.
-            runner_prefix: The prefix of the runner to be removed.
-            pipeline_id: The ID of the pipeline to be removed.
-            function_logic_key: The function logic key to be removed.
-
-        Returns:
-            The sanitized and shortened node ID.
-
-        Raises:
-            ValueError: If a new ID collision is detected.
-        """
-        # 1. Perform the original, coarse transformation
-        base_id = _xform_memo_uri_into_node_id(memo_uri, runner_prefix, pipeline_id, function_logic_key)
-
-        # 2. Apply the configured substring replacements for sanitization
-        final_id = base_id
-        for from_str, to_str in self.replacements.items():
-            final_id = final_id.replace(from_str, to_str)
-
-        # 3. Check for collisions
-        # We track which original URIs map to each final ID.
-        self.transformed_ids[final_id].add(memo_uri)
-
-        if len(self.transformed_ids[final_id]) > 1:
-            collided_uris = self.transformed_ids[final_id]
-            raise ValueError(
-                f"ID collision detected! The new ID '{final_id}' was generated "
-                f"from multiple different source URIs: {collided_uris}"
-            )
-
-        return final_id
-
-
 def create_dag(
     log_entries: ty.List[run_summary.LogEntry],
     xform_node_name: ty.Callable[[str], str],
-    xform_node_id: NodeIdTransformer,
 ) -> nx.DiGraph:
     g = nx.DiGraph()
     # each log entry file is a node - we use the function_name as the node name.  the
@@ -132,24 +50,23 @@ def create_dag(
         if not memo_uri:
             continue
 
-        node_id = xform_node_id(
-            memo_uri,
-            log_entry.get("runner_prefix", ""),
-            log_entry.get("pipeline_id", ""),
-            log_entry.get("function_logic_key", ""),
-        )
+        memo_uri = memo_uri.replace(log_entry.get("runner_prefix", ""), "")
+        memo_uri = memo_uri.replace(log_entry.get("pipeline_id", ""), "")
+        memo_uri = memo_uri.replace("@" + log_entry.get("function_logic_key", ""), "")
+        memo_uri = memo_uri.strip("/")
+        memo_uri = memo_uri[:-40]  # get rid of the numeric bits of the hash
 
         if input_uris := log_entry.get("uris_in_args_kwargs"):
             for uri in input_uris:
-                sink_functions_by_uri[uri].add(node_id)
+                sink_functions_by_uri[uri].add(memo_uri)
         else:
-            g.add_node(node_id)
+            g.add_node(memo_uri)
 
         if output_uris := log_entry.get("uris_in_rvalue"):
             for uri in output_uris:
-                source_functions_by_uri[uri].add(node_id)
+                source_functions_by_uri[uri].add(memo_uri)
         else:
-            g.add_node(node_id)
+            g.add_node(memo_uri)
 
     # now we can create the graph:
     for uri, sink_functions in sink_functions_by_uri.items():
@@ -157,8 +74,8 @@ def create_dag(
             for sink_function in sink_functions:
                 g.add_edge(source_function, sink_function)
 
-    for node_id in g.nodes():
-        g.nodes[node_id]["label"] = xform_node_name(node_id)
+    for node in g.nodes():
+        g.nodes[node]["label"] = xform_node_name(node)
 
     return g
 
@@ -181,7 +98,6 @@ class SubgraphConfig(ty.TypedDict):
 def apply_subgraph_config(subgraph_config: ty.Mapping[str, SubgraphConfig], g: nx.DiGraph) -> nx.DiGraph:
     for node in g.nodes():
         for sg in subgraph_config.values():
-            # first match wins
             if any(re.match(p, node) for p in sg["patterns"]):
                 g.nodes[node]["subgraph"] = sg["name"]
                 g.nodes[node]["fillcolor"] = sg["fillcolor"]
@@ -197,15 +113,10 @@ class Coordinates(ty.TypedDict):
 def apply_fixed_coordinates(
     fixed_coordinates: ty.Mapping[str, Coordinates], g: nx.DiGraph
 ) -> nx.DiGraph:
-    try:
-        for node, coords in fixed_coordinates.items():
-            g.nodes[node]["x"] = coords["x"]
-            g.nodes[node]["y"] = coords["y"]
-            g.nodes[node]["fixed"] = True
-    except KeyError:
-        print(list(g.nodes.keys()))
-        raise
-
+    for node, coords in fixed_coordinates.items():
+        g.nodes[node]["x"] = coords["x"]
+        g.nodes[node]["y"] = coords["y"]
+        g.nodes[node]["fixed"] = True
     return g
 
 
@@ -413,11 +324,11 @@ def graphviz_render(
 def nx_to_echarts_graph(
     graph: nx.DiGraph,
     *,  # Enforces keyword-only arguments after this
-    default_symbol_size: int = 15,
+    default_symbol_size: int = 20,
     tooltip_formatter: str = "",
     force_config: ty.Optional[dict[str, Any]] = None,
     default_category_name: str = "Other",
-    default_category_color: str = "#AdAdAd",
+    default_category_color: str = "#cccccc",
 ) -> dict[str, ty.Any]:
     """
     Converts a NetworkX DiGraph into an ECharts graph option dictionary,
@@ -528,7 +439,7 @@ def nx_to_echarts_graph(
     }
 
     echarts_option: dict[str, Any] = {
-        # "tooltip": tooltip_config,
+        "tooltip": tooltip_config,
         "legend": [{"data": category_name_list}],  # Use discovered names
         "series": [
             {
@@ -538,18 +449,17 @@ def nx_to_echarts_graph(
                 "roam": True,
                 "draggable": True,
                 "label": {
-                    "show": False,
+                    "show": True,
                     "position": "bottom",  # Position of the label
                     "formatter": "{b}",  # Use node name ('label' or ID)
                 },
                 "edgeSymbol": ["none", "arrow"],
-                "edgeSymbolSize": 7,
+                "edgeSymbolSize": 10,
                 "focusNodeAdjacency": True,
                 "categories": echarts_categories,  # Use discovered categories
                 "data": echarts_nodes,
                 "links": echarts_links,
                 "force": final_force_config,
-                "itemStyle": {"borderColor": "#0A1E33", "borderWidth": 1.0},
             }
         ],
     }
@@ -567,14 +477,7 @@ def xform_node_name(name: str) -> str:
         name = name[5:]
     if "--" not in name:
         return name
-
-    # if we have a /calls-[^/]+/ segment, we remove that:
-    if "/calls-" in name:
-        name = re.sub(r"/calls-[^/]+/", "/", name)
-    name_pieces = name.split("--")
-    if len(name_pieces) != 2:
-        raise ValueError(f"Invalid node name format: {name}. Expected 'module--function/args'.")
-    module, function_and_args = name_pieces[0], name_pieces[1]
+    module, function_and_args = name.split("--")
     function_name, args = function_and_args.split("/", 1)
     return f"{module}\n{function_name}({args})"
 
@@ -595,13 +498,8 @@ def create_and_visualize_dag(
     subgraph_config: dict,
     fixed_coordinates: ty.Mapping[str, Coordinates],
     edges_to_add: ty.Collection[ty.Sequence[str]],
-    node_id_replacements: ty.Mapping[str, str],
 ) -> None:
-    dag = create_dag(
-        load_all_log_entries(auto_find_run_directory(run_dir)),
-        xform_node_name,
-        SafeNodeIdTransformer(node_id_replacements),
-    )
+    dag = create_dag(load_all_log_entries(auto_find_run_directory(run_dir)), xform_node_name)
     if remove_nodes:
         dag = remove_unininteresting_nodes(
             is_uninteresting_regexes(remove_nodes),
@@ -623,11 +521,8 @@ def create_and_visualize_dag(
                 ),
             )
         )
-    except Exception as e:
-        try:
-            print(nx.find_cycle(dag))
-        except Exception:
-            print(e)
+    except Exception:
+        print(nx.find_cycle(dag))
 
 
 def main():
@@ -650,7 +545,6 @@ def main():
         {sg["name"]: sg for sg in config.get("subgraphs") or list()},
         config.get("fixed") or dict(),
         config.get("add_edges") or list(),
-        config.get("node_id_renaming", dict()).get("substring_replacements", dict()),
     )
 
 

@@ -1,4 +1,4 @@
-# this works only if you have something to map the tuples to a class/object.
+# this works only if you have something to map the tuples to an attrs class.
 # it also does not currently offer any parallelism.
 import typing as ty
 
