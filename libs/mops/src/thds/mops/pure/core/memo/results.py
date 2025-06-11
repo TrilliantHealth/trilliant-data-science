@@ -8,8 +8,8 @@ import typing as ty
 from contextlib import contextmanager
 
 from thds.core import config, log, stack_context
-from thds.termtool import colorize
 
+from ...._utils import colorize
 from ..uris import lookup_blob_store
 
 _REQUIRE_ALL_RESULTS = config.item("require_all_results", default="")
