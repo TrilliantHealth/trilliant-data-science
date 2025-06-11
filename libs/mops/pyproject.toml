@@ -7,6 +7,7 @@ readme = "docs/pypi_readme.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
 requires-python = ">=3.9"
 dependencies = [
+    "ansicolors",
     "azure-core",
     "azure-identity",
     "azure-storage-file-datalake",
@@ -18,7 +19,6 @@ dependencies = [
     "thds-adls",
     "thds-core",
     "thds-humenc",
-    "thds-termtool",
     "tomli",
 ]
 
@@ -65,7 +65,6 @@ build-backend = "setuptools.build_meta"
 thds-adls = { path = "../../libs/adls", editable = true }
 thds-core = { path = "../../libs/core", editable = true }
 thds-humenc = { path = "../../libs/humenc", editable = true }
-thds-termtool = { path = "../../libs/termtool", editable = true }
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]

@@ -10,8 +10,8 @@ from kubernetes import client
 from thds.core import scope
 from thds.core.log import logger_context
 from thds.mops.pure.runner.simple_shims import samethread_shim
-from thds.termtool.colorize import colorized
 
+from .._utils.colorize import colorized
 from . import config
 from ._shared import logger
 from .auth import load_config, upsert_namespace
@@ -129,7 +129,7 @@ def launch(
 
         logger.debug("Applying environment variables ...")
         env_list = [
-            client.V1EnvVar(name="MOPS_IMAGE_RECURSIVE_REF", value=container_image),
+            client.V1EnvVar(name="MOPS_IMAGE_FULL_TAG", value=container_image),
             # by setting these, things will be 'reentrant' if it is necessary to launch jobs within this job.
         ]
         if env_vars is not None:
