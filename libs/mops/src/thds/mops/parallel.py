@@ -10,7 +10,8 @@ from thds.core.thunks import (  # noqa: F401; for backward-compatibility, since 
     Thunk,
     thunking,
 )
-from thds.termtool.colorize import colorized
+
+from ._utils.colorize import colorized
 
 ERROR = colorized(fg="white", bg="red")
 DONE = colorized(fg="white", bg="blue")
