@@ -10,8 +10,8 @@ from kubernetes import client
 from thds.core import scope
 from thds.core.log import logger_context
 from thds.mops.pure.runner.simple_shims import samethread_shim
+from thds.termtool.colorize import colorized
 
-from .._utils.colorize import colorized
 from . import config
 from ._shared import logger
 from .auth import load_config, upsert_namespace
