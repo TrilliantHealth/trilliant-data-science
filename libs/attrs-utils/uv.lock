@@ -352,19 +352,15 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.37"
+version = "1.38"
 source = { editable = "../core" }
 dependencies = [
-    { name = "attrs" },
-    { name = "cattrs" },
     { name = "setuptools" },
     { name = "typing-extensions" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "attrs", specifier = ">=22.2.0" },
-    { name = "cattrs", specifier = ">=22.2.0" },
     { name = "setuptools" },
     { name = "typing-extensions" },
 ]
