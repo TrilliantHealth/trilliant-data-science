@@ -8,7 +8,6 @@ import typing as ty
 from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.resources import Package
-from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
@@ -47,31 +46,6 @@ def misc() -> meta.MiscType:
 
 
 @pytest.fixture
-def metadata(misc: meta.MiscType) -> meta.Metadata:
-    return meta.Metadata(
-        git_commit=COMMIT_HASH,
-        git_branch=BRANCH_NAME,
-        git_is_clean=True,
-        thds_user=USER_NAME,
-        misc=misc,
-    )
-
-
-@pytest.fixture
-def metadata_unstructured(
-    misc: meta.MiscType,
-) -> ty.Dict[str, ty.Union[str, bool, meta.MiscType]]:
-    return dict(
-        git_commit=COMMIT_HASH,
-        git_branch=BRANCH_NAME,
-        git_is_clean=True,
-        pyproject_version="",
-        thds_user=USER_NAME,
-        misc=dict(misc),
-    )
-
-
-@pytest.fixture
 def mock_getuser(mocker: MockFixture) -> MagicMock:
     mock = mocker.patch.object(meta, "getuser", autospec=True)
     mock.return_value = USER_NAME
@@ -96,27 +70,6 @@ def mock_git_is_clean(mocker: MockFixture) -> MagicMock:
 def mock_git_branch(mocker: MockFixture) -> MagicMock:
     mock = mocker.patch.object(git, "_simple_run", autospec=True)
     mock.return_value = BRANCH_NAME
-    return mock
-
-
-@pytest.fixture
-def mock_read_metadata(mocker: MockFixture, metadata: meta.Metadata) -> MagicMock:
-    mock = mocker.patch.object(meta, "read_metadata", autospec=True)
-    mock.return_value = metadata
-    return mock
-
-
-@pytest.fixture
-def mock_read_empty_metadata(mocker: MockFixture) -> MagicMock:
-    mock = mocker.patch.object(meta, "read_metadata", autospec=True)
-    mock.return_value = meta.Metadata()
-    return mock
-
-
-@pytest.fixture
-def mock_init_metadata(mocker: MockFixture, metadata: meta.Metadata) -> MagicMock:
-    mock = mocker.patch.object(meta, "init_metadata", autospec=True)
-    mock.return_value = metadata
     return mock
 
 
@@ -163,47 +116,6 @@ def mock_open_text(
     return mock
 
 
-def test_metadata(metadata: meta.Metadata) -> None:
-    assert metadata.git_commit == COMMIT_HASH
-    assert metadata.git_branch == BRANCH_NAME
-    assert metadata.docker_branch == DOCKER_BRANCH_NAME
-    assert metadata.hive_branch == HIVE_BRANCH_NAME
-    assert metadata.thds_user == USER_NAME
-    assert metadata.docker_user == USER_NAME
-    assert metadata.hive_user == HIVE_USER_NAME
-    assert metadata.git_is_clean
-    assert not metadata.git_is_dirty
-    assert not metadata.is_empty
-    assert metadata.misc["bool"]
-    with pytest.raises(TypeError):
-        metadata.misc["new"] = "some_value"  # type: ignore
-
-
-def test_empty_metadata() -> None:
-    metadata = meta.Metadata()
-    assert metadata.is_empty
-
-
-def test_init_metadata(metadata: meta.Metadata, mocker: MockFixture) -> None:
-    mock = mocker.patch.object(meta, "Metadata", autospec=True)
-    mock.return_value = metadata
-    assert meta.init_metadata() == metadata
-
-
-def test_metadata_structure(
-    metadata_unstructured: ty.Dict[str, ty.Union[str, bool, meta.MiscType]],
-    metadata: meta.Metadata,
-) -> None:
-    assert meta.meta_converter.structure(metadata_unstructured, meta.Metadata) == metadata
-
-
-def test_metadata_unstructure(
-    metadata: meta.Metadata,
-    metadata_unstructured: ty.Dict[str, ty.Union[str, bool, meta.MiscType]],
-) -> None:
-    assert meta.meta_converter.unstructure(metadata) == metadata_unstructured
-
-
 def test_format_name_git() -> None:
     assert meta.format_name(BRANCH_NAME, format="git") == BRANCH_NAME
 
@@ -233,24 +145,6 @@ def test_get_hive_user_from_envvar(caplog) -> None:
         with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
             assert meta.get_user(format="hive") == HIVE_USER_NAME
         assert "`get_user` reading from env var." in caplog.text
-
-
-def test_get_user_from_metadata(caplog, mock_read_metadata: MagicMock) -> None:
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert meta.get_user(PACKAGE_NAME) == USER_NAME
-    assert mock_read_metadata.called
-    assert "`get_user` reading from metadata." in caplog.text
-
-
-def test_get_user_from_metadata_no_metadata(
-    caplog, mock_read_metadata: MagicMock, mock_getuser: MagicMock
-) -> None:
-    mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert meta.get_user(PACKAGE_NAME) == USER_NAME
-    assert mock_getuser.called
-    assert "`get_user` reading from metadata." in caplog.text
-    assert "`get_user` found no user data - getting system user." in caplog.text
 
 
 def test_get_user_no_user(caplog, mock_getuser: MagicMock) -> None:
@@ -337,30 +231,6 @@ def test_get_commit_from_git_repo(caplog, mock_git_commit: MagicMock) -> None:
     assert "`get_commit` reading from Git repo." in caplog.text
 
 
-def test_get_commit_from_metadata(
-    caplog, mock_git_commit: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert meta.get_commit(PACKAGE_NAME) == COMMIT_HASH
-    assert mock_git_commit.called
-    assert mock_read_metadata.called
-    assert "`get_commit` reading from metadata." in caplog.text
-
-
-def test_get_commit_from_metadata_no_metadata(
-    caplog, mock_git_commit: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
-    mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert not meta.get_commit(PACKAGE_NAME)
-    assert mock_git_commit.called
-    assert mock_read_metadata.called
-    assert "`get_commit` reading from metadata." in caplog.text
-    assert "`get_commit` found no commit." in caplog.text
-
-
 def test_get_commit_no_commit(caplog, mock_git_commit: MagicMock) -> None:
     mock_git_commit.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.WARNING, logger="thds.core.meta"):
@@ -388,29 +258,6 @@ def test_is_clean_from_git_repo(caplog, mock_git_is_clean: MagicMock) -> None:
         assert not meta.is_clean()
     assert mock_git_is_clean.called
     assert "`is_clean` reading from Git repo." in caplog.text
-
-
-def test_is_clean_from_metadata(
-    caplog, mock_git_is_clean: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_is_clean.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert meta.is_clean(PACKAGE_NAME)
-    assert mock_git_is_clean.called
-    assert "`is_clean` reading from metadata." in caplog.text
-
-
-def test_is_clean_from_metadata_no_metadata(
-    caplog, mock_git_is_clean: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_is_clean.side_effect = subprocess.CalledProcessError(-1, [])
-    mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert not meta.is_clean(PACKAGE_NAME)
-    assert mock_git_is_clean.called
-    assert mock_read_metadata.called
-    assert "`is_clean` reading from metadata." in caplog.text
-    assert "`is_clean` found no cleanliness - assume dirty." in caplog.text
 
 
 def test_is_clean_no_dirtiness(caplog, mock_git_is_clean: MagicMock) -> None:
@@ -442,43 +289,12 @@ def test_get_branch_from_git_repo(caplog, mock_git_branch: MagicMock) -> None:
     assert "`get_branch` reading from Git repo." in caplog.text
 
 
-def test_get_branch_from_metadata(
-    caplog, mock_git_branch: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert meta.get_branch(PACKAGE_NAME) == BRANCH_NAME
-    assert mock_git_branch.called
-    assert "`get_branch` reading from metadata." in caplog.text
-
-
-def test_get_branch_from_metadata_no_metadata(
-    caplog, mock_git_branch: MagicMock, mock_read_metadata: MagicMock
-) -> None:
-    mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
-    mock_read_metadata.return_value = meta.Metadata()
-    with caplog.at_level(logging.DEBUG, logger="thds.core.meta"):
-        assert not meta.get_branch(PACKAGE_NAME)
-    assert mock_git_branch.called
-    assert mock_read_metadata.called
-    assert "`get_branch` reading from metadata." in caplog.text
-    assert "`get_branch` found no branch." in caplog.text
-
-
 def test_get_branch_no_branch(caplog, mock_git_branch: MagicMock) -> None:
     mock_git_branch.side_effect = subprocess.CalledProcessError(-1, [])
     with caplog.at_level(logging.WARNING):
         assert not meta.get_branch()
     assert mock_git_branch.called
     assert "`get_branch` found no branch." in caplog.text
-
-
-def test_is_deployed_with_metadata(mock_read_metadata: MagicMock) -> None:
-    assert meta.is_deployed(PACKAGE_NAME)
-
-
-def test_is_deployed_with_empty_metadata(mock_read_empty_metadata: MagicMock) -> None:
-    assert not meta.is_deployed(PACKAGE_NAME)
 
 
 def test_get_version_from_package(mock_version: MagicMock) -> None:
@@ -513,54 +329,6 @@ def test_get_base_package_no_package(caplog, mock_base_package: MagicMock) -> No
         assert meta.get_base_package("unknown.package") == ""
     assert mock_base_package.call_count == 4
     assert "Could not find the base package" in caplog.text
-
-
-def test_read_metadata_from_package(mock_open_text: MagicMock, metadata: meta.Metadata) -> None:
-    assert meta.read_metadata(PACKAGE_NAME) == metadata
-    assert mock_open_text.call_count == 1
-
-
-def test_read_metadata_from_module(mock_open_text: MagicMock, metadata: meta.Metadata) -> None:
-    assert meta.read_metadata(f"{PACKAGE_NAME}.module") == metadata
-    assert mock_open_text.call_count == 2
-
-
-def test_read_metadata_no_package(mock_open_text: MagicMock) -> None:
-    metadata = meta.Metadata()
-    assert meta.read_metadata("unknown.package.module") == metadata
-    assert mock_open_text.call_count == 3
-
-
-def test_read_metadata_errors_on___main__() -> None:
-    with pytest.raises(ValueError) as ex:
-        meta.read_metadata("__main__")
-    assert ex.match(r"'__main__'.$")
-
-
-def test_read_metadata_errors_on_no_pkg_passed() -> None:
-    with pytest.raises(ValueError) as ex:
-        meta.read_metadata("")
-    assert ex.match(r"^`read_meta` is missing")
-
-
-def test_write_metadata(mock_init_metadata: MagicMock, metadata: meta.Metadata, tmp_path: Path) -> None:
-    d = tmp_path / "src/thds/test"
-    d.mkdir(parents=True)
-    meta.write_metadata("test", wdir=tmp_path, deploying=True)
-    with open(d / "meta.json", "r") as f:
-        meta_read = meta.meta_converter.structure(json.load(f), meta.Metadata)
-    assert meta_read == metadata
-
-
-def test_write_metadata_not_deploying(
-    mock_init_metadata: MagicMock, metadata: meta.Metadata, tmp_path: Path
-) -> None:
-    d = tmp_path / "src/thds/test"
-    d.mkdir(parents=True)
-    meta.write_metadata("test", wdir=tmp_path, deploying=False)
-    with pytest.raises(FileNotFoundError):
-        with open(d / "meta.json", "r") as f:
-            meta.meta_converter.structure(json.load(f), meta.Metadata)
 
 
 def test_get_repo_name():
