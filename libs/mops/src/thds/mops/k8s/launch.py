@@ -129,7 +129,7 @@ def launch(
 
         logger.debug("Applying environment variables ...")
         env_list = [
-            client.V1EnvVar(name="MOPS_IMAGE_FULL_TAG", value=container_image),
+            client.V1EnvVar(name="MOPS_IMAGE_RECURSIVE_REF", value=container_image),
             # by setting these, things will be 'reentrant' if it is necessary to launch jobs within this job.
         ]
         if env_vars is not None:
