@@ -413,7 +413,7 @@ def graphviz_render(
 def nx_to_echarts_graph(
     graph: nx.DiGraph,
     *,  # Enforces keyword-only arguments after this
-    default_symbol_size: int = 10,
+    default_symbol_size: int = 15,
     tooltip_formatter: str = "",
     force_config: ty.Optional[dict[str, Any]] = None,
     default_category_name: str = "Other",
@@ -543,13 +543,13 @@ def nx_to_echarts_graph(
                     "formatter": "{b}",  # Use node name ('label' or ID)
                 },
                 "edgeSymbol": ["none", "arrow"],
-                "edgeSymbolSize": 10,
+                "edgeSymbolSize": 7,
                 "focusNodeAdjacency": True,
                 "categories": echarts_categories,  # Use discovered categories
                 "data": echarts_nodes,
                 "links": echarts_links,
                 "force": final_force_config,
-                "itemStyle": {"borderColor": "#0A1E33", "borderWidth": 1.5},
+                "itemStyle": {"borderColor": "#0A1E33", "borderWidth": 1.0},
             }
         ],
     }
