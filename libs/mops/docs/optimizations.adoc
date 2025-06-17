@@ -69,7 +69,7 @@ as well as what is received (it can choose to download the data if necessary, or
 and pass it by reference to some later consumer).
 
 `Source` objects should generally be created via `thds.core.source.from_file` or
-`thds.core.source.from_uri`, though if you have an `AdlsFqn` you may use
+`thds.core.source.from_uri`, though if you have an `AdlsFqn` or `AdlsHashedResource` you may use
 `thds.adls.source.from_adls` directly to avoid needing to convert the `AdlsFqn` into a string.
 
 Functions consuming read-only data should define their parameter types as `Source`, and functions
