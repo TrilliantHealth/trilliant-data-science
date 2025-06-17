@@ -7,7 +7,8 @@ from pathlib import Path
 from azure.core.exceptions import HttpResponseError
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds import adls
+from thds.adls import ADLS_SCHEME, AdlsFqn, download, join, resource, ro_cache
+from thds.adls.cached_up_down import download_to_cache, upload_through_cache
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
 from thds.adls.global_client import get_global_fs_client
 from thds.core import config, fretry, home, link, log, scope
@@ -27,11 +28,11 @@ log.getLogger("azure.core").setLevel(logging.WARNING)
 logger = log.getLogger(__name__)
 
 
-def _selective_upload_path(path: Path, adls_uri: str) -> None:
+def _selective_upload_path(path: Path, fqn: AdlsFqn) -> None:
     if path.stat().st_size > _5_MB:
-        adls.upload_through_cache(adls_uri, path)
+        upload_through_cache(fqn, path)
     else:
-        adls.upload(adls_uri, path)
+        resource.upload(fqn, path)
 
 
 def is_creds_failure(exc: Exception) -> bool:
@@ -45,15 +46,15 @@ _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9,
 
 class AdlsBlobStore(BlobStore):
     def control_root(self, uri: str) -> str:
-        return str(adls.fqn.parse(uri).root())
+        return str(AdlsFqn.parse(uri).root())
 
-    def _client(self, fqn: adls.AdlsFqn) -> DataLakeFileClient:
-        return adls.get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path)
+    def _client(self, fqn: AdlsFqn) -> DataLakeFileClient:
+        return get_global_fs_client(fqn.sa, fqn.container).get_file_client(fqn.path)
 
     @_azure_creds_retry
     @scope.bound
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
-        fqn = adls.fqn.parse(remote_uri)
+        fqn = AdlsFqn.parse(remote_uri)
         scope.enter(log.logger_context(download=fqn))
         logger.debug(f"<----- downloading {type_hint}")
         with blob_not_found_translation(fqn):
@@ -65,7 +66,7 @@ class AdlsBlobStore(BlobStore):
     @scope.bound
     def getfile(self, remote_uri: str) -> Path:
         scope.enter(log.logger_context(download="mops-getfile"))
-        return adls.download_to_cache(remote_uri)
+        return download_to_cache(AdlsFqn.parse(remote_uri))
 
     @_azure_creds_retry
     @scope.bound
@@ -73,18 +74,18 @@ class AdlsBlobStore(BlobStore):
         self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"
     ) -> None:
         """Upload data to a remote path."""
-        adls.upload(remote_uri, data, content_type=type_hint)
+        resource.upload(AdlsFqn.parse(remote_uri), data, content_type=type_hint)
 
     @_azure_creds_retry
     @scope.bound
     def putfile(self, path: Path, remote_uri: str) -> None:
         scope.enter(log.logger_context(upload="mops-putfile"))
-        _selective_upload_path(path, remote_uri)
+        _selective_upload_path(path, AdlsFqn.parse(remote_uri))
 
     @_azure_creds_retry
     @scope.bound
     def exists(self, remote_uri: str) -> bool:
-        fqn = adls.fqn.parse(remote_uri)
+        fqn = AdlsFqn.parse(remote_uri)
         scope.enter(log.logger_context(exists=fqn))
         return on_slow(
             lambda secs: LogSlow(f"Took {int(secs)}s to check if file exists."),
@@ -92,19 +93,19 @@ class AdlsBlobStore(BlobStore):
         )(lambda: self._client(fqn).exists())()
 
     def join(self, *parts: str) -> str:
-        return adls.fqn.join(*parts).rstrip("/")
+        return join(*parts).rstrip("/")
 
     def split(self, uri: str) -> ty.List[str]:
-        fqn = adls.fqn.parse(uri)
+        fqn = AdlsFqn.parse(uri)
         return [str(fqn.root()), *fqn.path.split("/")]
 
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
 
     def list(self, uri: str) -> ty.List[str]:
-        fqn = adls.fqn.parse(uri)
+        fqn = AdlsFqn.parse(uri)
         return [
-            str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, path.name))
+            str(AdlsFqn(fqn.sa, fqn.container, path.name))
             for path in get_global_fs_client(fqn.sa, fqn.container).get_paths(fqn.path, recursive=False)
         ]
 
@@ -127,10 +128,10 @@ class DangerouslyCachingStore(AdlsBlobStore):
     """
 
     def __init__(self, root: Path):
-        self._cache = adls.Cache(root.resolve(), ("ref", "hard"))
+        self._cache = ro_cache.Cache(root.resolve(), ("ref", "hard"))
 
     def exists(self, remote_uri: str) -> bool:
-        cache_path = self._cache.path(adls.fqn.parse(remote_uri))
+        cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
         if cache_path.exists():
             return True
         return super().exists(remote_uri)
@@ -140,10 +141,10 @@ class DangerouslyCachingStore(AdlsBlobStore):
         # of some sort. We use a completely separate cache for all of these things, because
         # in previous implementations, none of these things would have been cached at all.
         # (see comment on getfile below...)
-        fqn = adls.fqn.parse(remote_uri)
+        fqn = AdlsFqn.parse(remote_uri)
         cache_path = self._cache.path(fqn)
         if not cache_path.exists():
-            adls.download.download_or_use_verified(
+            download.download_or_use_verified(
                 get_global_fs_client(fqn.sa, fqn.container), fqn.path, cache_path, cache=self._cache
             )
         with cache_path.open("rb") as f:
@@ -161,7 +162,7 @@ class DangerouslyCachingStore(AdlsBlobStore):
         # (a link, usually) to our separate cache directory so that it's possible to
         # completely empty this particular mops cache (and all its 'dangerous' behavior)
         # simply by deleting that one cache directory.
-        cache_path = self._cache.path(adls.fqn.parse(remote_uri))
+        cache_path = self._cache.path(AdlsFqn.parse(remote_uri))
         if cache_path.exists():
             return cache_path
         outpath = super().getfile(remote_uri)
@@ -175,7 +176,7 @@ _DEFAULT_CONTROL_CACHE = config.item(
 
 
 def get_adls_blob_store(uri: str) -> ty.Optional[AdlsBlobStore]:
-    if not uri.startswith(adls.ADLS_SCHEME):
+    if not uri.startswith(ADLS_SCHEME):
         return None
 
     if DISABLE_CONTROL_CACHE() or not _DEFAULT_CONTROL_CACHE():

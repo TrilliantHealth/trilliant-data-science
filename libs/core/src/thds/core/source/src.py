@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import hashing, types
+from . import _download
 
 
 @dataclass(frozen=True)
@@ -72,8 +73,6 @@ class Source(os.PathLike):
         failure will raise SourceHashMismatchError.
         """
         if self.cached_path is None or not self.cached_path.exists():
-            from . import _download  # ugly circular import
-
             lpath = _download._get_download_handler(self.uri)(self.hash)
             # path() used to be responsible for checking the hash, but since we pass it to the downloader,
             # it really makes more sense to allow the downloader to decide how to verify its own download,

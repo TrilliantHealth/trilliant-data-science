@@ -7,10 +7,8 @@ except ModuleNotFoundError as mnf:
         "Please install mops with the `k8s` extra to use `thds.mops.k8s`."
     ) from mnf
 
-from . import batching, counts, job_future  # noqa: F401
-from ._launch import launch, shim  # noqa
 from .container_registry import autocr  # noqa: F401
-from .job_future import K8sJobFailedError  # noqa: F401
+from .launch import K8sJobFailedError, launch, shim  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
     ResourceDefinition,
