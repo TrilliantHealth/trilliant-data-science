@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from thds.core import config, log, scope
+from thds.termtool.colorize import colorized, make_colorized_out
 
-from ..._utils.colorize import colorized, make_colorized_out
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.partial import unwrap_partial
