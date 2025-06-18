@@ -1,3 +1,7 @@
+### 3.3.20250604
+
+- Turns off azcopy globally by default
+
 ### 3.3.20250603
 
 - Fix various places where we weren't returning connections to the underlying ConnectionPool, which led
