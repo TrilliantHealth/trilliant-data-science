@@ -14,8 +14,8 @@ from kubernetes import watch as k8s_watch
 
 from thds.core import scope
 from thds.core.log import getLogger, logger_context
+from thds.termtool.colorize import colorized
 
-from .._utils.colorize import colorized
 from . import config
 from .auth import load_config
 from .too_old_resource_version import parse_too_old_resource_version

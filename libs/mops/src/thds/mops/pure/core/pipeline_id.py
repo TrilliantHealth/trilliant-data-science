@@ -6,8 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from thds.core import hostname, log, meta, stack_context
-
-from ..._utils.colorize import colorized
+from thds.termtool.colorize import colorized
 
 # this is a global instead of a StackContext because we _do_ want it
 # to spill over automatically into new threads.
