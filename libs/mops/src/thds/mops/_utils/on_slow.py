@@ -3,7 +3,8 @@ from functools import wraps
 from timeit import default_timer
 
 from thds.core import log
-from thds.termtool.colorize import colorized, make_colorized_out
+
+from .colorize import colorized, make_colorized_out
 
 F = ty.TypeVar("F", bound=ty.Callable)
 logger = log.getLogger(__name__)

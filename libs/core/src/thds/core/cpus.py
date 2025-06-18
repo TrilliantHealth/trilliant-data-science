@@ -39,20 +39,7 @@ def _try_read_value(config_path: Path, parse: ty.Callable[[str], T]) -> ty.Optio
 
 def _parse_cpu_quota_and_period_v2(s: str) -> ty.Tuple[int, int]:
     """Parse both CPU quota and period from kernel cgroup v2 config file."""
-
-    parts = s.split()
-    quota_str, period_str = parts[0], parts[1]
-
-    if quota_str == "max":
-        # https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
-        #
-        # "In the above four control files, the special token “max” should be used
-        # to represent upward infinity for both reading and writing."
-        quota = -1  # Use -1 to indicate unlimited, matching v1 behavior
-    else:
-        quota = int(quota_str)
-
-    period = int(period_str)
+    quota, period = map(int, s.split())
     return quota, period
 
 

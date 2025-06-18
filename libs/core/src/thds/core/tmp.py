@@ -4,13 +4,12 @@ Module is given this name partly because we tend not to name other things intern
 the word 'tmp', preferring instead 'temp'. Therefore `tmp` will be a little less ambiguous
 overall.
 """
-
 import contextlib
 import shutil
 import tempfile
 import typing as ty
 from pathlib import Path
-from uuid import uuid4
+from random import SystemRandom
 
 from .home import HOMEDIR
 from .types import StrOrPath
@@ -46,7 +45,10 @@ def temppath_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
         # we would prefer _not_ to reinvent the wheel here, but if the tempfiles are
         # getting created on a different volume, then moves are no longer atomic, and
         # that's a huge pain for lots of reasons.
-        fname_parts = [".core-tmp-home-fs", str(uuid4())]
+        fname_parts = [
+            ".thds-core-tmp-home-fs",
+            str(SystemRandom().random())[2:],  # makes a float look like a numeric string
+        ]
         if basename:
             fname_parts.append(basename)
         dpath = parent_dir / "-".join(fname_parts)
@@ -62,10 +64,8 @@ def temppath_same_fs(lcl_path: StrOrPath = "") -> ty.Iterator[Path]:
     with tempfile.TemporaryDirectory() as tdir:
         # actually check whether we're on the same filesystem.
         if _are_same_fs(parent_dir, Path(tdir)):
-            # the standard path has us just using a normal temporary directory that we don't create ourselves.
-            yield Path(tdir) / "-".join(filter(None, ["core-tmp", basename]))
+            yield Path(tdir) / "-".join(filter(None, ["thds-core-tmp-def-fs", basename]))
         else:
-            # but if we need to do something special... here we are.
             yield from _tempdir_same_filesystem()
 
 

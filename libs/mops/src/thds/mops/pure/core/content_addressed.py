@@ -12,13 +12,7 @@ B64_ADDRESSED = "{algo}-b64-addressed"
 
 def storage_content_addressed(hash_str: str, algo: str, storage_root: str = "") -> str:
     hash_namespace = B64_ADDRESSED.format(algo=algo)
-    return "/".join(
-        [
-            (storage_root or active_storage_root()).strip("/"),
-            hash_namespace.strip("/"),
-            hash_str.strip("/"),
-        ]
-    )
+    return f"{storage_root or active_storage_root()}/{hash_namespace}/{hash_str}"
 
 
 class ContentAddressed(ty.NamedTuple):

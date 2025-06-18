@@ -48,7 +48,6 @@ def link(
     src = Path(src).resolve()
     if src == Path(dest).resolve():
         return "same"
-
     assert os.path.exists(src), f"Source {src} does not exist"
 
     dest_parent = _dest_parent(dest)
@@ -64,27 +63,24 @@ def link(
             try:
                 subprocess.check_output(["cp", "-c", str(src), str(tmp_link_dest)])
                 os.rename(tmp_link_dest, dest)
-                logger.debug("Created a copy-on-write reflink from %s to %s", src, dest)
+                logger.debug(f"Created a copy-on-write reflink from {src} to {dest}")
                 return "ref"
-
             except subprocess.CalledProcessError:
                 pass
         if "hard" in attempt_types:
             try:
                 os.link(src, tmp_link_dest)
                 os.rename(tmp_link_dest, dest)
-                logger.debug("Created a hardlink from %s to %s", src, dest)
+                logger.debug(f"Created a hardlink from {src} to {dest}")
                 return "hard"
-
             except OSError as oserr:
                 logger.warning(f"Unable to hard-link {src} to {dest} ({oserr})")
         if "soft" in attempt_types:
             try:
                 os.symlink(src, tmp_link_dest)
                 os.rename(tmp_link_dest, dest)
-                logger.debug("Created a softlink from %s to %s", src, dest)
+                logger.debug(f"Created a softlink from {src} to {dest}")
                 return "soft"
-
             except OSError as oserr:
                 logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
 
@@ -116,9 +112,7 @@ def link_or_copy(src: ct.StrOrPath, dest: ct.StrOrPath, *link_types: LinkType) -
         link_success_type = link(src, dest, *link_types)
         if link_success_type:
             return link_success_type
-
-        log_at_lvl = logger.debug if link_types == ("ref",) and not _IS_MAC else logger.info
-        log_at_lvl("Unable to link %s to %s using %s; falling back to copy.", src, dest, link_types)
+        logger.info(f"Unable to link {src} to {dest}; falling back to copy.")
 
     logger.debug("Copying %s to %s", src, dest)
     with tmp.temppath_same_fs(dest) as tmpfile:

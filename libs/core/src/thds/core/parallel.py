@@ -89,7 +89,7 @@ def yield_all(
     files.bump_limits()
     len_or_none = try_len(thunks)
 
-    if PARALLEL_OFF() or (len_or_none == 1 and not executor_cm):
+    if PARALLEL_OFF() or len_or_none == 1:
         # don't actually transfer this to an executor we only have one task.
         for key, thunk in thunks:
             try:
