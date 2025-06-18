@@ -7,7 +7,6 @@
 from . import adls  # noqa
 from ._magic.api import magic  # noqa
 from .core.entry import register_entry_handler
-from .core.lock.maintain import no_maintain as no_maintain_locks  # noqa: F401
 from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa
     add_pipeline_memospace_handlers,
@@ -22,7 +21,7 @@ from .core.use_runner import use_runner  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
 from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
-from .runner.types import FutureShim, Shim, ShimBuilder  # noqa
+from .runner.types import Shim, ShimBuilder  # noqa
 
 
 def _register_things() -> None:

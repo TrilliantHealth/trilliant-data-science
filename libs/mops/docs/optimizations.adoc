@@ -69,7 +69,7 @@ as well as what is received (it can choose to download the data if necessary, or
 and pass it by reference to some later consumer).
 
 `Source` objects should generally be created via `thds.core.source.from_file` or
-`thds.core.source.from_uri`, though if you have an `AdlsFqn` you may use
+`thds.core.source.from_uri`, though if you have an `AdlsFqn` or `AdlsHashedResource` you may use
 `thds.adls.source.from_adls` directly to avoid needing to convert the `AdlsFqn` into a string.
 
 Functions consuming read-only data should define their parameter types as `Source`, and functions
@@ -77,17 +77,12 @@ returning read-only data should use `Source` in the return type as well. The fun
 using `Path` or whatever else is convenient when creating new files, but prior to return, any file being
 returned should be converted into a `Source`, usually via `from_file`.
 
-- `source.from_file` will create a source with a local file uri. Before writing the
-  invocation result to the blob store, mops will automagically assign a remote
-  URI to these returned Source(s), based on the invocation output URI plus the
-  base name of the file (e.g.
+- `source.from_file` will automagically assign a remote URI name for your returned Source(s), based on
+  the invocation output URI plus the base name of the file (e.g.
   `/var/tmp/t4/9__2bhc914s58rs3gdf3d4t00000gr/snow_white.txt` ->
-  `adls://ds/tmp/foobar/pipeline/thds.my_function/snow_white.txt--VaultAskBrain.hPUok14h4T8BYy1oGgoaJu9LxNV6yVM154sFaP8/snow_white.txt`),
-  and upload the local file to the derived remote URI just before writing the
-  invocation result. Letting mops derive the remote URI is standard practice and
-  recommended, to avoid name collisions on a shared remote blob store.
-- To skip the automagic remote naming behavior, you may instead use
- `mops.pure.create_source_at_uri`, which also uploads the file immediately.
+  `adls://ds/tmp/foobar/pipeline/thds.my_function/snow_white.txt--VaultAskBrain.hPUok14h4T8BYy1oGgoaJu9LxNV6yVM154sFaP8/snow_white.txt`).
+  This is standard practice and recommended, to avoid name collisions on a shared remote blob store.
+- To skip the automagic remote naming behavior, you may instead use `mops.pure.create_source_at_uri`.
   Note that this risks name collisions, in particular the possibility of overwriting data that was meant
   to be read-only for the benefit of a downstream process. You have been warned...
 
