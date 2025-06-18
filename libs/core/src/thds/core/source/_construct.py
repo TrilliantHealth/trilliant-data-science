@@ -1,36 +1,14 @@
 import os
-import sys
 import typing as ty
 from functools import partial
 from pathlib import Path
 
-from .. import log
 from ..files import is_file_uri, path_from_uri, to_uri
-from ..hash_cache import filehash
-from ..hashing import Hash, Hasher, add_named_hash
+from ..hashing import Hash
+from . import _download
 from .src import Source
 
 # Creation from local Files or from remote URIs
-
-_AUTOHASH = "sha256"
-
-
-def set_file_autohash(
-    algo: str, hash_constructor: ty.Optional[ty.Callable[[str], Hasher]] = None
-) -> None:
-    """If you call this and provide a non-builtin hash algorithm, you must also provide a constructor for it."""
-    if hash_constructor:
-        hash_constructor(algo)  # this will raise if algo is not supported.
-        add_named_hash(algo, hash_constructor)
-    global _AUTOHASH
-    _AUTOHASH = sys.intern(algo)
-
-
-def hash_file(path: Path, algo: str = "") -> Hash:
-    hash_algo = sys.intern(algo or _AUTOHASH)
-    with log.logger_context(hash_for=f"source-{hash_algo}"):
-        computed_hash = filehash(hash_algo, path)
-        return computed_hash
 
 
 def from_file(
@@ -46,11 +24,10 @@ def from_file(
     if not path.exists():
         raise FileNotFoundError(path)
 
-    file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
     if uri:
-        src = from_uri(uri, file_hash)
+        src = from_uri(uri, _download._check_hash(hash, path))
     else:
-        src = Source(to_uri(path), file_hash)
+        src = Source(to_uri(path), _download._check_hash(hash, path))
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 

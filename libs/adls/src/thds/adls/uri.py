@@ -36,9 +36,3 @@ def resolve_any(fqn_or_uri: UriIsh) -> ty.Optional[fqn.AdlsFqn]:
 
 def parse_any(fqn_or_uri: UriIsh) -> fqn.AdlsFqn:
     return parse_uri(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
-
-
-def to_blob_windows_url(uri: UriIsh) -> str:
-    """Convert an ADLS URI to a Windows network path."""
-    fqn = parse_any(uri)
-    return f"https://{fqn.sa}.blob.core.windows.net/{fqn.container}/{fqn.path}"

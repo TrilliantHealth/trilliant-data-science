@@ -1,44 +1,3 @@
-## 3.9.20250807
-
-- Upload result sources using deferred work. A consequence of this is that these uploads are now
-  multithreaded.
-
-## 3.9.20250730
-
-- Reintroduce pre-shim lock maintenance that was removed in 3.9 because of the inefficiency it posed to
-  heavy users of FutureShims.
-- Make lock maintenance much more efficient (2 orders of magnitude fewer threads required) so that we
-  re-enable pre-shim lock maintenance.
-
-### 3.9.20250729
-
-- Tighten up some places where lack of orchestrator lock/lease maintenance could lead to multiple
-  invocations continuing to work all the way through the writing of the final result. This will not
-  prevent all such cases but it will prevent a majority of them.
-
-## 3.9
-
-- `MemoizingPicklingRunner` and `pure.magic` now provide an Executor-like interface, wherein you can
-  `.submit(fn, *args, **kwargs)` and receive an abstract `PFuture` as soon as the function has been
-  invoked via the shim - if and only if the underlying shim itself returns a `PFuture`. This should
-  hopefully unlock additional scaling in cases where there are many thousands of functions being run in
-  parallel.
-
-### 3.8.20250714
-
-- Make `deferred_work` use a restricted `ThreadPoolExecutor` so that we never spawn thousands of threads
-  to deal with lots of `Source` objects and writing their hashrefs. I imagine we should eventually batch
-  these...
-
-### 3.8.20250709
-
-- Only error on duplicate remote URIs when returning `core.Source` objects where the URI was not provided
-  and we have generated one.
-
-### 3.8.20250609
-
-- Uses `core.inspect.bind_arguments` internally.
-
 ### 3.8.20250602
 
 - Now raising an error instead of silently overwriting when duplicate basenames are used as output
@@ -442,7 +401,7 @@ Big changes to consistency and usability of memoization.
 
 Initial re-release as `mops`.
 
-# Ancient History (`trilliant-ml-ops`) versions below
+# Ancient History (`trilliant-ml-ops`) versions below:
 
 ## 30000003.7.0
 
