@@ -1,0 +1,83 @@
+[project]
+name = "thds.termtool"
+version = "1.0"
+# Patch version is a datetime determined upon release.
+description = "Tools for terminal-based applications"
+readme = "README.md"
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "ansicolors",
+    "thds-core",
+]
+
+#################
+# Runtime dependencies should have as low a bound as the library can
+# handle, and generally should have no upper bound unless actual
+# breakage is found, since that allows applications and other
+# libraries maximum flexibility.
+#################
+
+
+[project.urls]
+repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+[dependency-groups]
+dev = [
+    "mypy~=1.14",
+    "mypy-extensions~=1.0",
+    "pytest~=8.2",
+    "pytest-cov~=4.0",
+    "pytest-mock~=3.10",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-core = { path = "../../libs/core", editable = true }
+
+# TOOLING CONFIG
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.termtool"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    build/
+    | dist/
+    | \S+\.egg-info/
+)'''
+check_untyped_defs = true
+# in the main project code, we should have nothing without full type annotations.
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+	"colors",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+# we are not as strict about untyped things in tests, though projects should feel free to
+# make these overrides more targeted to keep test readability high.
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+# do not run integration test by default, but CI will pick it up
+addopts = "-m 'not integration'"
+markers = ["integration"]
+testpaths = ["tests"]

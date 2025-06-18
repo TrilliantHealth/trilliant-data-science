@@ -1,4 +1,4 @@
-from thds.mops._utils import colorize
+from thds.termtool import colorize
 
 
 def test_colors(capsys):
