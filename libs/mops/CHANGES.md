@@ -1,3 +1,7 @@
+### 3.8.20250609
+
+- Uses `core.inspect.bind_arguments` internally.
+
 ### 3.8.20250602
 
 - Now raising an error instead of silently overwriting when duplicate basenames are used as output
@@ -401,7 +405,7 @@ Big changes to consistency and usability of memoization.
 
 Initial re-release as `mops`.
 
-# Ancient History (`trilliant-ml-ops`) versions below:
+# Ancient History (`trilliant-ml-ops`) versions below
 
 ## 30000003.7.0
 
