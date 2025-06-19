@@ -1,7 +1,6 @@
 """Utilities built around pickle for the purpose of transferring large amounts of on-disk
 data and also functions."""
 
-import inspect
 import io
 import os
 import pickle
@@ -11,7 +10,7 @@ from functools import partial
 # so we can pickle and re-raise exceptions with remote tracebacks
 from tblib import pickling_support  # type: ignore
 
-from thds.core import hashing, log, source
+from thds.core import hashing, inspect, log, source
 
 from ..core import memo, metadata
 from ..core.source import prepare_source_argument, prepare_source_result
@@ -131,8 +130,7 @@ def freeze_args_kwargs(dumper: Dumper, f: ty.Callable, args: Args, kwargs: Kwarg
 
     Also binds default arguments, for maximum determinism/explicitness.
     """
-    bound_arguments = inspect.signature(f).bind(*args, **kwargs)
-    bound_arguments.apply_defaults()
+    bound_arguments = inspect.bind_arguments(f, *args, **kwargs)
     return gimme_bytes(dumper, (bound_arguments.args, bound_arguments.kwargs))
 
 
