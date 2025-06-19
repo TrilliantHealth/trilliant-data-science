@@ -1,3 +1,8 @@
+## 1.39
+
+- Adds helpers to `core.inspect` for dynamically getting arguments by name, internally using
+  `inspect.signature(func).find(*args, **kwargs)`.
+
 ## 1.38
 
 - Remove dependencies on `attrs` and `cattrs`, which were lightly used anyway.
