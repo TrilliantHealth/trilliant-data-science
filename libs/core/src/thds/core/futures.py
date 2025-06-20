@@ -28,11 +28,12 @@ class PFuture(ty.Protocol[R]):
         ...
 
     def result(self, timeout: ty.Optional[float] = None) -> R:
-        """
-        Return the result of the work item.
+        """Return the result of the work item.
 
-        If the work item raised an exception, this method raises the same
-        exception. If the timeout is reached, it raises TimeoutError.
+        If the work item raised an exception, this method raises the same exception.
+        If the timeout is reached, it raises TimeoutError.
+        Other exceptions (e.g. CancelledException) may also be raised depending on the
+        implementation.
         """
         ...
 
@@ -42,6 +43,8 @@ class PFuture(ty.Protocol[R]):
 
         Returns None if the work item completed without raising.
         If the timeout is reached, it raises TimeoutError.
+        Other exceptions (e.g. CancelledException) may also be raised depending on the
+        implementation.
         """
         ...
 
@@ -57,7 +60,11 @@ class PFuture(ty.Protocol[R]):
 
 class LazyFuture(PFuture[R]):
     def __init__(self, mk_future: ty.Callable[[], PFuture[R]]) -> None:
-        """mk_future should generally be serializable."""
+        """mk_future should generally be serializable.
+
+        It also needs to be repeatable - i.e. if it were resolved in two different
+        processes, it should return the same 'result' (value or exception) in both.
+        """
         self._mk_future = mk_future
         self._lazy_future = lazy.lazy(mk_future)
 
@@ -106,11 +113,22 @@ class LazyFuture(PFuture[R]):
         self._lazy_future().add_done_callback(fn)
 
 
+P = ParamSpec("P")
+
+
+def make_lazy(mk_future: ty.Callable[P, PFuture[R]]) -> ty.Callable[P, LazyFuture[R]]:
+    """Create a LazyFuture that will lazily resolve the given callable."""
+
+    def mk_future_with_params(*args: P.args, **kwargs: P.kwargs) -> LazyFuture[R]:
+        return LazyFuture(partial(mk_future, *args, **kwargs))
+
+    return mk_future_with_params
+
+
 @dataclass(frozen=True)
 class ResolvedFuture(PFuture[R]):
-    def __init__(self, result: R) -> None:
-        self._result = result
-        self._done = True
+    _result: R
+    _done: bool = True
 
     def running(self) -> bool:
         return False
