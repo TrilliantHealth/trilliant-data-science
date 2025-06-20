@@ -1,4 +1,5 @@
 import inspect
+import typing as ty
 from dataclasses import dataclass
 
 
@@ -55,3 +56,15 @@ def get_caller_info(skip: int = 2) -> CallerInfo:
     del parentframe
 
     return CallerInfo(module=module, klass=klass, caller=caller, line=line)
+
+
+def bind_arguments(
+    func: ty.Callable, *args: ty.Sequence, **kwargs: ty.Mapping[str, ty.Any]
+) -> inspect.BoundArguments:
+    bound = inspect.signature(func).bind(*args, **kwargs)
+    bound.apply_defaults()
+    return bound
+
+
+def get_argument(arg_name: str, bound_arguments: inspect.BoundArguments) -> ty.Any:
+    return bound_arguments.arguments[arg_name]
