@@ -1,6 +1,6 @@
 [project]
 name = "thds.mops"
-version = "3.8"
+version = "3.9"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
 readme = "docs/pypi_readme.md"
@@ -40,7 +40,7 @@ Repository = "https://github.com/TrilliantHealth/ds-monorepo"
 [dependency-groups]
 dev = [
     "kubernetes>=18.20",
-    "mypy~=1.11.0",
+    "mypy>=1.16",
     "mypy-extensions~=1.0",
     "pytest~=7.2",
     "pytest-cov~=4.0",

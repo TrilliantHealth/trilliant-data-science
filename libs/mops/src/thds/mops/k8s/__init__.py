@@ -8,7 +8,8 @@ except ModuleNotFoundError as mnf:
     ) from mnf
 
 from .container_registry import autocr  # noqa: F401
-from .launch import K8sJobFailedError, launch, shim  # noqa
+from .job_future import K8sJobFailedError  # noqa: F401
+from .launch import launch, shim  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
     ResourceDefinition,
