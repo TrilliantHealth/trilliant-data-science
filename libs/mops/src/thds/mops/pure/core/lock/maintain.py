@@ -20,7 +20,7 @@ from thds.core import log
 from ._funcs import make_lock_uri
 from .read import get_writer_id, make_read_lockfile
 from .types import LockAcquired
-from .write import LockfileWriter, make_lock_contents
+from .write import LockEmitter, LockfileWriter
 
 logger = log.getLogger(__name__)
 
@@ -103,7 +103,7 @@ def remote_lock_maintain(lock_dir_uri: str, expected_writer_id: str = "") -> Loc
     lockfile_writer = LockfileWriter(
         current_writer_id,
         lock_dir_uri,
-        make_lock_contents(get_writer_id(lock_contents), timedelta(seconds=expire_s)),
+        LockEmitter(get_writer_id(lock_contents), timedelta(seconds=expire_s)),
         expire_s,
         writer_name="remote",
     )

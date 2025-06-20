@@ -4,41 +4,23 @@ import os
 import threading
 import typing as ty
 import uuid
+from functools import partial
 
 from kubernetes import client
 
-from thds.core import scope
-from thds.core.log import logger_context
+from thds import core
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config
+from . import config, counts, job_future
 from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .logging import JobLogWatcher
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
 from .thds_std import embed_thds_auth
-from .wait_job import wait_for_job
 
 LAUNCHED = colorized(fg="white", bg="green")
-COMPLETE = colorized(fg="white", bg="blue")
-FAILED = colorized(fg="white", bg="red")
-
-
-class K8sJobFailedError(Exception):
-    """Raised by `launch` when a Job is seen to terminate in a Failed state."""
-
-
-class Counter:
-    def __init__(self) -> None:
-        self.value = 0
-        self._lock = threading.Lock()
-
-    def inc(self) -> int:
-        with self._lock:
-            self.value += 1
-            return self.value
 
 
 def sanitize_str(name: str) -> str:
@@ -65,12 +47,10 @@ def construct_job_name(user_prefix: str, job_num: str) -> str:
     return name
 
 
-_LAUNCH_COUNT = Counter()
-_FINISH_COUNT = Counter()
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
 
 
-@scope.bound
+@core.scope.bound
 def launch(
     container_image: str,
     args: ty.Sequence[str],
@@ -82,37 +62,34 @@ def launch(
     # building.  these should get separated in a future change.
     name_prefix: str = "",
     dry_run: bool = False,
-    fire_and_forget: bool = False,
     suppress_logs: bool = False,
     transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = embed_thds_auth,
     # this is a default for now. later if we share this code we'll need to have a wrapper interface
     service_account_name: str = "",
-) -> None:
+) -> core.futures.LazyFuture[bool]:
     """Launch a Kubernetes job.
 
     Required parameters are the container_image and the arguments to
     that image, just as if you were running this directly with Docker.
 
-    Unless fire_and_forget=True, will poll until Job completes and
-    will raise K8sJobFailedError if the Job fails. None is returned
-    if the Job succeeds.
+    Returns a Future that will resolve to True when the Job completes successfully, or
+    raise K8sJobFailedError if the Job fails.
 
     `name_prefix` is an optional parameter for debugging/developer
     convenience. A generated suffix will be added to it.
-
     """
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
-    job_num = f"{_LAUNCH_COUNT.inc():0>3}"
+
+    job_num = f"{counts.LAUNCH_COUNT.inc():0>3}"
     name = construct_job_name(name_prefix, job_num)
-    scope.enter(logger_context(job=name))
+    core.scope.enter(core.log.logger_context(job=name))
     node_narrowing = node_narrowing or dict()
 
     # TODO move this entire function out to be separately callable
     @k8s_sdk_retry()
     def assemble_base_job() -> client.models.V1Job:
         logger.debug(f"Assembling job named `{name}` on image `{container_image}`")
-        logger.debug("Fire and forget: %s", fire_and_forget)
         logger.debug("Loading kube configs ...")
         load_config()
         logger.debug("Populating job object ...")
@@ -185,7 +162,7 @@ def launch(
     if dry_run:
         job_with_all_transforms()
         logger.info("Dry run assembly successful; not launching...")
-        return
+        return core.futures.LazyFuture(partial(core.futures.ResolvedFuture, True))
 
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:
@@ -205,18 +182,13 @@ def launch(
             daemon=True,
         ).start()
 
-    if not fire_and_forget:
-
-        def counts() -> str:
-            launched = _LAUNCH_COUNT.value
-            return f"- ({launched - _FINISH_COUNT.inc()} unfinished of {launched})"
-
-        job_name = job.metadata.name
-        del job  # trying to save memory here while we wait...
-        if not wait_for_job(job_name, short_name=job_num):
-            logger.error(FAILED(f"Job {job_num} Failed! {counts()}"))
-            raise K8sJobFailedError(f"Job {job_name} failed.")
-        logger.info(COMPLETE(f"Job {job_num} Complete! {counts()}"))
+    return core.futures.LazyFuture(
+        partial(
+            job_future.make_job_completion_future,
+            job.metadata.name,
+            namespace=config.k8s_namespace(),
+        )
+    )
 
 
 def shim(
