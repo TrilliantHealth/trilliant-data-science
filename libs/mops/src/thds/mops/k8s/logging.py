@@ -13,8 +13,8 @@ from kubernetes import client, watch
 
 from thds import core
 from thds.core.log import logger_context
+from thds.termtool.colorize import colorized, make_colorized_out, next_color
 
-from .._utils.colorize import colorized, make_colorized_out, next_color
 from .._utils.locked_cache import locked_cached
 from . import config
 from ._shared import logger
