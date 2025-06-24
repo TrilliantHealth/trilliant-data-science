@@ -12,16 +12,19 @@ import os
 import subprocess
 import typing as ty
 import urllib.parse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.core import cache, config, log
+from thds.core import cache, config, cpus, log
 
 from .. import _progress, conf, uri
 
-DONT_USE_AZCOPY = config.item("dont_use", default=True, parse=config.tobool)
+DONT_USE_AZCOPY = config.item("dont_use", default=False, parse=config.tobool)
+MIN_FILE_SIZE = config.item("min_file_size", default=20 * 10**6, parse=int)  # 20 MB
 
 _AZCOPY_LOGIN_WORKLOAD_IDENTITY = "azcopy login --login-type workload".split()
 _AZCOPY_LOGIN_LOCAL_STATUS = "azcopy login status".split()
@@ -33,37 +36,54 @@ _AZCOPY_LOGIN_LOCAL_STATUS = "azcopy login status".split()
 logger = log.getLogger(__name__)
 
 
-class DownloadRequest(ty.NamedTuple):
+@dataclass
+class DownloadRequest:
+    temp_path: Path
+    size_bytes: int
+
+
+@dataclass
+class SdkDownloadRequest(DownloadRequest):
     """Use one or the other, but not both, to write the results."""
 
     writer: ty.IO[bytes]
-    temp_path: Path
 
 
 @cache.locking  # only run this once per process.
-def _good_azcopy_login() -> bool:
+def is_azcopy_enabled() -> bool:
+    """Checks if this is disabled, and also checks for a good login."""
     if DONT_USE_AZCOPY():
+        logger.debug('Using azcopy is disabled by confg "thds.adls.azcopy.download.dont_use"')
         return False
 
     try:
         subprocess.run(_AZCOPY_LOGIN_WORKLOAD_IDENTITY, check=True, capture_output=True)
-        logger.info("Will use azcopy for downloads in this process...")
+        logger.info("Will use azcopy for large downloads in this process...")
         return True
 
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
     try:
         subprocess.run(_AZCOPY_LOGIN_LOCAL_STATUS, check=True)
-        logger.info("Will use azcopy for downloads in this process...", dl=None)
+        logger.info("Will use azcopy for large downloads in this process...", dl=None)
         return True
+
     except FileNotFoundError:
-        logger.info("azcopy is not installed or not on your PATH, so we cannot speed up downloads")
+        logger.info("azcopy is not installed or not on your PATH, so we cannot speed up large downloads")
     except subprocess.CalledProcessError as cpe:
         logger.warning(
-            "You are not logged in with azcopy, so we cannot speed up downloads."
+            "You are not logged in with azcopy, so we cannot speed up large downloads."
             f" Run `azcopy login` to fix this. Return code was {cpe.returncode}"
         )
     return False
+
+
+def is_big_enough_for_azcopy(size_bytes: int) -> bool:
+    return size_bytes >= MIN_FILE_SIZE()
+
+
+def should_use_azcopy(file_size_bytes: int) -> bool:
+    return is_azcopy_enabled() and is_big_enough_for_azcopy(file_size_bytes)
 
 
 def _azcopy_download_command(dl_file_client: DataLakeFileClient, path: Path) -> ty.List[str]:
@@ -89,12 +109,17 @@ def _parse_azcopy_json_output(line: str) -> AzCopyJsonLine:
 
 
 @contextmanager
-def _track_azcopy_progress(http_url: str) -> ty.Iterator[ty.Callable[[str], None]]:
+def _track_azcopy_progress(http_url: str, size_bytes: int) -> ty.Iterator[ty.Callable[[str], None]]:
     """Context manager that tracks progress from AzCopy JSON lines. This works for both async and sync impls."""
     tracker = _progress.get_global_download_tracker()
     adls_uri = urllib.parse.unquote(str(uri.parse_uri(http_url)))
+    if size_bytes:
+        tracker.add(adls_uri, total=size_bytes)
 
     def track(line: str):
+        if not size_bytes:
+            return  # no size, no progress
+
         if not line:
             return
 
@@ -108,15 +133,32 @@ def _track_azcopy_progress(http_url: str) -> ty.Iterator[ty.Callable[[str], None
     yield track
 
 
-def _restrict_mem() -> dict:
-    return dict(os.environ, AZCOPY_BUFFER_GB="0.3")
+@lru_cache
+def _restrict_resource_usage() -> dict:
+    num_cpus = cpus.available_cpu_count()
+
+    env = dict(os.environ)
+    if "AZCOPY_BUFFER_GB" not in os.environ:
+        likely_mem_gb_available = num_cpus * 4  # assume 4 GB per CPU core is available
+        # o3 suggested 15% of the total available memory...
+        env["AZCOPY_BUFFER_GB"] = str(likely_mem_gb_available * 0.15)
+    if "AZCOPY_CONCURRENCY" not in os.environ:
+        env["AZCOPY_CONCURRENCY"] = str(int(num_cpus * 2))
+
+    logger.info(
+        "AZCOPY_BUFFER_GB == %s and AZCOPY_CONCURRENCY == %s",
+        env["AZCOPY_BUFFER_GB"],
+        env["AZCOPY_CONCURRENCY"],
+    )
+    return env
 
 
 def sync_fastpath(
     dl_file_client: DataLakeFileClient,
     download_request: DownloadRequest,
 ) -> None:
-    if _good_azcopy_login():
+    if not isinstance(download_request, SdkDownloadRequest):
+        logger.debug("Downloading %s using azcopy", dl_file_client.url)
         try:
             # Run the copy
             process = subprocess.Popen(
@@ -124,10 +166,10 @@ def sync_fastpath(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                env=_restrict_mem(),
+                env=_restrict_resource_usage(),
             )
             assert process.stdout
-            with _track_azcopy_progress(dl_file_client.url) as track:
+            with _track_azcopy_progress(dl_file_client.url, download_request.size_bytes) as track:
                 for line in process.stdout:
                     track(line)
             return  # success
@@ -135,33 +177,40 @@ def sync_fastpath(
         except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
 
-    dl_file_client.download_file(
-        max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
-        connection_timeout=conf.CONNECTION_TIMEOUT(),
-    ).readinto(download_request.writer)
+    logger.debug("Downloading %s using Python SDK", dl_file_client.url)
+    if hasattr(download_request, "writer"):
+        writer_cm = nullcontext(download_request.writer)
+    else:
+        writer_cm = open(download_request.temp_path, "wb")  # type: ignore[assignment]
+    with writer_cm as writer:
+        dl_file_client.download_file(
+            max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
+            connection_timeout=conf.CONNECTION_TIMEOUT(),
+        ).readinto(writer)
 
 
 async def async_fastpath(
     dl_file_client: DataLakeFileClient,
     download_request: DownloadRequest,
 ) -> None:
-    # technically it would be 'better' to do this login in an async subproces,
+    # technically it would be 'better' to do this login in an async subprocess,
     # but it involves a lot of boilerplate, _and_ we have no nice way to cache
     # the value, which is going to be computed one per process and never again.
     # So we'll just block the async loop for a couple of seconds one time...
-    if _good_azcopy_login():
+    if not isinstance(download_request, SdkDownloadRequest):
+        logger.debug("Downloading %s using azcopy", dl_file_client.url)
         try:
             # Run the copy
             copy_proc = await asyncio.create_subprocess_exec(
                 *_azcopy_download_command(dl_file_client, download_request.temp_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=_restrict_mem(),
+                env=_restrict_resource_usage(),
             )
             assert copy_proc.stdout
 
             # Feed lines to the tracker asynchronously
-            with _track_azcopy_progress(dl_file_client.url) as track:
+            with _track_azcopy_progress(dl_file_client.url, download_request.size_bytes) as track:
                 while True:
                     line = await copy_proc.stdout.readline()
                     if not line:  # EOF
@@ -178,9 +227,15 @@ async def async_fastpath(
         except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
 
-    reader = await dl_file_client.download_file(  # type: ignore[misc]
-        # TODO - check above type ignore
-        max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
-        connection_timeout=conf.CONNECTION_TIMEOUT(),
-    )
-    await reader.readinto(download_request.writer)
+    logger.debug("Downloading %s using Async Python SDK", dl_file_client.url)
+    if hasattr(download_request, "writer"):
+        writer_cm = nullcontext(download_request.writer)
+    else:
+        writer_cm = open(download_request.temp_path, "wb")  # type: ignore[assignment]
+    with writer_cm as writer:
+        reader = await dl_file_client.download_file(  # type: ignore[misc]
+            # TODO - check above type ignore
+            max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
+            connection_timeout=conf.CONNECTION_TIMEOUT(),
+        )
+        await reader.readinto(writer)

@@ -39,11 +39,14 @@ def _atomic_download_and_move(
 ) -> ty.Iterator[azcopy.download.DownloadRequest]:
     known_size = (properties.size or 0) if properties else 0
     with tmp.temppath_same_fs(dest) as dpath:
-        with open(dpath, "wb") as f:
-            logger.debug("Downloading %s", fqn)
-            yield azcopy.download.DownloadRequest(
-                report_download_progress(f, str(fqn), known_size), dpath
-            )
+        logger.debug("Downloading %s", fqn)
+        if azcopy.download.should_use_azcopy(known_size):
+            yield azcopy.download.DownloadRequest(dpath, known_size)
+        else:
+            with open(dpath, "wb") as down_f:
+                yield azcopy.download.SdkDownloadRequest(
+                    dpath, known_size, report_download_progress(down_f, str(fqn), known_size)
+                )
         if known_size and os.path.getsize(dpath) != known_size:
             raise ValueError(
                 f"Downloaded file {dpath} has size {os.path.getsize(dpath)}"

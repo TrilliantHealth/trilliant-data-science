@@ -49,7 +49,7 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64(test_dest: Path):
     # we need to know whether to skip the download.
 
     wfp = co.send(FileProperties())
-    assert isinstance(wfp, azcopy.download.DownloadRequest)
+    assert isinstance(wfp, azcopy.download.SdkDownloadRequest)
     wfp.writer.write(b"ello")
 
     with pytest.raises(StopIteration) as si:
