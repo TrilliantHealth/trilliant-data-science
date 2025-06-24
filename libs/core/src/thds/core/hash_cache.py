@@ -14,10 +14,9 @@ import hashlib
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 from . import config, files
-from .hashing import Hash, hash_using
+from .hashing import Hash, Hasher, hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
@@ -53,7 +52,7 @@ def _is_no_older_than(file: Path, other: Path) -> bool:
     return file.stat().st_mtime >= other.stat().st_mtime
 
 
-def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
+def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
     """Hashes a file with the given hashlib hasher. If we've already previously computed
     the given hash for the file and the file hasn't changed (according to filesystem
     mtime) since we stored that hash, we'll just return the cached hash.
@@ -74,7 +73,12 @@ def hash_file(filepath: StrOrPath, hasher: Any) -> bytes:
         # I want to know how often we're finding 'outdated' hashes; those should be rare.
         log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}{hash_cached}")
 
-    hash_bytes = hash_using(resolved_path, hasher).digest()
+    if hasattr(hasher, "update_mmap"):
+        # a special case for the blake3 module, which we don't depend on but which somebody else might.
+        hash_bytes = hasher.update_mmap(resolved_path).digest()
+    else:
+        hash_bytes = hash_using(resolved_path, hasher).digest()
+
     cached_hash_path.parent.mkdir(parents=True, exist_ok=True)
     with files.atomic_binary_writer(cached_hash_path) as f:
         f.write(hash_bytes)

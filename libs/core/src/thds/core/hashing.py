@@ -2,6 +2,7 @@
 https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
 I have written this code too many times to write it again. Why isn't this in the stdlib?
 """
+
 import base64
 import contextlib
 import io
@@ -20,11 +21,28 @@ _CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 65536))
 # least a halfway decent guess and benchmarking this ourselves would
 # be a massive waste of time.
 
-T = ty.TypeVar("T")
+
+class Hasher(ty.Protocol):
+    """This may be incomplete as far as hashlib is concerned, but it covers everything we use."""
+
+    @property
+    def name(self) -> str:
+        """The name of the hashing algorithm, e.g. 'sha256'."""
+        ...
+
+    def update(self, __byteslike: ty.Union[bytes, bytearray, memoryview]) -> None:
+        """Update the hash object with the bytes-like object."""
+        ...
+
+    def digest(self) -> bytes:
+        ...
+
+
+H = ty.TypeVar("H", bound=Hasher)
 SomehowReadable = ty.Union[ty.AnyStr, ty.IO[ty.AnyStr], Path]
 
 
-def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: T) -> T:
+def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: H) -> H:
     """Return thing you can call .digest or .hexdigest on.
 
     E.g.:
@@ -53,7 +71,7 @@ def attempt_readable(thing: SomehowReadable) -> ty.Iterator[ty.IO[bytes]]:
         yield readable
 
 
-def hash_using(data: SomehowReadable, hasher: T) -> T:
+def hash_using(data: SomehowReadable, hasher: H) -> H:
     """This is quite dynamic - but if your data object is not readable
     bytes and is not openable as bytes, you'll get a
     FileNotFoundError, or possibly a TypeError or other gremlin.
@@ -66,7 +84,7 @@ def hash_using(data: SomehowReadable, hasher: T) -> T:
         return hash_readable_chunks(readable, hasher)
 
 
-def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
+def hash_anything(data: SomehowReadable, hasher: H) -> ty.Optional[H]:
     try:
         return hash_using(data, hasher)
     except (FileNotFoundError, TypeError):
