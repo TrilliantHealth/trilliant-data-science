@@ -78,6 +78,10 @@ def _verify_md5s_before_and_after_download(
 
     yield  # perform download
 
+    if not remote_md5b64 and not expected_md5b64:
+        # if we have neither of these, then we have nothing to check.
+        return
+
     with log.logger_context(hash_for="after-download"):
         local_md5b64 = b64(md5_file(local_dest))
     check_reasonable_md5b64(local_md5b64)  # must always exist

@@ -87,7 +87,9 @@ def should_use_azcopy(file_size_bytes: int) -> bool:
 
 
 def _azcopy_download_command(dl_file_client: DataLakeFileClient, path: Path) -> ty.List[str]:
-    return ["azcopy", "copy", dl_file_client.url, str(path), "--output-type=json"]
+    # turns out azcopy checks md5 by default - but we we do our own checking, sometimes with faster methods,
+    # and their checking _dramatically_ slows downloads on capable machines, so we disable it.
+    return ["azcopy", "copy", dl_file_client.url, str(path), "--output-type=json", "--check-md5=NoCheck"]
 
 
 class AzCopyMessage(ty.TypedDict):
