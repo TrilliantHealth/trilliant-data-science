@@ -1,14 +1,25 @@
 import os
+import sys
 import typing as ty
 from functools import partial
 from pathlib import Path
 
+from .. import log
 from ..files import is_file_uri, path_from_uri, to_uri
+from ..hash_cache import filehash
 from ..hashing import Hash
-from . import _download
 from .src import Source
 
 # Creation from local Files or from remote URIs
+
+SHA256 = "sha256"  # this hopefully interns the string which makes sure that all our pickles reuse the reference
+
+
+def hash_file(path: Path, algo: str = SHA256) -> Hash:
+    hash_algo = sys.intern(algo or SHA256)
+    with log.logger_context(hash_for=f"source-{hash_algo}"):
+        computed_hash = filehash(hash_algo, path)
+        return computed_hash
 
 
 def from_file(
@@ -25,9 +36,9 @@ def from_file(
         raise FileNotFoundError(path)
 
     if uri:
-        src = from_uri(uri, _download._check_hash(hash, path))
+        src = from_uri(uri, hash or hash_file(path))
     else:
-        src = Source(to_uri(path), _download._check_hash(hash, path))
+        src = Source(to_uri(path), hash or hash_file(path))
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
