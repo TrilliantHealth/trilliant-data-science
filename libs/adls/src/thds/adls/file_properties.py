@@ -1,6 +1,10 @@
+import typing as ty
+
 from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.storage.blob import BlobProperties
 from azure.storage.filedatalake import FileProperties
+
+from thds.core import hashing
 
 from .errors import translate_azure_error
 from .fqn import AdlsFqn
@@ -25,6 +29,18 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
         .get_blob_client(fqn.path)
         .get_blob_properties()
     )
+
+
+def extract_hash_from_props(
+    props: ty.Union[FileProperties, BlobProperties]
+) -> ty.Optional[hashing.Hash]:
+    if props.metadata and "hash_blake3_b64" in props.metadata:
+        return hashing.Hash("blake3", hashing.db64(props.metadata["hash_blake3_b64"]))
+
+    if props.content_settings and props.content_settings.content_md5:
+        return hashing.Hash("md5", props.content_settings.content_md5)
+
+    return None
 
 
 # At some point it may make sense to separate file and blob property modules,

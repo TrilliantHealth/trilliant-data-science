@@ -8,6 +8,7 @@ internal code and data sets.
 That said, please _do not_ use MD5 for non-Azure things. Prefer SHA256
 if at all possible.
 """
+
 import hashlib
 import typing as ty
 from pathlib import Path
@@ -41,6 +42,7 @@ def try_md5(data: AnyStrSrc) -> ty.Optional[bytes]:
     """
     if isinstance(data, Path):
         return md5_file(data)
+
     res = hash_anything(data, hashlib.md5())
     if res:
         return res.digest()

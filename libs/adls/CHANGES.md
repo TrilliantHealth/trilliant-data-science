@@ -1,3 +1,12 @@
+# 4.0
+
+- Switch to `blake3` hash for all new uploads, and prefer it for any download verification where it is
+  embedded as the metadata key `hash_blake3_b64`. This is a backward-incompatible change, since we no
+  longer compute MD5 automatically for your uploads.
+- Completely remove `AdlsHashedResource` - it was mostly obsoleted by `core.Source`, and is now
+  completely obsolete since we are preferring a faster hash, `blake3`.
+- `adls.upload_through_cache` now returns a `core.Source` object rather than an `AdlsHashedResource`.
+
 ### 3.3.20250604
 
 - Turns off azcopy globally by default

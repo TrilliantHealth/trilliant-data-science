@@ -19,7 +19,7 @@ from pathlib import Path
 
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.core import cache, config, cpus, log
+from thds.core import cache, config, cpus, log, scope
 
 from .. import _progress, conf, uri
 
@@ -50,22 +50,19 @@ class SdkDownloadRequest(DownloadRequest):
 
 
 @cache.locking  # only run this once per process.
-def is_azcopy_enabled() -> bool:
-    """Checks if this is disabled, and also checks for a good login."""
-    if DONT_USE_AZCOPY():
-        logger.debug('Using azcopy is disabled by confg "thds.adls.azcopy.download.dont_use"')
-        return False
-
+@scope.bound
+def good_azcopy_login() -> bool:
+    scope.enter(log.logger_context(dl=None))
     try:
         subprocess.run(_AZCOPY_LOGIN_WORKLOAD_IDENTITY, check=True, capture_output=True)
-        logger.info("Will use azcopy for large downloads in this process...")
+        logger.info("Azcopy login with workload identity, so we can use it for large downloads")
         return True
 
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
     try:
         subprocess.run(_AZCOPY_LOGIN_LOCAL_STATUS, check=True)
-        logger.info("Will use azcopy for large downloads in this process...", dl=None)
+        logger.info("Azcopy login with local token, so we can use it for large downloads")
         return True
 
     except FileNotFoundError:
@@ -83,7 +80,7 @@ def is_big_enough_for_azcopy(size_bytes: int) -> bool:
 
 
 def should_use_azcopy(file_size_bytes: int) -> bool:
-    return is_azcopy_enabled() and is_big_enough_for_azcopy(file_size_bytes)
+    return is_big_enough_for_azcopy(file_size_bytes) and not DONT_USE_AZCOPY() and good_azcopy_login()
 
 
 def _azcopy_download_command(dl_file_client: DataLakeFileClient, path: Path) -> ty.List[str]:

@@ -1,21 +1,20 @@
 import typing as ty
 from pathlib import Path
 
-from thds.adls import source
-from thds.core import parallel
+from thds import core
 from thds.core.source.tree import SourceTree
 from thds.core.thunks import thunking
 
+from . import upload
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
 from .global_client import get_global_fs_client
 from .impl import ADLSFileSystem
-from .resource.up_down import AdlsHashedResource, upload
 from .ro_cache import global_cache
 from .uri import UriIsh, parse_any
 
 
-def download_to_cache(fqn_or_uri: UriIsh, md5b64: str = "") -> Path:
+def download_to_cache(fqn_or_uri: UriIsh, *, md5b64: str = "") -> Path:
     """Downloads directly to the cache and returns a Path to the read-only file.
 
     This will allow you to download a file 'into' the cache even if
@@ -31,15 +30,15 @@ def download_to_cache(fqn_or_uri: UriIsh, md5b64: str = "") -> Path:
     return cache_path
 
 
-def upload_through_cache(dest: UriIsh, src_path: Path) -> AdlsHashedResource:
-    """Return an AdlsHashedResource, since by definition an upload through the cache must have a known checksum.
+def upload_through_cache(dest: UriIsh, src_path: Path) -> core.source.Source:
+    """Return a Source with a Hash, since by definition an upload through the cache must have a known checksum.
 
     Uses global client, which is pretty much always what you want.
     """
     assert src_path.is_file(), "src_path must be a file."
-    resource = upload(dest, src_path, write_through_cache=global_cache())
-    assert resource, "MD5 should always be calculable for a local path."
-    return resource
+    new_src = upload.upload(dest, src_path, write_through_cache=global_cache())
+    assert new_src.hash, "blake3 should always be calculable for a local path."
+    return new_src
 
 
 def download_directory(fqn: AdlsFqn) -> Path:
@@ -75,9 +74,6 @@ def upload_directory_through_cache(dest: UriIsh, src_path: Path) -> SourceTree:
 
     return SourceTree(
         sources=list(
-            map(
-                source.from_adls,
-                parallel.yield_results(upload_thunks, named="upload_directory_through_cache"),
-            )
+            core.parallel.yield_results(upload_thunks, named="upload_directory_through_cache"),
         )
     )
