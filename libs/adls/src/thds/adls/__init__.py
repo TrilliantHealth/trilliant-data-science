@@ -1,6 +1,7 @@
-from thds.core import meta
+from thds import core
 
 from . import abfss, defaults, etag, fqn, named_roots, source, source_tree, uri  # noqa: F401
+from .blake_hash import register_blake3
 from .cached import download_directory, download_to_cache, upload_through_cache  # noqa: F401
 from .copy import copy_file, copy_files, wait_for_copy  # noqa: F401
 from .errors import BlobNotFoundError  # noqa: F401
@@ -11,7 +12,9 @@ from .ro_cache import Cache, global_cache  # noqa: F401
 from .upload import upload  # noqa: F401
 from .uri import UriIsh, parse_any, parse_uri, resolve_any, resolve_uri  # noqa: F401
 
-__version__ = meta.get_version(__name__)
-metadata = meta.read_metadata(__name__)
+__version__ = core.meta.get_version(__name__)
+metadata = core.meta.read_metadata(__name__)
 __basepackage__ = __name__
 __commit__ = metadata.git_commit
+
+register_blake3()

@@ -6,7 +6,7 @@ import typing as ty
 from pathlib import Path
 
 import aiohttp.http_exceptions
-from azure.core.exceptions import AzureError, HttpResponseError
+from azure.core.exceptions import AzureError, HttpResponseError, ResourceModifiedError
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient, aio
 
 from thds.core import fretry, hashing, log, scope, tmp
@@ -357,8 +357,8 @@ def download_or_use_verified(
                 logger.info(f"Setting missing hash for {remote_key}")
                 assert file_properties
                 dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
-            except HttpResponseError as hre:
-                logger.info(f"Unable to set Hash for {remote_key}: {hre}")
+            except (HttpResponseError, ResourceModifiedError) as ex:
+                logger.info(f"Unable to set Hash for {remote_key}: {ex}")
         return si.value.hit
     except AzureError as err:
         errors.translate_azure_error(fs_client, remote_key, err)
@@ -414,8 +414,8 @@ async def async_download_or_use_verified(
                 assert file_properties
                 await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))  # type: ignore[misc]
                 # TODO - check above type ignore
-            except HttpResponseError as hre:
-                logger.info(f"Unable to set Hash for {remote_key}: {hre}")
+            except (HttpResponseError, ResourceModifiedError) as ex:
+                logger.info(f"Unable to set Hash for {remote_key}: {ex}")
         return si.value.hit
     except AzureError as err:
         errors.translate_azure_error(fs_client, remote_key, err)

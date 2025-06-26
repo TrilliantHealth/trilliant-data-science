@@ -7,7 +7,7 @@ from thds.core import source
 from thds.core.hashing import Hash
 from thds.core.source import Source
 from thds.core.source._construct import from_file, from_uri, to_uri
-from thds.core.source._download import SourceHashMismatchError, _get_download_handler
+from thds.core.source._download import _get_download_handler
 
 
 def test_source_from_file_is_openable(temp_file):
@@ -46,13 +46,6 @@ def test_resolve_local_source(temp_file):
 def test_from_file_fails_if_path_not_exists():
     with pytest.raises(FileNotFoundError):
         from_file(Path("does-not-exist"))
-
-
-def test_hash_mismatch_detected_upon_creation_of_file_source(temp_file):
-    tfile = temp_file("some text")
-
-    with pytest.raises(SourceHashMismatchError):
-        from_file(tfile, hash=Hash("sha256", b"not-the-right-hash"))
 
 
 def test_from_uri_redirects_to_from_file_for_file_scheme(temp_file):

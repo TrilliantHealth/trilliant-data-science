@@ -9,7 +9,7 @@ import pytest
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, FileSystemClient, aio
 
-from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy, cached, errors, hashes
+from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy, cached, errors, hashes, md5
 from thds.adls.download import (
     _download_or_use_verified_cached_coroutine,
     _IoRequest,
@@ -63,7 +63,7 @@ def test_integration_download_to_local_and_reuse_from_there(
     fqn = AdlsFqn(
         ty.cast(str, global_test_fs_client.account_name), global_test_fs_client.file_system_name, real
     )
-    the_hash = hashes.make_hashes(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")[0]
+    the_hash = md5.to_hash(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")
     lcl = test_dest / "DONT_DELETE_THESE_FILES.txt"
     hit = download_or_use_verified(global_test_fs_client, real, lcl, expected_hash=the_hash)
     assert not hit
@@ -118,10 +118,10 @@ def test_integration_handles_emoji_and_long_key(
     fqn = AdlsFqn(
         ty.cast(str, global_test_fs_client.account_name), global_test_fs_client.file_system_name, remote
     )
-    md5 = hashes.make_hashes(md5b64="gEL83AfKoP2e3O1Y4RsBqQ==")[0]
+    md5h = md5.to_hash(md5b64="gEL83AfKoP2e3O1Y4RsBqQ==")
     lcl = test_dest / "benchmark_hashing.py"
     hit = download_or_use_verified(
-        global_test_fs_client, remote, lcl, expected_hash=md5, cache=_TEST_CACHE
+        global_test_fs_client, remote, lcl, expected_hash=md5h, cache=_TEST_CACHE
     )
     assert not hit
     assert lcl.exists()
@@ -131,10 +131,10 @@ def test_integration_handles_emoji_and_long_key(
 
 def test_integration_md5_verification(global_test_fs_client: FileSystemClient, test_dest: Path):
     real = "test/read-only/DONT_DELETE_THESE_FILES.txt"
-    md5 = hashes.make_hashes(md5b64="incorrect-MrMjF87w3GvA1==")[0]
+    md5h = md5.to_hash(md5b64="incorrect-MrMjF87w3GvA1==")
     lcl = test_dest / "DONT_DELETE_THESE_FILES.txt"
     with pytest.raises(errors.HashMismatchError):
-        download_or_use_verified(global_test_fs_client, real, lcl, expected_hash=md5)
+        download_or_use_verified(global_test_fs_client, real, lcl, expected_hash=md5h)
 
 
 def test_unit_md5_verification(test_dest: Path):
@@ -143,10 +143,10 @@ def test_unit_md5_verification(test_dest: Path):
         local_dest = test_dest / "a-file.txt"
         with open(local_dest, "w") as f:
             f.write("hi")
-        md5 = hashes.make_hashes(md5b64="WPMVPiXYwhMrMjF87w3GvA==")[0]
+        md5h = md5.to_hash(md5b64="WPMVPiXYwhMrMjF87w3GvA==")
         with hashes.verify_hashes_before_and_after_download(
-            md5,
-            md5,
+            md5h,
+            md5h,
             AdlsFqn("foo", "bar", "baz"),
             local_dest,
         ):
@@ -167,12 +167,12 @@ async def test_integration_async(test_remote_root: AdlsRoot, test_dest: Path):
     lcl = test_dest / "DONT_DELETE_THESE_FILES----use-async.txt"
 
     async_client = _async_adls_fs_client(*test_remote_root)
-    md5 = hashes.make_hashes(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")[0]
-    hit = await async_download_or_use_verified(async_client, remote, lcl, expected_hash=md5)
+    md5h = md5.to_hash(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")
+    hit = await async_download_or_use_verified(async_client, remote, lcl, expected_hash=md5h)
     assert not hit
     assert lcl.exists()
 
-    hit = await async_download_or_use_verified(async_client, remote, lcl, expected_hash=md5)
+    hit = await async_download_or_use_verified(async_client, remote, lcl, expected_hash=md5h)
     assert hit
     assert lcl.exists()
     assert hit.exists()
@@ -278,8 +278,8 @@ def test_dont_use_azcopy_if_present(global_test_fs_client: FileSystemClient, tes
         # then all the integration tests above are testing the fallback code anyway.
         # Whatever. we just want to make sure all the code paths are tested wherever they can be.
         real = "test/read-only/DONT_DELETE_THESE_FILES.txt"
-        md5 = hashes.make_hashes(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")[0]
+        md5h = md5.to_hash(md5b64="U3vtigRGuroWtJFEQ5dKoQ==")
         lcl = test_dest / "dont_use_azcopy_DONT_DELETE_THESE_FILES.txt"
-        hit = download_or_use_verified(global_test_fs_client, real, lcl, expected_hash=md5)
+        hit = download_or_use_verified(global_test_fs_client, real, lcl, expected_hash=md5h)
         assert not hit
         assert lcl.exists()

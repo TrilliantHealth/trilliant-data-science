@@ -6,7 +6,7 @@ from functools import partial
 from thds.core import hash_cache, hashing, log, types
 from thds.core.hashing import Hash
 
-from . import blake_hash, errors, file_properties
+from . import blake_hash, errors, file_properties, md5
 from .fqn import AdlsFqn
 
 
@@ -15,7 +15,7 @@ def make_hashes(*, md5b64: str = "", blake3_b64: str = "") -> tuple[hashing.Hash
     if blake3_b64:
         hashes.append(hashing.Hash(algo="blake3", bytes=hashing.db64(blake3_b64)))
     if md5b64:
-        hashes.append(hashing.Hash(algo="md5", bytes=hashing.db64(md5b64)))
+        hashes.append(md5.to_hash(md5b64))
     return tuple(hashes)
 
 

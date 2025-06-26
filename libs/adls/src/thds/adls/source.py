@@ -3,9 +3,9 @@ from functools import partial
 from pathlib import Path
 
 from thds.core import source
-from thds.core.hashing import Hash, db64
+from thds.core.hashing import Hash
 
-from . import cached
+from . import cached, md5
 from .errors import blob_not_found_translation
 from .file_properties import extract_hashes_from_props, get_file_properties
 from .fqn import AdlsFqn
@@ -73,4 +73,4 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
 
 def of(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:
     """Alias for `from_adls`."""
-    return from_adls(uri_or_fqn, Hash(algo="md5", bytes=db64(md5b64)) if md5b64 else None)
+    return from_adls(uri_or_fqn, md5.to_hash(md5b64) if md5b64 else None)

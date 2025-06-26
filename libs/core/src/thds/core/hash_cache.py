@@ -12,6 +12,7 @@ functions themselves.
 
 import hashlib
 import sys
+import typing as ty
 from pathlib import Path
 
 from . import config, files
@@ -84,7 +85,19 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
     return hash_bytes
 
 
+_NAMED_HASH_CONSTRUCTORS: ty.Dict[str, ty.Callable[[str, StrOrPath], Hasher]] = {}
+
+
+def add_named_hash(algo: str, constructor: ty.Callable[[str, StrOrPath], Hasher]) -> None:
+    _NAMED_HASH_CONSTRUCTORS[algo] = constructor
+
+
 def filehash(algo: str, pathlike: StrOrPath) -> Hash:
     """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
     of the hash algorithm used."""
-    return Hash(sys.intern(algo), hash_file(pathlike, hashlib.new(algo)))
+    if algo in _NAMED_HASH_CONSTRUCTORS:
+        hasher = _NAMED_HASH_CONSTRUCTORS[algo](algo, pathlike)
+    else:
+        hasher = hashlib.new(algo)
+
+    return Hash(sys.intern(algo), hash_file(pathlike, hasher))

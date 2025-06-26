@@ -5,11 +5,14 @@ I have written this code too many times to write it again. Why isn't this in the
 
 import base64
 import contextlib
+import hashlib
 import io
 import os
 import threading
 import typing as ty
 from pathlib import Path
+
+from .types import StrOrPath
 
 # Python threads don't allow for significant CPU parallelism, so
 # allowing for more than a few of these per process is a recipe for
@@ -122,3 +125,8 @@ class Hash(ty.NamedTuple):
 
     def __repr__(self) -> str:
         return f"Hash(algo='{self.algo}', bytes={_repr_bytes(self.bytes)})"
+
+
+def file(algo: str, pathlike: StrOrPath) -> bytes:
+    """I'm so lazy"""
+    return hash_using(pathlike, hashlib.new(algo)).digest()

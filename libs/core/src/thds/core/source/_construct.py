@@ -6,17 +6,29 @@ from pathlib import Path
 
 from .. import log
 from ..files import is_file_uri, path_from_uri, to_uri
-from ..hash_cache import filehash
-from ..hashing import Hash
+from ..hash_cache import add_named_hash, filehash
+from ..hashing import Hash, Hasher
+from ..types import StrOrPath
 from .src import Source
 
 # Creation from local Files or from remote URIs
 
-SHA256 = "sha256"  # this hopefully interns the string which makes sure that all our pickles reuse the reference
+_AUTOHASH = "sha256"
 
 
-def hash_file(path: Path, algo: str = SHA256) -> Hash:
-    hash_algo = sys.intern(algo or SHA256)
+def set_file_autohash(
+    algo: str, hash_constructor: ty.Optional[ty.Callable[[str, StrOrPath], Hasher]] = None
+) -> None:
+    """If you call this and provide a non-builtin hash algorithm, you must also provide a constructor for it."""
+    if hash_constructor:
+        hash_constructor(algo, "")  # this will raise if algo is not supported.
+        add_named_hash(algo, hash_constructor)
+    global _AUTOHASH
+    _AUTOHASH = sys.intern(algo)
+
+
+def hash_file(path: Path, algo: str = "") -> Hash:
+    hash_algo = sys.intern(algo or _AUTOHASH)
     with log.logger_context(hash_for=f"source-{hash_algo}"):
         computed_hash = filehash(hash_algo, path)
         return computed_hash
@@ -35,10 +47,11 @@ def from_file(
     if not path.exists():
         raise FileNotFoundError(path)
 
+    file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
     if uri:
-        src = from_uri(uri, hash or hash_file(path))
+        src = from_uri(uri, file_hash)
     else:
-        src = Source(to_uri(path), hash or hash_file(path))
+        src = Source(to_uri(path), file_hash)
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
