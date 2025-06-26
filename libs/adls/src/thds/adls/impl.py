@@ -31,10 +31,10 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 
 from thds.core import lazy, log
 
-from ._upload import async_upload_decision_and_metadata
+from ._upload import async_upload_decision_and_settings, metadata_for_upload
 from .conf import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
 from .download import async_download_or_use_verified
-from .errors import NotADirectoryError, translate_azure_error
+from .errors import translate_azure_error
 from .file_properties import is_directory
 from .ro_cache import from_cache_path_to_local, global_cache
 from .shared_credential import get_credential_kwargs
@@ -247,10 +247,9 @@ class ADLSFileSystem:
         """
         # normalize remote path to a standard relative dir path -
         # this ensures correctness of strip_prefix() below
-        stripped_remote_path = remote_path.strip("/")
-        remote_path = stripped_remote_path + "/"
+        remote_path = remote_path.strip("/") + "/"
         dir_path = self._local_path_for(remote_path, local_path)
-        made_dir = False
+        dir_path.mkdir(exist_ok=True, parents=True)
         path_filter_ = _true if path_filter is None else path_filter
 
         # remove the remote directory prefix to determine a relative path for creation under dir_path
@@ -263,22 +262,8 @@ class ADLSFileSystem:
             if not path.is_directory and path_filter_(path)
         )
 
-        # shim generator to check for file vs directory, to prevent confusing errors that happen lower down
-        async def validated_paths() -> AsyncIterator[PathPair]:
-            async for path_pair in paths:
-                if path_pair.remote_path == stripped_remote_path:
-                    raise NotADirectoryError(
-                        f"Path '{stripped_remote_path}' points to a file, not a directory. "
-                        f"Use fetch_file() instead."
-                    )
-                nonlocal made_dir
-                if not made_dir:
-                    dir_path.mkdir(exist_ok=True, parents=True)
-                    made_dir = True
-                yield path_pair
-
         local_paths = []
-        async for batch in self._async_batch(validated_paths(), batch_size):
+        async for batch in self._async_batch(paths, batch_size):
             local_paths.extend(
                 await asyncio.gather(
                     *[
@@ -345,14 +330,15 @@ class ADLSFileSystem:
 
         async with file_system_client.get_file_client(remote_path) as file_client:
             with open(local_path, "rb") as fp:
-                decision = await async_upload_decision_and_metadata(file_client.get_file_properties, fp)
+                decision = await async_upload_decision_and_settings(file_client.get_file_properties, fp)
                 if decision.upload_required:
                     await file_client.upload_data(
                         fp,
                         overwrite=True,
+                        content_settings=decision.content_settings,
                         connection_timeout=CONNECTION_TIMEOUT(),
                         chunk_size=UPLOAD_CHUNK_SIZE(),
-                        metadata={**decision.metadata, **(metadata or {})},
+                        metadata={**metadata_for_upload(), **(metadata or {})},
                     )
 
         return remote_path

@@ -8,7 +8,6 @@ from . import (  # noqa: F401
     config,
     decos,
     dict_utils,
-    dump_stacks,
     env,
     exit_after,
     files,

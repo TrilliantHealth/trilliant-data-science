@@ -1,5 +1,4 @@
 """This is where fine-tuning environment variables are defined."""
-
 from thds.core import config
 
 # These defaults were tested to perform well (~200 MB/sec) on a 2 core
