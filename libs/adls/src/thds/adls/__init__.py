@@ -1,7 +1,7 @@
 from thds.core import meta
 
 from . import abfss, defaults, etag, fqn, named_roots, source, source_tree, uri  # noqa: F401
-from .cached_up_down import download_directory, download_to_cache, upload_through_cache  # noqa: F401
+from .cached import download_directory, download_to_cache, upload_through_cache  # noqa: F401
 from .copy import copy_file, copy_files, wait_for_copy  # noqa: F401
 from .errors import BlobNotFoundError  # noqa: F401
 from .fqn import *  # noqa: F401,F403

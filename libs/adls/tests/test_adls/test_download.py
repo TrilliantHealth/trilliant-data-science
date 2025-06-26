@@ -9,8 +9,7 @@ import pytest
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, FileSystemClient, aio
 
-from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy, errors, hashes
-from thds.adls.cached_up_down import download_to_cache
+from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy, cached, errors, hashes
 from thds.adls.download import (
     _download_or_use_verified_cached_coroutine,
     _IoRequest,
@@ -245,7 +244,7 @@ def test_parallel_downloads_only_perform_a_single_download(
         # so that we can see them in the test is to use threads
         # so that everything shares the same logging config.
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            list(executor.map(download_to_cache, [random_test_file_fqn] * 10))
+            list(executor.map(cached.download_to_cache, [random_test_file_fqn] * 10))
 
     download_count = 0
     reuse_count = 0
