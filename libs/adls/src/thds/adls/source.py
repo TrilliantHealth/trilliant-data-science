@@ -3,11 +3,11 @@ from functools import partial
 from pathlib import Path
 
 from thds.core import source
-from thds.core.hashing import Hash, b64, db64
+from thds.core.hashing import Hash, db64
 
 from .cached_up_down import download_to_cache
 from .errors import blob_not_found_translation
-from .file_properties import extract_hash_from_props, get_file_properties
+from .file_properties import extract_hashes_from_props, get_file_properties
 from .fqn import AdlsFqn
 from .uri import resolve_any, resolve_uri
 
@@ -19,13 +19,13 @@ def _adls_uri_source_download_handler(uri: str) -> ty.Optional[source.Downloader
 
     def download(hash: ty.Optional[Hash]) -> Path:
         assert fqn
-        if hash and hash.algo == "md5":
+        if hash:
             # this 'extra' check just allows us to short-circuit a download
             # where the hash at this URI is known not to match what we expect.
             # It's no safer than the non-md5 hash check that Source performs after download.
-            return download_to_cache(fqn, md5b64=b64(hash.bytes))
+            return download_to_cache(fqn, expected_hash=hash)
 
-        # we don't validate this hash, because we already have md5 validation
+        # we don't validate this hash, because we already have blake3+md5 validation
         # happening inside the download_to_cache function. the Source hash
         # is actually mostly for use by systems that want to do content addressing,
         # and not necessarily intended to be a runtime check in all scenarios.
@@ -62,13 +62,13 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
     """
     fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
     with blob_not_found_translation(fqn):
-        the_hash = extract_hash_from_props(get_file_properties(fqn))
-        if not the_hash:
+        hashes = extract_hashes_from_props(get_file_properties(fqn))
+        if not hashes:
             raise ValueError(
                 f"ADLS file {fqn} must have a hash to use this function. "
                 "If you know the hash, use `from_adls` with the hash parameter."
             )
-        return from_adls(fqn, the_hash)
+        return from_adls(fqn, hashes.get("blake3") or hashes["md5"])
 
 
 def of(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:

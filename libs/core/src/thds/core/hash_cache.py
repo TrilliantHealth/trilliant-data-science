@@ -11,7 +11,6 @@ functions themselves.
 """
 
 import hashlib
-import os
 import sys
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
 
-CACHE_HASH_DIR = config.item("directory", HOMEDIR() / ".hash-cache", parse=Path)
+CACHE_HASH_DIR = config.item("directory", HOMEDIR() / ".thds/core/hash-cache", parse=Path)
 _1GB = 1 * 2**30  # log if hashing a file larger than this, since it will be slow.
 
 
@@ -85,7 +84,7 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
     return hash_bytes
 
 
-def filehash(algo: str, pathlike: os.PathLike) -> Hash:
+def filehash(algo: str, pathlike: StrOrPath) -> Hash:
     """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
     of the hash algorithm used."""
     return Hash(sys.intern(algo), hash_file(pathlike, hashlib.new(algo)))

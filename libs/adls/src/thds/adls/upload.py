@@ -76,7 +76,7 @@ def upload(
     **upload_data_kwargs: ty.Any,
 ) -> source.Source:
     """Uploads only if the remote does not exist or does not match
-    md5.
+    blake3.
 
     Always embeds blake3 hash in the blob metadata if at all possible. In very rare cases
     it may not be possible for us to calculate one. Will always be possible if the passed

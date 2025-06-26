@@ -3,12 +3,12 @@ from pathlib import Path
 
 from blake3 import blake3
 
-from thds.core import hash_cache
+from thds.core import hash_cache, hashing
 from thds.core.hashing import SomehowReadable, hash_anything
 from thds.core.types import StrOrPath
 
 
-def blake3_file(file: StrOrPath) -> bytes:
+def blake3_file(file: StrOrPath) -> hashing.Hash:
     """Calculate the BLAKE3 hash of a file."""
     path = Path(file).resolve()
     size_bytes = path.stat().st_size
@@ -18,7 +18,8 @@ def blake3_file(file: StrOrPath) -> bytes:
     else:  # i just don't think we want thread pools for tiny files
         hasher = blake3()
 
-    return hash_cache.hash_file(path, hasher)  # type: ignore[arg-type]
+    # we pass this off toe hash_file _so that_ the hash will be cached.
+    return hashing.Hash("blake3", hash_cache.hash_file(path, hasher))  # type: ignore[arg-type]
 
 
 AnyStrSrc = ty.Union[SomehowReadable, ty.Iterable[ty.AnyStr]]
@@ -27,7 +28,7 @@ AnyStrSrc = ty.Union[SomehowReadable, ty.Iterable[ty.AnyStr]]
 
 def try_blake3(data: AnyStrSrc) -> ty.Optional[bytes]:
     if isinstance(data, Path):
-        return blake3_file(data)
+        return blake3_file(data).bytes
 
     res = hash_anything(data, blake3(max_threads=blake3.AUTO))  # type: ignore[type-var]
     if res:

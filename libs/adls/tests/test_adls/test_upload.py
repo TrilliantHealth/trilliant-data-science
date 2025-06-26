@@ -53,11 +53,11 @@ def test_basic_upload_without_cache(caplog):
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required
-            assert "Remote file exists but MD5 does not match" in caplog.text
+            assert "Remote file exists but blake3 does not match" in caplog.text
         with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
             # async bytes don't match
             fs.put_file(fb, remote_path)
-            assert "Remote file exists but MD5 does not match" in caplog.text
+            assert "Remote file exists but blake3 does not match" in caplog.text
 
 
 def test_cached_large_upload(caplog):

@@ -14,19 +14,28 @@ from .ro_cache import global_cache
 from .uri import UriIsh, parse_any
 
 
-def download_to_cache(fqn_or_uri: UriIsh, *, md5b64: str = "") -> Path:
+def download_to_cache(
+    fqn_or_uri: UriIsh,
+    *,
+    expected_hash: ty.Optional[core.hashing.Hash] = None,
+) -> Path:
     """Downloads directly to the cache and returns a Path to the read-only file.
 
     This will allow you to download a file 'into' the cache even if
-    you provide no MD5 and the remote file properties does not have
+    you provide no expected hash and the remote file properties does not have
     one. However, future attempts to reuse the cache will force a
-    re-download if no MD5 is available at that time.
+    re-download if no remote hash is available at that time.
     """
     fqn = parse_any(fqn_or_uri)
     cache_path = global_cache().path(fqn)
     download_or_use_verified(
-        get_global_fs_client(fqn.sa, fqn.container), fqn.path, cache_path, md5b64, cache=global_cache()
+        get_global_fs_client(fqn.sa, fqn.container),
+        fqn.path,
+        cache_path,
+        expected_hash=expected_hash,
+        cache=global_cache(),
     )
+    assert cache_path.is_file(), "File should have been downloaded to the cache."
     return cache_path
 
 
