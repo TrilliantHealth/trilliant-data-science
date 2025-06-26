@@ -4,8 +4,6 @@ from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.storage.blob import BlobProperties
 from azure.storage.filedatalake import FileProperties
 
-from thds.core import hashing
-
 from .errors import translate_azure_error
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client, get_global_fs_client
@@ -31,19 +29,10 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
     )
 
 
-def extract_hashes_from_props(
-    props: ty.Union[None, FileProperties, BlobProperties]
-) -> dict[str, hashing.Hash]:
-    if not props:
-        return dict()
-
-    hashes = list()
-    # NOTE! the order here is critical, because we want to _prefer_ the BLAKE3 hash if it exists.
-    if props.metadata and "hash_blake3_b64" in props.metadata:
-        hashes.append(hashing.Hash("blake3", hashing.db64(props.metadata["hash_blake3_b64"])))
-    if props.content_settings and props.content_settings.content_md5:
-        hashes.append(hashing.Hash("md5", props.content_settings.content_md5))
-    return {h.algo: h for h in hashes}
+class Properties(ty.Protocol):
+    name: ty.Any
+    metadata: ty.Any
+    content_settings: ty.Any
 
 
 # At some point it may make sense to separate file and blob property modules,

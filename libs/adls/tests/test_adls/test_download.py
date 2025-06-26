@@ -195,7 +195,7 @@ async def test_file_missing_hash_gets_one_assigned_after_download(
     fp = await file_client.get_file_properties()
     assert not fp.content_settings.content_md5
     assert fp.metadata
-    assert fp.metadata["hash_blake3_b64"] == "xbOHr0T91b3s1yjc24tkZ1y70caPbvkMBO7y7dyN2Rw="
+    assert fp.metadata["hash_xxh3_128_b64"] == "hOfn6RuS0zmzAhyh1tid6w=="
 
     # should not error since the md5 should be correct
     cache_hit = await async_download_or_use_verified(fs_client, key, test_dest / "missing-md5.txt")
@@ -251,7 +251,7 @@ def test_parallel_downloads_only_perform_a_single_download(
     for record in caplog.records:
         if "Downloading" in record.getMessage():
             download_count += 1
-        elif "Local path matches blake3" in record.getMessage():
+        elif "Local path matches" in record.getMessage():
             reuse_count += 1
 
     global_cache().path(random_test_file_fqn).unlink()

@@ -1,7 +1,6 @@
 from thds import core
 
-from . import abfss, defaults, etag, fqn, named_roots, source, source_tree, uri  # noqa: F401
-from .blake_hash import register_blake3
+from . import abfss, defaults, etag, fqn, hashes, named_roots, source, source_tree, uri  # noqa: F401
 from .cached import download_directory, download_to_cache, upload_through_cache  # noqa: F401
 from .copy import copy_file, copy_files, wait_for_copy  # noqa: F401
 from .errors import BlobNotFoundError  # noqa: F401
@@ -17,4 +16,6 @@ metadata = core.meta.read_metadata(__name__)
 __basepackage__ = __name__
 __commit__ = metadata.git_commit
 
-register_blake3()
+hashes.register_hashes()
+# SPOOKY: without the above line, the hashing algorithms will not be registered with thds.core.hash_cache,
+# which will be bad for core.Source as well as uploads and downloads.

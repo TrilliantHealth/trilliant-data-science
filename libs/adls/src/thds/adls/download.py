@@ -2,6 +2,7 @@ import contextlib
 import enum
 import os
 import shutil
+import threading
 import typing as ty
 from pathlib import Path
 
@@ -9,13 +10,12 @@ import aiohttp.http_exceptions
 from azure.core.exceptions import AzureError, HttpResponseError, ResourceModifiedError
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient, aio
 
-from thds.core import fretry, hashing, log, scope, tmp
+from thds.core import fretry, hash_cache, hashing, log, scope, tmp
 from thds.core.types import StrOrPath
 
-from . import azcopy, blake_hash, errors, etag, hashes
+from . import azcopy, errors, etag, hashes
 from ._progress import report_download_progress
 from .download_lock import download_lock
-from .file_properties import extract_hashes_from_props
 from .fqn import AdlsFqn
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
@@ -48,8 +48,11 @@ def _atomic_download_and_move(
         except OSError as oserr:
             if "Invalid cross-device link" in str(oserr):
                 # this shouldn't ever happen because of temppath_same_fs, but just in case...
+                logger.warning('Failed to move "%s" to "%s" - copying instead', dpath, dest)
                 shutil.copyfile(dpath, dest)
+                logger.info('Copied "%s" to "%s"', dpath, dest)
             else:
+                logger.error('Failed to move "%s" to "%s" - raising', dpath, dest)
                 raise
 
 
@@ -202,7 +205,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     if not local_path:
         raise ValueError("Must provide a destination path.")
 
-    _dl_scope.enter(log.logger_context(dl=fqn))
+    _dl_scope.enter(log.logger_context(dl=fqn, pid=os.getpid(), tid=threading.get_ident()))
     file_properties = None
 
     if not expected_hash:
@@ -211,17 +214,12 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         file_properties = yield _IoRequest.FILE_PROPERTIES
         if file_properties:
             # critically, we expect the _first_ one in this list to be the fastest to verify.
-            expected_hash = next(iter(extract_hashes_from_props(file_properties).values()), None)
+            expected_hash = next(iter(hashes.extract_hashes_from_props(file_properties).values()), None)
 
     def attempt_cache_hit() -> ty.Optional[_FileResult]:
-        if file_result := _attempt_cache_hit(
-            expected_hash=expected_hash,
-            cache=cache,
-            fqn=fqn,
-            local_path=local_path,
-        ):
-            return file_result
-        return None
+        return _attempt_cache_hit(
+            expected_hash=expected_hash, cache=cache, fqn=fqn, local_path=local_path
+        )
 
     # attempt cache hits before taking a lock, to avoid contention for existing files.
     if file_result := attempt_cache_hit():
@@ -230,15 +228,16 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     # No cache hit, so its time to prepare to download. if a cache was provided, we will
     # _put_ the resulting file in it.
 
-    _dl_scope.enter(download_lock(str(cache.path(fqn) if cache else local_path)))
+    file_lock = str(cache.path(fqn) if cache else local_path)
     # create lockfile name from the (shared) cache path if present, otherwise the final
     # destination.  Non-cache users may then still incur multiple downloads in parallel,
     # but if you wanted to coordinate then you should probably have been using the global
     # cache in the first place.
+    _dl_scope.enter(download_lock(file_lock))
 
     # re-attempt cache hit - we may have gotten the lock after somebody else downloaded
     if file_result := attempt_cache_hit():
-        logger.debug("Got cache hit on the second attempt, after acquiring lock for %s", fqn)
+        logger.info("Got cache hit on the second attempt, after acquiring lock for %s", fqn)
         return file_result  # noqa: B901
 
     logger.debug("Unable to find a cached version anywhere that we looked...")
@@ -246,7 +245,7 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
 
     # if any of the remote hashes match the expected hash, verify that one.
     # otherwise, verify the first remote hash in the list, since that's the fastest one.
-    all_remote_hashes = extract_hashes_from_props(file_properties)
+    all_remote_hashes = hashes.extract_hashes_from_props(file_properties)
     remote_hash_to_match = all_remote_hashes.get(expected_hash.algo) if expected_hash else None
     with hashes.verify_hashes_before_and_after_download(
         remote_hash_to_match,
@@ -261,9 +260,9 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
 
     hash_to_set_if_missing = expected_hash or remote_hash_to_match
-    if not hash_to_set_if_missing or hash_to_set_if_missing.algo != "blake3":
-        hash_to_set_if_missing = blake_hash.blake3_file(local_path)
-    assert hash_to_set_if_missing, "We should have a blake3 hash to set at this point."
+    if not hash_to_set_if_missing or hash_to_set_if_missing.algo not in hashes.PREFERRED_ALGOS:
+        hash_to_set_if_missing = hash_cache.filehash(hashes.PREFERRED_ALGOS[0], local_path)
+    assert hash_to_set_if_missing, "We should have a preferred hash to set at this point."
     return _FileResult(hash_to_set_if_missing, hit=None)
 
 

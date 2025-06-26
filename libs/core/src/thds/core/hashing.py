@@ -8,21 +8,15 @@ import contextlib
 import hashlib
 import io
 import os
-import threading
 import typing as ty
 from pathlib import Path
 
 from .types import StrOrPath
 
-# Python threads don't allow for significant CPU parallelism, so
-# allowing for more than a few of these per process is a recipe for
-# getting nothing done.
-_SEMAPHORE = threading.BoundedSemaphore(int(os.getenv("THDS_CORE_HASHING_PARALLELISM", 4)))
-_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 65536))
+_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 2**18))
 # https://stackoverflow.com/questions/17731660/hashlib-optimal-size-of-chunks-to-be-used-in-md5-update
-# this may not apply to us as the architecture is 32 bit, but it's at
-# least a halfway decent guess and benchmarking this ourselves would
-# be a massive waste of time.
+# i've done some additional benchmarking, and slightly larger chunks (256 KB) are faster
+# when the files are larger, and those are the ones we care about most since they take the longest.
 
 
 class Hasher(ty.Protocol):
@@ -52,10 +46,9 @@ def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: H) -> H:
 
     hash_readable_chunks(open(Path('foo/bar'), 'rb'), hashlib.sha256()).hexdigest()
     """
-    with _SEMAPHORE:
-        for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
-            hasher.update(chunk)  # type: ignore
-        return hasher
+    for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
+        hasher.update(chunk)  # type: ignore
+    return hasher
 
 
 @contextlib.contextmanager

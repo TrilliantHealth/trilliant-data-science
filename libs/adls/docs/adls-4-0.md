@@ -45,9 +45,9 @@ Previous optimization attempts had been made multiple times with limited success
 - Even with faster downloads, MD5 hashes are known to be very slow, and while we can cache those hashes
   on a local laptop, that's not usually very useful on a pod, where everything is being downloaded fresh
   every time.
-- After looking for options, I settled on `blake3`, which hashes files in parallel and has a very
-  optimized implementation that is trivially available with precompiled Python wheels for both Mac and
-  Linux.
+- After looking for options, I settled on [`xxhash`](blake3/README.md), ~which hashes files in parallel
+  and~ has a very optimized implementation that is trivially available with precompiled Python wheels for
+  both Mac and Linux.
 - Moving away from MD5 will incur some transition costs, and the refactor necessary was not small, but it
   enabled us to get rid of some legacy code (`AdlsHashedResource`) in favor of consistent use of
   `Source`, and over time the speed up should be well-worth it.

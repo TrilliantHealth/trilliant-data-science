@@ -20,7 +20,7 @@ class BlobPropertiesValidationError(ValueError):
 
 
 class HashMismatchError(BlobPropertiesValidationError):
-    """Raised when the MD5 or BLAKE3 hash of a file does not match the expected value."""
+    """Raised when the hash of a file does not match the expected value."""
 
 
 class ContentLengthMismatchError(BlobPropertiesValidationError):

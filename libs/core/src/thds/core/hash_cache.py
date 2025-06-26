@@ -75,7 +75,10 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
 
     if hasattr(hasher, "update_mmap"):
         # a special case for the blake3 module, which we don't depend on but which somebody else might.
-        hash_bytes = hasher.update_mmap(resolved_path).digest()
+        logger.info("DEBUG starting mmap for blake3")
+        hasher.update_mmap(filepath)
+        hash_bytes = hasher.digest()
+        logger.info("DEBUG finished update_mmap")
     else:
         hash_bytes = hash_using(resolved_path, hasher).digest()
 

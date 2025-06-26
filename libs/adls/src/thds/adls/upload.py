@@ -1,6 +1,6 @@
 """API for uploading files to Azure Data Lake Storage (ADLS) Gen2.
 
-We blake3-hash anything that we possibly can, since it's a fast verification step that we
+We hash anything that we possibly can, since it's a fast verification step that we
 can do later during downloads.
 """
 
@@ -10,8 +10,9 @@ from pathlib import Path
 from azure.core.exceptions import ResourceModifiedError
 from azure.storage.blob import ContentSettings
 
-from thds.core import files, fretry, hashing, link, log, scope, source, tmp
+from thds.core import files, fretry, link, log, scope, source, tmp
 
+from . import hashes
 from ._progress import report_upload_progress
 from ._upload import upload_decision_and_metadata
 from .conf import UPLOAD_FILE_MAX_CONCURRENCY
@@ -76,16 +77,16 @@ def upload(
     **upload_data_kwargs: ty.Any,
 ) -> source.Source:
     """Uploads only if the remote does not exist or does not match
-    blake3.
+    xxhash.
 
-    Always embeds blake3 hash in the blob metadata if at all possible. In very rare cases
+    Always embeds xxhash in the blob metadata if at all possible. In very rare cases
     it may not be possible for us to calculate one. Will always be possible if the passed
     data was a Path. If one can be calculated, it will be returned in the Source.
 
     Can write through a local cache, which may save you a download later.
 
     content_type and all upload_data_kwargs will be ignored if the file
-    has already been uploaded and the blake3 matches.
+    has already been uploaded and the hash matches.
     """
     dest_ = AdlsFqn.parse(dest) if isinstance(dest, str) else dest
     if write_through_cache:
@@ -134,13 +135,9 @@ def upload(
             **upload_data_kwargs,
         )
 
-    blake3_hash = (
-        hashing.Hash("blake3", hashing.db64(decision.upload_metadata["hash_blake3_b64"]))
-        if "hash_blake3_b64" in decision.upload_metadata
-        else None
-    )
+    best_hash = next(iter(hashes.extract_hashes_from_metadata(decision.upload_metadata)), None)
     if isinstance(src, Path):
-        assert blake3_hash, "blake3 hash should always be calculable for a local path."
-        return source.from_file(src, hash=blake3_hash, uri=str(dest_))
+        assert best_hash, "A hash should always be calculable for a local path."
+        return source.from_file(src, hash=best_hash, uri=str(dest_))
 
-    return source.from_uri(str(dest_), hash=blake3_hash)
+    return source.from_uri(str(dest_), hash=best_hash)

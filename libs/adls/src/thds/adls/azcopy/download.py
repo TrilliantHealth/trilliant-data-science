@@ -163,7 +163,7 @@ def sync_fastpath(
             process = subprocess.Popen(
                 _azcopy_download_command(dl_file_client, download_request.temp_path),
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 env=_restrict_resource_usage(),
             )
@@ -171,9 +171,16 @@ def sync_fastpath(
             with _track_azcopy_progress(dl_file_client.url, download_request.size_bytes) as track:
                 for line in process.stdout:
                     track(line)
+
+            process.wait()
+            if process.returncode != 0:
+                raise subprocess.SubprocessError(f"AzCopy failed with return code {process.returncode}")
+            assert (
+                download_request.temp_path.exists()
+            ), f"AzCopy did not create the file at {download_request.temp_path}"
             return  # success
 
-        except (subprocess.SubprocessError, FileNotFoundError):
+        except (subprocess.CalledProcessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
 
     logger.debug("Downloading %s using Python SDK", dl_file_client.url)
@@ -203,7 +210,7 @@ async def async_fastpath(
             copy_proc = await asyncio.create_subprocess_exec(
                 *_azcopy_download_command(dl_file_client, download_request.temp_path),
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
                 env=_restrict_resource_usage(),
             )
             assert copy_proc.stdout

@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from random import randint
 
-from thds.adls import ADLSFileSystem
+from thds.adls import ADLSFileSystem, hashes
 from thds.adls._upload import upload_decision_and_metadata
 from thds.adls.global_client import get_global_fs_client
 
@@ -53,20 +53,21 @@ def test_basic_upload_without_cache(caplog):
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required
-            assert "Remote file exists but blake3 does not match" in caplog.text
+            assert "Remote file exists but hash does not match" in caplog.text
         with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
             # async bytes don't match
             fs.put_file(fb, remote_path)
-            assert "Remote file exists but blake3 does not match" in caplog.text
+            assert "Remote file exists but hash does not match" in caplog.text
 
 
 def test_cached_large_upload(caplog):
     fs = ADLSFileSystem("thdsdatasets", "prod-datasets")
 
-    remote_path = "test/writable/a_small_parquet_file.parquet"
+    src_path = "test/read-only/a_small_parquet_file.parquet"
+    dest_path = f"test/writable/a_small_parquet_file_{hashes.default_hasher().name.lower()}.parquet"
     with tempfile.TemporaryDirectory() as dir:
         local_path = Path(dir) / "11mb.parquet"
-        fs.fetch_file(remote_path, local_path)
+        fs.fetch_file(src_path, local_path)
         with caplog.at_level(logging.INFO):
-            fs.put_file(local_path, remote_path)  # this should get skipped after md5 calc.
+            fs.put_file(local_path, dest_path)  # this should get skipped after checksum calc.
             assert "already exists and has matching checksum" in caplog.text

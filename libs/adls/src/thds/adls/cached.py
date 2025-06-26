@@ -46,7 +46,7 @@ def upload_through_cache(dest: UriIsh, src_path: Path) -> core.source.Source:
     """
     assert src_path.is_file(), "src_path must be a file."
     new_src = upload.upload(dest, src_path, write_through_cache=global_cache())
-    assert new_src.hash, "blake3 should always be calculable for a local path."
+    assert new_src.hash, "hash should always be calculable for a local path."
     return new_src
 
 
