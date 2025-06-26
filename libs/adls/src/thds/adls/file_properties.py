@@ -1,5 +1,3 @@
-import typing as ty
-
 from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.storage.blob import BlobProperties
 from azure.storage.filedatalake import FileProperties
@@ -27,12 +25,6 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
         .get_blob_client(fqn.path)
         .get_blob_properties()
     )
-
-
-class PropertiesP(ty.Protocol):
-    name: ty.Any
-    metadata: ty.Any
-    content_settings: ty.Any
 
 
 # At some point it may make sense to separate file and blob property modules,

@@ -1,6 +1,6 @@
 [project]
 name = "thds.adls"
-version = "4.1"
+version = "3.2"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 readme = "README.md"
@@ -12,9 +12,7 @@ dependencies = [
     "aiostream>=0.4.5",
     "azure-identity>=1.9",
     "azure-storage-file-datalake>=12.6",
-    "blake3",  # we're going to use this for hashes from now on - it can work in parallel and is blazing fast.
     "filelock>=3.0",
-	"xxhash",
     "thds-core",
 ]
 
