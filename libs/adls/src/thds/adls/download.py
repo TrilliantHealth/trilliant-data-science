@@ -12,11 +12,9 @@ from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileS
 from thds.core import fretry, hashing, log, scope, tmp
 from thds.core.types import StrOrPath
 
-from . import azcopy, blake_hash, hashes
+from . import azcopy, blake_hash, errors, etag, hashes
 from ._progress import report_download_progress
 from .download_lock import download_lock
-from .errors import translate_azure_error
-from .etag import match_etag
 from .file_properties import extract_hashes_from_props
 from .fqn import AdlsFqn
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
@@ -41,7 +39,7 @@ def _atomic_download_and_move(
                     dpath, known_size, report_download_progress(down_f, str(fqn), known_size)
                 )
         if known_size and os.path.getsize(dpath) != known_size:
-            raise ValueError(
+            raise errors.ContentLengthMismatchError(
                 f"Downloaded file {dpath} has size {os.path.getsize(dpath)}"
                 f" but expected {known_size}."
             )
@@ -306,6 +304,7 @@ def _excs_to_retry() -> ty.Callable[[Exception], bool]:
             filter(
                 None,
                 (
+                    errors.ContentLengthMismatchError,
                     aiohttp.http_exceptions.ContentLengthError,
                     aiohttp.client_exceptions.ClientPayloadError,
                     getattr(
@@ -357,12 +356,12 @@ def download_or_use_verified(
             try:
                 logger.info(f"Setting missing hash for {remote_key}")
                 assert file_properties
-                dl_file_client.set_metadata(meta, **match_etag(file_properties))
+                dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
             except HttpResponseError as hre:
                 logger.info(f"Unable to set Hash for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
-        translate_azure_error(fs_client, remote_key, err)
+        errors.translate_azure_error(fs_client, remote_key, err)
 
 
 _async_dl_scope = scope.AsyncScope("adls.download.async")
@@ -413,10 +412,10 @@ async def async_download_or_use_verified(
             try:
                 logger.info(f"Setting missing Hash for {remote_key}")
                 assert file_properties
-                await dl_file_client.set_metadata(meta, **match_etag(file_properties))  # type: ignore[misc]
+                await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))  # type: ignore[misc]
                 # TODO - check above type ignore
             except HttpResponseError as hre:
                 logger.info(f"Unable to set Hash for {remote_key}: {hre}")
         return si.value.hit
     except AzureError as err:
-        translate_azure_error(fs_client, remote_key, err)
+        errors.translate_azure_error(fs_client, remote_key, err)
