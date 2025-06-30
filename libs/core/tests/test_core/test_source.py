@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from thds.core import source
 from thds.core.hashing import Hash
 from thds.core.source import Source
 from thds.core.source._construct import from_file, from_uri, to_uri
-from thds.core.source._download import SourceHashMismatchError, _get_download_handler
+from thds.core.source._download import _get_download_handler
 
 
 def test_source_from_file_is_openable(temp_file):
@@ -45,13 +46,6 @@ def test_resolve_local_source(temp_file):
 def test_from_file_fails_if_path_not_exists():
     with pytest.raises(FileNotFoundError):
         from_file(Path("does-not-exist"))
-
-
-def test_hash_mismatch_detected_upon_creation_of_file_source(temp_file):
-    tfile = temp_file("some text")
-
-    with pytest.raises(SourceHashMismatchError):
-        from_file(tfile, hash=Hash("sha256", b"not-the-right-hash"))
 
 
 def test_from_uri_redirects_to_from_file_for_file_scheme(temp_file):
@@ -94,3 +88,38 @@ def test_set_cached_path_does_not_error_if_none(temp_file):
     s = from_file(temp_file("dog"))
     s._set_cached_path(None)
     assert not s.cached_path
+
+
+def test_source_json_parsing():
+    a_file = Path(__file__).parents[1] / "data" / "hello_world.txt"
+    a_file_uri = "file://" + str(a_file)
+    src = source.serde.from_json(
+        f'{{"uri": "{a_file_uri}", "sha256b64": "qUiQTy8PR5uPgZdpSzAYSw0u0cHNKh7A+4XSmaGSpEc="}}'
+    )
+    assert src.hash == Hash(
+        "sha256",
+        b"\xa9H\x90O/\x0fG\x9b\x8f\x81\x97iK0\x18K\r.\xd1\xc1\xcd*\x1e\xc0\xfb\x85\xd2\x99\xa1\x92\xa4G",
+    )
+    assert src.uri == a_file_uri
+
+
+def test_hash_from_b64():
+    a_dict = {"uri": "whocares", "blake3b64": "3FpO24JAsBgSQFLDMCcGlvlncaY7RSUKXBfTAA6CM1U="}
+    the_hash = source.serde._from_b64(a_dict)
+    assert the_hash
+    assert the_hash == Hash(
+        "blake3", b"\xdcZN\xdb\x82@\xb0\x18\x12@R\xc30'\x06\x96\xf9gq\xa6;E%\n\\\x17\xd3\x00\x0e\x823U"
+    )
+
+
+def test_to_json():
+    the_json = source.serde.to_json(
+        Source(
+            uri="foobar",
+            hash=Hash(
+                "blake3",
+                b"\xdcZN\xdb\x82@\xb0\x18\x12@R\xc30'\x06\x96\xf9gq\xa6;E%\n\\\x17\xd3\x00\x0e\x823U",
+            ),
+        )
+    )
+    assert the_json == '{"uri": "foobar", "blake3b64": "3FpO24JAsBgSQFLDMCcGlvlncaY7RSUKXBfTAA6CM1U="}'

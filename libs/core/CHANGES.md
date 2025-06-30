@@ -1,3 +1,8 @@
+## 1.40
+
+- Support non-stdlib hashing functions being registered for file hashing, and use this capability within
+  `core.Source` for any `from_file`-constructed `Source` objects.
+
 ## 1.39
 
 - Adds helpers to `core.inspect` for dynamically getting arguments by name, internally using
