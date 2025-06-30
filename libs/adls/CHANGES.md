@@ -1,10 +1,10 @@
 # 4.0
 
-- Switch to `blake3` hash for all new uploads, and prefer it for any download verification where it is
-  embedded as the metadata key `hash_blake3_b64`. This is a backward-incompatible change, since we no
+- Switch to `xxh3_128` hash for all new uploads, and prefer it for any download verification where it is
+  embedded as the metadata key `hash_xxh3_128_b64`. This is a backward-incompatible change, since we no
   longer compute MD5 automatically for your uploads.
 - Completely remove `AdlsHashedResource` - it was mostly obsoleted by `core.Source`, and is now
-  completely obsolete since we are preferring a faster hash, `blake3`.
+  completely obsolete since we are preferring a faster hash, `xxh3_128`.
 - `adls.upload_through_cache` now returns a `core.Source` object rather than an `AdlsHashedResource`.
 - rename `cached_up_down` to `cached`, to encourage namespace import/usage rather than the individual
   functions.

@@ -1,6 +1,6 @@
 # this is why we want to use update_mmap rather than chunking into small pieces in Python:
 
-The script used to create the below output is [here](./test_blake3.py).
+The script used to create the below output is [here](./benchmark_hash_algos.py).
 
 ```text
 root@ds-unified-directory-orch:/app/unified-directory# python ~/test_hash.py

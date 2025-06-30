@@ -5,7 +5,7 @@ at all.
 
 doing .update in smaller chunks is always much slower.
 
-the inner loop in question is `hash_mmap` from [test_blake3.py](./test_blake3.py):
+the inner loop in question is `hash_mmap` from [benchmark_hash_algos.py](./benchmark_hash_algos.py):
 
 ```python
         logger.info(f"DEBUG starting mmap for blake3")

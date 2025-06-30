@@ -29,7 +29,7 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
     )
 
 
-class Properties(ty.Protocol):
+class PropertiesP(ty.Protocol):
     name: ty.Any
     metadata: ty.Any
     content_settings: ty.Any

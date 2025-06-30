@@ -12,11 +12,10 @@ functions themselves.
 
 import hashlib
 import sys
-import typing as ty
 from pathlib import Path
 
 from . import config, files
-from .hashing import Hash, Hasher, hash_using
+from .hashing import Hash, Hasher, get_hasher, hash_using
 from .home import HOMEDIR
 from .log import getLogger
 from .types import StrOrPath
@@ -74,8 +73,8 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
         log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}{hash_cached}")
 
     if hasattr(hasher, "update_mmap"):
-        # a special case for the blake3 module, which we don't depend on but which somebody else might.
-        logger.info("DEBUG starting mmap for blake3")
+        # a special case for the blake3 module, which has deadlocked in the past
+        logger.warning("DEBUG starting update_mmap for blake3")
         hasher.update_mmap(filepath)
         hash_bytes = hasher.digest()
         logger.info("DEBUG finished update_mmap")
@@ -88,19 +87,7 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
     return hash_bytes
 
 
-_NAMED_HASH_CONSTRUCTORS: ty.Dict[str, ty.Callable[[str, StrOrPath], Hasher]] = {}
-
-
-def add_named_hash(algo: str, constructor: ty.Callable[[str, StrOrPath], Hasher]) -> None:
-    _NAMED_HASH_CONSTRUCTORS[algo] = constructor
-
-
 def filehash(algo: str, pathlike: StrOrPath) -> Hash:
     """Wraps a cached hash of a file in a core.hashing.Hash object, which carries the name
     of the hash algorithm used."""
-    if algo in _NAMED_HASH_CONSTRUCTORS:
-        hasher = _NAMED_HASH_CONSTRUCTORS[algo](algo, pathlike)
-    else:
-        hasher = hashlib.new(algo)
-
-    return Hash(sys.intern(algo), hash_file(pathlike, hasher))
+    return Hash(sys.intern(algo), hash_file(pathlike, get_hasher(algo)))

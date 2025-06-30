@@ -22,19 +22,19 @@ def default_hasher() -> hashing.Hasher:
     return xxhash.xxh3_128()
 
 
-def _xxhash_hasher(algo: str, _path: ty.Any) -> hashing.Hasher:
+def _xxhash_hasher(algo: str) -> hashing.Hasher:
     return getattr(xxhash, algo)()
 
 
 def register_hashes():
     for algo in xxhash.algorithms_available:
-        hash_cache.add_named_hash(algo, _xxhash_hasher)
+        hashing.add_named_hash(algo, _xxhash_hasher)
     source.set_file_autohash(PREFERRED_ALGOS[0], _xxhash_hasher)
 
     try:
         from blake3 import blake3
 
-        hash_cache.add_named_hash("blake3", lambda _, __: blake3())  # type: ignore
+        hashing.add_named_hash("blake3", lambda _: blake3())  # type: ignore
     except ModuleNotFoundError:
         pass
 
@@ -59,14 +59,16 @@ def metadata_hash_b64_key(algo: str) -> str:
 
 
 def extract_hashes_from_metadata(metadata: dict) -> ty.Iterable[hashing.Hash]:
-    # NOTE! the order here is critical, because we want to _prefer_ the BLAKE3 hash if it exists.
+    # NOTE! the order here is critical, because we want to _prefer_ the faster hash if it exists.
     for hash_algo in PREFERRED_ALGOS:
         md_key = metadata_hash_b64_key(hash_algo)
         if metadata and md_key in metadata:
             yield hashing.Hash(hash_algo, hashing.db64(metadata[md_key]))
 
 
-def extract_hashes_from_props(props: ty.Optional[file_properties.Properties]) -> dict[str, hashing.Hash]:
+def extract_hashes_from_props(
+    props: ty.Optional[file_properties.PropertiesP],
+) -> dict[str, hashing.Hash]:
     if not props:
         return dict()
 

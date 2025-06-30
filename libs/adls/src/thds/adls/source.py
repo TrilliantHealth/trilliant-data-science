@@ -33,8 +33,8 @@ source.register_download_handler("thds.adls", _adls_uri_source_download_handler)
 def from_adls(uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None) -> source.Source:
     """Flexible, public interface to creating Sources from any ADLS-like reference.
 
-    Does NOT automatically fetch an MD5 hash from the ADLS URI if it's not provided. If
-    you know you want to include that, instead call:
+    Does NOT automatically fetch a checksumming hash from the ADLS URI if it's not
+    provided. If you know you want to include that, instead call:
     `source.get_with_hash(uri_or_fqn)`.
     """
     r_fqn = resolve_any(uri_or_fqn)
@@ -64,6 +64,6 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
         return from_adls(fqn, next(iter(uri_hashes.values())))
 
 
-def of(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:
+def with_md5b64(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:
     """Meant for older use cases where we had an MD5"""
     return from_adls(uri_or_fqn, md5.to_hash(md5b64) if md5b64 else None)

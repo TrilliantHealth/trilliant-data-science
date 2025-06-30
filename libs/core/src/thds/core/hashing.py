@@ -120,6 +120,20 @@ class Hash(ty.NamedTuple):
         return f"Hash(algo='{self.algo}', bytes={_repr_bytes(self.bytes)})"
 
 
+_NAMED_HASH_CONSTRUCTORS: ty.Dict[str, ty.Callable[[str], Hasher]] = {}
+
+
+def add_named_hash(algo: str, constructor: ty.Callable[[str], Hasher]) -> None:
+    _NAMED_HASH_CONSTRUCTORS[algo] = constructor
+
+
+def get_hasher(algo: str) -> Hasher:
+    if algo in _NAMED_HASH_CONSTRUCTORS:
+        return _NAMED_HASH_CONSTRUCTORS[algo](algo)
+
+    return hashlib.new(algo)
+
+
 def file(algo: str, pathlike: StrOrPath) -> bytes:
     """I'm so lazy"""
-    return hash_using(pathlike, hashlib.new(algo)).digest()
+    return hash_using(pathlike, get_hasher(algo)).digest()

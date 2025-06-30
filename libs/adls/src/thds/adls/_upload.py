@@ -11,7 +11,7 @@ import azure.core.exceptions
 from thds.core import hash_cache, hashing, hostname, log
 
 from . import hashes
-from .file_properties import Properties
+from .file_properties import PropertiesP
 
 _SKIP_ALREADY_UPLOADED_CHECK_IF_MORE_THAN_BYTES = 2 * 2**20  # 2 MB is about right
 
@@ -62,7 +62,7 @@ def metadata_for_upload() -> ty.Dict[str, str]:
 
 def _co_upload_decision_unless_file_present_with_matching_checksum(
     data: hashes.AnyStrSrc, min_size_for_remote_check: int
-) -> ty.Generator[bool, ty.Optional[Properties], UploadDecision]:
+) -> ty.Generator[bool, ty.Optional[PropertiesP], UploadDecision]:
     local_hash = _try_default_hash(data)
     if not local_hash:
         return UploadDecision(True, metadata_for_upload())
@@ -99,7 +99,7 @@ Returns a metadata dict that should be added to any upload.
 
 
 async def async_upload_decision_and_metadata(
-    get_properties: ty.Callable[[], ty.Awaitable[Properties]],
+    get_properties: ty.Callable[[], ty.Awaitable[PropertiesP]],
     data: hashes.AnyStrSrc,
     min_size_for_remote_check: int = _SKIP_ALREADY_UPLOADED_CHECK_IF_MORE_THAN_BYTES,
 ) -> UploadDecision:
@@ -118,7 +118,7 @@ async def async_upload_decision_and_metadata(
 
 
 def upload_decision_and_metadata(
-    get_properties: ty.Callable[[], Properties],
+    get_properties: ty.Callable[[], PropertiesP],
     data: hashes.AnyStrSrc,
     min_size_for_remote_check: int = _SKIP_ALREADY_UPLOADED_CHECK_IF_MORE_THAN_BYTES,
 ) -> UploadDecision:

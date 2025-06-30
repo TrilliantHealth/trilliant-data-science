@@ -6,9 +6,8 @@ from pathlib import Path
 
 from .. import log
 from ..files import is_file_uri, path_from_uri, to_uri
-from ..hash_cache import add_named_hash, filehash
-from ..hashing import Hash, Hasher
-from ..types import StrOrPath
+from ..hash_cache import filehash
+from ..hashing import Hash, Hasher, add_named_hash
 from .src import Source
 
 # Creation from local Files or from remote URIs
@@ -17,11 +16,11 @@ _AUTOHASH = "sha256"
 
 
 def set_file_autohash(
-    algo: str, hash_constructor: ty.Optional[ty.Callable[[str, StrOrPath], Hasher]] = None
+    algo: str, hash_constructor: ty.Optional[ty.Callable[[str], Hasher]] = None
 ) -> None:
     """If you call this and provide a non-builtin hash algorithm, you must also provide a constructor for it."""
     if hash_constructor:
-        hash_constructor(algo, "")  # this will raise if algo is not supported.
+        hash_constructor(algo)  # this will raise if algo is not supported.
         add_named_hash(algo, hash_constructor)
     global _AUTOHASH
     _AUTOHASH = sys.intern(algo)
