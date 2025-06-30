@@ -1,7 +1,3 @@
-### 4.1.20250702
-
-- Retry `requests.exceptions.ConnectionError` during downloads, since these seem to be a thing now.
-
 ## 4.1
 
 - Use `azcopy` for uploads over a certain size.
