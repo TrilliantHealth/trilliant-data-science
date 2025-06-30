@@ -63,6 +63,8 @@ def download_lock(download_unique_str: str) -> FileLock:
     return FileLock(
         DOWNLOAD_LOCKS_DIR()
         / (download_unique_str.split("/")[-1][:50] + hex_md5_str(download_unique_str)),
-        is_singleton=True,  # critical for keeping this reentrant without passing the lock around.
+        # is_singleton=True,
+        # critical for keeping this reentrant without passing the lock around.
         # see https://github.com/tox-dev/filelock/issues/315#issuecomment-2016797681
+        # however, this is not compatible with the version of Databricks we use, so.....
     )
