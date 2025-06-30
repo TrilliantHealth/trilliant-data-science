@@ -2857,7 +2857,7 @@ wheels = [
 
 [[package]]
 name = "thds-adls"
-version = "4.0"
+version = "4.1"
 source = { editable = "../adls" }
 dependencies = [
     { name = "aiohttp" },

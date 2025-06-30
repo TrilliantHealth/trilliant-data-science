@@ -1,6 +1,6 @@
 [project]
 name = "thds.adls"
-version = "4.0"
+version = "4.1"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 readme = "README.md"

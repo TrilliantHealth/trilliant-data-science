@@ -7,31 +7,21 @@
 # very end of the download), so for local users who don't have huge bandwidth, it's likely
 # a better user experience to disable this globally.
 import asyncio
-import json
-import os
 import subprocess
 import typing as ty
-import urllib.parse
-from contextlib import contextmanager, nullcontext
+from contextlib import nullcontext
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from azure.storage.filedatalake import DataLakeFileClient
 
-from thds.core import cache, config, cpus, log, scope
+from thds.core import config, log
 
-from .. import _progress, conf, uri
+from .. import conf
+from . import login, progress, system_resources
 
 DONT_USE_AZCOPY = config.item("dont_use", default=False, parse=config.tobool)
 MIN_FILE_SIZE = config.item("min_file_size", default=20 * 10**6, parse=int)  # 20 MB
-
-_AZCOPY_LOGIN_WORKLOAD_IDENTITY = "azcopy login --login-type workload".split()
-_AZCOPY_LOGIN_LOCAL_STATUS = "azcopy login status".split()
-# device login is an interactive process involving a web browser,
-# which is not acceptable for large scale automation.
-# So instead of logging in, we check to see if you _are_ logged in,
-# and if you are, we try using azcopy in the future.
 
 logger = log.getLogger(__name__)
 
@@ -49,107 +39,22 @@ class SdkDownloadRequest(DownloadRequest):
     writer: ty.IO[bytes]
 
 
-@cache.locking  # only run this once per process.
-@scope.bound
-def good_azcopy_login() -> bool:
-    scope.enter(log.logger_context(dl=None))
-    try:
-        subprocess.run(_AZCOPY_LOGIN_WORKLOAD_IDENTITY, check=True, capture_output=True)
-        logger.info("Azcopy login with workload identity, so we can use it for large downloads")
-        return True
-
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-    try:
-        subprocess.run(_AZCOPY_LOGIN_LOCAL_STATUS, check=True)
-        logger.info("Azcopy login with local token, so we can use it for large downloads")
-        return True
-
-    except FileNotFoundError:
-        logger.info("azcopy is not installed or not on your PATH, so we cannot speed up large downloads")
-    except subprocess.CalledProcessError as cpe:
-        logger.warning(
-            "You are not logged in with azcopy, so we cannot speed up large downloads."
-            f" Run `azcopy login` to fix this. Return code was {cpe.returncode}"
-        )
-    return False
-
-
-def is_big_enough_for_azcopy(size_bytes: int) -> bool:
+def _is_big_enough_for_azcopy(size_bytes: int) -> bool:
     return size_bytes >= MIN_FILE_SIZE()
 
 
 def should_use_azcopy(file_size_bytes: int) -> bool:
-    return is_big_enough_for_azcopy(file_size_bytes) and not DONT_USE_AZCOPY() and good_azcopy_login()
+    return (
+        _is_big_enough_for_azcopy(file_size_bytes)
+        and not DONT_USE_AZCOPY()
+        and login.good_azcopy_login()
+    )
 
 
 def _azcopy_download_command(dl_file_client: DataLakeFileClient, path: Path) -> ty.List[str]:
     # turns out azcopy checks md5 by default - but we we do our own checking, sometimes with faster methods,
     # and their checking _dramatically_ slows downloads on capable machines, so we disable it.
     return ["azcopy", "copy", dl_file_client.url, str(path), "--output-type=json", "--check-md5=NoCheck"]
-
-
-class AzCopyMessage(ty.TypedDict):
-    TotalBytesEnumerated: str
-    TotalBytesTransferred: str
-
-
-class AzCopyJsonLine(ty.TypedDict):
-    MessageType: str
-    MessageContent: AzCopyMessage
-
-
-def _parse_azcopy_json_output(line: str) -> AzCopyJsonLine:
-    outer_msg = json.loads(line)
-    return AzCopyJsonLine(
-        MessageType=outer_msg["MessageType"],
-        MessageContent=json.loads(outer_msg["MessageContent"]),
-    )
-
-
-@contextmanager
-def _track_azcopy_progress(http_url: str, size_bytes: int) -> ty.Iterator[ty.Callable[[str], None]]:
-    """Context manager that tracks progress from AzCopy JSON lines. This works for both async and sync impls."""
-    tracker = _progress.get_global_download_tracker()
-    adls_uri = urllib.parse.unquote(str(uri.parse_uri(http_url)))
-    if size_bytes:
-        tracker.add(adls_uri, total=size_bytes)
-
-    def track(line: str):
-        if not size_bytes:
-            return  # no size, no progress
-
-        if not line:
-            return
-
-        try:
-            prog = _parse_azcopy_json_output(line)
-            if prog["MessageType"] == "Progress":
-                tracker(adls_uri, total_written=int(prog["MessageContent"]["TotalBytesTransferred"]))
-        except json.JSONDecodeError:
-            pass
-
-    yield track
-
-
-@lru_cache
-def _restrict_resource_usage() -> dict:
-    num_cpus = cpus.available_cpu_count()
-
-    env = dict(os.environ)
-    if "AZCOPY_BUFFER_GB" not in os.environ:
-        likely_mem_gb_available = num_cpus * 4  # assume 4 GB per CPU core is available
-        # o3 suggested 15% of the total available memory...
-        env["AZCOPY_BUFFER_GB"] = str(likely_mem_gb_available * 0.15)
-    if "AZCOPY_CONCURRENCY" not in os.environ:
-        env["AZCOPY_CONCURRENCY"] = str(int(num_cpus * 2))
-
-    logger.info(
-        "AZCOPY_BUFFER_GB == %s and AZCOPY_CONCURRENCY == %s",
-        env["AZCOPY_BUFFER_GB"],
-        env["AZCOPY_CONCURRENCY"],
-    )
-    return env
 
 
 def sync_fastpath(
@@ -165,10 +70,10 @@ def sync_fastpath(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                env=_restrict_resource_usage(),
+                env=system_resources.restrict_usage(),
             )
             assert process.stdout
-            with _track_azcopy_progress(dl_file_client.url, download_request.size_bytes) as track:
+            with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes) as track:
                 for line in process.stdout:
                     track(line)
 
@@ -211,12 +116,12 @@ async def async_fastpath(
                 *_azcopy_download_command(dl_file_client, download_request.temp_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                env=_restrict_resource_usage(),
+                env=system_resources.restrict_usage(),
             )
             assert copy_proc.stdout
 
             # Feed lines to the tracker asynchronously
-            with _track_azcopy_progress(dl_file_client.url, download_request.size_bytes) as track:
+            with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes) as track:
                 while True:
                     line = await copy_proc.stdout.readline()
                     if not line:  # EOF
