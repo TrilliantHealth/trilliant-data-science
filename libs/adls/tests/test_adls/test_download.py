@@ -9,6 +9,7 @@ import pytest
 from azure.identity.aio import DefaultAzureCredential
 from azure.storage.filedatalake import FileProperties, FileSystemClient, aio
 
+from thds import adls
 from thds.adls import ADLSFileSystem, AdlsFqn, AdlsRoot, azcopy, cached, errors, hashes, md5
 from thds.adls.download import (
     _download_or_use_verified_cached_coroutine,
@@ -228,7 +229,8 @@ def random_test_file_fqn(
     with open(random_file, "w") as f:
         f.write(uuid4().hex)
 
-    fs.put_file(random_file, random_test_file_path)  # non-cached upload
+    adls.upload(fqn, random_file, content_type="text/plain")
+    # this upload is not cached but it _does_ compute the standard preferred hash.
 
     yield fqn
 
