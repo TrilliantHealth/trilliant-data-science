@@ -4,7 +4,6 @@ We hash anything that we possibly can, since it's a fast verification step that 
 can do later during downloads.
 """
 
-import subprocess
 import typing as ty
 from pathlib import Path
 
@@ -13,7 +12,7 @@ from azure.storage.blob import ContentSettings
 
 from thds.core import files, fretry, link, log, scope, source, tmp
 
-from . import azcopy, hashes
+from . import hashes
 from ._progress import report_upload_progress
 from ._upload import upload_decision_and_metadata
 from .conf import UPLOAD_FILE_MAX_CONCURRENCY
@@ -98,15 +97,6 @@ def upload(
     blob_container_client = get_global_blob_container_client(dest_.sa, dest_.container)
     blob_client = blob_container_client.get_blob_client(dest_.path)
     decision = upload_decision_and_metadata(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
-
-    def source_from_meta() -> source.Source:
-        best_hash = next(iter(hashes.extract_hashes_from_metadata(decision.metadata)), None)
-        if isinstance(src, Path):
-            assert best_hash, "A hash should always be calculable for a local path."
-            return source.from_file(src, hash=best_hash, uri=str(dest_))
-
-        return source.from_uri(str(dest_), hash=best_hash)
-
     if decision.upload_required:
         # set up some bookkeeping
         n_bytes = None  # if we pass 0 to upload_blob, it truncates the write now
@@ -120,23 +110,9 @@ def upload(
         else:
             bytes_src = src
 
+        adls_meta = decision.upload_metadata
         if "metadata" in upload_data_kwargs:
-            decision.metadata.update(upload_data_kwargs.pop("metadata"))
-
-        if azcopy.upload.should_use_azcopy(n_bytes or 0) and isinstance(src, Path):
-            logger.info("Using azcopy to upload %s to %s", src, dest_)
-            try:
-                azcopy.upload.run(
-                    azcopy.upload.build_azcopy_upload_command(
-                        src, dest_, content_type=content_type, metadata=decision.metadata, overwrite=True
-                    ),
-                    dest_,
-                    n_bytes or 0,
-                )
-                return source_from_meta()
-
-            except subprocess.SubprocessError:
-                logger.warning("Azcopy upload failed, falling back to SDK upload")
+            adls_meta.update(upload_data_kwargs.pop("metadata"))
 
         upload_content_settings = ContentSettings()
         if content_type:
@@ -155,8 +131,13 @@ def upload(
             content_settings=upload_content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
-            metadata=decision.metadata,
+            metadata=adls_meta,
             **upload_data_kwargs,
         )
 
-    return source_from_meta()
+    best_hash = next(iter(hashes.extract_hashes_from_metadata(decision.upload_metadata)), None)
+    if isinstance(src, Path):
+        assert best_hash, "A hash should always be calculable for a local path."
+        return source.from_file(src, hash=best_hash, uri=str(dest_))
+
+    return source.from_uri(str(dest_), hash=best_hash)

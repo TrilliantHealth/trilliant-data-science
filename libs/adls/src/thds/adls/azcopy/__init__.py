@@ -1,1 +1,1 @@
-from . import download, upload  # noqa: F401
+from . import download  # noqa

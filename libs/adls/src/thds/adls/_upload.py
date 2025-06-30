@@ -53,7 +53,7 @@ def _too_small_to_skip_upload(data: hashes.AnyStrSrc, min_size_for_remote_check:
 
 class UploadDecision(ty.NamedTuple):
     upload_required: bool
-    metadata: ty.Dict[str, str]
+    upload_metadata: ty.Dict[str, str]
 
 
 def metadata_for_upload() -> ty.Dict[str, str]:
