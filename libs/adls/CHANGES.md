@@ -1,3 +1,7 @@
+## 4.1
+
+- Use `azcopy` for uploads over a certain size.
+
 # 4.0
 
 - Switch to `xxh3_128` hash for all new uploads, and prefer it for any download verification where it is

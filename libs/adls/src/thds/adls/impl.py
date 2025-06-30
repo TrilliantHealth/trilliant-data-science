@@ -337,7 +337,7 @@ class ADLSFileSystem:
                         overwrite=True,
                         connection_timeout=CONNECTION_TIMEOUT(),
                         chunk_size=UPLOAD_CHUNK_SIZE(),
-                        metadata={**decision.upload_metadata, **(metadata or {})},
+                        metadata={**decision.metadata, **(metadata or {})},
                     )
 
         return remote_path
