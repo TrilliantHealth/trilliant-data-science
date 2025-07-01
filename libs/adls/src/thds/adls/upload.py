@@ -32,8 +32,11 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
     @scope.bound
     def _try_write_through() -> bool:
         if isinstance(data, Path) and data.exists():
+            # we don't do hard or soft links because they share file permissions,
+            # and it's not up to us to change permissions on the src file.
             link.link_or_copy(data, local_cache_path, "ref")
             return True
+
         out = scope.enter(tmp.temppath_same_fs(local_cache_path))
         if hasattr(data, "read") and hasattr(data, "seek"):
             with open(out, "wb") as f:
@@ -41,11 +44,13 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
             data.seek(0)  # type: ignore
             link.link_or_copy(out, local_cache_path)
             return True
+
         if isinstance(data, bytes):
             with open(out, "wb") as f:
                 f.write(data)
             link.link_or_copy(out, local_cache_path)
             return True
+
         return False
 
     if _try_write_through():
@@ -54,6 +59,7 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
             # and we don't want to allow anyone to write to its copy.
             files.set_read_only(local_cache_path)
             return local_cache_path
+
         except FileNotFoundError:
             # may have hit a race condition.
             # don't fail upload just because we couldn't write through the cache.
