@@ -22,27 +22,31 @@ from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 logger = log.getLogger(__name__)
 
 
+def _check_size(dpath: Path, expected_size: ty.Optional[int]) -> None:
+    actual_size = os.path.getsize(dpath)
+    if expected_size is not None and actual_size != expected_size:
+        raise errors.ContentLengthMismatchError(
+            f"Downloaded file {dpath} has size {actual_size} but expected {expected_size}"
+        )
+
+
 @contextlib.contextmanager
 def _atomic_download_and_move(
     fqn: AdlsFqn,
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[azcopy.download.DownloadRequest]:
-    known_size = (properties.size or 0) if properties else 0
+    known_size = properties.size if properties else None
     with tmp.temppath_same_fs(dest) as dpath:
         logger.debug("Downloading %s", fqn)
-        if azcopy.download.should_use_azcopy(known_size):
+        if azcopy.download.should_use_azcopy(known_size or -1):
             yield azcopy.download.DownloadRequest(dpath, known_size)
         else:
             with open(dpath, "wb") as down_f:
                 yield azcopy.download.SdkDownloadRequest(
-                    dpath, known_size, report_download_progress(down_f, str(fqn), known_size)
+                    dpath, known_size, report_download_progress(down_f, str(fqn), known_size or 0)
                 )
-        if known_size and os.path.getsize(dpath) != known_size:
-            raise errors.ContentLengthMismatchError(
-                f"Downloaded file {dpath} has size {os.path.getsize(dpath)}"
-                f" but expected {known_size}."
-            )
+        _check_size(dpath, known_size)
         try:
             os.rename(dpath, dest)  # will succeed even if dest is read-only
         except OSError as oserr:
@@ -303,7 +307,6 @@ def _excs_to_retry() -> ty.Callable[[Exception], bool]:
             filter(
                 None,
                 (
-                    errors.ContentLengthMismatchError,
                     aiohttp.http_exceptions.ContentLengthError,
                     aiohttp.client_exceptions.ClientPayloadError,
                     getattr(
@@ -368,6 +371,9 @@ _async_dl_scope = scope.AsyncScope("adls.download.async")
 
 @_dl_scope.bound
 @_async_dl_scope.async_bound
+@fretry.retry_regular_async(
+    fretry.is_exc(errors.ContentLengthMismatchError), fretry.iter_to_async(fretry.n_times(2))
+)
 async def async_download_or_use_verified(
     fs_client: aio.FileSystemClient,
     remote_key: str,
@@ -381,9 +387,8 @@ async def async_download_or_use_verified(
         co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, expected_hash, cache
         )
-        await _async_dl_scope.async_enter(
-            dl_file_client  # type: ignore[arg-type]
-        )  # on __aexit__, will release the connection to the pool
+        await _async_dl_scope.async_enter(dl_file_client)  # type: ignore[arg-type]
+        # on __aexit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
@@ -393,7 +398,6 @@ async def async_download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-
                 await fretry.retry_regular_async(
                     _excs_to_retry(), fretry.iter_to_async(fretry.n_times(2))
                 )(
