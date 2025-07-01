@@ -16,9 +16,10 @@ def main():
         help="A fully qualified path to an ADLS location. Accepts adls://, https:// and abfss:// URIs.",
     )
     parser.add_argument(
-        "--copy-to",
-        "-c",
+        "copy_to",
+        nargs="?",
         type=Path,
+        default=None,
         help="This will create a link to the cached download at the specified location",
     )
     parser.add_argument(
