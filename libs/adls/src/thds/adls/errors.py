@@ -15,8 +15,16 @@ class BlobNotFoundError(HttpResponseError):
         super().__init__(f"{type_hint} not found: {fqn}")
 
 
-class MD5MismatchError(Exception):
-    """Indicates that something needs to be done by the developer to correct a hash mismatch."""
+class BlobPropertiesValidationError(ValueError):
+    """Raised when the properties of a blob do not match the expected values."""
+
+
+class HashMismatchError(BlobPropertiesValidationError):
+    """Raised when the hash of a file does not match the expected value."""
+
+
+class ContentLengthMismatchError(BlobPropertiesValidationError):
+    """Raised when the content length of a file does not match the expected value as retrieved from the server."""
 
 
 def is_blob_not_found(exc: Exception) -> bool:
