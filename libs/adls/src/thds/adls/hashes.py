@@ -13,9 +13,7 @@ from .fqn import AdlsFqn
 
 logger = log.getLogger(__name__)
 
-_KNOWN_METADATA_ALGOS: ty.Final = ("xxh3_128", "blake3")  # in order of descending preference
-PREFERRED_ALGOS: ty.Final = _KNOWN_METADATA_ALGOS[:1]
-assert PREFERRED_ALGOS == ("xxh3_128",)
+PREFERRED_ALGOS: ty.Final = ("xxh3_128", "blake3")
 AnyStrSrc = ty.Union[SomehowReadable, ty.Iterable[ty.AnyStr]]
 # this type closely corresponds to what the underlying DataLakeStorageClient will accept for upload_data.
 
@@ -62,7 +60,7 @@ def metadata_hash_b64_key(algo: str) -> str:
 
 def extract_hashes_from_metadata(metadata: dict) -> ty.Iterable[hashing.Hash]:
     # NOTE! the order here is critical, because we want to _prefer_ the faster hash if it exists.
-    for hash_algo in _KNOWN_METADATA_ALGOS:
+    for hash_algo in PREFERRED_ALGOS:
         md_key = metadata_hash_b64_key(hash_algo)
         if metadata and md_key in metadata:
             yield hashing.Hash(hash_algo, hashing.db64(metadata[md_key]))
@@ -76,7 +74,7 @@ def extract_hashes_from_props(
 
     hashes = list(extract_hashes_from_metadata(props.metadata or dict()))
     if props.content_settings and props.content_settings.content_md5:
-        hashes.append(hashing.Hash("md5", bytes(props.content_settings.content_md5)))
+        hashes.append(hashing.Hash("md5", props.content_settings.content_md5))
     return {h.algo: h for h in hashes}
 
 

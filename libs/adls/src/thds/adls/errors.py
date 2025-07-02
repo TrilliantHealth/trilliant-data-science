@@ -27,10 +27,6 @@ class ContentLengthMismatchError(BlobPropertiesValidationError):
     """Raised when the content length of a file does not match the expected value as retrieved from the server."""
 
 
-class NotADirectoryError(ValueError):
-    """Raised when a path was expected to be a directory but is not."""
-
-
 def is_blob_not_found(exc: Exception) -> bool:
     return (isinstance(exc, HttpResponseError) and exc.status_code == 404) or isinstance(
         exc, BlobNotFoundError
