@@ -31,7 +31,7 @@ from azure.storage.filedatalake.aio import DataLakeServiceClient, FileSystemClie
 
 from thds.core import lazy, log
 
-from ._upload import async_upload_decision_and_settings, metadata_for_upload
+from ._upload import async_upload_decision_and_metadata
 from .conf import CONNECTION_TIMEOUT, UPLOAD_CHUNK_SIZE
 from .download import async_download_or_use_verified
 from .errors import translate_azure_error
@@ -330,15 +330,14 @@ class ADLSFileSystem:
 
         async with file_system_client.get_file_client(remote_path) as file_client:
             with open(local_path, "rb") as fp:
-                decision = await async_upload_decision_and_settings(file_client.get_file_properties, fp)
+                decision = await async_upload_decision_and_metadata(file_client.get_file_properties, fp)
                 if decision.upload_required:
                     await file_client.upload_data(
                         fp,
                         overwrite=True,
-                        content_settings=decision.content_settings,
                         connection_timeout=CONNECTION_TIMEOUT(),
                         chunk_size=UPLOAD_CHUNK_SIZE(),
-                        metadata={**metadata_for_upload(), **(metadata or {})},
+                        metadata={**decision.metadata, **(metadata or {})},
                     )
 
         return remote_path
