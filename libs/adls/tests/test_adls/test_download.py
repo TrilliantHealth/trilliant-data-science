@@ -40,12 +40,12 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64(test_dest: Path):
     assert request == _IoRequest.FILE_PROPERTIES
     # this time, we're asking because we don't have an md5
 
-    request = co.send(FileProperties(name="exist.lol"))
+    request = co.send(FileProperties())
     assert request == _IoRequest.FILE_PROPERTIES
     # this time, we're asking because we're about to do a download and
     # we need to know whether to skip the download.
 
-    wfp = co.send(FileProperties(name="exist.lol"))
+    wfp = co.send(FileProperties())
     assert isinstance(wfp, azcopy.download.SdkDownloadRequest)
     wfp.writer.write(b"ello")
 
@@ -237,9 +237,6 @@ def random_test_file_fqn(
     fs.delete_file(fqn.path)  # clean up remote
 
 
-@pytest.mark.flaky(
-    reruns=2
-)  # i still have no idea why this test very occasionally fails, but only on CI (Linux?)
 def test_parallel_downloads_only_perform_a_single_download(
     caplog: pytest.LogCaptureFixture, random_test_file_fqn: AdlsFqn
 ):
