@@ -25,15 +25,9 @@ def _parse_azcopy_json_output(line: str) -> AzCopyJsonLine:
 
 
 @contextmanager
-def azcopy_tracker(
-    direction: ty.Literal["up", "down"], http_url: str, size_bytes: int
-) -> ty.Iterator[ty.Callable[[str], None]]:
+def azcopy_tracker(http_url: str, size_bytes: int) -> ty.Iterator[ty.Callable[[str], None]]:
     """Context manager that tracks progress from AzCopy JSON lines. This works for both async and sync impls."""
-    tracker = (
-        _progress.get_global_download_tracker
-        if direction == "down"
-        else _progress.get_global_upload_tracker
-    )()
+    tracker = _progress.get_global_download_tracker()
     adls_uri = urllib.parse.unquote(str(uri.parse_uri(http_url)))
     if size_bytes:
         tracker.add(adls_uri, total=size_bytes)

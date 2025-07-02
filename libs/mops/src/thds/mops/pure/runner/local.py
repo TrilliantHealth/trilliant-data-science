@@ -5,41 +5,35 @@ import threading
 import time
 import typing as ty
 from datetime import datetime, timedelta, timezone
-from functools import partial
 from pathlib import Path
 
-from thds.core import futures, log, scope
+from thds.core import config, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
-from ..core.lock.maintain import MAINTAIN_LOCKS  # noqa: F401
 from ..core.partial import unwrap_partial
-from ..core.types import Args, Kwargs, T
+from ..core.types import Args, Kwargs, NoResultAfterShimSuccess, T
 from ..tools.summarize import run_summary
 from . import strings, types
-from .get_results import (
-    PostShimResultGetter,
-    ResultAndInvocationType,
-    lock_maintaining_future,
-    unwrap_value_or_error,
-)
 
-# this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
+MAINTAIN_LOCKS = config.item("thds.mops.pure.local.maintain_locks", default=True, parse=config.tobool)
+
+# these two semaphores allow us to prioritize getting meaningful units
 # of progress _complete_, rather than issuing many instructions to the
 # underlying client and allowing it to randomly order the operations
 # such that it takes longer to get a full unit of work complete.
 _BEFORE_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
-# _BEFORE prioritizes uploading a single invocation and its dependencies so the Shim can start running.
+# _OUT prioritizes uploading a single invocation and its dependencies so the Shim can start running.
+_AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
+# _IN prioritizes retrieving the result of a Shim that has completed.
 
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _Purple = colorized(fg="white", bg="#800080")
-_Pink = colorized(fg="black", bg="#ff1493")
 logger = log.getLogger(__name__)
 _LogKnownResult = make_colorized_out(_DarkBlue, out=logger.info, fmt_str=" {} ")
 _LogNewInvocation = make_colorized_out(_GreenYellow, out=logger.info, fmt_str=" {} ")
-_LogInvocationAfterSteal = make_colorized_out(_Pink, out=logger.info, fmt_str=" {} ")
 _LogAwaitedResult = make_colorized_out(_Purple, out=logger.info, fmt_str=" {} ")
 
 
@@ -50,9 +44,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
     get_meta_and_result: types.GetMetaAndResult,
     run_directory: ty.Optional[Path] = None,
     calls_registry: ty.Mapping[ty.Callable, ty.Collection[ty.Callable]] = dict(),  # noqa: B006
-) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], futures.PFuture[T]]:
+) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], T]:
     @scope.bound
-    def create_invocation_and_result_future(
+    def create_invocation__check_result__wait_shim(
         rerun_exceptions: bool,
         function_memospace: str,
         # by allowing the caller to set the function memospace, we allow 'redirects' to look up an old result by name.
@@ -60,7 +54,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         func: ty.Callable[..., T],
         args_: Args,
         kwargs_: Kwargs,
-    ) -> futures.PFuture[T]:
+    ) -> T:
         """This is the generic local runner. Its core abstractions are:
 
         - serializers of some sort (for the function and its arguments)
@@ -95,13 +89,16 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         )
 
         # Define some important and reusable 'chunks of work'
-        def check_result_exists(
+
+        class ResultAndInvocationType(ty.NamedTuple):
+            value_or_error: ty.Union[memo.results.Success, memo.results.Error]
+            invoc_type: run_summary.InvocationType
+
+        def check_result(
             invoc_type: run_summary.InvocationType,
         ) -> ty.Union[ResultAndInvocationType, None]:
             result = memo.results.check_if_result_exists(
-                memo_uri,
-                check_for_exception=not rerun_exceptions,
-                before_raise=debug_required_result_failure,
+                memo_uri, rerun_excs=rerun_exceptions, before_raise=debug_required_result_failure
             )
             if not result:
                 return None
@@ -110,6 +107,28 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                 f"{invoc_type} {val_or_res} for {memo_uri} already exists and is being returned without invocation!"
             )
             return ResultAndInvocationType(result, invoc_type)
+
+        def unwrap_value_or_error(result_and_itype: ResultAndInvocationType) -> T:
+            result = result_and_itype.value_or_error
+            metadata = None
+            value_t = None
+            try:
+                if isinstance(result, memo.results.Success):
+                    metadata, value_t = get_meta_and_result("value", result.value_uri)
+                    return ty.cast(T, value_t)
+                else:
+                    assert isinstance(result, memo.results.Error), "Must be Error or Success"
+                    metadata, exc = get_meta_and_result("EXCEPTION", result.exception_uri)
+                    raise exc
+            finally:
+                run_summary.log_function_execution(
+                    *(run_directory, memo_uri, result_and_itype.invoc_type),
+                    metadata=metadata,
+                    runner_prefix=function_memospace.split(pipeline_id)[0],
+                    was_error=not isinstance(result, memo.results.Success),
+                    return_value=value_t,
+                    args_kwargs=(args, kwargs),
+                )
 
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:
             return lock.acquire(fs.join(memo_uri, "lock"), expire=timedelta(seconds=88))
@@ -135,16 +154,6 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
 
             inspect_and_log(memo_uri)
 
-        p_unwrap_value_or_error = partial(
-            unwrap_value_or_error,
-            get_meta_and_result,
-            run_directory,
-            function_memospace.split(pipeline_id)[0],  # runner_prefix
-            run_summary.extract_source_uris((args, kwargs)),
-        )
-
-        log_invocation = _LogNewInvocation  # this is what we use unless we steal the lock.
-
         # the network ops being grouped by _BEFORE_INVOCATION include one or more
         # download attempts (consider possible Paths) plus
         # one or more uploads (embedded Paths & Sources/refs, and then invocation).
@@ -153,9 +162,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
 
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
-            result = check_result_exists("memoized")
+            result = check_result("memoized")
             if result:
-                return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                return unwrap_value_or_error(result)
 
             lock_owned = acquire_lock()
             # if no result exists, the vastly most common outcome here will be acquiring
@@ -166,6 +175,10 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # LOCK LOOP: entering this loop (where we attempt to acquire the lock) is the common non-memoized case
         while not result:
             if lock_owned:
+                if MAINTAIN_LOCKS():
+                    release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
+                else:
+                    release_lock = lock_owned.release
                 break  # we own the invocation - invoke the shim ourselves (below)
 
             # getting to this point ONLY happens if we failed to acquire the lock, which
@@ -177,51 +190,57 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             time.sleep(22)
 
             with _BEFORE_INVOCATION_SEMAPHORE:
-                result = check_result_exists("awaited")
+                result = check_result("awaited")
                 if result:
                     _LogAwaitedResult(
                         f"{val_or_res} for {memo_uri} was found after waiting for the lock."
                     )
-                    return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                    return unwrap_value_or_error(result)
 
                 lock_owned = acquire_lock()  # still inside the semaphore, as it's a network op
-                if lock_owned:
-                    log_invocation = _LogInvocationAfterSteal
-                    logger.info(f"Stole expired lock for {memo_uri} - invoking ourselves.")
 
+        assert release_lock is not None
         assert lock_owned is not None
         # if/when we acquire the lock, we move forever into 'run this ourselves mode'.
         # If something about our invocation fails,
         # we fail just as we would have previously, without any attempt to go
         # 'back' to waiting for someone else to compute the result.
-        lock.maintain_to_release(lock_owned)
-        # we don't actually need the release_lock here, because it will get
-        # 'recreated' in the PostShimResultGetter below, which is also where it gets called
 
-        future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
+        try:
+            with _BEFORE_INVOCATION_SEMAPHORE:
+                _LogNewInvocation(f"Invoking {memo_uri}")
+                upload_invocation_and_deps()
 
-        with _BEFORE_INVOCATION_SEMAPHORE:
-            log_invocation(f"Invoking {memo_uri}")
-            upload_invocation_and_deps()
-
-        # can't hold the semaphore while we block on the shim, though.
-        shim = shim_builder(func, args_, kwargs_)
-        future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
-            (
-                memo_uri,
-                *metadata.format_invocation_cli_args(
-                    metadata.InvocationMetadata.new(pipeline_id, invoked_at, lock_owned.writer_id)
-                ),
+            # can't hold the semaphore while we block on the shim, though.
+            shim_ex = None
+            shim = shim_builder(func, args_, kwargs_)
+            shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
+                (
+                    memo_uri,
+                    *metadata.format_invocation_cli_args(
+                        metadata.InvocationMetadata.new(pipeline_id, invoked_at, lock_owned.writer_id)
+                    ),
+                )
             )
-        )
-        if hasattr(future_or_shim_result, "add_done_callback"):
-            # if the shim returns a Future, we wrap it.
-            logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
-            return futures.make_lazy(lock_maintaining_future)(
-                lock_owned, future_result_getter, future_or_shim_result
-            )
-        else:  # it's a synchronous shim - just process the result directly.
-            future_result_getter.release_lock = lock.maintain_to_release(lock_owned)
-            return futures.resolved(future_result_getter(future_or_shim_result))
+        except Exception as ex:
+            # network or similar errors are very common and hard to completely eliminate.
+            # We know that if a result (or error) exists, then the network failure is
+            # not important, because results in blob storage are atomically populated (either fully there or not)
+            logger.exception("Error awaiting shim. Optimistically checking for result.")
+            shim_ex = ex
 
-    return create_invocation_and_result_future
+        finally:
+            release_lock()
+
+        # the network ops being grouped by _AFTER_INVOCATION include one or more downloads.
+        with _AFTER_INVOCATION_SEMAPHORE:
+            value_or_error = memo.results.check_if_result_exists(memo_uri)
+            if not value_or_error:
+                if shim_ex:
+                    raise shim_ex  # re-raise the underlying exception rather than making up our own.
+                raise NoResultAfterShimSuccess(
+                    f"The shim for {memo_uri} exited cleanly, but no result or exception was found."
+                )
+            return unwrap_value_or_error(ResultAndInvocationType(value_or_error, "invoked"))
+
+    return create_invocation__check_result__wait_shim

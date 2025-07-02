@@ -11,7 +11,7 @@ from functools import partial
 
 from typing_extensions import Self
 
-from thds.core import cache, futures, log
+from thds.core import cache, log
 from thds.core.stack_context import StackContext
 
 from ..._utils.once import Once
@@ -20,7 +20,7 @@ from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, F, Kwargs, Serializer, T
 from ..runner import local, shim_builder
-from ..runner.types import FutureShim, Shim, ShimBuilder
+from ..runner.types import Shim, ShimBuilder
 from ..tools.summarize import run_summary
 from . import _pickle, pickles, sha256_b64
 
@@ -32,7 +32,7 @@ _KWARGS_CONTEXT = StackContext[ty.Mapping]("args_kwargs", dict())
 logger = log.getLogger(__name__)
 
 
-def mp_shim(base_shim: ty.Union[Shim, FutureShim], shim_args: ty.Sequence[str]) -> ty.Any:
+def mp_shim(base_shim: Shim, shim_args: ty.Sequence[str]) -> ty.Any:
     return base_shim((RUNNER_NAME, *shim_args))
 
 
@@ -48,7 +48,7 @@ class MemoizingPicklingRunner:
 
     def __init__(
         self,
-        shim: ty.Union[ShimBuilder, Shim, FutureShim],
+        shim: ty.Union[ShimBuilder, Shim],
         blob_storage_root: uris.UriResolvable,
         *,
         rerun_exceptions: bool = True,
@@ -159,14 +159,20 @@ class MemoizingPicklingRunner:
             ),
         )
 
-    def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> ty.Union[Shim, FutureShim]:
+    def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> Shim:
         base_shim = self._shim_builder(func, args, kwargs)
         return partial(mp_shim, base_shim)
 
-    def submit(self, func: ty.Callable[..., T], *args: ty.Any, **kwargs: ty.Any) -> futures.PFuture[T]:
-        """Now that mops supports Futures, we can have an 'inner' API that returns a PFuture.
+    def __call__(self, func: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:
+        """Return result of running this function remotely via the shim.
 
-        We are trying to mimic the interface that concurrent.futures.Executors provide.
+        Passes data to shim process via pickles in a Blob Store.
+
+        May return cached (previously-computed) results found via the
+        derived function memo URI, which contains the determinstic
+        hashed bytes of all the function arguments, but also
+        additional namespacing including pipeline_id as documented
+        in memo.function_memospace.py.
         """
         logger.debug("Preparing to run function via remote shim")
         with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs):
@@ -186,16 +192,3 @@ class MemoizingPicklingRunner:
                 args,
                 kwargs,
             )
-
-    def __call__(self, func: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:
-        """Return result of running this function remotely via the shim.
-
-        Passes data to shim process via pickles in a Blob Store.
-
-        May return cached (previously-computed) results found via the
-        derived function memo URI, which contains the determinstic
-        hashed bytes of all the function arguments, but also
-        additional namespacing including pipeline_id as documented
-        in memo.function_memospace.py.
-        """
-        return self.submit(func, *args, **kwargs).result()

@@ -1,12 +1,6 @@
-import re
-import sqlite3
-import time
-from datetime import timedelta
-
 import pytest
 
-from thds.core import scope, tmp
-from thds.core.progress import calc_report_every, report_gen, report_still_alive
+from thds.core.progress import calc_report_every, report_gen
 
 
 @pytest.mark.parametrize(
@@ -54,30 +48,3 @@ def test_report_gen():
             yield i
 
     assert list(report_gen(gen)()) == list(range(100))
-
-
-def test_report_still_alive(caplog):
-    def _takes_a_long_time(n: int) -> int:
-        time.sleep(0.5)
-        return n + 1
-
-    result = report_still_alive(roughly_every_s=timedelta(seconds=0.2))(_takes_a_long_time)(1)
-    assert result == 2
-    assert re.search(r"Still working after \d+\.\d+ seconds", caplog.text)
-
-
-@scope.bound
-def test_report_still_alive_can_handle_sqlite_connections():
-    tmp_db = scope.enter(tmp.temppath_same_fs())
-
-    def _populate_table(conn: sqlite3.Connection) -> None:
-        conn.executescript(
-            """
-            create table t (x integer, y integer);
-            insert into t (x, y) values (1, 2);
-            insert into t (x, y) values (3, 4);
-            """
-        )
-
-    conn = sqlite3.connect(tmp_db)
-    report_still_alive(roughly_every_s=timedelta(seconds=0.1))(_populate_table)(conn)

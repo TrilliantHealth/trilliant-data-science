@@ -29,17 +29,10 @@ def get_blob_properties(fqn: AdlsFqn) -> BlobProperties:
     )
 
 
-class ContentSettingsP(ty.Protocol):
-    content_md5: ty.Optional[bytearray]
-
-
 class PropertiesP(ty.Protocol):
     name: ty.Any
     metadata: ty.Any
-
-    @property
-    def content_settings(self) -> ContentSettingsP:
-        pass
+    content_settings: ty.Any
 
 
 # At some point it may make sense to separate file and blob property modules,
