@@ -161,10 +161,6 @@ def get_global_download_tracker() -> Tracker:
     return _GLOBAL_DN_TRACKER
 
 
-def get_global_upload_tracker() -> Tracker:
-    return _GLOBAL_UP_TRACKER
-
-
 def _proxy_io(io_type: str, stream: T, key: str, total_len: int) -> T:
     assert io_type in ("read", "write"), io_type
 
