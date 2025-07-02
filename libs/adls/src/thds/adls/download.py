@@ -7,6 +7,7 @@ import typing as ty
 from pathlib import Path
 
 import aiohttp.http_exceptions
+import requests.exceptions
 from azure.core.exceptions import AzureError, HttpResponseError, ResourceModifiedError
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient, aio
 
@@ -307,6 +308,7 @@ def _excs_to_retry() -> ty.Callable[[Exception], bool]:
             filter(
                 None,
                 (
+                    requests.exceptions.ConnectionError,
                     aiohttp.http_exceptions.ContentLengthError,
                     aiohttp.client_exceptions.ClientPayloadError,
                     getattr(
