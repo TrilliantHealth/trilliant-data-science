@@ -320,6 +320,18 @@ def _excs_to_retry() -> ty.Callable[[Exception], bool]:
     )
 
 
+def _log_nonfatal_hash_error_exc(exc: Exception, url: str) -> None:
+    """Azure exceptions are very noisy."""
+    msg = "Unable to set hash for %s: %s"
+    exception_txt = str(exc)
+    log, extra_txt = (
+        (logger.debug, type(exc).__name__)
+        if ("AuthorizationPermissionMismatch" in exception_txt or "ConditionNotMet" in exception_txt)
+        else (logger.warning, exception_txt)
+    )
+    log(msg, url, extra_txt)
+
+
 @_dl_scope.bound
 def download_or_use_verified(
     fs_client: FileSystemClient,
@@ -362,7 +374,7 @@ def download_or_use_verified(
                 assert file_properties
                 dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
             except (HttpResponseError, ResourceModifiedError) as ex:
-                logger.info(f"Unable to set Hash for {remote_key}: {ex}")
+                _log_nonfatal_hash_error_exc(ex, dl_file_client.url)
         return si.value.hit
     except AzureError as err:
         errors.translate_azure_error(fs_client, remote_key, err)
@@ -420,7 +432,7 @@ async def async_download_or_use_verified(
                 await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))  # type: ignore[misc]
                 # TODO - check above type ignore
             except (HttpResponseError, ResourceModifiedError) as ex:
-                logger.info(f"Unable to set Hash for {remote_key}: {ex}")
+                _log_nonfatal_hash_error_exc(ex, dl_file_client.url)
         return si.value.hit
     except AzureError as err:
         errors.translate_azure_error(fs_client, remote_key, err)

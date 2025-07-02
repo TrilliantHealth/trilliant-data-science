@@ -1,3 +1,7 @@
+### 4.1.20250703
+
+- Make common, expected errors when trying to set hash (for downloaded file missing a hash) quieter.
+
 ### 4.1.20250702
 
 - Retry `requests.exceptions.ConnectionError` during downloads, since these seem to be a thing now.
