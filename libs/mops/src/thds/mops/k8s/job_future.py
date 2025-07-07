@@ -45,7 +45,7 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
             return None  # we don't know what's going on but things aren't truly stale yet.
 
         def fmt_counts() -> str:
-            launched = counts.LAUNCH_COUNT.value
+            launched = counts.LAUNCH_COUNT.counter.value
             return f"- ({launched - counts.FINISH_COUNT.inc()} unfinished of {launched})"
 
         if is_job_succeeded(job):
