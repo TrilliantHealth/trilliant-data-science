@@ -61,6 +61,7 @@ def launch(
     # arguments below are for launching; arguments above are for
     # building.  these should get separated in a future change.
     name_prefix: str = "",
+    full_name: str = "",
     dry_run: bool = False,
     suppress_logs: bool = False,
     transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = embed_thds_auth,
@@ -81,8 +82,14 @@ def launch(
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
 
-    job_num = f"{counts.LAUNCH_COUNT.inc():0>3}"
-    name = construct_job_name(name_prefix, job_num)
+    if full_name and name_prefix:
+        raise ValueError("You cannot specify both full_name and name_prefix; use one or the other.")
+
+    if not full_name:
+        name = construct_job_name(name_prefix, f"{counts.LAUNCH_COUNT.inc():0>3}")
+    else:
+        name = full_name
+
     core.scope.enter(core.log.logger_context(job=name))
     node_narrowing = node_narrowing or dict()
 
@@ -175,7 +182,7 @@ def launch(
             )
 
     job = launch_job()
-    logger.info(LAUNCHED(f"Job {job_num} launched!") + f" on {container_image}")
+    logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
     if not suppress_logs:
         threading.Thread(  # fire and forget a log watching thread
             target=JobLogWatcher(job.metadata.name, len(job.spec.template.spec.containers)).start,
