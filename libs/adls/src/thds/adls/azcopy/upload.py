@@ -87,7 +87,7 @@ def run(
     )
     assert process.stdout
     output_lines = list()
-    with progress.azcopy_tracker(uri.to_blob_windows_url(dest), size_bytes) as track:
+    with progress.azcopy_tracker("up", uri.to_blob_windows_url(dest), size_bytes) as track:
         for line in process.stdout:
             track(line)
             output_lines.append(line.strip())
