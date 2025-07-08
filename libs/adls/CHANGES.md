@@ -1,7 +1,3 @@
-### 4.1.20250709
-
-- Provide sane error message when trying to download a file as a directory.
-
 ### 4.1.20250703
 
 - Make common, expected errors when trying to set hash (for downloaded file missing a hash) quieter.
