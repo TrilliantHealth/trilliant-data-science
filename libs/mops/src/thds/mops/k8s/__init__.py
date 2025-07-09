@@ -10,7 +10,7 @@ except ModuleNotFoundError as mnf:
 from . import counts, job_future  # noqa: F401
 from .container_registry import autocr  # noqa: F401
 from .job_future import K8sJobFailedError  # noqa: F401
-from .launch import construct_job_name, launch, shim  # noqa
+from .launch import construct_job_name, create_lazy_job_logging_future, launch, shim  # noqa
 from .node_selection import (  # noqa
     NodeNarrowing,
     ResourceDefinition,

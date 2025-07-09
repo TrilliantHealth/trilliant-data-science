@@ -12,10 +12,9 @@ from thds import core
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config, counts, job_future
+from . import config, counts, job_future, logging
 from ._shared import logger
 from .auth import load_config, upsert_namespace
-from .logging import JobLogWatcher
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
 from .thds_std import embed_thds_auth
@@ -31,7 +30,7 @@ def sanitize_str(name: str) -> str:
 
 def construct_job_name(user_prefix: str, job_num: str) -> str:
     # we want some consistency here, but also some randomness in case the prefixes don't exist or aren't unique.
-    mops_name_part = "-".join([str(os.getpid()), sanitize_str(job_num), str(uuid.uuid4())[:8]])
+    mops_name_part = "-".join([sanitize_str(job_num), str(os.getpid()), str(uuid.uuid4())[:8]])
     if len(mops_name_part) > 63:
         # this should be _impossible_, because having a job num longer than even 20 digits would be an impossibly large
         # number of jobs. but just in case, we'll truncate it to the last 63 characters.
@@ -183,18 +182,32 @@ def launch(
 
     job = launch_job()
     logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
-    if not suppress_logs:
-        threading.Thread(  # fire and forget a log watching thread
-            target=JobLogWatcher(job.metadata.name, len(job.spec.template.spec.containers)).start,
-            daemon=True,
-        ).start()
+    return core.futures.make_lazy(_launch_logs_and_create_future)(  # see below for implementation
+        job.metadata.name,
+        num_pods_expected=len(job.spec.template.spec.containers),
+        namespace=config.k8s_namespace(),
+        suppress_logs=suppress_logs,
+    )
 
-    return core.futures.LazyFuture(
-        partial(
-            job_future.make_job_completion_future,
-            job.metadata.name,
-            namespace=config.k8s_namespace(),
-        )
+
+# this function has to be a top level def because it will sometimes be transferred across process boundaries,
+# and Python/pickle in its infinite wisdom does not allow nested functions to be pickled.
+def _launch_logs_and_create_future(
+    job_name: str, *, num_pods_expected: int, namespace: str, suppress_logs: bool
+) -> core.futures.PFuture[bool]:
+    if not suppress_logs:
+        logging.maybe_start_job_thread(job_name, num_pods_expected)
+    return job_future.make_job_completion_future(job_name, namespace=namespace)
+
+
+def create_lazy_job_logging_future(
+    job_name: str, *, namespace: str = "", num_pods_expected: int = 1
+) -> core.futures.LazyFuture[bool]:
+    return core.futures.make_lazy(_launch_logs_and_create_future)(
+        job_name,
+        num_pods_expected=num_pods_expected,
+        namespace=namespace or config.k8s_namespace(),
+        suppress_logs=False,
     )
 
 
@@ -202,7 +215,7 @@ def shim(
     container_image: ty.Union[str, ty.Callable[[], str]],
     disable_remote: ty.Callable[[], bool] = lambda: False,
     **outer_kwargs: ty.Any,
-) -> ty.Callable[[ty.Sequence[str]], None]:
+) -> ty.Callable[[ty.Sequence[str]], core.futures.LazyFuture[bool]]:
     """Return a closure that can launch the given configuration and run a mops pure function.
 
     Now supports callables that return a container image name; the
@@ -219,16 +232,18 @@ def shim(
     ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
 
     if disable_remote():
-        return samethread_shim
+        return samethread_shim  # type: ignore[return-value]
 
     if isinstance(container_image, str):
         get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731
     else:
         get_container_image = container_image
 
-    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs: ty.Any) -> None:
+    def launch_container_on_k8s_with_args(
+        args: ty.Sequence[str], **inner_kwargs: ty.Any
+    ) -> core.futures.LazyFuture[bool]:
         assert "args" not in inner_kwargs
-        launch(
+        return launch(
             get_container_image(),
             ["python", "-m", "thds.mops.pure.core.entry.main", *args],
             **{**outer_kwargs, **inner_kwargs},
