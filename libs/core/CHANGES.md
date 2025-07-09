@@ -1,3 +1,7 @@
+## 1.41
+
+- Add `find_project_root` function.
+
 ## 1.40
 
 - Support non-stdlib hashing functions being registered for file hashing, and use this capability within
