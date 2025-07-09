@@ -39,8 +39,6 @@ def open_context() -> ty.Iterator[None]:
     reason re-entrancy were desired, we could just silently pass if the dictionary already
     has deferred work.
     """
-    existing_work = _DEFERRED_INVOCATION_WORK()
-    assert existing_work is None, f"deferred work context is not re-entrant! {existing_work}"
     with _DEFERRED_INVOCATION_WORK.set(dict()):
         logger.debug("Opening deferred work context")
         yield

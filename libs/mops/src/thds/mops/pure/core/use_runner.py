@@ -8,17 +8,15 @@ from functools import wraps
 
 from thds.core import log, stack_context
 
-from .entry.runner_registry import entry_count
 from .types import Runner
+
+USE_RUNNER_BYPASS = stack_context.StackContext("use_runner_bypass", False)
+# use this in a Runner remote entry point to allow the remote function call
+# to bypass any use_runner decorator. Also necessary in case somebody is doing advanced
+# things like using a remote runner to run a manifest of _other_ remote functions...
 
 logger = log.getLogger(__name__)
 F = ty.TypeVar("F", bound=ty.Callable)
-FUNCTION_UNWRAP_COUNT = stack_context.StackContext("function_unwrap_count", 0)
-
-
-def _is_runner_entry() -> bool:
-    """Function is being called in the context of a Runner."""
-    return entry_count() > FUNCTION_UNWRAP_COUNT()
 
 
 def use_runner(runner: Runner, skip: ty.Callable[[], bool] = lambda: False) -> ty.Callable[[F], F]:
@@ -34,9 +32,9 @@ def use_runner(runner: Runner, skip: ty.Callable[[], bool] = lambda: False) -> t
     def deco(f: F) -> F:
         @wraps(f)
         def __use_runner_wrapper(*args, **kwargs):  # type: ignore
-            if _is_runner_entry() or skip():
+            if USE_RUNNER_BYPASS() or skip():
                 logger.debug("Calling function %s directly...", f)
-                with FUNCTION_UNWRAP_COUNT.set(FUNCTION_UNWRAP_COUNT() + 1):
+                with USE_RUNNER_BYPASS.set(False):
                     return f(*args, **kwargs)
 
             logger.debug("Forwarding local function %s call to runner...", f)
