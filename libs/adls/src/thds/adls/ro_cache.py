@@ -12,7 +12,7 @@ from thds.core.link import LinkType, link_or_copy
 from .fqn import AdlsFqn
 from .md5 import hex_md5_str
 
-GLOBAL_CACHE_PATH = config.item("global-cache-path", HOMEDIR() / ".adls-md5-ro-cache", parse=Path)
+GLOBAL_CACHE_PATH = config.item("global-cache-path", HOMEDIR() / ".thds/adls/ro-cache", parse=Path)
 MAX_FILENAME_LEN = config.item("max-filename-len", 255, parse=int)  # safe on most local filesystems?
 MAX_TOTAL_PATH_LEN = config.item(
     "max-total-path-len", 1023 if sys.platform == "darwin" else 4095, parse=int
@@ -39,7 +39,6 @@ class Cache(ty.NamedTuple):
 
 
 def global_cache(link: LinkOpts = ("ref", "hard")) -> Cache:
-    """This is the recommended caching configuration."""
     return Cache(GLOBAL_CACHE_PATH(), link)
 
 
