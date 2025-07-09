@@ -63,3 +63,13 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
         job_name,
         namespace=namespace or config.k8s_namespace(),
     )
+
+
+def make_lazy_completion_future(job_name: str, *, namespace: str = "") -> futures.LazyFuture[bool]:
+    """This is a convenience function that will create a job completion future and then
+    immediately process it, returning the result.
+    """
+    return futures.make_lazy(make_job_completion_future)(
+        job_name,
+        namespace=namespace or config.k8s_namespace(),
+    )

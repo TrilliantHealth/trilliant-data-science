@@ -5,34 +5,22 @@ from thds.core import futures
 from ..core.metadata import ResultMetadata
 from ..core.types import Args, F, Kwargs
 
-Shim = ty.Callable[[ty.Sequence[str]], None]
+FutureShim = ty.Callable[[ty.Sequence[str]], futures.PFuture]
+SyncShim = ty.Callable[[ty.Sequence[str]], None]
+Shim = ty.Union[SyncShim, FutureShim]
 """A runner Shim is a way of getting back into a Python process with enough
 context to download the uploaded function and its arguments from the
 location where a runner placed it, and then invoke the function. All
 arguments are strings because it is assumed that this represents some
 kind of command line invocation.
 
-The Shim must be a blocking call, and its result(s) must be available
+A SyncShim must be a blocking call, and its result(s) must be available
 immediately after its return.
+A FutureShim must return a Future (with an 'add_done_callback' method)
+that, when resolved, means that the result(s) are available.
 """
 
-FutureShimP = ty.Callable[[ty.Sequence[str]], futures.PFuture]
-
-
-class FutureShim:
-    """A FutureShim can return as soon as it likes, but must return some type of Future
-    that can be passed to
-    """
-
-    def __init__(self, future_shim: FutureShimP) -> None:
-        self.future_shim = future_shim
-
-    def __call__(self, args: ty.Sequence[str]) -> futures.PFuture:
-        """Call the FutureShim with the arguments to get a PFuture."""
-        return self.future_shim(*args)
-
-
-S = ty.TypeVar("S", Shim, FutureShim, covariant=True)
+S = ty.TypeVar("S", SyncShim, FutureShim, Shim, covariant=True)
 
 
 class ShimBuilder(ty.Protocol, ty.Generic[S]):
@@ -40,7 +28,7 @@ class ShimBuilder(ty.Protocol, ty.Generic[S]):
         ...  # pragma: no cover
 
 
-SyncShimBuilder = ShimBuilder[Shim]
+SyncShimBuilder = ShimBuilder[SyncShim]
 FutureShimBuilder = ShimBuilder[FutureShim]
 
 StorageRootURI = str

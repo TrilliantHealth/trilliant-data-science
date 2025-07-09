@@ -221,7 +221,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         )
         if future is not None and hasattr(future, "add_done_callback"):
             # if the shim returns a Future, we wrap it.
-            logger.info("Shim returned a Future; wrapping it for post-shim result retrieval.")
+            logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
             return futures.chain_lazy_future(future_result_getter, future)
         else:
             return futures.resolved(future_result_getter(None))

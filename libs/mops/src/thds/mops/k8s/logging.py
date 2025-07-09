@@ -32,6 +32,17 @@ BOINK = colorized(fg="white", bg="magenta")
 # string in this and it'll stand out.
 
 
+def should_log(job_name: str) -> bool:
+    if NO_K8S_LOGS():
+        return False
+
+    if random.random() > K8S_LOG_POD_FRACTION():
+        logger.info(f"Skipping log watcher for {job_name} due to fraction.")
+        return False
+
+    return True
+
+
 class JobLogWatcher:
     """Will spawn one or more daemon threads.
 
@@ -59,11 +70,7 @@ class JobLogWatcher:
     @core.scope.bound
     def start(self, failed_pod_name: str = "") -> None:
         """Call this one time - it will spawn threads as needed."""
-        if NO_K8S_LOGS():
-            return
-
-        if random.random() > K8S_LOG_POD_FRACTION():
-            logger.info(f"Skipping log watcher for {self.job_name} due to fraction.")
+        if not should_log(self.job_name):
             return
 
         core.scope.enter(self.job_pods_discovery_lock)
@@ -245,3 +252,28 @@ def _scrape_pod_logs(
         logger.exception(BOINK("Pod log scraping failed utterly. Pod may have died?"))
         # at least let the caller know something went horribly wrong
         failure_callback(pod_name)
+
+
+_JOB_LOG_THREADS: set[str] = set()
+_JOB_LOG_THREAD_COUNT: int = 0
+_JOB_LOG_THREADS_LOCK = threading.Lock()
+
+
+def maybe_start_job_thread(job_name: str, num_pods_expected: int = 1) -> bool:
+    """Starts a thread to watch the logs of a job. Makes sure we only start one thread per
+    job even if there are multiple calls to this function.
+    """
+    if job_name not in _JOB_LOG_THREADS:
+        with _JOB_LOG_THREADS_LOCK:
+            if job_name not in _JOB_LOG_THREADS:
+                # double-checked locking to avoid creating multiple threads for the same job
+                _JOB_LOG_THREADS.add(job_name)
+                if should_log(job_name):
+                    global _JOB_LOG_THREAD_COUNT
+                    _JOB_LOG_THREAD_COUNT += 1
+                    logger.info(f"Starting log watcher {_JOB_LOG_THREAD_COUNT} for job {job_name}")
+                    threading.Thread(
+                        target=JobLogWatcher(job_name, num_pods_expected).start, daemon=True
+                    ).start()
+                    return True
+    return False
