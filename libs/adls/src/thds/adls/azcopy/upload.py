@@ -86,10 +86,15 @@ def run(
         env=system_resources.restrict_usage(),
     )
     assert process.stdout
+    output_lines = list()
     with progress.azcopy_tracker(uri.to_blob_windows_url(dest), size_bytes) as track:
         for line in process.stdout:
             track(line)
+            output_lines.append(line.strip())
 
     process.wait()
     if process.returncode != 0:
-        raise subprocess.SubprocessError(f"AzCopy failed with return code {process.returncode}")
+        raise subprocess.CalledProcessError(
+            process.returncode,
+            f"AzCopy failed with return code {process.returncode}\n\n" + "\n".join(output_lines),
+        )

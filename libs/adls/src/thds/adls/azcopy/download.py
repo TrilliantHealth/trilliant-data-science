@@ -73,19 +73,24 @@ def sync_fastpath(
                 env=system_resources.restrict_usage(),
             )
             assert process.stdout
+            output_lines = list()
             with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes or 0) as track:
                 for line in process.stdout:
                     track(line)
+                    output_lines.append(line.strip())
 
             process.wait()
             if process.returncode != 0:
-                raise subprocess.SubprocessError(f"AzCopy failed with return code {process.returncode}")
+                raise subprocess.CalledProcessError(
+                    process.returncode,
+                    f"AzCopy failed with return code {process.returncode}\n\n" + "\n".join(output_lines),
+                )
             assert (
                 download_request.temp_path.exists()
             ), f"AzCopy did not create the file at {download_request.temp_path}"
             return
 
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
 
     logger.debug("Downloading %s using Python SDK", dl_file_client.url)
@@ -121,17 +126,22 @@ async def async_fastpath(
             assert copy_proc.stdout
 
             # Feed lines to the tracker asynchronously
+            output_lines = list()
             with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes or 0) as track:
                 while True:
                     line = await copy_proc.stdout.readline()
                     if not line:  # EOF
                         break
                     track(line.decode().strip())
+                    output_lines.append(line.decode().strip())
 
             # Wait for process completion
             exit_code = await copy_proc.wait()
             if exit_code != 0:
-                raise subprocess.SubprocessError()
+                raise subprocess.CalledProcessError(
+                    exit_code,
+                    f"AzCopy failed with return code {exit_code}\n\n" + "\n".join(output_lines),
+                )
 
             return
 
