@@ -9,7 +9,7 @@ import pytest
 from thds.core.source import Source, from_file
 from thds.mops import pure, tempdir
 from thds.mops.pure import memoize_in, pipeline_id_mask
-from thds.mops.pure.pickling._pickle import DuplicateSourceBasenameError
+from thds.mops.pure.core.source import DuplicateSourceBasenameError
 
 from ...config import TEST_TMP_URI
 
@@ -57,6 +57,7 @@ def _a_function_which_incorrectly_reuses_basenames() -> tuple[Source, Source]:
 
 def test_disallow_output_sources_with_same_basename():
     with pytest.raises(
-        DuplicateSourceBasenameError, match="Duplicate basename source.txt found in SourceResultPickler."
+        DuplicateSourceBasenameError,
+        match="Duplicate blob store URI .*/source.txt found in SourceResultPickler.",
     ):
         _a_function_which_incorrectly_reuses_basenames()
