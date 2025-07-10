@@ -30,9 +30,21 @@ PREJSON_UNSTRUCTURE_COLLECTION_OVERRIDES = {
 # hooks
 
 
-def _from_isoformat(dt: ty.Union[str, datetime.datetime], t: Type[datetime.date]) -> datetime.date:
+def _date_from_isoformat(dt: ty.Union[str, datetime.date], t: Type[datetime.date]) -> datetime.date:
+    if isinstance(dt, datetime.datetime):  # check most specific type first
+        return dt.date()
+    if isinstance(dt, datetime.date):
+        return dt
+    return t.fromisoformat(str(dt))
+
+
+def _datetime_from_isoformat(
+    dt: ty.Union[str, datetime.date], t: Type[datetime.datetime]
+) -> datetime.datetime:
     if isinstance(dt, datetime.datetime):
-        return t.fromisoformat(str(dt.date()))
+        return dt
+    if isinstance(dt, datetime.date):
+        return datetime.datetime(dt.year, dt.month, dt.day)
     return t.fromisoformat(str(dt))
 
 
@@ -80,8 +92,8 @@ def structure_restricted_conversion(
 # default hooks
 
 DEFAULT_STRUCTURE_HOOKS: Sequence[Tuple[Type, Struct]] = (
-    (datetime.date, _from_isoformat),
-    (datetime.datetime, _from_isoformat),
+    (datetime.date, _date_from_isoformat),
+    (datetime.datetime, _datetime_from_isoformat),
 )
 DEFAULT_UNSTRUCTURE_HOOKS_JSON: Sequence[Tuple[Type, UnStruct]] = (
     (datetime.date, datetime.date.isoformat),
