@@ -1,3 +1,7 @@
+### 4.1.20250714
+
+- Convert content_settings md5 bytearray to bytes in extract_hashes_from_props
+
 ### 4.1.20250709
 
 - Provide sane error message when trying to download a file as a directory.
