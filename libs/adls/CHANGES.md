@@ -1,3 +1,7 @@
+### 4.1.20250715
+
+- Upload tracker says "uploading ..." instead of "downloading ..."
+
 ### 4.1.20250714
 
 - Convert content_settings md5 bytearray to bytes in extract_hashes_from_props
