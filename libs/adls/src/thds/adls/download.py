@@ -158,12 +158,6 @@ IoRequest = ty.Union[_IoRequest, azcopy.download.DownloadRequest]
 IoResponse = ty.Union[FileProperties, None]
 
 
-def _assert_fp(fp: ty.Optional[FileProperties], fqn: AdlsFqn) -> None:
-    assert fp, f"FileProperties for {fqn} should not be None."
-    assert fp.name, f"FileProperties for {fqn} should have a name."
-    assert fp.name == fqn.path, (fp, fqn)
-
-
 _dl_scope = scope.Scope("adls.download")
 
 
@@ -224,7 +218,6 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
         # expectations from ADLS itself.
         file_properties = yield _IoRequest.FILE_PROPERTIES
         if file_properties:
-            _assert_fp(file_properties, fqn)
             # critically, we expect the _first_ one in this list to be the fastest to verify.
             expected_hash = next(iter(hashes.extract_hashes_from_props(file_properties).values()), None)
 
@@ -254,7 +247,6 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
 
     logger.debug("Unable to find a cached version anywhere that we looked...")
     file_properties = yield _IoRequest.FILE_PROPERTIES
-    _assert_fp(file_properties, fqn)
 
     # if any of the remote hashes match the expected hash, verify that one.
     # otherwise, verify the first remote hash in the list, since that's the fastest one.
@@ -294,14 +286,19 @@ def _prep_download_coroutine(
     local_path: StrOrPath,
     expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-) -> ty.Tuple[ty.Generator[IoRequest, IoResponse, _FileResult], IoRequest, DataLakeFileClient]:
+) -> ty.Tuple[
+    ty.Generator[IoRequest, IoResponse, _FileResult],
+    IoRequest,
+    ty.Optional[FileProperties],
+    DataLakeFileClient,
+]:
     co = _download_or_use_verified_cached_coroutine(
         AdlsFqn(ty.cast(str, fs_client.account_name), fs_client.file_system_name, remote_key),
         local_path,
         expected_hash=expected_hash,
         cache=cache,
     )
-    return co, co.send(None), fs_client.get_file_client(remote_key)
+    return co, co.send(None), None, fs_client.get_file_client(remote_key)
 
 
 def _excs_to_retry() -> ty.Callable[[Exception], bool]:
@@ -336,7 +333,6 @@ def _log_nonfatal_hash_error_exc(exc: Exception, url: str) -> None:
 
 
 @_dl_scope.bound
-@fretry.retry_regular(fretry.is_exc(errors.ContentLengthMismatchError), fretry.n_times(2))
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
@@ -352,16 +348,14 @@ def download_or_use_verified(
     """
     file_properties = None
     try:
-        co, co_request, dl_file_client = _prep_download_coroutine(
+        co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, expected_hash, cache
         )
-        assert dl_file_client.path_name == remote_key
         _dl_scope.enter(dl_file_client)  # on __exit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
                     # only fetch these if they haven't already been requested
-                    assert dl_file_client.path_name == remote_key
                     file_properties = dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
@@ -404,7 +398,7 @@ async def async_download_or_use_verified(
 ) -> ty.Optional[Path]:
     file_properties = None
     try:
-        co, co_request, dl_file_client = _prep_download_coroutine(
+        co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, expected_hash, cache
         )
         await _async_dl_scope.async_enter(dl_file_client)  # type: ignore[arg-type]

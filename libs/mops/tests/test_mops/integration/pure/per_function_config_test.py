@@ -49,26 +49,20 @@ def test_reuse_memoized_via_config():
         pass
 
     args, kwargs = (4,), dict(b=4.2)  # type: ignore
-    assert (
-        16.8
-        == invoke_via_shim_or_return_memoized(
-            runner._serialize_args_kwargs,
-            runner._serialize_invocation,  # mul
-            shim_builder,
-            read_metadata_and_object,
-        )(True, func_uri, noop, args, kwargs).result()
-    )
+    assert 16.8 == invoke_via_shim_or_return_memoized(
+        runner._serialize_args_kwargs,
+        runner._serialize_invocation,  # mul
+        shim_builder,
+        read_metadata_and_object,
+    )(True, func_uri, noop, args, kwargs)
 
-    assert (
-        16.8
-        == invoke_via_shim_or_return_memoized(
-            runner._serialize_args_kwargs,
-            runner._serialize_invocation,
-            shim_builder,
-            read_metadata_and_object,
-            # broken_mul,  # won't actually run broken_mul - will instead look up the results from mul
-        )(True, func_uri, noop, args, kwargs).result()
-    )
+    assert 16.8 == invoke_via_shim_or_return_memoized(
+        runner._serialize_args_kwargs,
+        runner._serialize_invocation,
+        shim_builder,
+        read_metadata_and_object,
+        # broken_mul,  # won't actually run broken_mul - will instead look up the results from mul
+    )(True, func_uri, noop, args, kwargs)
 
 
 def test_actual_config_is_used():

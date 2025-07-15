@@ -32,7 +32,7 @@ from thds.core import log
 from . import _funcs
 from .read import get_writer_id, make_read_lockfile
 from .types import LockAcquired, LockContents
-from .write import LockEmitter, LockfileWriter
+from .write import LockfileWriter, make_lock_contents
 
 logger = log.getLogger(__name__)
 
@@ -106,7 +106,7 @@ def acquire(  # noqa: C901
     lockfile_writer = LockfileWriter(
         my_writer_id,
         lock_dir_uri,
-        LockEmitter(my_writer_id, expire),
+        make_lock_contents(my_writer_id, expire),
         expire.total_seconds(),
         debug=debug,
     )
