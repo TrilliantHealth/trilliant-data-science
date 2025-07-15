@@ -76,8 +76,8 @@ class RequiredResultNotFound(Exception):
 
 def check_if_result_exists(
     memo_uri: str,
-    check_for_exception: bool = False,
-    before_raise: ty.Optional[ty.Callable[[], ty.Any]] = None,
+    rerun_excs: bool = False,
+    before_raise: ty.Callable[[], ty.Any] = lambda: None,
 ) -> ty.Union[None, Success, Error]:
     fs = lookup_blob_store(memo_uri)
     value_uri = fs.join(memo_uri, RESULT)
@@ -86,15 +86,14 @@ def check_if_result_exists(
 
     required_msg = _should_require_result(memo_uri)
     if required_msg:  # might be custom or the default. either way it indicates a required result.
-        if before_raise:
-            before_raise()
+        before_raise()
         error_msg = f"Required a result for {ORANGE(memo_uri)} but that result was not found"
         # i'm tired of visually scanning for these memo_uris in logs.
         if required_msg != _NO_MSG:
             error_msg += f": {required_msg}"
         raise RequiredResultNotFound(error_msg, memo_uri)
 
-    if not check_for_exception:
+    if rerun_excs:
         return None
 
     error_uri = fs.join(memo_uri, EXCEPTION)
