@@ -47,6 +47,7 @@ def construct_job_name(user_prefix: str, job_num: str) -> str:
 
 
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
+JOB_NAME = core.stack_context.StackContext("job_name", "")
 
 
 @core.scope.bound
@@ -80,6 +81,10 @@ def launch(
     """
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
+
+    full_name = full_name or JOB_NAME()
+    # in certain cases, it may be necessary to set the job name
+    # via a StackContext, so we check that here, and prefer it over name_prefix.
 
     if full_name and name_prefix:
         raise ValueError("You cannot specify both full_name and name_prefix; use one or the other.")

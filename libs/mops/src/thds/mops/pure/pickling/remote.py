@@ -12,7 +12,7 @@ from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, BlobStore, Kwargs, T
-from ..core.use_runner import USE_RUNNER_BYPASS
+from ..core.use_runner import unwrap_use_runner
 from ..runner import strings
 from . import _pickle, mprunner, pickles, sha256_b64
 
@@ -124,7 +124,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     def do_work_return_result() -> object:
         # ONLY failures in this code should transmit an EXCEPTION
         # back to the orchestrator side.
-        with USE_RUNNER_BYPASS.set(True):
+        with unwrap_use_runner(func):
             return func(*args, **kwargs)
 
     route_return_value_or_exception(
