@@ -1,4 +1,4 @@
-from thds.mops.k8s.launch import construct_job_name
+from thds.mops.k8s._launch import construct_job_name
 
 
 def test_job_name_len():
