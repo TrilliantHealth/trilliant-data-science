@@ -148,9 +148,15 @@ class OneShotLimiter:
             self._names.add(name)
 
 
+def _watch_timer() -> float:
+    # in this context, monotonicity (actual timing) is most useful because we don't need sentinels.
+    return time.monotonic()
+
+
 def is_stale(api_last_update_time: float, obj_last_seen_time: float) -> bool:
-    now = time.monotonic()
+    now = _watch_timer()
     allowed_stale_seconds = config.k8s_watch_object_stale_seconds()
+    # about 5 minutes by default as of 2025-07-15.
     if (time_since_api_update := now - api_last_update_time) > allowed_stale_seconds:  # noqa: F841
         # we haven't heard anything from the API in a while; probably
         # the API is down. Ignore object staleness to avoid false positives.
@@ -244,7 +250,7 @@ class _SeenObjectContainer(ty.Generic[K, T]):
 
     def set_object(self, key: K, obj: T) -> None:
         """Set an object in the cache, updating the last seen time."""
-        now = time.monotonic()
+        now = _watch_timer()
         self._last_api_update_time = now
         self._last_seen_times[key] = now
         self._objs[key] = obj
@@ -360,7 +366,7 @@ class WatchingObjectSource(ty.Generic[T]):
 
         The FutureInterpreter must:
          - raise an exception if it wishes the future to raise.
-         - return a FutureDone with the result if it wishes the future to resolve successfully.
+         - return a Done with the result if it wishes the future to resolve successfully.
           -return None if the status is still in progress.
         """
         namespace = namespace or config.k8s_namespace()
