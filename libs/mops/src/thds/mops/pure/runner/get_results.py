@@ -47,7 +47,7 @@ def unwrap_value_or_error(
         release_lock()
 
 
-_AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
+_AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()) * 3)
 # _IN prioritizes retrieving the result of a Shim that has completed.
 
 T = ty.TypeVar("T")
