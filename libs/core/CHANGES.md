@@ -1,3 +1,16 @@
+## 1.42
+
+- Adds `thds.core.fp` with `compose` for right-to-left unary fn composition and `pipe` for left-to-right.
+
+## 1.41
+
+- Add `find_project_root` function.
+
+## 1.40
+
+- Support non-stdlib hashing functions being registered for file hashing, and use this capability within
+  `core.Source` for any `from_file`-constructed `Source` objects.
+
 ## 1.39
 
 - Adds helpers to `core.inspect` for dynamically getting arguments by name, internally using

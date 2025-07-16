@@ -198,7 +198,7 @@ class NoBasePackageFromMain(ValueError):
 
 
 @lru_cache(None)
-def get_base_package(pkg: Package) -> str:
+def get_base_package(pkg: Package, *, orig: Package = "") -> str:
     try:
         str_pkg = str(pkg)
         if str_pkg == "__main__":
@@ -210,10 +210,12 @@ def get_base_package(pkg: Package) -> str:
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
-                LOGGER.warning("Could not find the base package for `%s`. Package not found.", pkg)
+                LOGGER.warning(
+                    "Could not find the base package for `%s`. Package %s not found.", orig, pkg
+                )
                 return ""
-            else:
-                return get_base_package(".".join(pkg_[:-1]))
+
+            return get_base_package(".".join(pkg_[:-1]), orig=orig or pkg)
 
     return str(pkg)
 

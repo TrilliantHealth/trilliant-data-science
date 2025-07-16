@@ -1,3 +1,39 @@
+### 4.1.20250715
+
+- Upload tracker says "uploading ..." instead of "downloading ..."
+
+### 4.1.20250714
+
+- Convert content_settings md5 bytearray to bytes in extract_hashes_from_props
+
+### 4.1.20250709
+
+- Provide sane error message when trying to download a file as a directory.
+
+### 4.1.20250703
+
+- Make common, expected errors when trying to set hash (for downloaded file missing a hash) quieter.
+
+### 4.1.20250702
+
+- Retry `requests.exceptions.ConnectionError` during downloads, since these seem to be a thing now.
+- Fix bug where `azcopy` failures were not falling back to SDK downloads.
+
+## 4.1
+
+- Use `azcopy` for uploads over a certain size.
+
+# 4.0
+
+- Switch to `xxh3_128` hash for all new uploads, and prefer it for any download verification where it is
+  embedded as the metadata key `hash_xxh3_128_b64`. This is a backward-incompatible change, since we no
+  longer compute MD5 automatically for your uploads.
+- Completely remove `AdlsHashedResource` - it was mostly obsoleted by `core.Source`, and is now
+  completely obsolete since we are preferring a faster hash, `xxh3_128`.
+- `adls.upload_through_cache` now returns a `core.Source` object rather than an `AdlsHashedResource`.
+- rename `cached_up_down` to `cached`, to encourage namespace import/usage rather than the individual
+  functions.
+
 ### 3.3.20250604
 
 - Turns off azcopy globally by default
