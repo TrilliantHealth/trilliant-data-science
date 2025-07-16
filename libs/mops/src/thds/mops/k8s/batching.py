@@ -1,3 +1,15 @@
+"""The basic idea of this module is that different threads can submit _parts_ of a job to a batcher,
+and immediately get the job name back, while the batcher itself defers creating the job until the
+batch is full, or when the process exits.
+
+The theory is that will get used in processes whose only responsibility is to create jobs,
+so waiting on atexit to create the final batch is not an issue.
+
+If you want a batcher that has a more context-manager-like behavior, you can write one of
+those, but it wouldn't work well with a concurrent.futures Executor-style approach, since
+those don't have an explicit shutdown procedure that we can hook to call __exit__.
+"""
+
 import atexit
 import itertools
 import threading
@@ -117,20 +129,8 @@ def init_batcher_with_unpicklable_submit_func(
 
 def shim(args: ty.Sequence[str]) -> futures.PFuture[bool]:
     # This thing needs to return a lazy Uncertain Future that contains a job name, so that Job can be polled on
-    # ... but the job does not exist yet! So we need to change some stuff under the hood I think.
-    #
-    # We could create that job name here and immediately return the future... and _then_
-    # toss the args into the queue. the reason we still need the queue is because we need
-    # to make sure that there's something that will 'see' the very last item that comes
-    # through, even though we don't know which one that will be.
-    #
-    # if we _did_ know exactly how many items we were going to process, we could just do this 'manually'.
-    # but we _don't_ know that, because some of the items may never make it to this point, since they will turn out
-    # to have been resolved by mops prior to this point.
-    #
-    # Therefore, what we need is to have a context that tells us what the job name will be, and then we put that into
-    # the queue alongside the rest of the args. On the other side, we can have a simple batching consumer
-    # that recognizes when the job name has _changed_, and batches all the items that shared the same job name into that job.
+    # ... but the job does not exist yet! So the batcher is in charge of creating the job name
+    # upfront, and then ensuring that it gets used when the job is created.
     assert _BATCHER is not None, "Batcher must be initialized before using the batching shim."
     job_name = _BATCHER.add_to_named_job(args)
     return _launch.create_lazy_job_logging_future(job_name)
