@@ -2,39 +2,53 @@
 https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
 I have written this code too many times to write it again. Why isn't this in the stdlib?
 """
+
 import base64
 import contextlib
+import hashlib
 import io
 import os
-import threading
 import typing as ty
 from pathlib import Path
 
-# Python threads don't allow for significant CPU parallelism, so
-# allowing for more than a few of these per process is a recipe for
-# getting nothing done.
-_SEMAPHORE = threading.BoundedSemaphore(int(os.getenv("THDS_CORE_HASHING_PARALLELISM", 4)))
-_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 65536))
-# https://stackoverflow.com/questions/17731660/hashlib-optimal-size-of-chunks-to-be-used-in-md5-update
-# this may not apply to us as the architecture is 32 bit, but it's at
-# least a halfway decent guess and benchmarking this ourselves would
-# be a massive waste of time.
+from .types import StrOrPath
 
-T = ty.TypeVar("T")
+_CHUNK_SIZE = int(os.getenv("THDS_CORE_HASHING_CHUNK_SIZE", 2**18))
+# https://stackoverflow.com/questions/17731660/hashlib-optimal-size-of-chunks-to-be-used-in-md5-update
+# i've done some additional benchmarking, and slightly larger chunks (256 KB) are faster
+# when the files are larger, and those are the ones we care about most since they take the longest.
+
+
+class Hasher(ty.Protocol):
+    """This may be incomplete as far as hashlib is concerned, but it covers everything we use."""
+
+    @property
+    def name(self) -> str:
+        """The name of the hashing algorithm, e.g. 'sha256'."""
+        ...
+
+    def update(self, __byteslike: ty.Union[bytes, bytearray, memoryview]) -> None:
+        """Update the hash object with the bytes-like object."""
+        ...
+
+    def digest(self) -> bytes:
+        ...
+
+
+H = ty.TypeVar("H", bound=Hasher)
 SomehowReadable = ty.Union[ty.AnyStr, ty.IO[ty.AnyStr], Path]
 
 
-def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: T) -> T:
+def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: H) -> H:
     """Return thing you can call .digest or .hexdigest on.
 
     E.g.:
 
     hash_readable_chunks(open(Path('foo/bar'), 'rb'), hashlib.sha256()).hexdigest()
     """
-    with _SEMAPHORE:
-        for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
-            hasher.update(chunk)  # type: ignore
-        return hasher
+    for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
+        hasher.update(chunk)  # type: ignore
+    return hasher
 
 
 @contextlib.contextmanager
@@ -53,7 +67,7 @@ def attempt_readable(thing: SomehowReadable) -> ty.Iterator[ty.IO[bytes]]:
         yield readable
 
 
-def hash_using(data: SomehowReadable, hasher: T) -> T:
+def hash_using(data: SomehowReadable, hasher: H) -> H:
     """This is quite dynamic - but if your data object is not readable
     bytes and is not openable as bytes, you'll get a
     FileNotFoundError, or possibly a TypeError or other gremlin.
@@ -66,7 +80,7 @@ def hash_using(data: SomehowReadable, hasher: T) -> T:
         return hash_readable_chunks(readable, hasher)
 
 
-def hash_anything(data: SomehowReadable, hasher: T) -> ty.Optional[T]:
+def hash_anything(data: SomehowReadable, hasher: H) -> ty.Optional[H]:
     try:
         return hash_using(data, hasher)
     except (FileNotFoundError, TypeError):
@@ -104,3 +118,22 @@ class Hash(ty.NamedTuple):
 
     def __repr__(self) -> str:
         return f"Hash(algo='{self.algo}', bytes={_repr_bytes(self.bytes)})"
+
+
+_NAMED_HASH_CONSTRUCTORS: ty.Dict[str, ty.Callable[[str], Hasher]] = {}
+
+
+def add_named_hash(algo: str, constructor: ty.Callable[[str], Hasher]) -> None:
+    _NAMED_HASH_CONSTRUCTORS[algo] = constructor
+
+
+def get_hasher(algo: str) -> Hasher:
+    if algo in _NAMED_HASH_CONSTRUCTORS:
+        return _NAMED_HASH_CONSTRUCTORS[algo](algo)
+
+    return hashlib.new(algo)
+
+
+def file(algo: str, pathlike: StrOrPath) -> bytes:
+    """I'm so lazy"""
+    return hash_using(pathlike, get_hasher(algo)).digest()

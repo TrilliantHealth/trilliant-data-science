@@ -1,3 +1,8 @@
+### 3.8.20250709
+
+- Only error on duplicate remote URIs when returning `core.Source` objects where the URI was not provided
+  and we have generated one.
+
 ### 3.8.20250609
 
 - Uses `core.inspect.bind_arguments` internally.
