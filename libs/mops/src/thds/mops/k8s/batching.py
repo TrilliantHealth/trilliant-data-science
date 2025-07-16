@@ -73,7 +73,8 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
 
     def _process_batch(self, batch: ty.Collection[str]) -> None:
         with _launch.JOB_NAME.set(self._job_name):
-            logger.warning(f"Processing batch of len {len(batch)} with job name {self._job_name}")
+            log_lvl = logger.warning if len(batch) < self._max_batch_size else logger.info
+            log_lvl(f"Processing batch of len {len(batch)} with job name {self._job_name}")
             self._submit_func(batch)
 
 
