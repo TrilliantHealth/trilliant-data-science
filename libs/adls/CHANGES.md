@@ -1,3 +1,7 @@
+### 4.1.20250716
+
+- Retry `ContentLengthMismatch` on synchronous downloads
+
 ### 4.1.20250715
 
 - Upload tracker says "uploading ..." instead of "downloading ..."
