@@ -1,3 +1,15 @@
+### 4.1.20250716
+
+- Retry `ContentLengthMismatch` on synchronous downloads
+
+### 4.1.20250715
+
+- Upload tracker says "uploading ..." instead of "downloading ..."
+
+### 4.1.20250714
+
+- Convert content_settings md5 bytearray to bytes in extract_hashes_from_props
+
 ### 4.1.20250709
 
 - Provide sane error message when trying to download a file as a directory.

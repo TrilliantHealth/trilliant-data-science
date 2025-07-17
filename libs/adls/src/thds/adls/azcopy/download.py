@@ -74,7 +74,9 @@ def sync_fastpath(
             )
             assert process.stdout
             output_lines = list()
-            with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes or 0) as track:
+            with progress.azcopy_tracker(
+                "down", dl_file_client.url, download_request.size_bytes or 0
+            ) as track:
                 for line in process.stdout:
                     track(line)
                     output_lines.append(line.strip())
@@ -127,7 +129,9 @@ async def async_fastpath(
 
             # Feed lines to the tracker asynchronously
             output_lines = list()
-            with progress.azcopy_tracker(dl_file_client.url, download_request.size_bytes or 0) as track:
+            with progress.azcopy_tracker(
+                "down", dl_file_client.url, download_request.size_bytes or 0
+            ) as track:
                 while True:
                     line = await copy_proc.stdout.readline()
                     if not line:  # EOF
