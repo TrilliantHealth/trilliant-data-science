@@ -333,6 +333,7 @@ def _log_nonfatal_hash_error_exc(exc: Exception, url: str) -> None:
 
 
 @_dl_scope.bound
+@fretry.retry_regular(fretry.is_exc(errors.ContentLengthMismatchError), fretry.n_times(2))
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,

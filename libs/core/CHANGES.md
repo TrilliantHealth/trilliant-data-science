@@ -1,3 +1,11 @@
+## 1.43
+
+- `refcount.Resource` is a new utility that may be useful.
+
+## 1.42
+
+- Adds `thds.core.fp` with `compose` for right-to-left unary fn composition and `pipe` for left-to-right.
+
 ## 1.41
 
 - Add `find_project_root` function.

@@ -74,7 +74,7 @@ def extract_hashes_from_props(
 
     hashes = list(extract_hashes_from_metadata(props.metadata or dict()))
     if props.content_settings and props.content_settings.content_md5:
-        hashes.append(hashing.Hash("md5", props.content_settings.content_md5))
+        hashes.append(hashing.Hash("md5", bytes(props.content_settings.content_md5)))
     return {h.algo: h for h in hashes}
 
 
