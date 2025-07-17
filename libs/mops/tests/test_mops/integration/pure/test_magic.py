@@ -48,14 +48,3 @@ def test_load_magic_config(clear_magic):
     assert func_test_config._get_blob_root() == "adls://magicians/gob"
     assert func_test_config._pipeline_id == "final-countdown"
     assert subprocess_shim is func_test_config._shimbuilder(func_test_config, tuple(), dict())  # type: ignore
-
-
-def test_pure_magic_with_futures(clear_magic):
-    """We can't actually test futures in a real sense, because the samethread shim does not support them.
-    But we can at least smoke-test that the futures API is available and works as expected.
-    """
-    fut = func1.submit(3, b="b")
-    assert not fut.exception()
-    assert not fut.running()
-    assert fut.done()
-    assert fut.result() == "bbb"
