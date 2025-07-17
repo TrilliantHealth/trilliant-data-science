@@ -60,30 +60,19 @@ class PicklableFunction:
     def __repr__(self) -> str:
         return str(self)
 
-    def _resolve(self) -> ty.Callable:
-        """Resolve the function if it hasn't been resolved yet."""
-        if self.f is None:
-            logger.debug(f"Dynamically importing function {str(self)}")
-            if self.fmod == "__main__":
-                self.f = get_main_module_function(self.fname)  # type: ignore
-            else:
-                mod = importlib.import_module(self.fmod)
-            self.f = getattr(mod, self.fname)
-            assert self.f is not None
-            return self.f
-        return self.f
-
-    @property
-    def func(self) -> ty.Callable:
-        """This is a property so we aren't ruining backward pickle compatibility."""
-        return self._resolve()
-
     @property
     def __name__(self) -> str:
         return self.fname
 
     def __call__(self, *args: ty.Any, **kwargs: ty.Any) -> ty.Any:
-        return self._resolve()(*args, **kwargs)
+        logger.debug(f"Dynamically importing function {str(self)}")
+        if self.fmod == "__main__":
+            self.f = get_main_module_function(self.fname)  # type: ignore
+        else:
+            mod = importlib.import_module(self.fmod)
+            self.f = getattr(mod, self.fname)
+        assert self.f
+        return self.f(*args, **kwargs)
 
 
 class UnpickleSimplePickleFromUri:
