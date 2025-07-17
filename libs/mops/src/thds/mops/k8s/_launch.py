@@ -4,41 +4,22 @@ import os
 import threading
 import typing as ty
 import uuid
+from functools import partial
 
 from kubernetes import client
 
-from thds.core import scope
-from thds.core.log import logger_context
+from thds import core
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config
+from . import config, counts, job_future, logging
 from ._shared import logger
 from .auth import load_config, upsert_namespace
-from .logging import JobLogWatcher
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
 from .thds_std import embed_thds_auth
-from .wait_job import wait_for_job
 
 LAUNCHED = colorized(fg="white", bg="green")
-COMPLETE = colorized(fg="white", bg="blue")
-FAILED = colorized(fg="white", bg="red")
-
-
-class K8sJobFailedError(Exception):
-    """Raised by `launch` when a Job is seen to terminate in a Failed state."""
-
-
-class Counter:
-    def __init__(self) -> None:
-        self.value = 0
-        self._lock = threading.Lock()
-
-    def inc(self) -> int:
-        with self._lock:
-            self.value += 1
-            return self.value
 
 
 def sanitize_str(name: str) -> str:
@@ -49,7 +30,7 @@ def sanitize_str(name: str) -> str:
 
 def construct_job_name(user_prefix: str, job_num: str) -> str:
     # we want some consistency here, but also some randomness in case the prefixes don't exist or aren't unique.
-    mops_name_part = "-".join([str(os.getpid()), sanitize_str(job_num), str(uuid.uuid4())[:8]])
+    mops_name_part = "-".join([sanitize_str(job_num), str(os.getpid()), str(uuid.uuid4())[:8]])
     if len(mops_name_part) > 63:
         # this should be _impossible_, because having a job num longer than even 20 digits would be an impossibly large
         # number of jobs. but just in case, we'll truncate it to the last 63 characters.
@@ -65,12 +46,11 @@ def construct_job_name(user_prefix: str, job_num: str) -> str:
     return name
 
 
-_LAUNCH_COUNT = Counter()
-_FINISH_COUNT = Counter()
 _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
+JOB_NAME = core.stack_context.StackContext("job_name", "")
 
 
-@scope.bound
+@core.scope.bound
 def launch(
     container_image: str,
     args: ty.Sequence[str],
@@ -81,38 +61,46 @@ def launch(
     # arguments below are for launching; arguments above are for
     # building.  these should get separated in a future change.
     name_prefix: str = "",
+    full_name: str = "",
     dry_run: bool = False,
-    fire_and_forget: bool = False,
     suppress_logs: bool = False,
     transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = embed_thds_auth,
     # this is a default for now. later if we share this code we'll need to have a wrapper interface
     service_account_name: str = "",
-) -> None:
+) -> core.futures.LazyFuture[bool]:
     """Launch a Kubernetes job.
 
     Required parameters are the container_image and the arguments to
     that image, just as if you were running this directly with Docker.
 
-    Unless fire_and_forget=True, will poll until Job completes and
-    will raise K8sJobFailedError if the Job fails. None is returned
-    if the Job succeeds.
+    Returns a Future that will resolve to True when the Job completes successfully, or
+    raise K8sJobFailedError if the Job fails.
 
     `name_prefix` is an optional parameter for debugging/developer
     convenience. A generated suffix will be added to it.
-
     """
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
-    job_num = f"{_LAUNCH_COUNT.inc():0>3}"
-    name = construct_job_name(name_prefix, job_num)
-    scope.enter(logger_context(job=name))
+
+    full_name = full_name or JOB_NAME()
+    # in certain cases, it may be necessary to set the job name
+    # via a StackContext, so we check that here, and prefer it over name_prefix.
+
+    if full_name and name_prefix:
+        raise ValueError("You cannot specify both full_name and name_prefix; use one or the other.")
+
+    if not full_name:
+        name = construct_job_name(name_prefix, f"{counts.LAUNCH_COUNT.inc():0>3}")
+    else:
+        name = full_name
+
+    core.scope.enter(core.log.logger_context(job=name))
     node_narrowing = node_narrowing or dict()
 
     # TODO move this entire function out to be separately callable
     @k8s_sdk_retry()
     def assemble_base_job() -> client.models.V1Job:
         logger.debug(f"Assembling job named `{name}` on image `{container_image}`")
-        logger.debug("Fire and forget: %s", fire_and_forget)
         logger.debug("Loading kube configs ...")
         load_config()
         logger.debug("Populating job object ...")
@@ -185,7 +173,7 @@ def launch(
     if dry_run:
         job_with_all_transforms()
         logger.info("Dry run assembly successful; not launching...")
-        return
+        return core.futures.LazyFuture(partial(core.futures.ResolvedFuture, True))
 
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:
@@ -198,32 +186,41 @@ def launch(
             )
 
     job = launch_job()
-    logger.info(LAUNCHED(f"Job {job_num} launched!") + f" on {container_image}")
+    logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
+    return core.futures.make_lazy(_launch_logs_and_create_future)(  # see below for implementation
+        job.metadata.name,
+        num_pods_expected=len(job.spec.template.spec.containers),
+        namespace=config.k8s_namespace(),
+        suppress_logs=suppress_logs,
+    )
+
+
+# this function has to be a top level def because it will sometimes be transferred across process boundaries,
+# and Python/pickle in its infinite wisdom does not allow nested functions to be pickled.
+def _launch_logs_and_create_future(
+    job_name: str, *, num_pods_expected: int, namespace: str, suppress_logs: bool
+) -> core.futures.PFuture[bool]:
     if not suppress_logs:
-        threading.Thread(  # fire and forget a log watching thread
-            target=JobLogWatcher(job.metadata.name, len(job.spec.template.spec.containers)).start,
-            daemon=True,
-        ).start()
+        logging.maybe_start_job_thread(job_name, num_pods_expected)
+    return job_future.make_job_completion_future(job_name, namespace=namespace)
 
-    if not fire_and_forget:
 
-        def counts() -> str:
-            launched = _LAUNCH_COUNT.value
-            return f"- ({launched - _FINISH_COUNT.inc()} unfinished of {launched})"
-
-        job_name = job.metadata.name
-        del job  # trying to save memory here while we wait...
-        if not wait_for_job(job_name, short_name=job_num):
-            logger.error(FAILED(f"Job {job_num} Failed! {counts()}"))
-            raise K8sJobFailedError(f"Job {job_name} failed.")
-        logger.info(COMPLETE(f"Job {job_num} Complete! {counts()}"))
+def create_lazy_job_logging_future(
+    job_name: str, *, namespace: str = "", num_pods_expected: int = 1
+) -> core.futures.LazyFuture[bool]:
+    return core.futures.make_lazy(_launch_logs_and_create_future)(
+        job_name,
+        num_pods_expected=num_pods_expected,
+        namespace=namespace or config.k8s_namespace(),
+        suppress_logs=False,
+    )
 
 
 def shim(
     container_image: ty.Union[str, ty.Callable[[], str]],
     disable_remote: ty.Callable[[], bool] = lambda: False,
     **outer_kwargs: ty.Any,
-) -> ty.Callable[[ty.Sequence[str]], None]:
+) -> ty.Callable[[ty.Sequence[str]], core.futures.LazyFuture[bool]]:
     """Return a closure that can launch the given configuration and run a mops pure function.
 
     Now supports callables that return a container image name; the
@@ -240,16 +237,18 @@ def shim(
     ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
 
     if disable_remote():
-        return samethread_shim
+        return samethread_shim  # type: ignore[return-value]
 
     if isinstance(container_image, str):
         get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731
     else:
         get_container_image = container_image
 
-    def launch_container_on_k8s_with_args(args: ty.Sequence[str], **inner_kwargs: ty.Any) -> None:
+    def launch_container_on_k8s_with_args(
+        args: ty.Sequence[str], **inner_kwargs: ty.Any
+    ) -> core.futures.LazyFuture[bool]:
         assert "args" not in inner_kwargs
-        launch(
+        return launch(
             get_container_image(),
             ["python", "-m", "thds.mops.pure.core.entry.main", *args],
             **{**outer_kwargs, **inner_kwargs},

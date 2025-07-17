@@ -78,7 +78,7 @@ def _generate_log_filename(
     return run_directory / filename
 
 
-def _extract_source_uris(result: ty.Any) -> ty.Set[str]:
+def extract_source_uris(obj: ty.Any) -> ty.Set[str]:
     uris: ty.Set[str] = set()
 
     def extract_uri(unknown: ty.Any) -> None:
@@ -94,15 +94,16 @@ def _extract_source_uris(result: ty.Any) -> ty.Set[str]:
             material = unknown.material
             if callable(material):
                 mat = material()
-                for uri in _extract_source_uris(mat):
+                # recurse!
+                for uri in extract_source_uris(mat):
                     uris.add(uri)
 
     try:
-        pickle_visit.recursive_visit(extract_uri, result)
+        pickle_visit.recursive_visit(extract_uri, obj)
     except pickle.PicklingError:
         pass
     except Exception as exc:
-        logger.warning(f'Unexpected error trying to extract URIs from "%s"; {exc}', result)
+        logger.warning(f'Unexpected error trying to extract URIs from "%s"; {exc}', obj)
 
     return uris
 
@@ -115,7 +116,7 @@ def log_function_execution(
     runner_prefix: str = "",
     was_error: bool = False,
     return_value: ty.Any = None,
-    args_kwargs: ty.Any = None,
+    args_kwargs_uris: ty.Collection[str] = (),
 ) -> None:
     if not run_directory:
         logger.debug("Not writing function summary for %s", memo_uri)
@@ -145,9 +146,9 @@ def log_function_execution(
         log_entry["remote_code_version"] = metadata.remote_code_version
         # we don't bother with invoked_at or remote_started_at because they can be
         # inferred from the timestamp and the wall times
-    if source_uris := _extract_source_uris(args_kwargs):
-        log_entry["uris_in_args_kwargs"] = sorted(source_uris)
-    if source_uris := _extract_source_uris(return_value):
+    if args_kwargs_uris:
+        log_entry["uris_in_args_kwargs"] = sorted(args_kwargs_uris)
+    if source_uris := extract_source_uris(return_value):
         log_entry["uris_in_rvalue"] = sorted(source_uris)
 
     try:
