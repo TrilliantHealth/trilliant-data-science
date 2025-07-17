@@ -33,8 +33,8 @@ def _check_newly_finished(job_name: str, namespace: str = "") -> str:
 
         _FINISHED_JOBS.add(job_full)
 
-    launched = counts.LAUNCH_COUNT.value
-    return f"- ({launched - counts.inc(counts.FINISH_COUNT)} unfinished of {launched})"
+    launched = counts.LAUNCH_COUNT.counter.value
+    return f"- ({launched - counts.FINISH_COUNT.inc()} unfinished of {launched})"
 
 
 class K8sJobFailedError(Exception):

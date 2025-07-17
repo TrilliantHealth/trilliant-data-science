@@ -7,7 +7,6 @@
 from . import adls  # noqa
 from ._magic.api import magic  # noqa
 from .core.entry import register_entry_handler
-from .core.lock.maintain import no_maintain as no_maintain_locks  # noqa: F401
 from .core.memo import results  # noqa
 from .core.memo.function_memospace import (  # noqa
     add_pipeline_memospace_handlers,

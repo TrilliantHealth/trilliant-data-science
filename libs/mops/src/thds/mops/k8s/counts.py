@@ -11,18 +11,15 @@ class MpValue(ty.Protocol[T]):
     value: T
 
 
-def inc(mp_val: MpValue[int]) -> int:
-    with mp_val.get_lock():
-        mp_val.value += 1
-        return mp_val.value
+class Counter:
+    def __init__(self, mp_val: MpValue[int]) -> None:
+        self.counter = mp_val
+
+    def inc(self) -> int:
+        with self.counter.get_lock():
+            self.counter.value += 1
+            return self.counter.value
 
 
-LAUNCH_COUNT = mp.Value("i", 0)
-FINISH_COUNT = mp.Value("i", 0)
-# these are spooky - they're global and mutable, and may in fact get overwritten by code
-# using specific multiprocessing contexts.
-
-
-def to_name(count: int) -> str:
-    """Convert a count to a name."""
-    return f"{count:0>4}"
+LAUNCH_COUNT = Counter(mp.Value("i", 0))
+FINISH_COUNT = Counter(mp.Value("i", 0))

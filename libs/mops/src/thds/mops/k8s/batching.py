@@ -11,13 +11,11 @@ those don't have an explicit shutdown procedure that we can hook to call __exit_
 """
 
 import atexit
-import concurrent.futures
 import itertools
-import multiprocessing
 import threading
 import typing as ty
 
-from thds.core import cpus, futures, log
+from thds.core import futures, log
 
 from . import _launch, counts
 
@@ -70,9 +68,9 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
         self._submit_func = submit_func
 
     def _get_new_name(self) -> str:
-        # counts.inc takes a multiprocess lock. do not forget this!
-        job_num = counts.inc(self._job_counter)
-        return _launch.construct_job_name(self._name_prefix, counts.to_name(job_num))
+        with self._job_counter.get_lock():
+            self._job_counter.value += 1
+            return _launch.construct_job_name(self._name_prefix, f"{self._job_counter.value:0>3}")
 
     def add_to_named_job(self, mops_invocation: ty.Sequence[str]) -> str:
         """Returns job name for the invocation."""
@@ -121,57 +119,11 @@ def init_batcher_with_unpicklable_submit_func(
     job_counter: counts.MpValue[int],
     name_prefix: str = "",
 ) -> None:
-    """Use this if you want to have an unpicklable submit function - because applying make_submit_func(submit_func_arg)
-    will happen inside the pool worker process after all the pickling/unpickling has happened.
-    """
     return init_batcher(
-        make_submit_func(submit_func_arg), func_max_batch_size, job_counter, name_prefix=name_prefix
-    )
-
-
-def make_counting_process_pool_executor(
-    make_submit_func: ty.Callable[[T], ty.Callable[[ty.Collection[str]], ty.Any]],
-    submit_func_arg: T,
-    max_batch_size: int,
-    name_prefix: str = "",
-    max_workers: int = 0,
-) -> concurrent.futures.ProcessPoolExecutor:
-    """Creates a ProcessPoolExecutor that uses the batching shim for job submission.
-
-    We are introducing this because we see segfaults prior to Python 3.12 related to this issue:
-    https://github.com/python/cpython/issues/77377
-
-    And it would seem that this had to do with creating mp.Values using a 'fork' start
-    method, and then passing those to a ProcessPoolExecutor with
-    mp_context=multiprolcessing.get_context('spawn'). So we can help you avoid that by creating
-    the mp.Value for you, alongside its ProcessPoolExecutor.
-
-    NOTE!!
-
-    You should only have one of these per process at a time, because we're doing spooky
-    things with the Job Counter.  In fact, you should probably only create one of these
-    _ever_ within a single logical 'application'.
-
-    If you fail to heed this advice, you will get weird launched/finished counts at a
-    minimum. Although these job counts are not mission-critical, you _will_ be confused.
-    """
-    start_method: str = "spawn"
-    # 'spawn' prevents weird batch processing deadlocks that seem to only happen on Linux with 'fork'.
-    # it is strongly recommended to use 'spawn' for this reason.
-
-    mp_context = multiprocessing.get_context(start_method)
-    launch_count = mp_context.Value("i", 0)
-    # even though i want to assign this to a global, I also want to prevent
-    # any possible race condition where i somehow use a different thread's LAUNCH_COUNT
-    # when i create the ProcessPoolExecutor a few lines below.
-    counts.LAUNCH_COUNT = launch_count
-    counts.FINISH_COUNT = mp_context.Value("i", 0)  # we don't use this here; we just reset it to zero.
-    # SPOOKY - reset the global finish counter and make it be the same 'type'
-    return concurrent.futures.ProcessPoolExecutor(
-        max_workers=max_workers or cpus.available_cpu_count(),
-        initializer=init_batcher_with_unpicklable_submit_func,
-        initargs=(make_submit_func, submit_func_arg, max_batch_size, launch_count, name_prefix),
-        mp_context=mp_context,
+        make_submit_func(submit_func_arg),
+        func_max_batch_size,
+        job_counter,
+        name_prefix=name_prefix,
     )
 
 

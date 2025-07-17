@@ -57,14 +57,6 @@ class PFuture(ty.Protocol[R]):
         """
         ...
 
-    def set_result(self, result: R) -> None:
-        """Set the result of the future, marking it as done."""
-        ...
-
-    def set_exception(self, exception: BaseException) -> None:
-        """Set the exception of the future, marking it as done."""
-        ...
-
 
 class LazyFuture(PFuture[R]):
     def __init__(self, mk_future: ty.Callable[[], PFuture[R]]) -> None:
@@ -120,14 +112,6 @@ class LazyFuture(PFuture[R]):
         """
         self._lazy_future().add_done_callback(fn)
 
-    def set_result(self, result: R) -> None:
-        """Set the result of the future, marking it as done."""
-        self._lazy_future().set_result(result)
-
-    def set_exception(self, exception: BaseException) -> None:
-        """Set the exception of the future, marking it as done."""
-        self._lazy_future().set_exception(exception)
-
 
 P = ParamSpec("P")
 
@@ -161,12 +145,6 @@ class ResolvedFuture(PFuture[R]):
     def add_done_callback(self, fn: ty.Callable[["PFuture[R]"], None]) -> None:
         fn(self)
 
-    def set_result(self, result: R) -> None:
-        raise RuntimeError("Cannot set result on a resolved future.")
-
-    def set_exception(self, exception: BaseException) -> None:
-        raise RuntimeError("Cannot set exception on a resolved future.")
-
 
 def resolved(result: R) -> ResolvedFuture[R]:
     return ResolvedFuture(result)
@@ -184,36 +162,58 @@ def identity(x: R) -> R:
 
 
 def translate_done(
-    out_future: PFuture[R1],
+    cfuture: concurrent.futures.Future[R1],
     translate_result: ty.Callable[[R], R1],
     done_fut: PFuture[R],
 ) -> None:
     try:
         result = done_fut.result()
-        out_future.set_result(translate_result(result))
+        cfuture.set_result(translate_result(result))
     except Exception as e:
-        out_future.set_exception(e)
+        cfuture.set_exception(e)
 
 
-OF_R1 = ty.TypeVar("OF_R1", bound=PFuture)
-
-
-def chain_futures(
-    inner_future: PFuture[R],
-    outer_future: OF_R1,
-    translate_future: ty.Callable[[R], R1],
-) -> OF_R1:
-    """Chain two futures together with a translator in the middle."""
-    outer_done_cb = partial(translate_done, outer_future, translate_future)
-    inner_future.add_done_callback(outer_done_cb)
-    return outer_future
+def _translate_future(
+    future: PFuture[R], translate_future: ty.Callable[[R], R1]
+) -> concurrent.futures.Future[R1]:
+    """Convert a PFuture to a concurrent.futures.Future."""
+    out_future = concurrent.futures.Future[R1]()
+    done_cb = partial(translate_done, out_future, translate_future)
+    future.add_done_callback(done_cb)
+    return out_future
 
 
 def reify_future(future: PFuture[R]) -> concurrent.futures.Future[R]:
     """Reify a PFuture into a concurrent.futures.Future."""
     if isinstance(future, concurrent.futures.Future):
         return future
-    return chain_futures(future, concurrent.futures.Future[R](), identity)
+    return _translate_future(future, identity)
+
+
+@dataclass(frozen=True)
+class _SerializableFutureChainMaker(ty.Generic[R, R1]):
+    """
+    A Future that chains the result of one future to another.
+
+    Used to transform a future of one type into another.
+
+    The two fields must be serializable.
+    """
+
+    _inner_future: PFuture[R]
+    _translate_result: ty.Callable[[R], R1]
+
+    def __call__(self) -> concurrent.futures.Future[R1]:
+        return _translate_future(self._inner_future, self._translate_result)
+
+
+def chain_lazy_future(
+    translate_result: ty.Callable[[R], R1], inner_future: PFuture[R]
+) -> LazyFuture[R1]:
+    """This mostly only makes sense to use if you have a Lazy inner Future that you want to
+    'transform' _lazily_ into a different type of Future.
+    """
+    return LazyFuture(_SerializableFutureChainMaker(inner_future, translate_result))
 
 
 def as_completed(

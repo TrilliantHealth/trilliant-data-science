@@ -15,14 +15,12 @@ from datetime import datetime, timedelta
 from functools import partial
 from threading import Thread
 
-from thds.core import config, log
+from thds.core import log
 
 from ._funcs import make_lock_uri
 from .read import get_writer_id, make_read_lockfile
 from .types import LockAcquired
 from .write import LockEmitter, LockfileWriter
-
-MAINTAIN_LOCKS = config.item("thds.mops.pure.local.maintain_locks", default=True, parse=config.tobool)
 
 logger = log.getLogger(__name__)
 
@@ -150,20 +148,3 @@ def launch_daemon_lock_maintainer(lock_acq: LockAcquired) -> ty.Callable[[], Non
         lock_acq.release()
 
     return stop_maintaining
-
-
-def maintain_to_release(
-    acquired_lock: LockAcquired,
-) -> ty.Callable[[], None]:
-    """Depending on configuration, potentially start maintaining the lock.
-
-    Return a callable that will release the lock when called.
-    """
-    if MAINTAIN_LOCKS():
-        return launch_daemon_lock_maintainer(acquired_lock)
-
-    return acquired_lock.release
-
-
-def no_maintain() -> None:
-    MAINTAIN_LOCKS.set_global(False)

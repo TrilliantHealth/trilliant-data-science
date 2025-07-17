@@ -8,22 +8,18 @@ from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 
-from thds.core import futures, log, scope
+from thds.core import config, futures, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
 from ...config import max_concurrent_network_ops
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
-from ..core.lock.maintain import MAINTAIN_LOCKS  # noqa: F401
 from ..core.partial import unwrap_partial
 from ..core.types import Args, Kwargs, T
 from ..tools.summarize import run_summary
 from . import strings, types
-from .get_results import (
-    PostShimResultGetter,
-    ResultAndInvocationType,
-    lock_maintaining_future,
-    unwrap_value_or_error,
-)
+from .get_results import PostShimResultGetter, ResultAndInvocationType, unwrap_value_or_error
+
+MAINTAIN_LOCKS = config.item("thds.mops.pure.local.maintain_locks", default=True, parse=config.tobool)
 
 # this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
 # of progress _complete_, rather than issuing many instructions to the
@@ -151,7 +147,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             # we can short-circuit the entire process by looking for that result and returning it immediately.
             result = check_result_exists("memoized")
             if result:
-                return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                return futures.resolved(p_unwrap_value_or_error(lambda: None, memo_uri, result))
 
             lock_owned = acquire_lock()
             # if no result exists, the vastly most common outcome here will be acquiring
@@ -162,6 +158,22 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # LOCK LOOP: entering this loop (where we attempt to acquire the lock) is the common non-memoized case
         while not result:
             if lock_owned:
+                if MAINTAIN_LOCKS():
+                    # TODO: decide how to manage lock maintenance when using
+                    # Futures. The difficulty is that we're currently using
+                    # a thread, and there will be no way to communicate with that thread later
+                    # if the Future is returned across process boundaries, which it is intended to be.
+                    #
+                    # One option would be to disallow maintenance entirely; maintenance
+                    # is no longer as necessary as it once was, because the remote
+                    # is expected to self-terminate when it discovered that the lock has been stolen.
+                    #
+                    # Additionally, callers making heavy use of Futures are more likely to be
+                    # callers who don't want to have hundreds or thousands of threads anyway.
+                    release_lock = lock.launch_daemon_lock_maintainer(lock_owned)
+                else:
+
+                    release_lock = lock_owned.release
                 break  # we own the invocation - invoke the shim ourselves (below)
 
             # getting to this point ONLY happens if we failed to acquire the lock, which
@@ -178,25 +190,28 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     _LogAwaitedResult(
                         f"{val_or_res} for {memo_uri} was found after waiting for the lock."
                     )
-                    return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                    return futures.resolved(p_unwrap_value_or_error(lambda: None, memo_uri, result))
 
                 lock_owned = acquire_lock()  # still inside the semaphore, as it's a network op
 
+        assert release_lock is not None
         assert lock_owned is not None
         # if/when we acquire the lock, we move forever into 'run this ourselves mode'.
         # If something about our invocation fails,
         # we fail just as we would have previously, without any attempt to go
         # 'back' to waiting for someone else to compute the result.
 
-        future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
+        future_result_getter = PostShimResultGetter[T](p_unwrap_value_or_error, release_lock, memo_uri)
 
+        # TODO add an except block on the upload plus the shim (if no future returned)
+        # that releases the lock
         with _BEFORE_INVOCATION_SEMAPHORE:
             _LogNewInvocation(f"Invoking {memo_uri}")
             upload_invocation_and_deps()
 
         # can't hold the semaphore while we block on the shim, though.
         shim = shim_builder(func, args_, kwargs_)
-        future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
+        future = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
             (
                 memo_uri,
                 *metadata.format_invocation_cli_args(
@@ -204,14 +219,11 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                 ),
             )
         )
-        if hasattr(future_or_shim_result, "add_done_callback"):
+        if future is not None and hasattr(future, "add_done_callback"):
             # if the shim returns a Future, we wrap it.
             logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
-            return futures.make_lazy(lock_maintaining_future)(
-                lock_owned, future_result_getter, future_or_shim_result
-            )
-        else:  # it's a synchronous shim - just process the result directly.
-            future_result_getter.release_lock = lock.maintain_to_release(lock_owned)
-            return futures.resolved(future_result_getter(future_or_shim_result))
+            return futures.chain_lazy_future(future_result_getter, future)
+        else:
+            return futures.resolved(future_result_getter(None))
 
     return create_invocation_and_result_future
