@@ -1,3 +1,8 @@
+## 1.44
+
+- `core.futures.PFuture` and `core.futures.LazyFuture` are provided to make it possible to provide
+  Future-like systems across subprocesses.
+
 ## 1.43
 
 - `refcount.Resource` is a new utility that may be useful.
