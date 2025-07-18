@@ -90,7 +90,7 @@ def launch(
         raise ValueError("You cannot specify both full_name and name_prefix; use one or the other.")
 
     if not full_name:
-        name = construct_job_name(name_prefix, f"{counts.LAUNCH_COUNT.inc():0>3}")
+        name = construct_job_name(name_prefix, counts.to_name(counts.inc(counts.LAUNCH_COUNT)))
     else:
         name = full_name
 
