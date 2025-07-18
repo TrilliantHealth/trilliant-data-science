@@ -8,14 +8,13 @@ results.
 
 More commonly, however, a remote runtime is a whole separate computer with its own computing resources.
 If we can offload some of the work to be done to a different computer, this is _distributed parallelism_
-– we're no longer limited to getting results as quickly as our link:./orchestrator.adoc[orchestrator] could
+\- we're no longer limited to getting results as quickly as our link:./orchestrator.adoc[orchestrator] could
 produce them on its own, and can instead produce results at a rate proportionate to how parallel our overall
 task is.
 
 Commonly, there will be link:./orchestrator.adoc#concurrency[multiple instances] of the remote environment, to
 afford greater parallelism.
 
-Transferring execution to a remote environment requires
-link:./serialization.adoc[serialization] and a link:./shims.adoc[shim implementation], and may have
-performance implications, so we have developed some
-link:./optimizations.adoc[optimizations] that you may want to be aware of.
+Transferring execution to a remote environment requires link:./serialization.adoc[serialization] and may have
+performance implications, so we have developed some link:./optimizations.adoc[optimizations] that you may
+want to be aware of.
