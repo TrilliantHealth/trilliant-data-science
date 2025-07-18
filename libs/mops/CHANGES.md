@@ -1,24 +1,3 @@
-## 3.9.20250730
-
-- Reintroduce pre-shim lock maintenance that was removed in 3.9 because of the inefficiency it posed to
-  heavy users of FutureShims.
-- Make lock maintenance much more efficient (2 orders of magnitude fewer threads required) so that we
-  re-enable pre-shim lock maintenance.
-
-### 3.9.20250729
-
-- Tighten up some places where lack of orchestrator lock/lease maintenance could lead to multiple
-  invocations continuing to work all the way through the writing of the final result. This will not
-  prevent all such cases but it will prevent a majority of them.
-
-## 3.9
-
-- `MemoizingPicklingRunner` and `pure.magic` now provide an Executor-like interface, wherein you can
-  `.submit(fn, *args, **kwargs)` and receive an abstract `PFuture` as soon as the function has been
-  invoked via the shim - if and only if the underlying shim itself returns a `PFuture`. This should
-  hopefully unlock additional scaling in cases where there are many thousands of functions being run in
-  parallel.
-
 ### 3.8.20250714
 
 - Make `deferred_work` use a restricted `ThreadPoolExecutor` so that we never spawn thousands of threads
