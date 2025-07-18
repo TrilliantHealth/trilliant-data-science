@@ -40,12 +40,12 @@ def test_unit_download_coroutine_no_cache_no_remote_md5b64(test_dest: Path):
     assert request == _IoRequest.FILE_PROPERTIES
     # this time, we're asking because we don't have an md5
 
-    request = co.send(FileProperties(name="exist.lol"))
+    request = co.send(FileProperties())
     assert request == _IoRequest.FILE_PROPERTIES
     # this time, we're asking because we're about to do a download and
     # we need to know whether to skip the download.
 
-    wfp = co.send(FileProperties(name="exist.lol"))
+    wfp = co.send(FileProperties())
     assert isinstance(wfp, azcopy.download.SdkDownloadRequest)
     wfp.writer.write(b"ello")
 

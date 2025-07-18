@@ -5,7 +5,7 @@ from .cached import download_directory, download_to_cache, upload_through_cache 
 from .copy import copy_file, copy_files, wait_for_copy  # noqa: F401
 from .errors import BlobNotFoundError  # noqa: F401
 from .fqn import *  # noqa: F401,F403
-from .global_client import get_global_fs_client  # noqa: F401
+from .global_client import get_global_client, get_global_fs_client  # noqa: F401
 from .impl import *  # noqa: F401,F403
 from .ro_cache import Cache, global_cache  # noqa: F401
 from .upload import upload  # noqa: F401
