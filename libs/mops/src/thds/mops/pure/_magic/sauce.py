@@ -6,7 +6,7 @@ import typing as ty
 
 from typing_extensions import ParamSpec
 
-from thds.core import stack_context
+from thds.core import futures, stack_context
 from thds.mops._utils import config_tree
 
 from ..core import file_blob_store, pipeline_id, pipeline_id_mask, uris
@@ -109,7 +109,7 @@ class Magic(ty.Generic[P, R]):
     def _is_off(self) -> bool:
         return self._shim_builder_or_off is None
 
-    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shim:
+    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shim:  # type: ignore[valid-type]
         # this can be set using a stack-local context, or set globally as specifically
         # or generally as the user needs. We prefer stack local over everything else.
         sb = self._shim_builder_or_off
@@ -123,8 +123,16 @@ class Magic(ty.Generic[P, R]):
     def _pipeline_id(self) -> str:
         return self.config.pipeline_id.getv(self._func_config_path)
 
+    def submit(self, *args: P.args, **kwargs: P.kwargs) -> futures.PFuture[R]:
+        """A futures-based interface that doesn't block on the result of the wrapped
+        function call, but returns a PFuture once either a result has been found or a a
+        new invocation has been started.
+        """
+        with pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+            return self.runner.submit(self.__wrapped__, *args, **kwargs)
+
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        """This is the wrapped function."""
+        """This is the wrapped function - call this as though it were the function itself."""
         with pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self._func(*args, **kwargs)
 
