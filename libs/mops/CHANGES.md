@@ -1,11 +1,3 @@
-## 3.9
-
-- `MemoizingPicklingRunner` and `pure.magic` now provide an Executor-like interface, wherein you can
-  `.submit(fn, *args, **kwargs)` and receive an abstract `PFuture` as soon as the function has been
-  invoked via the shim - if and only if the underlying shim itself returns a `PFuture`. This should
-  hopefully unlock additional scaling in cases where there are many thousands of functions being run in
-  parallel.
-
 ### 3.8.20250714
 
 - Make `deferred_work` use a restricted `ThreadPoolExecutor` so that we never spawn thousands of threads
