@@ -279,7 +279,7 @@ mops.pure.magic.blob_root = "adls://secret/bar"
 __mask.mops.pure.magic.shim = 'off'
 
 [foo.bar.baz.func1]
-mops.pure.magic.shim = 'samethread'
+mops.pure.magic.shim = 'sameprocess'
 ----
 
 The above would be exactly equivalent to the following `pure.magic` usage:
@@ -305,9 +305,9 @@ pure.magic.shim('off', mask=True)
 def func1(...):
     ...
 
-pure.magic.shim('samethread')
+pure.magic.shim('sameprocess')
 ----
 
-NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `samethread` shim for
+NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `sameprocess` shim for
 `func1` will not be used - everything under `foo.bar` would be a non-mops passthrough
 function call.
