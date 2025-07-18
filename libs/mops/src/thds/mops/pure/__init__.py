@@ -21,7 +21,7 @@ from .core.use_runner import use_runner  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
 from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
-from .runner.types import Shim, ShimBuilder  # noqa
+from .runner.types import FutureShim, Shim, ShimBuilder  # noqa
 
 
 def _register_things() -> None:

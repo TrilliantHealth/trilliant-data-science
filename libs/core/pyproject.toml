@@ -1,7 +1,7 @@
 [project]
 name = "thds.core"
 # Patch version is a datetime determined upon release
-version = "1.42"
+version = "1.44"
 description = "Core utilities."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
