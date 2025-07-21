@@ -148,7 +148,6 @@ def test_cache_valid(
     assert cache.is_valid_for(cache_file_properties_past)  # type: ignore
 
 
-@pytest.mark.integration
 def test_nicer_errors(caplog):
     with pytest.raises(AzureError):
         ADLSFileSystem("thisthing", "doesnt-exist-or-is-illegal")
