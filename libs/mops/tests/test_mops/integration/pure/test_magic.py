@@ -3,8 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from thds.core import futures
 from thds.mops import pure
-from thds.mops.pure.runner.simple_shims import subprocess_shim
+from thds.mops.pure.runner.simple_shims import future_subprocess_shim, subprocess_shim
 
 from ...config import TEST_TMP_URI
 
@@ -59,3 +60,14 @@ def test_pure_magic_with_futures(clear_magic):
     assert not fut.running()
     assert fut.done()
     assert fut.result() == "bbb"
+
+
+def test_pure_magic_with_subprocess_future(clear_magic):
+    with func1.shim(future_subprocess_shim):
+        futs = [
+            func1.submit(3, b="c"),
+            func1.submit(3, b="d"),
+            func1.submit(3, b="e"),
+            func1.submit(3, b="f"),
+        ]
+        assert {"ccc", "ddd", "eee", "fff"} == {fut.result() for fut in futures.as_completed(futs)}

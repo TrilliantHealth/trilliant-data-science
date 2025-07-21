@@ -4,7 +4,7 @@ import time
 import typing as ty
 
 # we use concurrent.futures.Future as an implementation detail, but it's communicated
-# as MopsFuture to give us the flexibility to change the implementation later if needed.
+# as core.futures.PFuture to give us the flexibility to change the implementation later if needed.
 from concurrent.futures import Future
 from dataclasses import dataclass
 from uuid import uuid4
