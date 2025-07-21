@@ -13,7 +13,6 @@ from . import (  # noqa: F401
     exit_after,
     files,
     fretry,
-    futures,
     generators,
     git,
     hash_cache,
