@@ -12,9 +12,8 @@ import urllib3
 from kubernetes import client
 from kubernetes import watch as k8s_watch
 
-from thds.core import scope
+from thds.core import futures, scope
 from thds.core.log import getLogger, logger_context
-from thds.mops.types import PFuture
 from thds.termtool.colorize import colorized
 
 from . import config
@@ -360,7 +359,7 @@ class WatchingObjectSource(ty.Generic[T]):
         obj_name: str,
         *,
         namespace: str = "",
-    ) -> PFuture[R]:
+    ) -> futures.PFuture[R]:
         """Create a future that will be resolved when the object is available according to
         the interpreter.
 
