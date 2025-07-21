@@ -32,15 +32,7 @@ def open_context() -> ty.Iterator[None]:
     The idea is that you'd call perform_all() inside your Shim which transfers
     execution to a remote environment, but _not_ call it if you're transferring execution
     to a local environment, as the upload will not be needed.
-
-    This is not re-entrant. If this is called while the dictionary is non-empty, an
-    exception will be raised. This is only because I can think of no reason why anyone
-    would want it to be re-entrant, so it seems better to raise an error. If for some
-    reason re-entrancy were desired, we could just silently pass if the dictionary already
-    has deferred work.
     """
-    existing_work = _DEFERRED_INVOCATION_WORK()
-    assert existing_work is None, f"deferred work context is not re-entrant! {existing_work}"
     with _DEFERRED_INVOCATION_WORK.set(dict()):
         logger.debug("Opening deferred work context")
         yield
