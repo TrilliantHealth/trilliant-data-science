@@ -34,9 +34,9 @@ pieces are:
 [[runtime-shim]]
 == `pure.magic.shim` - Set the runtime shim (f.k.a. Shell)
 
-If you want your function to run with a different runtime shim, use
-`+pure.magic.shim(...)+` as function at the module level, or pass a shim as the
-first argument to `@pure.magic(your_shim)`.
+If you want your function to run with a different link:./shims.adoc[runtime shim], use
+`+pure.magic.shim(...)+` as function at the module level, or pass a shim as the first
+argument to `@pure.magic(your_shim)`.
 
 Valid arguments in addition to actual Shim objects are ``ShimBuilder`` callables, the
 special-cased string names `'subprocess'` and `'samethread'`, and `'off'`, which
