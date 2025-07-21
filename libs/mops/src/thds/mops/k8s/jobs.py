@@ -25,6 +25,10 @@ _JOB_SOURCE = WatchingObjectSource(
 )
 
 
+def job_source() -> WatchingObjectSource[client.models.V1Job]:
+    return _JOB_SOURCE
+
+
 def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1Job]:
     return _JOB_SOURCE.get(job_name, namespace=namespace)
 
