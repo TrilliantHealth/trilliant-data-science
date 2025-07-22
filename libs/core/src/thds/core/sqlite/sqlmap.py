@@ -1,4 +1,5 @@
 import inspect
+import os
 import shutil
 import typing as ty
 from collections import defaultdict
@@ -94,7 +95,7 @@ def merge_sqlite_dirs(
         executor_cm=ProcessPoolExecutor(max_workers=max(min(max_cores, len(sqlite_dbs_by_filename)), 1)),
     ):
         logger.info(f"Moving merged database {merged_db} into {output_dir}")
-        shutil.move(str(merged_db), output_dir)
+        shutil.move(str(merged_db), os.path.join(output_dir, merged_db.name))
 
     return {filename: output_dir / filename for filename in sqlite_dbs_by_filename}
 
