@@ -141,11 +141,7 @@ class Timer:
 
     @property
     def secs_per_call(self) -> float:
-        return (self.secs / self.calls) / 60.0 if self.calls > 0 else float("nan")
-
-    @property
-    def mins(self) -> float:
-        return self.secs / 60.0
+        return (self.secs / self.calls) if self.calls > 0 else float("nan")
 
     def pct_of_total(self, total: float) -> float:
         return (self.secs / total) * 100
@@ -165,7 +161,7 @@ class TimeTracker:
         self._start_times = []
 
     def to_json(self) -> Iterator[str]:
-        if SINGLE_LINE_JSON_TIMERS:
+        if SINGLE_LINE_JSON_TIMERS():
             for name, timer in sorted(self.tracked_times.items(), key=lambda x: x[0]):
                 yield json.dumps({name: dict(timer)}, indent=None)
         else:
@@ -200,6 +196,7 @@ class TimeTracker:
 
     def __exit__(self, *args, **kwargs):
         cmpnt = self.tracked_times[self._names.pop()]
+        cmpnt.calls += 1
         cmpnt.secs += time.perf_counter() - self._start_times.pop()
 
     @property

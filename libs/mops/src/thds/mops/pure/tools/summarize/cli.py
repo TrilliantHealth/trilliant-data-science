@@ -28,6 +28,7 @@ class FunctionSummary(TypedDict):
     total_runtime_minutes: List[float]  # minutes
     remote_runtime_minutes: List[float]  # minutes
     uris_in_rvalue: List[str]
+    uris_in_args_kwargs: List[str]
 
 
 def _empty_summary() -> FunctionSummary:
@@ -46,6 +47,7 @@ def _empty_summary() -> FunctionSummary:
         "total_runtime_minutes": list(),
         "remote_runtime_minutes": list(),
         "uris_in_rvalue": list(),
+        "uris_in_args_kwargs": list(),
     }
 
 
@@ -77,6 +79,7 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         summary["error_count"] += int(log_entry.get("was_error") or 0)
         summary["timestamps"].append(log_entry["timestamp"])
         summary["uris_in_rvalue"].extend(log_entry.get("uris_in_rvalue") or tuple())
+        summary["uris_in_args_kwargs"].extend(log_entry.get("uris_in_args_kwargs") or tuple())
 
         mu_parts = parse_memo_uri(
             log_entry["memo_uri"], runner_prefix=log_entry.get("runner_prefix", "")
@@ -124,6 +127,7 @@ def _combine_summaries(
         acc[function_name]["pipeline_ids"].update(data["pipeline_ids"])
         acc[function_name]["function_logic_keys"].update(data["function_logic_keys"])
         acc[function_name]["uris_in_rvalue"].extend(data["uris_in_rvalue"])
+        acc[function_name]["uris_in_args_kwargs"].extend(data["uris_in_args_kwargs"])
 
         for key in (
             "invoked_by",
@@ -219,6 +223,12 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
                 remote_code_version=", ".join(sorted(set(data["remote_code_version"]))),
             )
         )
+        args_uris = and_more(
+            sorted(data["uris_in_args_kwargs"]),
+            max_count=uri_limit if uri_limit >= 0 else sys.maxsize,
+        ).replace(", ", "\n     ")
+        if args_uris:
+            report_lines.append(f"  URIs in args/kwargs:\n     {args_uris}\n")
         n_uris = and_more(
             sorted(data["uris_in_rvalue"]),
             max_count=uri_limit if uri_limit >= 0 else sys.maxsize,
@@ -228,8 +238,11 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
     return "\n".join(report_lines)
 
 
-def _auto_find_run_directory() -> ty.Optional[Path]:
-    mops_root = run_summary.MOPS_SUMMARY_DIR()
+def auto_find_run_directory(start_dir: ty.Optional[Path] = None) -> Path:
+    if start_dir is None:
+        mops_root = run_summary.MOPS_SUMMARY_DIR()
+    else:
+        mops_root = start_dir / run_summary.MOPS_SUMMARY_DIR()
     if not mops_root.exists():
         raise ValueError(f"No mops summary root directory found at {mops_root}.")
     if not mops_root.is_dir():
@@ -242,16 +255,13 @@ def _auto_find_run_directory() -> ty.Optional[Path]:
             # needs to have some files for it to count for anything
             return directory
 
-    print("No pipeline run directories found.")
-    return None
+    raise ValueError(f"No pipeline run directories found in {mops_root}.")
 
 
 def summarize(
     run_directory: Optional[str] = None, sort_by: SortOrder = "name", uri_limit: int = 10
 ) -> None:
-    run_directory_path = Path(run_directory) if run_directory else _auto_find_run_directory()
-    if not run_directory_path:
-        return
+    run_directory_path = Path(run_directory) if run_directory else auto_find_run_directory()
 
     print(f"Summarizing pipeline run '{run_directory_path}'\n")
     log_files = list(run_directory_path.glob("*.json"))
@@ -290,4 +300,7 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
-    summarize(args.run_directory, args.sort_by, args.uri_limit)
+    try:
+        summarize(args.run_directory, args.sort_by, args.uri_limit)
+    except ValueError as e:
+        print(f"Error: {e}")

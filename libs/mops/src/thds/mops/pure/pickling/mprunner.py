@@ -6,9 +6,12 @@ See runner.local.py for the core runner implementation.
 """
 
 import typing as ty
+from collections import defaultdict
 from functools import partial
 
-from thds.core import cache, log
+from typing_extensions import Self
+
+from thds.core import cache, futures, log
 from thds.core.stack_context import StackContext
 
 from ..._utils.once import Once
@@ -17,7 +20,7 @@ from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, F, Kwargs, Serializer, T
 from ..runner import local, shim_builder
-from ..runner.types import Shim, ShimBuilder
+from ..runner.types import FutureShim, Shim, ShimBuilder
 from ..tools.summarize import run_summary
 from . import _pickle, pickles, sha256_b64
 
@@ -29,7 +32,7 @@ _KWARGS_CONTEXT = StackContext[ty.Mapping]("args_kwargs", dict())
 logger = log.getLogger(__name__)
 
 
-def mp_shim(base_shim: Shim, shim_args: ty.Sequence[str]) -> ty.Any:
+def mp_shim(base_shim: ty.Union[Shim, FutureShim], shim_args: ty.Sequence[str]) -> ty.Any:
     return base_shim((RUNNER_NAME, *shim_args))
 
 
@@ -45,7 +48,7 @@ class MemoizingPicklingRunner:
 
     def __init__(
         self,
-        shim: ty.Union[ShimBuilder, Shim],
+        shim: ty.Union[ShimBuilder, Shim, FutureShim],
         blob_storage_root: uris.UriResolvable,
         *,
         rerun_exceptions: bool = True,
@@ -94,6 +97,23 @@ class MemoizingPicklingRunner:
 
         self._run_directory = run_summary.create_mops_run_directory()
 
+        self._calls_registry: dict[ty.Callable, list[ty.Callable]] = defaultdict(list)
+
+    def calls(self, caller: ty.Callable, *callees: ty.Callable) -> Self:
+        """Register that the first Callable calls the provided Callables(s).
+
+        This is (currently) used to ensure that function-logic-keys on the callees affect
+        the memoization of the caller. Callees that do not have a function-logic-key will
+        be ignored for this purpose; however there are no known reasons why your
+        underlying Callable should not have a function-logic-key, unless it has never been
+        modified since its creation.
+
+        The interface is more general and could in theory be used for other purposes in
+        the future.
+        """
+        self._calls_registry[caller].extend(callees)
+        return self  # returns self mainly to faciliate use with use_runner.
+
     def shared(self, *objs: ty.Any, **named_objs: ty.Any) -> None:
         """Set up memoizing pickle serialization for these objects.
 
@@ -139,9 +159,33 @@ class MemoizingPicklingRunner:
             ),
         )
 
-    def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> Shim:
+    def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> ty.Union[Shim, FutureShim]:
         base_shim = self._shim_builder(func, args, kwargs)
         return partial(mp_shim, base_shim)
+
+    def submit(self, func: ty.Callable[..., T], *args: ty.Any, **kwargs: ty.Any) -> futures.PFuture[T]:
+        """Now that mops supports Futures, we can have an 'inner' API that returns a PFuture.
+
+        We are trying to mimic the interface that concurrent.futures.Executors provide.
+        """
+        logger.debug("Preparing to run function via remote shim")
+        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs):
+            return local.invoke_via_shim_or_return_memoized(
+                self._serialize_args_kwargs,
+                self._serialize_invocation,
+                self._wrap_shim_builder,
+                _pickle.read_metadata_and_object,
+                self._run_directory,
+                self._calls_registry,
+            )(
+                self._rerun_exceptions,
+                memo.make_function_memospace(
+                    _runner_prefix_for_pickled_functions(self._get_storage_root()), func
+                ),
+                func,
+                args,
+                kwargs,
+            )
 
     def __call__(self, func: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:
         """Return result of running this function remotely via the shim.
@@ -154,20 +198,4 @@ class MemoizingPicklingRunner:
         additional namespacing including pipeline_id as documented
         in memo.function_memospace.py.
         """
-        logger.debug("Preparing to run function via remote shim")
-        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs):
-            return local.invoke_via_shim_or_return_memoized(
-                self._serialize_args_kwargs,
-                self._serialize_invocation,
-                self._wrap_shim_builder,
-                _pickle.read_metadata_and_object,
-                self._run_directory,
-            )(
-                self._rerun_exceptions,
-                memo.make_function_memospace(
-                    _runner_prefix_for_pickled_functions(self._get_storage_root()), func
-                ),
-                func,
-                args,
-                kwargs,
-            )
+        return self.submit(func, *args, **kwargs).result()

@@ -1,4 +1,4 @@
-import random
+import stat
 import time
 from datetime import timedelta
 from pathlib import Path
@@ -9,8 +9,10 @@ from thds.core import config, home, log
 
 from .md5 import hex_md5_str
 
-DOWNLOAD_LOCKS_DIR = config.item("dir", home.HOMEDIR() / ".adls-md5-download-locks", parse=Path)
+DOWNLOAD_LOCKS_DIR = config.item("dir", home.HOMEDIR() / ".thds/adls/download-locks", parse=Path)
 _CLEAN_UP_LOCKFILES_AFTER_TIME = timedelta(hours=24)
+_CLEAN_UP_LOCKFILES_EVERY = timedelta(hours=1).total_seconds()
+_LAST_CLEANED_BY_THIS_PROCESS = time.monotonic() - _CLEAN_UP_LOCKFILES_EVERY
 logger = log.getLogger(__name__)
 
 
@@ -19,7 +21,8 @@ def _clean_download_locks() -> int:
     deletion_threshold = time.time() - _CLEAN_UP_LOCKFILES_AFTER_TIME.total_seconds()
     try:
         for f in DOWNLOAD_LOCKS_DIR().iterdir():
-            if f.is_file() and f.stat().st_mtime < deletion_threshold:
+            fstat = f.stat()
+            if stat.S_ISREG(fstat.st_mode) and fstat.st_mtime < deletion_threshold:
                 f.unlink()
                 deleted += 1
     except Exception:
@@ -31,8 +34,11 @@ def _clean_download_locks() -> int:
 
 
 def _occasionally_clean_download_locks():
-    if random.random() < 0.005:  # do this about every 200 downloads
-        # random.random is considered to be very fast, and we have no need of cryptographic quality.
+    global _LAST_CLEANED_BY_THIS_PROCESS
+    # do this about once an hour
+    if time.monotonic() > _LAST_CLEANED_BY_THIS_PROCESS + _CLEAN_UP_LOCKFILES_EVERY:
+        _LAST_CLEANED_BY_THIS_PROCESS = time.monotonic()
+        # minor race condition with other threads but it doesn't really matter.
         _clean_download_locks()
 
 
@@ -54,4 +60,11 @@ def download_lock(download_unique_str: str) -> FileLock:
     """
     DOWNLOAD_LOCKS_DIR().mkdir(parents=True, exist_ok=True)
     _occasionally_clean_download_locks()
-    return FileLock(DOWNLOAD_LOCKS_DIR() / hex_md5_str(download_unique_str))
+    return FileLock(
+        DOWNLOAD_LOCKS_DIR()
+        / (download_unique_str.split("/")[-1][:50] + hex_md5_str(download_unique_str)),
+        # is_singleton=True,
+        # critical for keeping this reentrant without passing the lock around.
+        # see https://github.com/tox-dev/filelock/issues/315#issuecomment-2016797681
+        # however, this is not compatible with the version of Databricks we use, so.....
+    )

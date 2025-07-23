@@ -1,3 +1,62 @@
+## 3.9
+
+- `MemoizingPicklingRunner` and `pure.magic` now provide an Executor-like interface, wherein you can
+  `.submit(fn, *args, **kwargs)` and receive an abstract `PFuture` as soon as the function has been
+  invoked via the shim - if and only if the underlying shim itself returns a `PFuture`. This should
+  hopefully unlock additional scaling in cases where there are many thousands of functions being run in
+  parallel.
+
+### 3.8.20250714
+
+- Make `deferred_work` use a restricted `ThreadPoolExecutor` so that we never spawn thousands of threads
+  to deal with lots of `Source` objects and writing their hashrefs. I imagine we should eventually batch
+  these...
+
+### 3.8.20250709
+
+- Only error on duplicate remote URIs when returning `core.Source` objects where the URI was not provided
+  and we have generated one.
+
+### 3.8.20250609
+
+- Uses `core.inspect.bind_arguments` internally.
+
+### 3.8.20250602
+
+- Now raising an error instead of silently overwriting when duplicate basenames are used as output
+  `Source`s. See [docs](docs/optimizations.adoc#thds.core.source) for details.
+
+### 3.8.20250529
+
+- Restore previous values for log watching timeouts in `mops.k8s`.
+
+### 3.8.20250516
+
+- Removed stack-local context that will not mask nested pipeline ids defined in the various ways they may
+  be desired to function.
+
+### 3.8.20250425
+
+- Fix incompatibility with Python 3.12+ because of backward-incompatible change made by
+  `importlib.metadata` in Python 3.12.
+
+## 3.8
+
+- Adds `calls` API to `pure.magic` and `MemoizingPicklingRunner`, which serves as a way to have inner
+  `function-logic-key`s invalidate memoization for functions which are known to call them.
+
+## 3.7
+
+- `requires-python>=3.9`.
+
+### 3.6.20250409
+
+- Fixes a bug in Kubernetes Job name generation when no user prefix was supplied.
+
+### 3.6.20250328
+
+- Fixes a bug where `mops.pure.magic` config would not be correctly loaded when it was a `__mask` config.
+
 ## 3.6
 
 - [New `pure.magic` API for `mops`](docs/magic.adoc). A collection of lessons learned and long wished-for
@@ -365,7 +424,7 @@ Big changes to consistency and usability of memoization.
 
 Initial re-release as `mops`.
 
-# Ancient History (`trilliant-ml-ops`) versions below:
+# Ancient History (`trilliant-ml-ops`) versions below
 
 ## 30000003.7.0
 

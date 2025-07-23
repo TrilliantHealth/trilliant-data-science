@@ -69,7 +69,7 @@ as well as what is received (it can choose to download the data if necessary, or
 and pass it by reference to some later consumer).
 
 `Source` objects should generally be created via `thds.core.source.from_file` or
-`thds.core.source.from_uri`, though if you have an `AdlsFqn` or `AdlsHashedResource` you may use
+`thds.core.source.from_uri`, though if you have an `AdlsFqn` you may use
 `thds.adls.source.from_adls` directly to avoid needing to convert the `AdlsFqn` into a string.
 
 Functions consuming read-only data should define their parameter types as `Source`, and functions
@@ -85,6 +85,13 @@ returned should be converted into a `Source`, usually via `from_file`.
 - To skip the automagic remote naming behavior, you may instead use `mops.pure.create_source_at_uri`.
   Note that this risks name collisions, in particular the possibility of overwriting data that was meant
   to be read-only for the benefit of a downstream process. You have been warned...
+
+WARNING: Output Sources given automatic names by `mops` are guaranteeed not to collide
+_across_ `mops` functions - but all the output files within a given function must
+themselves have non-colliding ``os.path.basename``s. This is not a technical limitation;
+it's a choice on ``mops``'s part to get you to provide meaningful (and ideally
+deterministic) names to every output that every function creates, even though those names
+are not in any way relied upon by `mops`.
 
 An example:
 
