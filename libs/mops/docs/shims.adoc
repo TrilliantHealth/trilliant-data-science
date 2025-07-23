@@ -1,0 +1,71 @@
+link:../README.adoc[↑]
+
+# Shims
+
+## Definition
+
+A `mops` Shim is some code that knows how to pass the basic list of strings that the
+`MemoizingPicklingRunner` generates after uploading the invocation to the Blob Store –
+which are sufficient to point to that invocation – to some 'other' runtime environment
+where it can unwrap and thereby _run_ the function invocation by calling
+`run_named_entry_handler` (either directly, or more usually indirectly, via
+`thds.mops.pure.entry.main`).
+
+As long as your Shim 'remote' has access to the same blob store and access to the
+underlying Python code that the function call represents, you can run the invocation in
+that remote environment. This provides the core mechanism of remote computation, which
+itself may allow for very wide horizontal scaling of compute.
+
+## Provided shims
+
+Out of the box, `mops` supports 4 shims:
+
+- link:../src/thds/mops/pure/runner/simple_shims.py[`samethread`] - runs your
+  `mops`-wrapped function in the same thread where `mops` did its memoization check. If
+  you use this, you'll get memoization but no added parallelism.
+- link:../src/thds/mops/pure/runner/simple_shims.py[`subprocess`] - runs your
+  `mops`-wrapped function in a new subprocess, giving you both memoization and
+  process-based parallelism.h
+- link:../src/thds/mops/pure/runner/simple_shims.py[`future_subprocess`] - runs your
+  `mops`-wrapped function in a new subprocess, and returns a Future, so that you can
+  choose to spawn many subprocesses without needing to provide a thread to wait on
+  each one.
+- link:../src/thds/mops/k8s/_launch.py[`mops.k8s.shim`] - runs your `mops`-wrapped
+  function on the default Kubernetes cluster according to your machine-local
+  configuration. You will need to provide a Docker image ref. This also returns a Future,
+  and that Future is picklable, so you can launch the `mops` function in a separate
+  process (or even a separate machine) and then 'wait' for the Future to complete
+  somewhere else that has access to the same Kubernetes cluster.
+
+## Building other shims
+
+Other shims can be built. The core challenge for any non-trivial shim is code (and
+dependency) distribution. If you can provide a way to get the code in the right place,
+what's left is somehow calling a Python function on the other side with the list
+of strings that come out of the `MemoizingPicklingRunner`. Everything else will be taken
+care of for you.
+
+A Shim either returns:
+
+- a `PFuture` that represents a future state in which the underlying
+  job will have completed once it is resolved, but ideally has only just been launched, _or_
+- a non-future (whose result will otherwise be ignored), but _only_ after the underlying
+  job has fully completed.
+
+NOTE: New shims should if possible prefer to return an object matching the
+`core.futures.PFuture` interface. This is strictly more flexible for users than a
+non-future-returning Shim, as they will have the option to call their own function in a
+non-blocking manner. Usually this will amount to some Python code that knows how to poll
+for the completion of a given remote 'job' of some sort.
+
+If the job fails, an Exception must be raised to indicate failure (either synchronously or
+via the `PFuture`); if no Exception is raised, `MemoizingPicklingRunner` will itself raise
+an exception after it discovers that no result has been written.
+
+If returning a `PFuture`, the Shim implementation must properly resolve the `PFuture` when
+complete, or else the user code will never return.
+
+Making the `PFuture` itself picklable so that it is compatible with application-level use
+of multiprocessing in order to manage very large quantities of function invocations is an
+ideal scenario. Our Kubernetes shim does this and uses the Job name to track the
+completion of the job even across process boundaries.
