@@ -47,9 +47,3 @@ def upsert_namespace(namespace: str, created_cache: ty.Set[str] = set()) -> None
         logger.info(f"Creating namespace {namespace}")
         kubeapi.create_namespace(ns_obj)
     created_cache.add(namespace)
-
-
-def core_client() -> client.CoreV1Api:
-    """Returns a CoreV1Api client, ensuring that the Kubernetes config is loaded."""
-    load_config()
-    return client.CoreV1Api()
