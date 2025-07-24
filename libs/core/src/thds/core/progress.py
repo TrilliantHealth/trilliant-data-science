@@ -1,7 +1,5 @@
-import concurrent.futures
 import math
 import typing as ty
-from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial, wraps
 from timeit import default_timer
@@ -56,19 +54,12 @@ def _name(obj: ty.Any) -> str:
     return "item"
 
 
-_Frequency = ty.Union[timedelta, float]
-
-
-def _to_float(t: _Frequency) -> float:
-    return t if isinstance(t, float) else t.total_seconds()
-
-
 @_progress_scope.bound
 def report(
     it: ty.Iterable[T],
     *,
     name: str = "",
-    roughly_every_s: _Frequency = timedelta(seconds=20),
+    roughly_every_s: timedelta = timedelta(seconds=20),
 ) -> ty.Iterator[T]:
     """Report round-number progress roughly every so often..."""
     iterator = iter(it)
@@ -76,7 +67,7 @@ def report(
     start = default_timer()
     report_every = 0
     last_report = 0
-    frequency = _to_float(roughly_every_s)
+    frequency = roughly_every_s.total_seconds()
 
     try:
         first_item = next(iterator)
@@ -119,28 +110,3 @@ def _report_gen(f: ty.Callable[P, ty.Iterator[T]], *args: P.args, **kwargs: P.kw
 
 def report_gen(f: ty.Callable[P, ty.Iterator[T]]) -> ty.Callable[P, ty.Iterator[T]]:
     return wraps(f)(partial(_report_gen, f))
-
-
-@contextmanager
-def report_still_alive(
-    roughly_every_s: _Frequency = timedelta(seconds=60), *, name: str = ""
-) -> ty.Iterator[None]:
-    start, frequency = default_timer(), _to_float(roughly_every_s)
-
-    sentinel: concurrent.futures.Future[bool] = concurrent.futures.Future()
-
-    def _report_still_alive():
-        while not sentinel.done():
-            try:
-                return sentinel.result(timeout=frequency)
-            except concurrent.futures.TimeoutError:
-                logger.info(
-                    f"Still working{f' on {name} ' if name else ' '}after {default_timer() - start:.3f} seconds..."
-                )
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.submit(_report_still_alive)
-
-        yield
-
-        sentinel.set_result(True)

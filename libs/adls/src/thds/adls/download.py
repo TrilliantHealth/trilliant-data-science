@@ -376,7 +376,7 @@ def download_or_use_verified(
     except StopIteration as si:
         if meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash):
             try:
-                logger.info(f"Setting missing {si.value.hash.algo} hash for {remote_key}")
+                logger.info(f"Setting missing hash for {remote_key}")
                 assert file_properties
                 dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
             except (HttpResponseError, ResourceModifiedError) as ex:

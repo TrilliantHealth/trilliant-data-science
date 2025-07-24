@@ -101,12 +101,7 @@ def acquire(  # noqa: C901
 
     start = _funcs.utc_now()
 
-    my_writer_id = humenc.encode(uuid4().bytes, num_bytes=2)
-    # we do not expect there to be many writers, so we make the humenc part of the writer
-    # id relatively short so it doesn't 'look' like other uses of humenc.  Making the rest
-    # of the string identical to the base64 encoding (by choosing a multiple of 3) is not
-    # useful to us because we are only using this as a big UUID, not as a hash of an
-    # actual input.
+    my_writer_id = humenc.encode(uuid4().bytes)
 
     lockfile_writer = LockfileWriter(
         my_writer_id,

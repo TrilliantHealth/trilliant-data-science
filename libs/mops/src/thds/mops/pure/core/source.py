@@ -178,6 +178,10 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
     return hashing.Hash(algo=sys.intern(source_.hash.algo), bytes=source_.hash.bytes)
 
 
+def perform_source_uploads() -> None:  # has been replaced by a general work-deferring mechanism.
+    deferred_work.perform_all()
+
+
 # RETURNING FROM REMOTE
 #
 # when returning a Source from a remote, we cannot avoid the upload.  this is because the
@@ -218,11 +222,6 @@ class DuplicateSourceBasenameError(ValueError):
     """
 
 
-def _put_file_to_blob_store(local_path: Path, remote_uri: str) -> None:
-    logger.info("Uploading Source to remote URI %s", remote_uri)
-    lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
-
-
 def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = tuple()) -> SourceResult:
     """Call from within the remote side of an invocation, while serializing the function return value.
 
@@ -238,12 +237,8 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
             # it exists locally - an upload may be necessary.
             file_uri = to_uri(source_.cached_path)
             if source_.uri not in existing_uris:
-                logger.info("Using existing remote URI on Source %s", source_.uri)
-                deferred_work.add(
-                    __name__ + "-chosen-source-result",
-                    source_.uri,
-                    partial(_put_file_to_blob_store, source_.cached_path, source_.uri),
-                )
+                lookup_blob_store(source_.uri).putfile(source_.cached_path, source_.uri)
+                logger.info("Uploading Source to chosen URI %s", source_.uri)
         else:
             file_uri = ""
             logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
@@ -254,7 +249,7 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
     # future caller on a different machine could try to use this memoized result.
     local_path = source.path_from_uri(source_.uri)
     assert local_path.exists(), f"{local_path} does not exist"
-    logger.info("Automatically selecting a remote URI for a Source being returned.")
+    logger.debug("Automatically selecting a remote URI for a Source being returned.")
     remote_uri = invocation_output_uri(name=local_path.name)
     # the line above is a bit of opinionated magic. it uses the 'end' of the filename
     # to automagically assign a meaningful name to the output remote URI.
@@ -271,12 +266,9 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
             " with unique basenames, in order to allow retention of the basename for usability and debugging."
         )
 
-    deferred_work.add(
-        __name__ + "-derived-source-result",
-        remote_uri,
-        partial(_put_file_to_blob_store, local_path, remote_uri),
-    )
+    lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
     # upload must _always_ happen on remotely-returned Sources, as detailed above.
+    # There is no advantage to waiting to upload past this point.
     return SourceResult(remote_uri, source_.hash, source_.uri)
 
 
@@ -288,19 +280,12 @@ def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], 
         return source.from_uri(remote_uri, hash=hash)
 
     local_path = source.path_from_uri(file_uri)
-
-    try:
-        file_exists = local_path.exists()
-    except PermissionError:
-        file_exists = False  # this will happen if one of the intermediate directories is not readable
-
-    if file_exists:
+    if local_path.exists():
         try:
             # since there's a remote URI, it's possible a specific consumer might want to
             # get access to that directly, even though the default data access would still
             # be to use the local file.
             return source.from_file(local_path, hash=hash, uri=remote_uri)
-
         except Exception as e:
             logger.warning(
                 f"Unable to reuse destination local path {local_path} when constructing Source {remote_uri}: {e}"
