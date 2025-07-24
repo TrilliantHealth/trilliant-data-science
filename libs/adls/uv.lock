@@ -1060,19 +1060,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-rerunfailures"
-version = "15.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/78/e6e358545537a8e82c4dc91e72ec0d6f80546a3786dd27c76b06ca09db77/pytest_rerunfailures-15.1.tar.gz", hash = "sha256:c6040368abd7b8138c5b67288be17d6e5611b7368755ce0465dda0362c8ece80", size = 26981 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/30/11d836ff01c938969efa319b4ebe2374ed79d28043a12bfc908577aab9f3/pytest_rerunfailures-15.1-py3-none-any.whl", hash = "sha256:f674c3594845aba8b23c78e99b1ff8068556cc6a8b277f728071fdc4f4b0b355", size = 13274 },
-]
-
-[[package]]
 name = "pytest-xdist"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1162,7 +1149,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
-    { name = "pytest-rerunfailures" },
     { name = "pytest-xdist" },
     { name = "types-requests" },
 ]
@@ -1187,7 +1173,6 @@ dev = [
     { name = "pytest-asyncio", specifier = "~=0.21" },
     { name = "pytest-cov", specifier = "~=4.0" },
     { name = "pytest-mock", specifier = "~=3.10" },
-    { name = "pytest-rerunfailures" },
     { name = "pytest-xdist", specifier = ">=3.3.1,<4.0.0" },
     { name = "types-requests" },
 ]
