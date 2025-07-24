@@ -1363,7 +1363,6 @@ dev = [
     { name = "pytest-asyncio", specifier = "~=0.21" },
     { name = "pytest-cov", specifier = "~=4.0" },
     { name = "pytest-mock", specifier = "~=3.10" },
-    { name = "pytest-rerunfailures" },
     { name = "pytest-xdist", specifier = ">=3.3.1,<4.0.0" },
     { name = "types-requests" },
 ]

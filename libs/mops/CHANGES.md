@@ -1,9 +1,3 @@
-### 3.9.20250729
-
-- Tighten up some places where lack of orchestrator lock/lease maintenance could lead to multiple
-  invocations continuing to work all the way through the writing of the final result. This will not
-  prevent all such cases but it will prevent a majority of them.
-
 ## 3.9
 
 - `MemoizingPicklingRunner` and `pure.magic` now provide an Executor-like interface, wherein you can
