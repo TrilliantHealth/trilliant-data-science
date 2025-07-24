@@ -1,3 +1,9 @@
+### 4.1.20250718
+
+- The global clients (file and blob container) will now be recreated even in forked processes, because it
+  seems like we are observing some issues that might be explained by resources (and potentially locks?)
+  getting reused across processes after fork.
+
 ### 4.1.20250716
 
 - Retry `ContentLengthMismatch` on synchronous downloads
