@@ -4,14 +4,14 @@ from thds import core
 
 from ..runner.shim_builder import make_builder
 from ..runner.simple_shims import samethread_shim, subprocess_shim
-from ..runner.types import Shim, ShimBuilder
+from ..runner.types import FutureShim, Shim, ShimBuilder
 
 ShimName = ty.Literal[
     "samethread",  # memoization and coordination, but run in the same thread as the caller.
     "subprocess",  # memoization and coordination, but transfer to a subprocess rather than remote.
     "off",  # equivalent to None - disables use of mops.
 ]
-ShimOrBuilder = ty.Union[ShimBuilder, Shim]
+ShimOrBuilder = ty.Union[ShimBuilder, Shim, FutureShim]
 logger = core.log.getLogger(__name__)
 
 

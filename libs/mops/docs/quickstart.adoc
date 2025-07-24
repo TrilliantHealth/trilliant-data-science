@@ -2,7 +2,11 @@ link:../README.adoc[↑]
 
 # Quickstart
 
-NOTE: Normally, `mops` would be used with a cloud-based blob store and some kind of cloud-based remote runtime shim, e.g. Kubernetes or AWS Lambda.footnote:[Lambda is not yet a runtime shim, but it could be!] This is a trivial example to allow you to see `mops` in action with no dependencies other than the library itself.
+NOTE: Normally, `mops` would be used with a cloud-based blob store and some kind of
+cloud-based remote link:./shims.adoc[runtime shim], e.g. Kubernetes or AWS
+Lambda.footnote:[Lambda is not yet a runtime shim, but it could be!] This is a trivial
+example to allow you to see `mops` in action with no dependencies other than the library
+itself.
 
 * `pip install thds.mops` (a virtual environment is recommended)
 
@@ -75,7 +79,15 @@ IRE(
 
 You've successfully installed and used `mops`. Although it's a toy example, everything you need for local-only memoization is already working.
 
-If you want to do very expensive computations inside automagically-launched subprocesses, rather than in the same thread as `@pure.magic()` does by default, you could call it as `@pure.magic('subprocess')`.footnote:[Technically, you'll also need to move your function into a separate module from your `+__main__+`, as Python makes it difficult to track down the actual module your code is in if it's being run as main.] If you prefer to provide a different shim, like a Kubernetes runner, see the further link:magic.adoc[docs on `pure.magic`].
-Believe it or not... if you have read+write access to an ADLS Storage Account and Container, you can replace the default `"file://~/.mops"` blob root like so: `@pure.magic(blob_root="adls://yoursa/container/")`, and `mops` will automatically share your results across any other users of the same SA+Container.
+If you want to do very expensive computations inside automagically-launched subprocesses,
+rather than in the same thread as `@pure.magic()` does by default, you could call it as
+`@pure.magic('subprocess')`.footnote:[Technically, you'll also need to move your function
+into a separate module from your `+__main__+`, as Python makes it difficult to track down
+the actual module your code is in if it's being run as main.] If you prefer to provide a
+different link:./shims.adoc[shim], like a Kubernetes runner, see the further
+link:magic.adoc[docs on `pure.magic`].  Believe it or not... if you have read+write access
+to an ADLS Storage Account and Container, you can replace the default `"file://~/.mops"`
+blob root like so: `@pure.magic(blob_root="adls://yoursa/container/")`, and `mops` will
+automatically share your results across any other users of the same SA+Container.
 
 Sprinkle in some Docker images and a Kubernetes cluster (using the built-in `mops.k8s.shim`), and you'll have remotely-running Python code just by calling your own functions.
