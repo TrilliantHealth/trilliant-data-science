@@ -9,7 +9,7 @@ import pytest
 
 from thds.core import tmp
 from thds.mops.pure.core.lock import acquire
-from thds.mops.pure.core.lock.maintain import LockWasStolenError, make_remote_lock_writer
+from thds.mops.pure.core.lock.maintain import LockWasStolenError, remote_lock_maintain
 from thds.mops.pure.core.lock.read import make_read_lockfile
 
 SHORT = timedelta(seconds=0.3)
@@ -84,7 +84,7 @@ def test_not_fresh_lock(lock_uri):
 def test_maintain(lock_uri):
     assert acquire(lock_uri, acquire_margin=SHORT, expire=timedelta(seconds=4))
 
-    maintainer = make_remote_lock_writer(lock_uri)
+    maintainer = remote_lock_maintain(lock_uri)
     assert maintainer.expire_s == 4.0
 
     maintainer.maintain()  # just needs to not error
@@ -108,7 +108,7 @@ def test_beaten_remote_maintainer_gives_up_early(lock_uri):
     assert beaten_writer_id != locked_2.writer_id
 
     with pytest.raises(LockWasStolenError):
-        make_remote_lock_writer(lock_uri, expected_writer_id=beaten_writer_id)
+        remote_lock_maintain(lock_uri, expected_writer_id=beaten_writer_id)
 
-    make_remote_lock_writer(lock_uri, expected_writer_id=locked_2.writer_id)
-    make_remote_lock_writer(lock_uri, expected_writer_id="")  # nothing expected so it's fine
+    remote_lock_maintain(lock_uri, expected_writer_id=locked_2.writer_id)
+    remote_lock_maintain(lock_uri, expected_writer_id="")  # nothing expected so it's fine
