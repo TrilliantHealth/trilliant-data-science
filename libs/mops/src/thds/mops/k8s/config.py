@@ -10,7 +10,7 @@ k8s_namespace_env_var_key = config.item("mops.k8s.namespace_env_var_key", "MOPS_
 # environment variable.  it will not affect how your namespace is selected in the first
 # place.
 
-k8s_watch_object_stale_seconds = config.item("mops.k8s.watch.object_stale_seconds", 30 * 60, parse=int)
+k8s_watch_object_stale_seconds = config.item("mops.k8s.watch.object_stale_seconds", 5 * 60, parse=int)
 k8s_acr_url = config.item("mops.k8s.acr.url", "")
 k8s_job_retry_count = config.item("mops.k8s.job.retry_count", 6, parse=int)
 k8s_job_cleanup_ttl_seconds_after_completion = config.item(
