@@ -35,9 +35,11 @@ _BEFORE_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_net
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
 _Purple = colorized(fg="white", bg="#800080")
+_Pink = colorized(fg="black", bg="#ff1493")
 logger = log.getLogger(__name__)
 _LogKnownResult = make_colorized_out(_DarkBlue, out=logger.info, fmt_str=" {} ")
 _LogNewInvocation = make_colorized_out(_GreenYellow, out=logger.info, fmt_str=" {} ")
+_LogInvocationAfterSteal = make_colorized_out(_Pink, out=logger.info, fmt_str=" {} ")
 _LogAwaitedResult = make_colorized_out(_Purple, out=logger.info, fmt_str=" {} ")
 
 
@@ -141,6 +143,8 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             run_summary.extract_source_uris((args, kwargs)),
         )
 
+        log_invocation = _LogNewInvocation  # this is what we use unless we steal the lock.
+
         # the network ops being grouped by _BEFORE_INVOCATION include one or more
         # download attempts (consider possible Paths) plus
         # one or more uploads (embedded Paths & Sources/refs, and then invocation).
@@ -164,6 +168,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             if lock_owned:
                 break  # we own the invocation - invoke the shim ourselves (below)
 
+            log_invocation = _LogInvocationAfterSteal
             # getting to this point ONLY happens if we failed to acquire the lock, which
             # is not expected to be the usual situation. We log a differently-colored
             # message here to make that clear to users.
@@ -191,7 +196,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
 
         with _BEFORE_INVOCATION_SEMAPHORE:
-            _LogNewInvocation(f"Invoking {memo_uri}")
+            log_invocation(f"Invoking {memo_uri}")
             upload_invocation_and_deps()
 
         # can't hold the semaphore while we block on the shim, though.
