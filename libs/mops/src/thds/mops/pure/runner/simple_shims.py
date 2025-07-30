@@ -1,3 +1,4 @@
+import concurrent.futures
 import subprocess
 from typing import Sequence
 
@@ -19,3 +20,9 @@ def samethread_shim(shim_args: Sequence[str]) -> None:
 def subprocess_shim(shim_args: Sequence[str]) -> None:
     logger.debug("Running a mops function locally in a new subprocess.")
     subprocess.check_call(["python", "-m", "thds.mops.pure.core.entry.main", *shim_args])
+
+
+def future_subprocess_shim(shim_args: Sequence[str]) -> concurrent.futures.Future:
+    """Use this if you really want a Future rather than just running the process"""
+    logger.debug("Running a mops function in a new subprocess, returning a Future.")
+    return concurrent.futures.ProcessPoolExecutor().submit(samethread_shim, shim_args)
