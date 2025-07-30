@@ -106,6 +106,7 @@ class _ShouldExit:
         self.lock_acquired.release()
 
 
+_LOCK_RELEASERS_BY_ID = dict[str, ty.Callable[[], None]]()
 _LOCK_MAINTENANCE_DAEMON_STATES = dict[int, _LockMaintenanceThreadState]()
 
 
@@ -124,6 +125,12 @@ def _ensure_daemon(thread_num: int) -> None:
 
 def add_lock_to_maintenance_daemon(lock_acq: LockAcquired) -> ty.Callable[[], None]:
     """Add lock to global maintenance system and return a cleanup function."""
+    if lock_acq.writer_id in _LOCK_RELEASERS_BY_ID:
+        # technically we could be locking this, but mops itself does not allow
+        # multiple callers to ask for the same lock to be maintained at the same time;
+        # it will always be either the runner or the future that the runner has created.
+        return _LOCK_RELEASERS_BY_ID[lock_acq.writer_id]
+
     should_exit = _ShouldExit(lock_acq)
 
     for i in range(len(_LOCK_MAINTENANCE_DAEMON_STATES) + 1):
@@ -143,6 +150,7 @@ def add_lock_to_maintenance_daemon(lock_acq: LockAcquired) -> ty.Callable[[], No
         maintenance_daemon_state.lock_added_event.set()
         break  # we found a thread that can take the lock
 
+    _LOCK_RELEASERS_BY_ID[lock_acq.writer_id] = should_exit.stop_maintaining
     return should_exit.stop_maintaining
 
 
