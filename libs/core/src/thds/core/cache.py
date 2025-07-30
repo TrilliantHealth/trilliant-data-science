@@ -12,7 +12,7 @@ else:  # pragma: no cover
     from typing_extensions import ParamSpec
 
 
-class _HashedTuple(tuple):
+class HashedTuple(tuple):
     """A tuple that ensures that `hash` will be called no more than once
     per element, since cache decorators will hash the key multiple
     times on a cache miss.  See also `_HashedSeq` in the standard
@@ -27,11 +27,11 @@ class _HashedTuple(tuple):
             self.__hashvalue = hashvalue = hash(self)
         return hashvalue
 
-    def __add__(self, other, add=tuple.__add__) -> "_HashedTuple":
-        return _HashedTuple(add(self, other))
+    def __add__(self, other, add=tuple.__add__) -> "HashedTuple":
+        return HashedTuple(add(self, other))
 
-    def __radd__(self, other, add=tuple.__add__) -> "_HashedTuple":
-        return _HashedTuple(add(other, self))
+    def __radd__(self, other, add=tuple.__add__) -> "HashedTuple":
+        return HashedTuple(add(other, self))
 
     def __getstate__(self) -> ty.Dict:
         return {}
@@ -39,23 +39,23 @@ class _HashedTuple(tuple):
 
 # used for separating keyword arguments; we do not use an object
 # instance here so identity is preserved when pickling/unpickling
-_kwmark = (_HashedTuple,)
+_kwmark = (HashedTuple,)
 
 
-def hashkey(args: tuple, kwargs: ty.Mapping) -> _HashedTuple:
+def hashkey(args: tuple, kwargs: ty.Mapping) -> HashedTuple:
     """Return a cache key for the specified hashable arguments."""
 
     if kwargs:
-        return _HashedTuple(args + sum(sorted(kwargs.items()), _kwmark))
+        return HashedTuple(args + sum(sorted(kwargs.items()), _kwmark))
     else:
-        return _HashedTuple(args)
+        return HashedTuple(args)
 
 
 # above keying code borrowed from `cachetools`: https://github.com/tkem/cachetools/tree/master
 # I have added some type information
 
 
-def make_bound_hashkey(func: ty.Callable) -> ty.Callable[..., _HashedTuple]:
+def make_bound_hashkey(func: ty.Callable) -> ty.Callable[..., HashedTuple]:
     """Makes a hashkey function that binds its `*args, **kwargs` to the function signature of `func`.
 
     The resulting bound hashkey function makes cache keys that are robust to variations in how arguments are passed to
@@ -63,7 +63,7 @@ def make_bound_hashkey(func: ty.Callable) -> ty.Callable[..., _HashedTuple]:
     """
     signature = inspect.signature(func)
 
-    def bound_hashkey(args: tuple, kwargs: ty.Mapping) -> _HashedTuple:
+    def bound_hashkey(args: tuple, kwargs: ty.Mapping) -> HashedTuple:
         bound_arguments = signature.bind(*args, **kwargs)
         bound_arguments.apply_defaults()
         return hashkey(bound_arguments.args, bound_arguments.kwargs)
@@ -85,11 +85,11 @@ _R = ty.TypeVar("_R")
 
 def _locking_factory(
     cache_lock: proto.ContextManager,
-    make_func_lock: ty.Callable[[_HashedTuple], proto.ContextManager],
+    make_func_lock: ty.Callable[[HashedTuple], proto.ContextManager],
 ) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
     def decorator(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]:
-        cache: ty.Dict[_HashedTuple, _R] = {}
-        keys_to_func_locks: ty.Dict[_HashedTuple, proto.ContextManager] = {}
+        cache: ty.Dict[HashedTuple, _R] = {}
+        keys_to_func_locks: ty.Dict[HashedTuple, proto.ContextManager] = {}
         hits = misses = 0
         bound_hashkey = make_bound_hashkey(func)
         sentinel = ty.cast(_R, object())  # unique object used to signal cache misses
@@ -120,7 +120,7 @@ def _locking_factory(
                 result = func(*args, **kwargs)
                 cache[key] = result
 
-            del keys_to_func_locks[key]
+            keys_to_func_locks.pop(key, None)  # this allows for the use of reentrant locks
             return result
 
         def cache_info() -> _CacheInfo:
@@ -154,7 +154,7 @@ def locking(
     func: None = ...,
     *,
     cache_lock: ty.Optional[proto.ContextManager] = ...,
-    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], proto.ContextManager]] = ...,
+    make_func_lock: ty.Optional[ty.Callable[[HashedTuple], proto.ContextManager]] = ...,
 ) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
     ...  # pragma: no cover
 
@@ -167,7 +167,7 @@ def locking(
     func: ty.Optional[ty.Callable[_P, _R]] = None,
     *,
     cache_lock: ty.Optional[proto.ContextManager] = None,
-    make_func_lock: ty.Optional[ty.Callable[[_HashedTuple], proto.ContextManager]] = None,
+    make_func_lock: ty.Optional[ty.Callable[[HashedTuple], proto.ContextManager]] = None,
 ):
     """A threadsafe, simple, unbounded cache.
 
@@ -189,7 +189,7 @@ def locking(
     usage that is not worth the cost.
     """
 
-    def default_make_func_lock(_key: _HashedTuple) -> threading.Lock:
+    def default_make_func_lock(_key: HashedTuple) -> threading.Lock:
         return threading.Lock()
 
     decorator = _locking_factory(

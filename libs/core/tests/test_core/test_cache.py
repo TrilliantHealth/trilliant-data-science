@@ -84,3 +84,22 @@ def test_locking_calls_same_args_once_diff_args_parallel() -> None:
     assert cached_slow_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
     assert stop - start < 4
     # concurrent runtime is less than serial runtime of the 4 function invocations
+
+
+def deadlocker(deco) -> int:
+    n = 0
+
+    @deco
+    def inner() -> int:
+        nonlocal n
+        if n < 2:
+            n += 1
+            inner()
+
+        return n
+
+    return inner()
+
+
+def test_locking_supports_recursive_calls_w_rlock() -> None:
+    assert deadlocker(cache.locking(make_func_lock=lambda _key: RLock()))
