@@ -67,7 +67,7 @@ class KeyedLocalRunner(MemoizingPicklingRunner):
             redirect=lambda _f, _args, _kwargs: _perform_original_invocation,
         )
 
-    def __call__(self, raw_func: ty.Callable[P, R], raw_args: P.args, raw_kwargs: P.kwargs) -> R:
+    def __call__(self, raw_func: ty.Callable[P, R], raw_args: P.args, raw_kwargs: P.kwargs) -> R:  # type: ignore[valid-type]
         actual_function_to_call = self._pre_pickle_redirect(raw_func, raw_args, raw_kwargs)
         with _ORIGINAL_F_ARGS_KWARGS.set((actual_function_to_call, raw_args, raw_kwargs)):
             return super().__call__(*self._impure_keyfunc(raw_func, raw_args, raw_kwargs))
