@@ -8,8 +8,8 @@ import typing as ty
 from contextlib import contextmanager
 
 from thds.core import config, log, stack_context
+from thds.termtool import colorize
 
-from ...._utils import colorize
 from ..uris import lookup_blob_store
 
 _REQUIRE_ALL_RESULTS = config.item("require_all_results", default="")
@@ -76,8 +76,8 @@ class RequiredResultNotFound(Exception):
 
 def check_if_result_exists(
     memo_uri: str,
-    rerun_excs: bool = False,
-    before_raise: ty.Callable[[], ty.Any] = lambda: None,
+    check_for_exception: bool = False,
+    before_raise: ty.Optional[ty.Callable[[], ty.Any]] = None,
 ) -> ty.Union[None, Success, Error]:
     fs = lookup_blob_store(memo_uri)
     value_uri = fs.join(memo_uri, RESULT)
@@ -86,14 +86,15 @@ def check_if_result_exists(
 
     required_msg = _should_require_result(memo_uri)
     if required_msg:  # might be custom or the default. either way it indicates a required result.
-        before_raise()
+        if before_raise:
+            before_raise()
         error_msg = f"Required a result for {ORANGE(memo_uri)} but that result was not found"
         # i'm tired of visually scanning for these memo_uris in logs.
         if required_msg != _NO_MSG:
             error_msg += f": {required_msg}"
         raise RequiredResultNotFound(error_msg, memo_uri)
 
-    if rerun_excs:
+    if not check_for_exception:
         return None
 
     error_uri = fs.join(memo_uri, EXCEPTION)

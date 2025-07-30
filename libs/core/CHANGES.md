@@ -1,3 +1,77 @@
+## 1.44
+
+- `core.futures.PFuture` and `core.futures.LazyFuture` are provided to make it possible to provide
+  Future-like systems across subprocesses.
+
+## 1.43
+
+- `refcount.Resource` is a new utility that may be useful.
+
+## 1.42
+
+- Adds `thds.core.fp` with `compose` for right-to-left unary fn composition and `pipe` for left-to-right.
+
+## 1.41
+
+- Add `find_project_root` function.
+
+## 1.40
+
+- Support non-stdlib hashing functions being registered for file hashing, and use this capability within
+  `core.Source` for any `from_file`-constructed `Source` objects.
+
+## 1.39
+
+- Adds helpers to `core.inspect` for dynamically getting arguments by name, internally using
+  `inspect.signature(func).find(*args, **kwargs)`.
+
+## 1.38
+
+- Remove dependencies on `attrs` and `cattrs`, which were lightly used anyway.
+- Remove the bulk of the code having to do with reading and writing a `meta.json` file, which we have not
+  used for a while. Technically this is a backward incompatible change, but since it required no
+  downstream changes I think it's safe enough to pretend that it wasn't.
+
+## 1.37
+
+- `core.scope` now provides a parallel API for AsyncContextManagers, i.e. scopes with `__aenter__` and
+  `__aexit__`.
+
+### 1.36
+
+- Adds `core.git.get_repo_root() -> Path`, which returns an absolute Path to the repo-root on your local
+  machine
+
+### 1.35.20250416
+
+- Adds util function to `cpus` that returns `4` if `"CI" in os.environ`, and otherwise returns
+  `available_cpu_count()`
+
+## 1.35
+
+- Remove patch version from core.
+
+### 1.34.20250415
+
+- Fixes a bug in `timer.Timer` where `secs_per_call` was erroneously being divided by 60, and ensured
+  that `calls` was incremented when using the context manager method for time tracking.
+
+### 1.34.20250408
+
+- Fixes bug in `core.source.SourceTree` when `SourceTree.sources` contains only one `Source` - in that
+  event, we want the single file's parent directory, not the file itself as the logical root.
+- Adds `source.tree_from_directory(dirpath: str | os.PathLike) -> SourceTree` function.
+
+## 1.34
+
+- `requires-python>=3.9`.
+
+## 1.33
+
+- `calgitver.calgitver()` is now `lru_cached`. Which is to say, it is no longer possible to have an
+  application get two different results for this; so don't change your git repo while your application is
+  running.
+
 ## 1.32
 
 - Add `source.tree.SourceTree` dataclass and the related `logical_root` utility, in order to be able to
@@ -48,7 +122,7 @@
 ## 1.27
 
 - Add `ThdsJsonFormatter` and `ThdsLogfmter` (which is based on
-  https://github.com/jteppinette/python-logfmter/tree/main) so that we can have more parsable and
+  <https://github.com/jteppinette/python-logfmter/tree/main>) so that we can have more parsable and
   queryable logs in production. Use `THDS_CORE_LOG_FORMAT` to configure.
 
 ## 1.26.20240905

@@ -3,13 +3,11 @@ import json
 import os
 import pickle
 import typing as ty
-import uuid
 from pathlib import Path
 
 from thds.core import config, log, pickle_visit, source
 from thds.mops.pure.core.memo import function_memospace
 from thds.mops.pure.core.metadata import get_invoked_by
-from thds.mops.pure.core.types import T
 
 from ...core import metadata
 
@@ -43,6 +41,7 @@ class LogEntry(LogEntryV1, total=False):
     invoker_code_version: str
     remote_code_version: str
 
+    uris_in_args_kwargs: ty.List[str]
     uris_in_rvalue: ty.List[str]
 
 
@@ -68,51 +67,66 @@ def create_mops_run_directory() -> Path:
     return run_directory
 
 
-def _generate_log_filename(run_directory: Path) -> Path:
-    """Generate a log filename using the current timestamp and a short UUID, ensuring uniqueness"""
-    timestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    short_uuid = str(uuid.uuid4())[:8]
-    filename = f"{timestamp}-{short_uuid}.json"
+def _generate_log_filename(
+    run_directory: Path, invoked_at: dt.datetime, name: str, args_hash: str
+) -> Path:
+    """Generate a log filename using an invoked_at timestamp, the function name, and part
+    of the args hash, ensuring uniqueness.
+    """
+    timestamp = invoked_at.strftime("%Y%m%d%H%M%S")
+    filename = f"{timestamp}-{args_hash[:20]}-{name}.json"
     return run_directory / filename
 
 
-def _extract_source_uris(result: ty.Any) -> ty.Set[str]:
-    sources: ty.List[source.Source] = list()
+def extract_source_uris(obj: ty.Any) -> ty.Set[str]:
+    uris: ty.Set[str] = set()
 
-    def extract_source(unknown: ty.Any) -> None:
+    def extract_uri(unknown: ty.Any) -> None:
+        if hasattr(unknown, "stored_uri") and isinstance(unknown.stored_uri, str):
+            uris.add(unknown.stored_uri)
         if isinstance(unknown, source.Source):
-            sources.append(unknown)
+            uris.add(unknown.uri)
+        if hasattr(unknown, "sa") and hasattr(unknown, "container") and hasattr(unknown, "path"):
+            uris.add(str(unknown))
+        if isinstance(unknown, str) and (unknown.startswith("adls://") or unknown.startswith("file://")):
+            uris.add(unknown)
+        if hasattr(unknown, "material"):
+            material = unknown.material
+            if callable(material):
+                mat = material()
+                # recurse!
+                for uri in extract_source_uris(mat):
+                    uris.add(uri)
 
     try:
-        pickle_visit.recursive_visit(extract_source, result)
+        pickle_visit.recursive_visit(extract_uri, obj)
     except pickle.PicklingError:
         pass
     except Exception as exc:
-        logger.warning(f'Unexpected error trying to extract source URIs from "%s"; {exc}', result)
+        logger.warning(f'Unexpected error trying to extract URIs from "%s"; {exc}', obj)
 
-    return {source.uri for source in sources}
+    return uris
 
 
 def log_function_execution(
     run_directory: ty.Optional[Path],
-    func: ty.Callable[..., T],
     memo_uri: str,
     itype: InvocationType,
     metadata: ty.Optional[metadata.ResultMetadata] = None,
     runner_prefix: str = "",
     was_error: bool = False,
     return_value: ty.Any = None,
+    args_kwargs_uris: ty.Collection[str] = (),
 ) -> None:
     if not run_directory:
         logger.debug("Not writing function summary for %s", memo_uri)
         return
 
-    log_file = _generate_log_filename(run_directory)
-    func_module = func.__module__
-    func_name = func.__name__
-    full_function_name = f"{func_module}:{func_name}"
+    invoked_at = metadata.invoked_at if metadata else dt.datetime.utcnow()
 
     parts = function_memospace.parse_memo_uri(memo_uri, runner_prefix)
+    full_function_name = f"{parts.function_module}:{parts.function_name}"
+    log_file = _generate_log_filename(run_directory, invoked_at, full_function_name, parts.args_hash)
 
     log_entry: LogEntry = {
         "function_name": full_function_name,
@@ -120,7 +134,7 @@ def log_function_execution(
         "runner_prefix": parts.runner_prefix,
         "pipeline_id": parts.pipeline_id,
         "function_logic_key": parts.function_logic_key,
-        "timestamp": dt.datetime.utcnow().isoformat(),
+        "timestamp": invoked_at.isoformat(),
         "status": itype,
         "was_error": was_error,
     }
@@ -132,7 +146,9 @@ def log_function_execution(
         log_entry["remote_code_version"] = metadata.remote_code_version
         # we don't bother with invoked_at or remote_started_at because they can be
         # inferred from the timestamp and the wall times
-    if source_uris := _extract_source_uris(return_value):
+    if args_kwargs_uris:
+        log_entry["uris_in_args_kwargs"] = sorted(args_kwargs_uris)
+    if source_uris := extract_source_uris(return_value):
         log_entry["uris_in_rvalue"] = sorted(source_uris)
 
     try:
@@ -140,4 +156,6 @@ def log_function_execution(
         with log_file.open("w") as f:
             json.dump(log_entry, f, indent=2)
     except Exception:
-        logger.exception(f"Unable to write mops function invocation log file at '{log_file}'")
+        logger.info(
+            f"Unable to write mops function invocation log file at '{log_file}' - you may have multiple callers for the same invocation"
+        )

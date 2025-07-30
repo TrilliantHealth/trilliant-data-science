@@ -1,22 +1,26 @@
+"""Some parts of this module having to do with actual metadata files have been removed,
+being no longer in use.
+
+The actual removal was done mainly to enable us to remove attrs and cattrs as dependencies,
+not because we don't like them, but because reducing our depedency footprint in
+our most central library is a good idea.
+"""
+
 import importlib
-import json
 import os
 import re
 import typing as ty
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version
-from importlib.resources import Package, open_text
+from importlib.resources import Package
 from pathlib import Path
 from types import MappingProxyType
 
-import attrs
-from cattrs import Converter
-
 from . import calgitver, git
 from .log import getLogger
-from .types import StrOrPath
 
 LayoutType = ty.Literal["flat", "src"]
 NameFormatType = ty.Literal["git", "docker", "hive"]
@@ -36,8 +40,6 @@ GIT_IS_CLEAN = "GIT_IS_CLEAN"
 GIT_IS_DIRTY = "GIT_IS_DIRTY"
 GIT_BRANCH = "GIT_BRANCH"
 THDS_USER = "THDS_USER"
-
-META_FILE = "meta.json"
 
 LOGGER = getLogger(__name__)
 
@@ -170,12 +172,6 @@ def get_version(pkg: Package, orig: str = "") -> str:
             # 'recurse' upward, assuming that the package name is overly-specified
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
-                # Check to see if there's a
-                # meta.json file hanging around, and if so, see if it contains a pyproject_version.
-                metadata = read_metadata(orig or pkg)
-                if metadata and metadata.pyproject_version:
-                    return metadata.pyproject_version
-
                 for env_var in ("CALGITVER", "GIT_COMMIT"):
                     env_var_version = os.getenv(env_var)
                     lvl = LOGGER.debug if env_var == "CALGITVER" else LOGGER.info
@@ -202,7 +198,7 @@ class NoBasePackageFromMain(ValueError):
 
 
 @lru_cache(None)
-def get_base_package(pkg: Package) -> str:
+def get_base_package(pkg: Package, *, orig: Package = "") -> str:
     try:
         str_pkg = str(pkg)
         if str_pkg == "__main__":
@@ -214,10 +210,12 @@ def get_base_package(pkg: Package) -> str:
         except PackageNotFoundError:
             pkg_ = pkg.split(".")
             if len(pkg_) <= 1:
-                LOGGER.warning("Could not find the base package for `%s`. Package not found.", pkg)
+                LOGGER.warning(
+                    "Could not find the base package for `%s`. Package %s not found.", orig, pkg
+                )
                 return ""
-            else:
-                return get_base_package(".".join(pkg_[:-1]))
+
+            return get_base_package(".".join(pkg_[:-1]), orig=orig or pkg)
 
     return str(pkg)
 
@@ -240,16 +238,6 @@ def get_commit(pkg: Package = "") -> str:  # should really be named get_commit_h
     except git.NO_GIT:
         pass
 
-    try:
-        if pkg:
-            LOGGER.debug("`get_commit` reading from metadata.")
-            metadata = read_metadata(pkg)
-            if metadata.is_empty:
-                raise EmptyMetadataException
-            return metadata.git_commit
-    except EmptyMetadataException:
-        pass
-
     LOGGER.warning("`get_commit` found no commit.")
     return ""
 
@@ -269,16 +257,6 @@ def is_clean(pkg: Package = "") -> bool:
     except git.NO_GIT:
         pass
 
-    try:
-        if pkg:
-            LOGGER.debug("`is_clean` reading from metadata.")
-            metadata = read_metadata(pkg)
-            if metadata.is_empty:
-                raise EmptyMetadataException
-            return metadata.git_is_clean
-    except EmptyMetadataException:
-        pass
-
     LOGGER.warning("`is_clean` found no cleanliness - assume dirty.")
     return False
 
@@ -294,16 +272,6 @@ def get_branch(pkg: Package = "", format: NameFormatType = "git") -> str:
         except git.NO_GIT:
             pass
 
-        try:
-            if pkg:
-                LOGGER.debug("`get_branch` reading from metadata.")
-                metadata = read_metadata(pkg)
-                if not metadata.git_branch:
-                    raise EmptyMetadataException
-                return metadata.git_branch
-        except EmptyMetadataException:
-            pass
-
         LOGGER.warning("`get_branch` found no branch.")
         return ""
 
@@ -316,25 +284,10 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
             LOGGER.debug("`get_user` reading from env var.")
             return os.environ[THDS_USER]
 
-        try:
-            if pkg:
-                LOGGER.debug("`get_user` reading from metadata.")
-                metadata = read_metadata(pkg)
-                if not metadata.thds_user:
-                    raise EmptyMetadataException
-                return metadata.thds_user
-        except EmptyMetadataException:
-            pass
-
         LOGGER.debug("`get_user` found no user data - getting system user.")
         return getuser()
 
     return format_name(_get_user(pkg), format)
-
-
-def is_deployed(pkg: Package) -> bool:
-    meta = read_metadata(pkg)
-    return not meta.is_empty
 
 
 def _hacky_get_pyproject_toml_version(pkg: Package, wdir: Path) -> str:
@@ -379,14 +332,14 @@ def find_pyproject_toml_version(starting_path: Path, pkg: Package) -> str:
 MiscType = ty.Mapping[str, ty.Union[str, int, float, bool]]
 
 
-@attrs.frozen
+@dataclass(frozen=True)
 class Metadata:
     git_commit: str = ""
     git_branch: str = ""
     git_is_clean: bool = False
     pyproject_version: str = ""  # only present if the project defines `version` inside pyproject.toml
     thds_user: str = ""
-    misc: MiscType = attrs.field(factory=lambda: MappingProxyType(dict()))
+    misc: MiscType = field(default_factory=lambda: MappingProxyType(dict()))
 
     @property
     def docker_branch(self) -> str:
@@ -406,103 +359,13 @@ class Metadata:
 
     @property
     def is_empty(self) -> bool:
-        return all(not getattr(self, field.name) for field in attrs.fields(Metadata))
+        return all(not getattr(self, f.name) for f in self.__dataclass_fields__.values())
 
     @property
     def git_is_dirty(self) -> bool:
         return not self.git_is_clean
 
 
-meta_converter = Converter(forbid_extra_keys=True)
-meta_converter.register_structure_hook(
-    Metadata, lambda v, _: Metadata(misc=MappingProxyType(v.pop("misc", {})), **v)
-)
-
-
-class EmptyMetadataException(Exception):
-    pass
-
-
-def init_metadata(misc: ty.Optional[MiscType] = None, pyproject_toml_version: str = "") -> Metadata:
-    return Metadata(
-        git_commit=get_commit(),
-        git_branch=get_branch(),
-        git_is_clean=is_clean(),
-        pyproject_version=pyproject_toml_version,
-        thds_user=os.getenv(THDS_USER, getuser()),
-        misc=MappingProxyType(misc) if misc else MappingProxyType(dict()),
-    )
-
-
-def _sanitize_metadata_for_docker_tools(d: dict):
-    """We want our Docker builds to be able to take advantage of
-    caching based on the contents of the sources copied over into
-    them.  If we embed a meta.json into each library where the commit
-    hash changes every time a commit happens, then we've blown away
-    our entire cache.
-
-    The Docker builds already inject this metadata as environment
-    variables after the source copies happen, so there's no need for
-    us to embed it this way.
-    """
-    d["git_commit"] = ""
-    d["git_branch"] = ""
-    d["git_is_clean"] = ""
-    d["thds_user"] = THDS_USER
-
-
-def write_metadata(
-    pkg: str,
-    *,
-    misc: ty.Optional[MiscType] = None,
-    namespace: str = "thds",
-    layout: LayoutType = "src",
-    wdir: ty.Optional[StrOrPath] = None,
-    deploying: bool = False,
-    for_docker_tools_build: bool = False,
-) -> None:
-    wdir_ = Path(wdir) if wdir else Path(".")
-    assert wdir_
-    if os.getenv(DEPLOYING) or deploying:
-        LOGGER.debug("Writing metadata.")
-        metadata = init_metadata(
-            misc=misc, pyproject_toml_version=_hacky_get_pyproject_toml_version(pkg, wdir_)
-        )
-        metadata_path = os.path.join(
-            "src" if layout == "src" else "",
-            namespace.replace("-", "/").replace(".", "/"),
-            pkg.replace("-", "_").replace(".", "/"),
-            META_FILE,
-        )
-
-        LOGGER.info(f"Writing metadata for {pkg} to {wdir_ / metadata_path}")
-        with open(wdir_ / metadata_path, "w") as f:
-            metadata_dict = meta_converter.unstructure(metadata)
-            if for_docker_tools_build:
-                _sanitize_metadata_for_docker_tools(metadata_dict)
-            json.dump(metadata_dict, f, indent=2)
-            f.write("\n")  # Add newline because Py JSON does not
-
-
 @lru_cache(None)
 def read_metadata(pkg: Package) -> Metadata:
-    LOGGER.debug("Reading metadata.")
-
-    if pkg == "__main__":
-        raise ValueError("`read_meta` expects a package or module name, not '__main__'.")
-
-    if not pkg:
-        raise ValueError(
-            "`read_meta` is missing a package or module name. "
-            "If using `__package__` make sure an __init__.py is present."
-        )
-
-    try:
-        with open_text(pkg, META_FILE) as f:
-            return meta_converter.structure(json.load(f), Metadata)
-    # pkg=__name__ will raise a TypeError unless it is called in an __init__.py
-    except (ModuleNotFoundError, FileNotFoundError, TypeError):
-        pkg_ = pkg.split(".")
-        if len(pkg_) <= 1:
-            return Metadata()
-        return read_metadata(".".join(pkg_[:-1]))
+    return Metadata()  # this is now deprecated because we don't use it.

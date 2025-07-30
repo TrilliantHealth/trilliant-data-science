@@ -33,6 +33,7 @@ have a Source object returned to it while it performs low-level deserialization.
 """
 
 import io
+import sys
 import typing as ty
 from functools import partial
 from pathlib import Path
@@ -174,7 +175,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
             partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri),
         )
 
-    return source_.hash
+    return hashing.Hash(algo=sys.intern(source_.hash.algo), bytes=source_.hash.bytes)
 
 
 def perform_source_uploads() -> None:  # has been replaced by a general work-deferring mechanism.
@@ -214,7 +215,14 @@ class SourceResult(ty.NamedTuple):
     file_uri: str
 
 
-def prepare_source_result(source_: Source) -> SourceResult:
+class DuplicateSourceBasenameError(ValueError):
+    """This is not a catchable error - it will be raised inside the mops result-wrapping
+    code, and is an indication that user code has attempted to return two file-only Source objects
+    without URIs specified, and that those two files have the same basename.
+    """
+
+
+def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = tuple()) -> SourceResult:
     """Call from within the remote side of an invocation, while serializing the function return value.
 
     Forces the Source to be present at a remote URI which will be available once
@@ -228,8 +236,9 @@ def prepare_source_result(source_: Source) -> SourceResult:
         if source_.cached_path and Path(source_.cached_path).exists():
             # it exists locally - an upload may be necessary.
             file_uri = to_uri(source_.cached_path)
-            lookup_blob_store(source_.uri).putfile(source_.cached_path, source_.uri)
-            logger.info("Uploading Source to %s", source_.uri)
+            if source_.uri not in existing_uris:
+                lookup_blob_store(source_.uri).putfile(source_.cached_path, source_.uri)
+                logger.info("Uploading Source to chosen URI %s", source_.uri)
         else:
             file_uri = ""
             logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
@@ -248,6 +257,15 @@ def prepare_source_result(source_: Source) -> SourceResult:
     # If users do not like this automatically assigned remote URI name, they can construct
     # the Source themselves and provide a remote URI (as well as, optionally, a
     # local_path), and we will use their remote URI.
+    if remote_uri in existing_uris:
+        raise DuplicateSourceBasenameError(
+            f"Duplicate blob store URI {remote_uri} found in SourceResultPickler."
+            " This is usually an indication that you have two files with the same name in two different directories,"
+            " and are trying to convert them into Source objects with automatically-assigned URIs."
+            " Per the documentation, all output Source objects without explicitly assigned remote URIs must be provided"
+            " with unique basenames, in order to allow retention of the basename for usability and debugging."
+        )
+
     lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
     # upload must _always_ happen on remotely-returned Sources, as detailed above.
     # There is no advantage to waiting to upload past this point.
