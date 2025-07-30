@@ -2,31 +2,33 @@ import contextlib
 import enum
 import os
 import shutil
+import threading
 import typing as ty
-from base64 import b64decode
+from pathlib import Path
 
-from azure.core.exceptions import AzureError, HttpResponseError
-from azure.storage.filedatalake import (
-    ContentSettings,
-    DataLakeFileClient,
-    FileProperties,
-    FileSystemClient,
-)
+import aiohttp.http_exceptions
+import requests.exceptions
+from azure.core.exceptions import AzureError, HttpResponseError, ResourceModifiedError
+from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient, aio
 
-from thds.core import log, scope, tmp
-from thds.core.hashing import b64
+from thds.core import fretry, hash_cache, hashing, log, scope, tmp
 from thds.core.types import StrOrPath
 
-from . import azcopy
+from . import azcopy, errors, etag, hashes
 from ._progress import report_download_progress
 from .download_lock import download_lock
-from .errors import MD5MismatchError, translate_azure_error
-from .etag import match_etag
 from .fqn import AdlsFqn
-from .md5 import check_reasonable_md5b64, md5_file
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
 logger = log.getLogger(__name__)
+
+
+def _check_size(dpath: Path, expected_size: ty.Optional[int]) -> None:
+    actual_size = os.path.getsize(dpath)
+    if expected_size is not None and actual_size != expected_size:
+        raise errors.ContentLengthMismatchError(
+            f"Downloaded file {dpath} has size {actual_size} but expected {expected_size}"
+        )
 
 
 @contextlib.contextmanager
@@ -35,68 +37,28 @@ def _atomic_download_and_move(
     dest: StrOrPath,
     properties: ty.Optional[FileProperties] = None,
 ) -> ty.Iterator[azcopy.download.DownloadRequest]:
+    known_size = properties.size if properties else None
     with tmp.temppath_same_fs(dest) as dpath:
-        with open(dpath, "wb") as f:
-            known_size = (properties.size or 0) if properties else 0
-            logger.debug("Downloading %s", fqn)
-            yield azcopy.download.DownloadRequest(
-                report_download_progress(f, str(fqn), known_size), dpath
-            )
+        logger.debug("Downloading %s", fqn)
+        if azcopy.download.should_use_azcopy(known_size or -1):
+            yield azcopy.download.DownloadRequest(dpath, known_size)
+        else:
+            with open(dpath, "wb") as down_f:
+                yield azcopy.download.SdkDownloadRequest(
+                    dpath, known_size, report_download_progress(down_f, str(fqn), known_size or 0)
+                )
+        _check_size(dpath, known_size)
         try:
             os.rename(dpath, dest)  # will succeed even if dest is read-only
         except OSError as oserr:
             if "Invalid cross-device link" in str(oserr):
                 # this shouldn't ever happen because of temppath_same_fs, but just in case...
+                logger.warning('Failed to move "%s" to "%s" - copying instead', dpath, dest)
                 shutil.copyfile(dpath, dest)
+                logger.info('Copied "%s" to "%s"', dpath, dest)
             else:
+                logger.error('Failed to move "%s" to "%s" - raising', dpath, dest)
                 raise
-
-
-@contextlib.contextmanager
-def _verify_md5s_before_and_after_download(
-    remote_md5b64: str, expected_md5b64: str, fqn: AdlsFqn, local_dest: StrOrPath
-) -> ty.Iterator[None]:
-    if expected_md5b64:
-        check_reasonable_md5b64(expected_md5b64)
-    if remote_md5b64:
-        check_reasonable_md5b64(remote_md5b64)
-    if remote_md5b64 and expected_md5b64 and remote_md5b64 != expected_md5b64:
-        raise MD5MismatchError(
-            f"ADLS thinks the MD5 of {fqn} is {remote_md5b64}, but we expected {expected_md5b64}."
-            " This may indicate that we need to update a hash in the codebase."
-        )
-
-    yield  # perform download
-
-    with log.logger_context(hash_for="after-download"):
-        local_md5b64 = b64(md5_file(local_dest))
-    check_reasonable_md5b64(local_md5b64)  # must always exist
-    if remote_md5b64 and remote_md5b64 != local_md5b64:
-        raise MD5MismatchError(
-            f"The MD5 of the downloaded file {local_dest} is {local_md5b64},"
-            f" but the remote ({fqn}) says it should be {remote_md5b64}."
-            f" This may indicate that ADLS has an erroneous MD5 for {fqn}."
-        )
-    if expected_md5b64 and local_md5b64 != expected_md5b64:
-        raise MD5MismatchError(
-            f"The MD5 of the downloaded file {local_dest} is {local_md5b64},"
-            f" but we expected it to be {expected_md5b64}."
-            f" This probably indicates a corrupted download of {fqn}"
-        )
-    all_hashes = dict(local=local_md5b64, remote=remote_md5b64, expected=expected_md5b64)
-    assert 1 == len(set(filter(None, all_hashes.values()))), all_hashes
-
-
-def _md5b64_path_if_exists(path: StrOrPath) -> ty.Optional[str]:
-    if not path or not os.path.exists(path):  # does not exist if it's a symlink with a bad referent.
-        return None
-    return b64(md5_file(path))
-
-
-def _remote_md5b64(file_properties: FileProperties) -> str:
-    if file_properties.content_settings.content_md5:
-        return b64(file_properties.content_settings.content_md5)
-    return ""
 
 
 # Async is weird.
@@ -137,6 +99,57 @@ def _remote_md5b64(file_properties: FileProperties) -> str:
 # again and rely on the controller to re-send the previously fetched result.
 
 
+class _FileResult(ty.NamedTuple):
+    hash: hashing.Hash
+    hit: ty.Optional[Path]
+
+
+def _attempt_cache_hit(
+    expected_hash: ty.Optional[hashing.Hash],
+    fqn: AdlsFqn,
+    local_path: StrOrPath,
+    cache: ty.Optional[Cache],
+) -> ty.Optional[_FileResult]:
+    if not expected_hash:
+        return None
+
+    hash_path_if_exists = hashes.hash_path_for_algo(expected_hash.algo)
+
+    with log.logger_context(hash_for="before-download-dest"):
+        local_hash = hash_path_if_exists(local_path)
+    if local_hash == expected_hash:
+        logger.debug("Local path matches %s - no need to look further", expected_hash.algo)
+        if cache:
+            cache_path = cache.path(fqn)
+            with log.logger_context(hash_for="before-download-cache"):
+                if local_hash != hash_path_if_exists(cache_path):
+                    # only copy if the cache is out of date
+                    from_local_path_to_cache(local_path, cache_path, cache.link)
+            return _FileResult(local_hash, hit=cache_path)
+        return _FileResult(local_hash, hit=Path(local_path))
+
+    if local_hash:
+        logger.debug(
+            "Local path exists but does not match expected %s %s",
+            expected_hash.algo,
+            expected_hash.bytes,
+        )
+    if cache:
+        cache_path = cache.path(fqn)
+        cache_hash = hash_path_if_exists(cache_path)
+        if cache_hash == expected_hash:  # file in cache matches!
+            from_cache_path_to_local(cache_path, local_path, cache.link)
+            return _FileResult(cache_hash, hit=cache_path)
+
+        if cache_hash:
+            logger.debug(
+                "Cache path exists but does not match expected %s %s",
+                expected_hash.algo,
+                expected_hash.bytes,
+            )
+    return None
+
+
 class _IoRequest(enum.Enum):
     FILE_PROPERTIES = "file_properties"
 
@@ -145,9 +158,10 @@ IoRequest = ty.Union[_IoRequest, azcopy.download.DownloadRequest]
 IoResponse = ty.Union[FileProperties, None]
 
 
-class _FileResult(ty.NamedTuple):
-    md5b64: str
-    hit: bool
+def _assert_fp(fp: ty.Optional[FileProperties], fqn: AdlsFqn) -> None:
+    assert fp, f"FileProperties for {fqn} should not be None."
+    assert fp.name, f"FileProperties for {fqn} should have a name."
+    assert fp.name == fqn.path, (fp, fqn)
 
 
 _dl_scope = scope.Scope("adls.download")
@@ -156,7 +170,7 @@ _dl_scope = scope.Scope("adls.download")
 def _download_or_use_verified_cached_coroutine(  # noqa: C901
     fqn: AdlsFqn,
     local_path: StrOrPath,
-    md5b64: str = "",
+    expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
 ) -> ty.Generator[IoRequest, IoResponse, _FileResult]:
     """Make a file on ADLS available at the local path provided.
@@ -195,82 +209,74 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     writing in a standard fashion.
 
     Raises StopIteration when complete. StopIteration.value.hit will
-    be True if there was a cache hit, and False if a download was
-    required. `.value` will also contain the md5b64 of the downloaded
-    file, which may be used as desired.
+    be the Path to the cached file if there was a cache hit, and None
+    if a download was required. `.value` will also contain the Hash of
+    the downloaded file, which may be used as desired.
     """
     if not local_path:
         raise ValueError("Must provide a destination path.")
 
-    _dl_scope.enter(log.logger_context(dl=fqn))
+    _dl_scope.enter(log.logger_context(dl=fqn, pid=os.getpid(), tid=threading.get_ident()))
     file_properties = None
-    if not md5b64:
-        # we don't know what we expect, so attempt to retrieve an
-        # expectation from ADLS itself.
+
+    if not expected_hash:
+        # we don't know what we expect, so attempt to retrieve
+        # expectations from ADLS itself.
         file_properties = yield _IoRequest.FILE_PROPERTIES
-        md5b64 = _remote_md5b64(file_properties)  # type: ignore[arg-type]
-        # TODO - check above type ignore
+        if file_properties:
+            _assert_fp(file_properties, fqn)
+            # critically, we expect the _first_ one in this list to be the fastest to verify.
+            expected_hash = next(iter(hashes.extract_hashes_from_props(file_properties).values()), None)
 
     def attempt_cache_hit() -> ty.Optional[_FileResult]:
-        if not md5b64:
-            return None
+        return _attempt_cache_hit(
+            expected_hash=expected_hash, cache=cache, fqn=fqn, local_path=local_path
+        )
 
-        check_reasonable_md5b64(md5b64)
-        with log.logger_context(hash_for="before-download-dest"):
-            local_md5b64 = _md5b64_path_if_exists(local_path)
-        if local_md5b64 == md5b64:
-            logger.debug("Local path matches MD5 - no need to look further")
-            if cache:
-                cache_path = cache.path(fqn)
-                with log.logger_context(hash_for="before-download-cache"):
-                    if local_md5b64 != _md5b64_path_if_exists(cache_path):
-                        # only copy if the cache is out of date
-                        from_local_path_to_cache(local_path, cache_path, cache.link)
-            return _FileResult(local_md5b64, hit=True)
-
-        if local_md5b64:
-            logger.debug("Local path exists but does not match expected md5 %s", md5b64)
-        if cache:
-            cache_path = cache.path(fqn)
-            cache_md5b64 = _md5b64_path_if_exists(cache_path)
-            if cache_md5b64 == md5b64:  # file in cache matches!
-                from_cache_path_to_local(cache_path, local_path, cache.link)
-                return _FileResult(cache_md5b64, hit=True)
-
-            if cache_md5b64:
-                logger.debug("Cache path exists but does not match expected md5 %s", md5b64)
-        return None
-
-    # attempt cache hit before taking a lock, to avoid contention for existing files.
+    # attempt cache hits before taking a lock, to avoid contention for existing files.
     if file_result := attempt_cache_hit():
         return file_result  # noqa: B901
 
-    _dl_scope.enter(download_lock(str(cache.path(fqn) if cache else local_path)))
+    # No cache hit, so its time to prepare to download. if a cache was provided, we will
+    # _put_ the resulting file in it.
+
+    file_lock = str(cache.path(fqn) if cache else local_path)
     # create lockfile name from the (shared) cache path if present, otherwise the final
     # destination.  Non-cache users may then still incur multiple downloads in parallel,
     # but if you wanted to coordinate then you should probably have been using the global
     # cache in the first place.
+    _dl_scope.enter(download_lock(file_lock))
 
     # re-attempt cache hit - we may have gotten the lock after somebody else downloaded
     if file_result := attempt_cache_hit():
-        logger.debug("Got cache hit on the second attempt, after acquiring lock for %s", fqn)
+        logger.info("Got cache hit on the second attempt, after acquiring lock for %s", fqn)
         return file_result  # noqa: B901
 
     logger.debug("Unable to find a cached version anywhere that we looked...")
     file_properties = yield _IoRequest.FILE_PROPERTIES
-    # no point in downloading if we've asked for hash X but ADLS only has hash Y.
-    with _verify_md5s_before_and_after_download(
-        _remote_md5b64(file_properties),  # type: ignore[arg-type]
-        # TODO - check above type ignore
-        md5b64,
+    _assert_fp(file_properties, fqn)
+
+    # if any of the remote hashes match the expected hash, verify that one.
+    # otherwise, verify the first remote hash in the list, since that's the fastest one.
+    all_remote_hashes = hashes.extract_hashes_from_props(file_properties)
+    remote_hash_to_match = all_remote_hashes.get(expected_hash.algo) if expected_hash else None
+    with hashes.verify_hashes_before_and_after_download(
+        remote_hash_to_match,
+        expected_hash,
         fqn,
         local_path,
     ):  # download new data directly to local path
         with _atomic_download_and_move(fqn, local_path, file_properties) as tmpwriter:
             yield tmpwriter
+
     if cache:
         from_local_path_to_cache(local_path, cache.path(fqn), cache.link)
-    return _FileResult(md5b64 or b64(md5_file(local_path)), hit=False)
+
+    hash_to_set_if_missing = expected_hash or remote_hash_to_match
+    if not hash_to_set_if_missing or hash_to_set_if_missing.algo not in hashes.PREFERRED_ALGOS:
+        hash_to_set_if_missing = hash_cache.filehash(hashes.PREFERRED_ALGOS[0], local_path)
+    assert hash_to_set_if_missing, "We should have a preferred hash to set at this point."
+    return _FileResult(hash_to_set_if_missing, hit=None)
 
 
 # So ends the crazy download caching coroutine.
@@ -286,41 +292,59 @@ def _prep_download_coroutine(
     fs_client: FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
-    md5b64: str = "",
+    expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-) -> ty.Tuple[
-    ty.Generator[IoRequest, IoResponse, _FileResult],
-    IoRequest,
-    ty.Optional[FileProperties],
-    DataLakeFileClient,
-]:
+) -> ty.Tuple[ty.Generator[IoRequest, IoResponse, _FileResult], IoRequest, DataLakeFileClient]:
     co = _download_or_use_verified_cached_coroutine(
         AdlsFqn(ty.cast(str, fs_client.account_name), fs_client.file_system_name, remote_key),
         local_path,
-        md5b64=md5b64,
+        expected_hash=expected_hash,
         cache=cache,
     )
-    return co, co.send(None), None, fs_client.get_file_client(remote_key)
+    return co, co.send(None), fs_client.get_file_client(remote_key)
 
 
-def _set_md5_if_missing(
-    file_properties: ty.Optional[FileProperties], md5b64: str
-) -> ty.Optional[ContentSettings]:
-    if not file_properties or file_properties.content_settings.content_md5:
-        return None
-    file_properties.content_settings.content_md5 = b64decode(md5b64)  # type: ignore[assignment]
-    # TODO - check above type ignore
-    return file_properties.content_settings
+def _excs_to_retry() -> ty.Callable[[Exception], bool]:
+    """These are exceptions that we observe to be spurious failures worth retrying."""
+    return fretry.is_exc(
+        *list(
+            filter(
+                None,
+                (
+                    requests.exceptions.ConnectionError,
+                    aiohttp.http_exceptions.ContentLengthError,
+                    aiohttp.client_exceptions.ClientPayloadError,
+                    getattr(
+                        aiohttp.client_exceptions, "SocketTimeoutError", None
+                    ),  # not present in aiohttp < 3.10 - Databricks installs 3.8.
+                ),
+            )
+        )
+    )
+
+
+def _log_nonfatal_hash_error_exc(exc: Exception, url: str) -> None:
+    """Azure exceptions are very noisy."""
+    msg = "Unable to set hash for %s: %s"
+    exception_txt = str(exc)
+    log, extra_txt = (
+        (logger.debug, type(exc).__name__)
+        if ("AuthorizationPermissionMismatch" in exception_txt or "ConditionNotMet" in exception_txt)
+        else (logger.warning, exception_txt)
+    )
+    log(msg, url, extra_txt)
 
 
 @_dl_scope.bound
+@fretry.retry_regular(fretry.is_exc(errors.ContentLengthMismatchError), fretry.n_times(2))
 def download_or_use_verified(
     fs_client: FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
-    md5b64: str = "",
+    *,
+    expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-) -> bool:
+) -> ty.Optional[Path]:
     """Download a file or use the existing, cached copy if one exists in the cache and is verifiable.
 
     Note that you will get a logged warning if `local_path` already exists when you call
@@ -328,47 +352,63 @@ def download_or_use_verified(
     """
     file_properties = None
     try:
-        co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
-            fs_client, remote_key, local_path, md5b64, cache
+        co, co_request, dl_file_client = _prep_download_coroutine(
+            fs_client, remote_key, local_path, expected_hash, cache
         )
+        assert dl_file_client.path_name == remote_key
+        _dl_scope.enter(dl_file_client)  # on __exit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
                     # only fetch these if they haven't already been requested
+                    assert dl_file_client.path_name == remote_key
                     file_properties = dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-                azcopy.download.sync_fastpath(dl_file_client, co_request)
+                fretry.retry_regular(_excs_to_retry(), fretry.n_times(2))(
+                    # retry n_times(2) means _retry_ twice.
+                    azcopy.download.sync_fastpath
+                )(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
     except StopIteration as si:
-        if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
+        if meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash):
             try:
-                logger.info(f"Setting missing MD5 for {remote_key}")
+                logger.info(f"Setting missing {si.value.hash.algo} hash for {remote_key}")
                 assert file_properties
-                dl_file_client.set_http_headers(cs, **match_etag(file_properties))
-            except HttpResponseError as hre:
-                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
+                dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
+            except (HttpResponseError, ResourceModifiedError) as ex:
+                _log_nonfatal_hash_error_exc(ex, dl_file_client.url)
         return si.value.hit
     except AzureError as err:
-        translate_azure_error(fs_client, remote_key, err)
+        errors.translate_azure_error(fs_client, remote_key, err)
+
+
+_async_dl_scope = scope.AsyncScope("adls.download.async")
 
 
 @_dl_scope.bound
+@_async_dl_scope.async_bound
+@fretry.retry_regular_async(
+    fretry.is_exc(errors.ContentLengthMismatchError), fretry.iter_to_async(fretry.n_times(2))
+)
 async def async_download_or_use_verified(
-    fs_client: FileSystemClient,
+    fs_client: aio.FileSystemClient,
     remote_key: str,
     local_path: StrOrPath,
-    md5b64: str = "",
+    *,
+    expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-) -> bool:
+) -> ty.Optional[Path]:
     file_properties = None
     try:
-        co, co_request, file_properties, dl_file_client = _prep_download_coroutine(
-            fs_client, remote_key, local_path, md5b64, cache
+        co, co_request, dl_file_client = _prep_download_coroutine(
+            fs_client, remote_key, local_path, expected_hash, cache
         )
+        await _async_dl_scope.async_enter(dl_file_client)  # type: ignore[arg-type]
+        # on __aexit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
@@ -378,22 +418,27 @@ async def async_download_or_use_verified(
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
                 # coroutine is requesting download
-                await azcopy.download.async_fastpath(dl_file_client, co_request)
+                await fretry.retry_regular_async(
+                    _excs_to_retry(), fretry.iter_to_async(fretry.n_times(2))
+                )(
+                    # retry n_times(2) means _retry_ twice.
+                    azcopy.download.async_fastpath
+                )(
+                    dl_file_client, co_request
+                )
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
 
     except StopIteration as si:
-        if cs := _set_md5_if_missing(file_properties, si.value.md5b64):
+        if meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash):
             try:
-                logger.info(f"Setting missing MD5 for {remote_key}")
+                logger.info(f"Setting missing Hash for {remote_key}")
                 assert file_properties
-                await dl_file_client.set_http_headers(  # type: ignore[misc]
-                    cs, **match_etag(file_properties)
-                )
+                await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))  # type: ignore[misc]
                 # TODO - check above type ignore
-            except HttpResponseError as hre:
-                logger.info(f"Unable to set MD5 for {remote_key}: {hre}")
+            except (HttpResponseError, ResourceModifiedError) as ex:
+                _log_nonfatal_hash_error_exc(ex, dl_file_client.url)
         return si.value.hit
     except AzureError as err:
-        translate_azure_error(fs_client, remote_key, err)
+        errors.translate_azure_error(fs_client, remote_key, err)

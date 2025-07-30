@@ -3,8 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from thds.core import futures
 from thds.mops import pure
-from thds.mops.pure.runner.simple_shims import subprocess_shim
+from thds.mops.pure.runner.simple_shims import future_subprocess_shim, subprocess_shim
 
 from ...config import TEST_TMP_URI
 
@@ -48,3 +49,25 @@ def test_load_magic_config(clear_magic):
     assert func_test_config._get_blob_root() == "adls://magicians/gob"
     assert func_test_config._pipeline_id == "final-countdown"
     assert subprocess_shim is func_test_config._shimbuilder(func_test_config, tuple(), dict())  # type: ignore
+
+
+def test_pure_magic_with_futures(clear_magic):
+    """We can't actually test futures in a real sense, because the samethread shim does not support them.
+    But we can at least smoke-test that the futures API is available and works as expected.
+    """
+    fut = func1.submit(3, b="b")
+    assert not fut.exception()
+    assert not fut.running()
+    assert fut.done()
+    assert fut.result() == "bbb"
+
+
+def test_pure_magic_with_subprocess_future(clear_magic):
+    with func1.shim(future_subprocess_shim):
+        futs = [
+            func1.submit(3, b="c"),
+            func1.submit(3, b="d"),
+            func1.submit(3, b="e"),
+            func1.submit(3, b="f"),
+        ]
+        assert {"ccc", "ddd", "eee", "fff"} == {fut.result() for fut in futures.as_completed(futs)}

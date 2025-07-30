@@ -9,10 +9,10 @@ from ..._utils.once import Once
 from ..core import lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
-from ..core.pipeline_id_mask import pipeline_id_mask
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.types import Args, BlobStore, Kwargs, T
+from ..core.use_runner import unwrap_use_runner
 from ..runner import strings
 from . import _pickle, mprunner, pickles, sha256_b64
 
@@ -52,9 +52,30 @@ class _ResultExcWithMetadataChannel:
         )
 
     def return_value(self, r: T) -> None:
+        result_uri = self.fs.join(self.call_id, results.RESULT)
+        if self.fs.exists(result_uri):
+            logger.warning("Not overwriting existing result at %s prior to serialization", result_uri)
+            self._write_metadata_only("lost-race")
+            return
+
+        # when we pickle the return value, we also end up potentially uploading
+        # various Sources and Paths and other special-cased things inside the result.
         return_value_bytes = _pickle.gimme_bytes(self.dumper, r)
+        if self.fs.exists(result_uri):
+            logger.warning("Not overwriting existing result at %s after serialization", result_uri)
+            self._write_metadata_only("lost-race-after-serialization")
+            return
+
+        # BUG: there remains a race condition between fs.exists and putbytes.
+        # multiple callers could get a False from fs.exists and then proceed to write.
+        # the biggest issue here is for functions that are not truly pure, because
+        # they will be writing different results, and theoretically different callers
+        # could end up seeing the different results.
+        #
+        # In the future, if a Blob Store provided a put_unless_exists method, we could use
+        # that to avoid the race condition.
         self.fs.putbytes(
-            self.fs.join(self.call_id, results.RESULT),
+            result_uri,
             self._metadata_header + return_value_bytes,
             type_hint="application/mops-return-value",
         )
@@ -92,6 +113,8 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
 
     # any recursively-called functions that use metadata will retain the original invoker.
 
+    failure_to_lock = None
+    stop_lock: ty.Callable = lambda: None  # noqa: E731
     try:
         stop_lock = lock.launch_daemon_lock_maintainer(
             lock.remote_lock_maintain(
@@ -100,7 +123,9 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         )
     except lock.CannotMaintainLock as e:
         logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
-        stop_lock = lambda: None  # noqa: E731
+    except lock.LockWasStolenError as e:
+        logger.error(f"Lock was stolen: {e}. Exiting without running the function.")
+        failure_to_lock = e
 
     def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
         parts = fs.split(memo_uri)
@@ -124,7 +149,16 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     def do_work_return_result() -> object:
         # ONLY failures in this code should transmit an EXCEPTION
         # back to the orchestrator side.
-        return pipeline_id_mask(invocation_metadata.pipeline_id)(func)(*args, **kwargs)
+
+        # if the lock was stolen, we should write an exception
+        # so that the orchestrator knows that it failed.
+        # in theory, it could resume waiting for a result, though
+        # currently it does not do this.
+        if failure_to_lock:
+            raise failure_to_lock
+
+        with unwrap_use_runner(func):
+            return func(*args, **kwargs)
 
     route_return_value_or_exception(
         _ResultExcWithMetadataChannel(

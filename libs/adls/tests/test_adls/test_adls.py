@@ -13,6 +13,7 @@ local_table_file_paths = downloader.fetch_hive_table("database.tablename")
 ```
 
 """
+
 import datetime
 import os
 import shutil
@@ -24,6 +25,7 @@ import pytest
 from azure.core.exceptions import AzureError
 
 from thds.adls import ADLSFileSystem, ADLSFileSystemCache
+from thds.adls.errors import NotADirectoryError
 
 TEST_PATHS = ["foo", "/bar", "foo/bar", "foo/", "bar/", "foo/bar/", "foo/bar/baz.txt"]
 TEST_FILE_PATHS = [p for p in TEST_PATHS if not p.endswith("/")]
@@ -146,8 +148,17 @@ def test_cache_valid(
     assert cache.is_valid_for(cache_file_properties_past)  # type: ignore
 
 
-@pytest.mark.integration
 def test_nicer_errors(caplog):
     with pytest.raises(AzureError):
         ADLSFileSystem("thisthing", "doesnt-exist-or-is-illegal")
     assert "Failed when operating on adls://thisthing/doesnt-exist-or-is-illegal/" == caplog.messages[-1]
+
+
+def test_fetch_directory_raises_error_when_path_is_file(test_remote_root):
+    """Test that fetch_directory raises NotADirectoryError when given a file path instead of directory path."""
+    fs = ADLSFileSystem(*test_remote_root)
+    with pytest.raises(
+        NotADirectoryError,
+        match=r"Path '.*DONT_DELETE_THESE_FILES\.txt' points to a file, not a directory",
+    ):
+        fs.fetch_directory(remote_path="test/read-only/DONT_DELETE_THESE_FILES.txt")
