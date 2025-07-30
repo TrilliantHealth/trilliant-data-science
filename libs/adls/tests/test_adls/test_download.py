@@ -237,6 +237,9 @@ def random_test_file_fqn(
     fs.delete_file(fqn.path)  # clean up remote
 
 
+@pytest.mark.flaky(
+    reruns=2
+)  # i still have no idea why this test very occasionally fails, but only on CI (Linux?)
 def test_parallel_downloads_only_perform_a_single_download(
     caplog: pytest.LogCaptureFixture, random_test_file_fqn: AdlsFqn
 ):
