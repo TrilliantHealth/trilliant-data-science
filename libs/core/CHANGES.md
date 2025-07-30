@@ -1,3 +1,9 @@
+## 1.45
+
+- Adds `core.progress.report_still_alive` decorator for long-running functions. If your function is still
+  executing after N seconds, will log a message saying "still working on that". This is particularly
+  useful for preventing log-read timeouts of k8s pods.
+
 ## 1.44
 
 - `core.futures.PFuture` and `core.futures.LazyFuture` are provided to make it possible to provide
