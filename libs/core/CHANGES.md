@@ -3,6 +3,8 @@
 - Adds `core.progress.report_still_alive` decorator for long-running functions. If your function is still
   executing after N seconds, will log a message saying "still working on that". This is particularly
   useful for preventing log-read timeouts of k8s pods.
+- Adds `core.iterators.titrate`. This is particularly useful for avoiding a stampede of elephants in a
+  concurrent Pool Executor.
 
 ## 1.44
 
