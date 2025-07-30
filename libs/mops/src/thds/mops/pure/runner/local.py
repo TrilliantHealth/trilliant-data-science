@@ -192,6 +192,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # If something about our invocation fails,
         # we fail just as we would have previously, without any attempt to go
         # 'back' to waiting for someone else to compute the result.
+        lock.maintain_to_release(lock_owned)
+        # we don't actually need the release_lock here, because it will get
+        # 'recreated' in the PostShimResultGetter below, which is also where it gets called
 
         future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
 
