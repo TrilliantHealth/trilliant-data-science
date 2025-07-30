@@ -2,8 +2,8 @@ from ._acquire import acquire  # noqa: F401
 from .maintain import (  # noqa: F401
     CannotMaintainLock,
     LockWasStolenError,
-    launch_daemon_lock_maintainer,
+    add_lock_to_maintenance_daemon,
     maintain_to_release,
-    remote_lock_maintain,
+    make_remote_lock_writer,
 )
 from .types import LockAcquired  # noqa: F401
