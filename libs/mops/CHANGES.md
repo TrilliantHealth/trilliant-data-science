@@ -1,3 +1,10 @@
+## 3.9.20250730
+
+- Reintroduce pre-shim lock maintenance that was removed in 3.9 because of the inefficiency it posed to
+  heavy users of FutureShims.
+- Make lock maintenance much more efficient (2 orders of magnitude fewer threads required) so that we
+  re-enable pre-shim lock maintenance.
+
 ### 3.9.20250729
 
 - Tighten up some places where lack of orchestrator lock/lease maintenance could lead to multiple
