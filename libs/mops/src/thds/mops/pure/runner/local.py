@@ -168,7 +168,6 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             if lock_owned:
                 break  # we own the invocation - invoke the shim ourselves (below)
 
-            log_invocation = _LogInvocationAfterSteal
             # getting to this point ONLY happens if we failed to acquire the lock, which
             # is not expected to be the usual situation. We log a differently-colored
             # message here to make that clear to users.
@@ -186,6 +185,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
 
                 lock_owned = acquire_lock()  # still inside the semaphore, as it's a network op
+                if lock_owned:
+                    log_invocation = _LogInvocationAfterSteal
+                    logger.info(f"Stole expired lock for {memo_uri} - invoking ourselves.")
 
         assert lock_owned is not None
         # if/when we acquire the lock, we move forever into 'run this ourselves mode'.
