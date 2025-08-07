@@ -280,12 +280,19 @@ def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], 
         return source.from_uri(remote_uri, hash=hash)
 
     local_path = source.path_from_uri(file_uri)
-    if local_path.exists():
+
+    try:
+        file_exists = local_path.exists()
+    except PermissionError:
+        file_exists = False  # this will happen if one of the intermediate directories is not readable
+
+    if file_exists:
         try:
             # since there's a remote URI, it's possible a specific consumer might want to
             # get access to that directly, even though the default data access would still
             # be to use the local file.
             return source.from_file(local_path, hash=hash, uri=remote_uri)
+
         except Exception as e:
             logger.warning(
                 f"Unable to reuse destination local path {local_path} when constructing Source {remote_uri}: {e}"
