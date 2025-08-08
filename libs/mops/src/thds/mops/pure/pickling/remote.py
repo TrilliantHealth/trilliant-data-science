@@ -1,3 +1,4 @@
+import contextlib
 import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -6,7 +7,7 @@ from functools import cached_property
 from thds.core import log, scope
 
 from ..._utils.once import Once
-from ..core import lock, metadata, pipeline_id, uris
+from ..core import deferred_work, lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
@@ -66,6 +67,14 @@ class _ResultExcWithMetadataChannel:
             self._write_metadata_only("lost-race-after-serialization")
             return
 
+        # It's important that all deferred work is performed before the return
+        # value is written to the blob store so that result consumers don't read
+        # inconsistent data. For example, one type of deferred work is uploading
+        # result sources. If the invocation result is written with the source
+        # uri before the source is uploaded, then result consumers might try to
+        # download a non-existent file in the meantime.
+        deferred_work.perform_all()
+
         # BUG: there remains a race condition between fs.exists and putbytes.
         # multiple callers could get a False from fs.exists and then proceed to write.
         # the biggest issue here is for functions that are not truly pure, because
@@ -100,6 +109,25 @@ def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
     return invocation.func, args, kwargs
 
 
+@contextlib.contextmanager
+def _manage_lock(lock_uri: str, lock_writer_id: str) -> ty.Iterator[ty.Optional[Exception]]:
+    stop_lock: ty.Callable = lambda: None  # noqa: E731
+    try:
+        stop_lock = lock.add_lock_to_maintenance_daemon(
+            lock.make_remote_lock_writer(lock_uri, expected_writer_id=lock_writer_id)
+        )
+        yield None  # pause for execution
+    except lock.CannotMaintainLock as e:
+        logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
+        yield None  # pause for execution
+    except lock.LockWasStolenError as stolen_lock_error:
+        logger.error(f"Lock was stolen: {stolen_lock_error}. Will exit without running the function.")
+        yield stolen_lock_error  # pause to upload failure
+
+    stop_lock()  # not critical since we don't _own_ the lock, but keeps things cleaner
+
+
+@scope.bound
 def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     """The arguments are those supplied by MemoizingPicklingRunner.
 
@@ -113,20 +141,6 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
 
     # any recursively-called functions that use metadata will retain the original invoker.
 
-    failure_to_lock = None
-    stop_lock: ty.Callable = lambda: None  # noqa: E731
-    try:
-        stop_lock = lock.launch_daemon_lock_maintainer(
-            lock.remote_lock_maintain(
-                fs.join(memo_uri, "lock"), expected_writer_id=invocation_metadata.invoker_uuid
-            )
-        )
-    except lock.CannotMaintainLock as e:
-        logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
-    except lock.LockWasStolenError as e:
-        logger.error(f"Lock was stolen: {e}. Exiting without running the function.")
-        failure_to_lock = e
-
     def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
         parts = fs.split(memo_uri)
         try:
@@ -138,6 +152,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         invocation_parts = parts[runner_idx + 1 :]
         return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
 
+    lock_error = scope.enter(_manage_lock(fs.join(memo_uri, "lock"), invocation_metadata.invoker_uuid))
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
 
     try:
@@ -150,12 +165,12 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         # ONLY failures in this code should transmit an EXCEPTION
         # back to the orchestrator side.
 
-        # if the lock was stolen, we should write an exception
+        # if the lock was stolen, we will write an exception
         # so that the orchestrator knows that it failed.
         # in theory, it could resume waiting for a result, though
         # currently it does not do this.
-        if failure_to_lock:
-            raise failure_to_lock
+        if lock_error:
+            raise lock_error
 
         with unwrap_use_runner(func):
             return func(*args, **kwargs)
@@ -176,4 +191,3 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         invocation_metadata.pipeline_id,
         _extract_invocation_unique_key(memo_uri),
     )
-    stop_lock()  # not critical since we don't _own_ the lock, but keeps things cleaner
