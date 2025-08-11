@@ -20,6 +20,7 @@ logger = getLogger(__name__)
 
 
 def set_read_only(fpath: StrOrPath) -> None:
+    assert not os.path.isdir(fpath), f"Cannot set a directory, {fpath}, to read-only, only files."
     # thank you https://stackoverflow.com/a/51262451
     logger.debug("Setting '%s' to read-only", fpath)
     perms = stat.S_IMODE(os.lstat(fpath).st_mode)
