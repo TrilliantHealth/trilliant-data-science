@@ -1,13 +1,3 @@
-### 1.45.20250908
-
-- Fix a few places where we were doing dynamic things with args, kwargs but not guarding against `func`
-  being a valid keyword argument for the underlying function.
-
-### 1.45.20250815
-
-- Adds `thread_debug.py` which can be used to debug what thread you're in and what thread(s) might have
-  spawned you.
-
 ## 1.45
 
 - Adds `core.progress.report_still_alive` decorator for long-running functions. If your function is still

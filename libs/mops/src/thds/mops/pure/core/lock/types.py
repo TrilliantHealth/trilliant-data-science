@@ -18,7 +18,6 @@ class LockContents(ty.TypedDict):
     # just for debugging
     hostname: str
     pid: str
-    tid: int
     write_count: int
     first_written_at: str
     first_acquired_at: str
@@ -29,8 +28,10 @@ class LockAcquired(ty.Protocol):
 
     writer_id: str
 
-    def maintain(self) -> None: ...  # pragma: no cover
+    def maintain(self) -> None:
+        ...  # pragma: no cover
 
-    def release(self) -> None: ...  # pragma: no cover
+    def release(self) -> None:
+        ...  # pragma: no cover
 
     expire_s: float

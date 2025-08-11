@@ -1,24 +1,4 @@
-### 3.9.20250908
-
-- Don't raise errors when serializing _relative_ Paths that are not an existing file. This will allow
-  relative Paths to be passed through _representing_ something (like an output directory) without
-  requiring the user to jump through a `str` hoop.
-
-### 3.9.20250902
-
-- Fixes release of leases/locks when a shim raises an Exception.
-
-### 3.9.20250815
-
-- Adds more debugging info (mostly about the current thread) to lock writers. Hopefully this allows us to
-  figure out which CI tests do not have proper `pure.results.require_all()` wrappers.
-
-### 3.9.20250807
-
-- Upload result sources using deferred work. A consequence of this is that these uploads are now
-  multithreaded.
-
-### 3.9.20250730
+## 3.9.20250730
 
 - Reintroduce pre-shim lock maintenance that was removed in 3.9 because of the inefficiency it posed to
   heavy users of FutureShims.

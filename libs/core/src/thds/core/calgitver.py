@@ -1,14 +1,14 @@
 """Uses local git repo info to construct a more informative CalVer version string.
 
-This time format was chosen to be CalVer-esque but to drop time
-fractions smaller than minutes since they're exceeding rarely
-semantically meaningful, and the git commit hash will in 99.999%
-of cases be a great disambiguator for cases where multiple
-versions happen to be generated within the same minute by
-different users.
+    This time format was chosen to be CalVer-esque but to drop time
+    fractions smaller than minutes since they're exceeding rarely
+    semantically meaningful, and the git commit hash will in 99.999%
+    of cases be a great disambiguator for cases where multiple
+    versions happen to be generated within the same minute by
+    different users.
 
-We use only dots as separators to be compatible with both Container Registry
-formats and PEP440.
+    We use only dots as separators to be compatible with both Container Registry
+    formats and PEP440.
 """
 
 import os
