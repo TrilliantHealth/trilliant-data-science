@@ -3,7 +3,6 @@ when the function is defined inside the __main__ module.
 
 Only works if you 'transfer execution' to the same process.
 """
-
 import typing as ty
 
 _LOCAL_MAIN_FUNCTIONS: ty.Dict[str, ty.Callable] = dict()
