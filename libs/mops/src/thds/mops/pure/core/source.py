@@ -241,7 +241,7 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
                 logger.info("Using existing remote URI on Source %s", source_.uri)
                 deferred_work.add(
                     __name__ + "-chosen-source-result",
-                    source_.cached_path,
+                    source_.uri,
                     partial(_put_file_to_blob_store, source_.cached_path, source_.uri),
                 )
         else:
@@ -273,7 +273,7 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
 
     deferred_work.add(
         __name__ + "-derived-source-result",
-        local_path,
+        remote_uri,
         partial(_put_file_to_blob_store, local_path, remote_uri),
     )
     # upload must _always_ happen on remotely-returned Sources, as detailed above.
