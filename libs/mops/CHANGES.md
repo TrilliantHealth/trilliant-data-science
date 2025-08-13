@@ -1,8 +1,3 @@
-## 3.9.20250807
-
-- Upload result sources using deferred work. A consequence of this is that these uploads are now
-  multithreaded.
-
 ## 3.9.20250730
 
 - Reintroduce pre-shim lock maintenance that was removed in 3.9 because of the inefficiency it posed to
