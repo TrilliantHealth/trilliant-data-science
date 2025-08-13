@@ -38,15 +38,7 @@ def route_return_value_or_exception(
     pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
 ) -> None:
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
-    _routing_scope.enter(deferred_work.push_non_context())
-    # deferred work can be requested during result serialization, but because we don't want
-    # to leave a 'broken' result payload (one that refers to unperformed deferred work,
-    # maybe because of network or other failure), we simply don't open a deferred work
-    # context on the remote side, which forces all the work to be performed as it is
-    # added for deferral instead of actually being deferred.
-    #
-    # pushing this non-context is only necessary in the case of a thread-local
-    # 'remote' invocation - in all true remote invocations, there will be no context open.
+    _routing_scope.enter(deferred_work.open_context())
 
     _routing_scope.enter(log.logger_context(remote=pipeline_id))
     if pipeline_function_and_arguments_unique_key:
