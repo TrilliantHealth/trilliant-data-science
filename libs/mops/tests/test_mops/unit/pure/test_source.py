@@ -11,7 +11,6 @@ from thds.mops.pure.core import deferred_work, output_naming
 from thds.mops.pure.core.source import (
     _hashref_uri,
     create_source_at_uri,
-    perform_source_uploads,
     prepare_source_argument,
     prepare_source_result,
     source_from_hashref,
@@ -46,7 +45,7 @@ def test_local_source_no_uploads(prep, temp_file):  # 1
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, Hash)
     assert source_arg == source.from_file(test_file).hash
-    perform_source_uploads()
+    deferred_work.perform_all()
 
     reconstituted_source = source_from_hashref(source_arg)
     assert reconstituted_source.hash == initial_source.hash
@@ -60,7 +59,7 @@ def test_local_source_with_uploads(prep, temp_file):  # 2
     assert initial_source.hash
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, Hash)
-    perform_source_uploads()
+    deferred_work.perform_all()
 
     # now, delete the local source ref (pretend that we're truly remote)
     # and see that we can still reconstitute the Source
@@ -82,7 +81,7 @@ def test_remote_source_with_hash(prep, temp_file):  # 3
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, Hash)
 
-    perform_source_uploads()
+    deferred_work.perform_all()
     # hashrefs are now also gated behind the 'uploads'
     # abstraction, in order to avoid unnecessarily uploading things
     # when we may already be able to fetch a result.
@@ -98,7 +97,7 @@ def test_remote_source_with_no_hash_just_communicates_uri(prep, temp_file):  # 4
 
     source_arg = prepare_source_argument(initial_source)
     assert isinstance(source_arg, str)
-    perform_source_uploads()  # just to show that we can 'not' do uploads if there are none.
+    deferred_work.perform_all()  # just to show that we can 'not' do uploads if there are none.
 
     reconstituted_source = source.from_uri(source_arg)
     assert test_file.read_text() == reconstituted_source.path().read_text()
@@ -111,24 +110,28 @@ def test_remote_source_with_no_hash_just_communicates_uri(prep, temp_file):  # 4
 
 
 def test_local_source_returned_to_local(prep, temp_file):  # 1
-    with output_naming.PipelineFunctionUniqueKey.set(
-        "test"
-    ), output_naming.FunctionArgumentsHashUniqueKey.set("abcdefg"):
+    with (
+        output_naming.PipelineFunctionUniqueKey.set("test"),
+        output_naming.FunctionArgumentsHashUniqueKey.set("abcdefg"),
+    ):
         test_file = temp_file("local source returned to local")
         initial_source = source.from_file(test_file)
         source_result = prepare_source_result(initial_source)
+        deferred_work.perform_all()
 
         out_src = source_from_source_result(*source_result)
         assert out_src.path().read_text() == initial_source.path().read_text()
 
 
 def test_local_source_returned_to_remote(prep, temp_file):  # 2
-    with output_naming.PipelineFunctionUniqueKey.set(
-        "test"
-    ), output_naming.FunctionArgumentsHashUniqueKey.set("123456"):
+    with (
+        output_naming.PipelineFunctionUniqueKey.set("test"),
+        output_naming.FunctionArgumentsHashUniqueKey.set("123456"),
+    ):
         test_file = temp_file("local source returned to remote")
         initial_source = source.from_file(test_file)
         source_result = prepare_source_result(initial_source)
+        deferred_work.perform_all()
 
         orig_text = test_file.read_text()
         test_file.unlink()  # delete the original file so we look like we're remote
@@ -181,7 +184,7 @@ def test_from_file_with_uri(prep, temp_file):
     orig_text = test_file.read_text()
 
     re_source = source_from_source_result(*prepare_source_result(source_))
-    # should do the upload
+    deferred_work.perform_all()
 
     test_file.unlink()  # make it go away so we can test
     assert open(re_source).read() == orig_text
