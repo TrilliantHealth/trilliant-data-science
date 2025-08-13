@@ -23,10 +23,6 @@ _DEFERRED_WORK_THREADPOOL = refcount.Resource[concurrent.futures.ThreadPoolExecu
 logger = core.log.getLogger(__name__)
 
 
-class NoDeferredWorkContext(Exception):
-    """Raised when work is pushed with no open context"""
-
-
 @contextmanager
 def open_context() -> ty.Iterator[None]:
     """Enter this context before you begin serializing your invocation. When perform_all()
@@ -48,6 +44,12 @@ def open_context() -> ty.Iterator[None]:
             )
 
 
+@contextmanager
+def push_non_context() -> ty.Iterator[None]:
+    with _DEFERRED_INVOCATION_WORK.set(None):
+        yield
+
+
 def add(work_owner: str, work_id: ty.Hashable, work: ty.Callable[[], ty.Any]) -> None:
     """Add some work to an open context. The work will be performed when perform_all() is
     called. If there is no open context, perform the work immediately.
@@ -60,7 +62,8 @@ def add(work_owner: str, work_id: ty.Hashable, work: ty.Callable[[], ty.Any]) ->
     """
     deferred_work = _DEFERRED_INVOCATION_WORK()
     if deferred_work is None:
-        raise NoDeferredWorkContext("Deferred work can only be added when there is an open context.")
+        logger.debug("No open context - performing work %s immediately", work)
+        work()
     else:
         logger.debug("Adding work %s to deferred work %s", (work_owner, work_id), id(deferred_work))
         deferred_work[(work_owner, work_id)] = work
