@@ -19,7 +19,7 @@ def encode(
     num_bytes: int = 3,
     *,
     altchars: ty.Optional[Buffer] = ALTCHARS,
-    splitchar: str = SPLITCHAR,
+    splitchar: str = SPLITCHAR
 ) -> str:
     """The goal here is to allow people to easily read and remember
     the leading bytes of a string-encoded checksum.
