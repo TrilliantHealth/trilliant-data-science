@@ -145,7 +145,8 @@ def _locking_factory(
 
 
 @ty.overload
-def locking(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]: ...  # pragma: no cover
+def locking(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]:
+    ...  # pragma: no cover
 
 
 @ty.overload
@@ -154,7 +155,8 @@ def locking(
     *,
     cache_lock: ty.Optional[proto.ContextManager] = ...,
     make_func_lock: ty.Optional[ty.Callable[[HashedTuple], proto.ContextManager]] = ...,
-) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]: ...  # pragma: no cover
+) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
+    ...  # pragma: no cover
 
 
 # overloads cover typical usage of `locking_cache` but aren't comprehensive

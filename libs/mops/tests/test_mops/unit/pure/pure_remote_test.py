@@ -1,5 +1,4 @@
 """This just tests that our abstraction can easily be implemented with other 'Runners'"""
-
 import concurrent.futures
 import multiprocessing as mp
 

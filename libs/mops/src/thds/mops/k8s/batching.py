@@ -14,7 +14,6 @@ import atexit
 import concurrent.futures
 import itertools
 import multiprocessing
-import os
 import threading
 import typing as ty
 
@@ -57,7 +56,7 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
         submit_func: ty.Callable[[ty.Collection[str]], ty.Any],
         max_batch_size: int,
         job_counter: counts.MpValue[int],
-        job_prefix: str = "",
+        name_prefix: str = "",
     ) -> None:
         """submit_func in particular should be a closure around whatever setup you need to
         do to call back into a function that is locally wrapped with a k8s shim that will
@@ -67,13 +66,13 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
         self._max_batch_size = max_batch_size
         self._job_counter = job_counter
         self._job_name = ""
-        self._job_prefix = job_prefix
+        self._name_prefix = name_prefix
         self._submit_func = submit_func
 
     def _get_new_name(self) -> str:
         # counts.inc takes a multiprocess lock. do not forget this!
         job_num = counts.inc(self._job_counter)
-        return _launch.construct_job_name(self._job_prefix, counts.to_name(job_num))
+        return _launch.construct_job_name(self._name_prefix, counts.to_name(job_num))
 
     def add_to_named_job(self, mops_invocation: ty.Sequence[str]) -> str:
         """Returns job name for the invocation."""
@@ -104,7 +103,7 @@ def init_batcher(
     submit_func: ty.Callable[[ty.Collection[str]], ty.Any],
     func_max_batch_size: int,
     job_counter: counts.MpValue[int],
-    job_prefix: str = "",
+    name_prefix: str = "",
 ) -> None:
     # for use with multiprocessing pool initializer
     global _BATCHER
@@ -112,7 +111,7 @@ def init_batcher(
         logger.warning("Batcher is already initialized; reinitializing will reset the job name.")
         return
 
-    _BATCHER = K8sJobBatchingShim(submit_func, func_max_batch_size, job_counter, job_prefix)
+    _BATCHER = K8sJobBatchingShim(submit_func, func_max_batch_size, job_counter, name_prefix)
 
 
 def init_batcher_with_unpicklable_submit_func(
@@ -120,13 +119,13 @@ def init_batcher_with_unpicklable_submit_func(
     submit_func_arg: T,
     func_max_batch_size: int,
     job_counter: counts.MpValue[int],
-    job_prefix: str = "",
+    name_prefix: str = "",
 ) -> None:
     """Use this if you want to have an unpicklable submit function - because applying make_submit_func(submit_func_arg)
     will happen inside the pool worker process after all the pickling/unpickling has happened.
     """
     return init_batcher(
-        make_submit_func(submit_func_arg), func_max_batch_size, job_counter, job_prefix=job_prefix
+        make_submit_func(submit_func_arg), func_max_batch_size, job_counter, name_prefix=name_prefix
     )
 
 
@@ -171,13 +170,7 @@ def make_counting_process_pool_executor(
     return concurrent.futures.ProcessPoolExecutor(
         max_workers=max_workers or cpus.available_cpu_count(),
         initializer=init_batcher_with_unpicklable_submit_func,
-        initargs=(
-            make_submit_func,
-            submit_func_arg,
-            max_batch_size,
-            launch_count,
-            "-".join([name_prefix, str(os.getpid())]),
-        ),
+        initargs=(make_submit_func, submit_func_arg, max_batch_size, launch_count, name_prefix),
         mp_context=mp_context,
     )
 
