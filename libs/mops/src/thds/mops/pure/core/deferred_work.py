@@ -11,9 +11,9 @@ from thds import core
 from thds.core import config, refcount
 from thds.core.stack_context import StackContext
 
-_DEFERRED_INVOCATION_WORK: StackContext[ty.Optional[ty.Dict[ty.Hashable, ty.Callable[[], ty.Any]]]] = (
-    StackContext("DEFERRED_INVOCATION_WORK", None)
-)
+_DEFERRED_INVOCATION_WORK: StackContext[
+    ty.Optional[ty.Dict[ty.Hashable, ty.Callable[[], ty.Any]]]
+] = StackContext("DEFERRED_INVOCATION_WORK", None)
 _MAX_DEFERRED_WORK_THREADS = config.item("max_deferred_work_threads", default=50, parse=int)
 _DEFERRED_WORK_THREADPOOL = refcount.Resource[concurrent.futures.ThreadPoolExecutor](
     lambda: concurrent.futures.ThreadPoolExecutor(
