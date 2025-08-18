@@ -112,10 +112,8 @@ def split(fqn: FR) -> Tuple[str, ...]:
 
 SA_REGEX = re.compile(r"^[\w]{3,24}$")
 # https://github.com/MicrosoftDocs/azure-docs/issues/64497#issuecomment-714380739
-CONT_REGEX = re.compile(r"^[\w\$][\w\-]{2,63}$")
-# contrary to the LIES in
+CONT_REGEX = re.compile(r"^\w[\w\-]{2,63}$")
 # https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
-# you _can_ have a $ at the beginning of some container names.
 
 
 class NotAdlsUri(ValueError):
