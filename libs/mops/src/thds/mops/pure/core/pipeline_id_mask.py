@@ -1,4 +1,5 @@
-"""Public API for masking the mops pipeline id."""
+"""Public API for masking the mops pipeline id.
+"""
 
 import re
 import typing as ty

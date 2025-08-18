@@ -36,7 +36,8 @@ class Runner(Protocol):
         __f: ty.Callable[..., T],
         __args: ty.Sequence,
         __kwargs: ty.Mapping[str, ty.Any],
-    ) -> T: ...  # pragma: no cover
+    ) -> T:
+        ...  # pragma: no cover
 
 
 class NoResultAfterInvocationError(Exception):  # TODO remove in v4.
@@ -133,7 +134,8 @@ class BlobStore(Protocol):
         followed by the path component split along the same lines that join would concatenate.
         """
 
-    def is_blob_not_found(self, __exc: Exception) -> bool: ...
+    def is_blob_not_found(self, __exc: Exception) -> bool:
+        ...
 
 
 Args = ty.Sequence
