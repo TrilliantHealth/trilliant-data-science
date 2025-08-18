@@ -1,5 +1,4 @@
 """Impure keyfunctions that are useful for common cases."""
-
 import typing as ty
 
 from ..pure.core.memo.keyfunc import Args, Keyfunc, Kwargs
