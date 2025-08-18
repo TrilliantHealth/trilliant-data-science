@@ -161,7 +161,7 @@ IoResponse = ty.Union[FileProperties, None]
 def _assert_fp(fp: ty.Optional[FileProperties], fqn: AdlsFqn) -> None:
     assert fp, f"FileProperties for {fqn} should not be None."
     assert fp.name, f"FileProperties for {fqn} should have a name."
-    assert fp.name.strip("/") == fqn.path.strip("/"), (fp, fqn)
+    assert fp.name == fqn.path, (fp, fqn)
 
 
 _dl_scope = scope.Scope("adls.download")
@@ -355,11 +355,13 @@ def download_or_use_verified(
         co, co_request, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, expected_hash, cache
         )
+        assert dl_file_client.path_name == remote_key
         _dl_scope.enter(dl_file_client)  # on __exit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
                     # only fetch these if they haven't already been requested
+                    assert dl_file_client.path_name == remote_key
                     file_properties = dl_file_client.get_file_properties()
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
