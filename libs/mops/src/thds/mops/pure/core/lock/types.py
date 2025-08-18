@@ -18,6 +18,7 @@ class LockContents(ty.TypedDict):
     # just for debugging
     hostname: str
     pid: str
+    tid: int
     write_count: int
     first_written_at: str
     first_acquired_at: str
