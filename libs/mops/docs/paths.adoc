@@ -12,12 +12,8 @@ memory-efficient manner to ADLS, and then on the 'other side' it will be streame
 and given to you as a `Path` object. The file is immutable, and even if written to, those effects will
 not be visible to the orchestrator.
 
-> The file must already exist for this behavior to be activated:
->
-> 1. an absolute Path pointing to a directory or to nothing at all will cause a subclass of
->    ValueError to be raised.
-> 2. a relative Path pointing to a directory or non-existent file will be serialized as a
->    relative Path object!
+> The file must already exist; a Path pointing to a directory or to nothing at all will cause subclass of
+> ValueError to be raised.
 
 Separately, any `Path` found in the return value will similarly be streamed to a **read-only** file on
 the local orchestrator. This is semantically meaningful as a _write-once destination_ - writing to this
