@@ -4,11 +4,13 @@ F = ty.TypeVar("F", bound=ty.Callable)
 
 
 @ty.overload
-def compose(*decorators: ty.Callable[[F], F]) -> ty.Callable[[F], F]: ...  # pragma: no cover
+def compose(*decorators: ty.Callable[[F], F]) -> ty.Callable[[F], F]:
+    ...  # pragma: no cover
 
 
 @ty.overload
-def compose(*decorators: ty.Callable[[F], F], f: F) -> F: ...  # pragma: no cover
+def compose(*decorators: ty.Callable[[F], F], f: F) -> F:
+    ...  # pragma: no cover
 
 
 def compose(*decorators: ty.Callable[[F], F], f: ty.Optional[F] = None) -> ty.Callable[[F], F]:
