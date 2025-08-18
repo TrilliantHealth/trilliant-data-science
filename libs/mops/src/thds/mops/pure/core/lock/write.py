@@ -1,9 +1,11 @@
 import os
+import sys
+import threading
 import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from thds.core import hostname, log
+from thds.core import hostname, log, thread_debug
 
 from . import _funcs
 from .types import LockContents
@@ -37,10 +39,30 @@ class LockEmitter:
             "write_count": self.write_count,
             "hostname": hostname.friendly(),
             "pid": str(os.getpid()),
+            "tid": threading.get_ident(),
             "first_written_at": self.first_written_at,
             "first_acquired_at": first_acquired_at.isoformat() if first_acquired_at else "",
             "released_at": "",
         }
+
+
+def _pid_tid() -> str:
+    return f"{os.getpid()}-{threading.get_ident()}"
+
+
+def _capture_thread_info() -> dict[str, ty.Any]:
+    return dict(
+        ppid=os.getppid(),
+        process_cmd=[" ".join(sys.argv)],
+        **thread_debug.capture_thread_context(),
+    )
+
+
+class _Debug:
+    def __init__(self) -> None:
+        self.original_pid = os.getpid()
+        self.original_thread_id = threading.get_ident()
+        self.thread_info: dict[str, dict] = {_pid_tid(): _capture_thread_info()}
 
 
 class LockfileWriter:
@@ -65,7 +87,7 @@ class LockfileWriter:
         self.blob_store, self.lock_uri = _funcs.store_and_lock_uri(lock_dir_uri)
         self.generate_lock = generate_lock
         self.expire_s = expire_s
-        self.debug = debug
+        self.debug = _Debug() if debug else None
         self.writer_name = writer_name
         self.first_acquired_at: ty.Optional[datetime] = None
 
@@ -115,21 +137,36 @@ class LockfileWriter:
         # 'successful' write, it will not impose extra latency during the
         # latency-critical section.
         if self.debug and self.first_acquired_at:
-            name = (self.writer_name + ";_") if self.writer_name else ""
+            pid = lock_contents["pid"]
+            tid = lock_contents["tid"]
+            pid_tid = f"{pid}-{tid}"
+            if pid_tid not in self.debug.thread_info:
+                self.debug.thread_info[pid_tid] = _capture_thread_info()
+
+            name = (";_name=" + self.writer_name) if self.writer_name else ""
             first_written_at = lock_contents["first_written_at"]
             hostname = lock_contents["hostname"]
-            pid = lock_contents["pid"]
+
             acq_uuid = lock_contents["writer_id"]
             assert "/" not in acq_uuid, lock_contents
             debug_uri = self.blob_store.join(
                 self.lock_dir_uri,
                 "writers-debug",
-                f"firstwrite={first_written_at};_uuid={acq_uuid};_host={hostname};_pid={pid}{name}.json",
+                f"firstwrite={first_written_at};_uuid={acq_uuid};_host={hostname};_pid={pid};_tid={tid}{name}.json",
             )
             try:
                 self.blob_store.putbytes(
                     debug_uri,
-                    _funcs.json_dumpb(lock_contents),
+                    _funcs.json_dumpb(
+                        dict(
+                            lock_contents,
+                            thread_debug=dict(
+                                original_pid=self.debug.original_pid,
+                                original_thread_id=self.debug.original_thread_id,
+                                thread_info=self.debug.thread_info,
+                            ),
+                        )
+                    ),
                     type_hint="application/mops-lock-breadcrumb",
                 )
             except Exception:
