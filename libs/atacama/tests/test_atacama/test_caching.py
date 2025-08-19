@@ -1,5 +1,4 @@
 """Test schema reuse."""
-
 from attrs import define
 from marshmallow import Schema, fields
 
