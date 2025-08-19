@@ -99,9 +99,6 @@ def lock_maintaining_future(
 ) -> concurrent.futures.Future[futures.R1]:
     """Create a Future that will be used to retrieve the result of a shim invocation.
 
-    Most commonly, this will be partially applied and only lazily invoked
-    when the user calls `.result()` or some other method on the Future.
-
     This Future will be used to retrieve the result of a shim invocation, and will
     maintain the lock while it is being retrieved.
     """
