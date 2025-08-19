@@ -7,7 +7,7 @@ from functools import cached_property
 from thds.core import log, scope
 
 from ..._utils.once import Once
-from ..core import deferred_work, lock, metadata, pipeline_id, uris
+from ..core import lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
@@ -66,14 +66,6 @@ class _ResultExcWithMetadataChannel:
             logger.warning("Not overwriting existing result at %s after serialization", result_uri)
             self._write_metadata_only("lost-race-after-serialization")
             return
-
-        # It's important that all deferred work is performed before the return
-        # value is written to the blob store so that result consumers don't read
-        # inconsistent data. For example, one type of deferred work is uploading
-        # result sources. If the invocation result is written with the source
-        # uri before the source is uploaded, then result consumers might try to
-        # download a non-existent file in the meantime.
-        deferred_work.perform_all()
 
         # BUG: there remains a race condition between fs.exists and putbytes.
         # multiple callers could get a False from fs.exists and then proceed to write.
