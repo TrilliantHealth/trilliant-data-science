@@ -31,7 +31,8 @@ class Hasher(ty.Protocol):
         """Update the hash object with the bytes-like object."""
         ...
 
-    def digest(self) -> bytes: ...
+    def digest(self) -> bytes:
+        ...
 
 
 H = ty.TypeVar("H", bound=Hasher)
