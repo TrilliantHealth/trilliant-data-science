@@ -7,7 +7,8 @@ import typing as ty
 
 
 class EntryHandler(ty.Protocol):
-    def __call__(self, *__args: str) -> ty.Any: ...  # pragma: nocover
+    def __call__(self, *__args: str) -> ty.Any:
+        ...  # pragma: nocover
 
 
 ENTRY_HANDLERS: ty.Dict[str, EntryHandler] = dict()
