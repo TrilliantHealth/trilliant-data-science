@@ -1,6 +1,6 @@
 [project]
 name = "thds.adls"
-version = "4.2"
+version = "4.1"
 # Patch version is a datetime determined upon release
 description = "ADLS tools"
 readme = "README.md"
@@ -22,7 +22,6 @@ dependencies = [
 adls-download-uri = "thds.adls.tools.download:main"
 adls-ls-uri = "thds.adls.tools.ls:main"
 adls-upload-uri = "thds.adls.tools.upload:main"
-adls-ls-fast-uri = "thds.adls.tools.ls_fast:main"
 
 [project.urls]
 Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
