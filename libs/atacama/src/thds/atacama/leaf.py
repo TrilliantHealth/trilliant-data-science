@@ -14,9 +14,11 @@ LeafType = ty.Union[type, ty.Any]
 
 
 class LeafTypeMapping(Protocol):
-    def __contains__(self, __key: LeafType) -> bool: ...  # pragma: nocover
+    def __contains__(self, __key: LeafType) -> bool:
+        ...  # pragma: nocover
 
-    def __getitem__(self, __key: LeafType) -> ty.Type[marshmallow.fields.Field]: ...  # pragma: nocover
+    def __getitem__(self, __key: LeafType) -> ty.Type[marshmallow.fields.Field]:
+        ...  # pragma: nocover
 
 
 FieldType = ty.Type[marshmallow.fields.Field]

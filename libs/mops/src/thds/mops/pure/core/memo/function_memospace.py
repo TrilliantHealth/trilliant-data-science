@@ -148,7 +148,8 @@ from .unique_name_for_function import make_unique_name_including_docstring_key, 
 
 
 class _PipelineMemospaceHandler(ty.Protocol):
-    def __call__(self, __callable_name: str, __runner_prefix: str) -> ty.Optional[str]: ...
+    def __call__(self, __callable_name: str, __runner_prefix: str) -> ty.Optional[str]:
+        ...
 
 
 _PIPELINE_MEMOSPACE_HANDLERS: ty.List[_PipelineMemospaceHandler] = list()

@@ -1,21 +1,3 @@
-### 3.9.20250929
-
-- `k8s`: During garbage collection of stale Uncertain Futures, don't iterate over them while also
-  potentially calling `.remove()` from time to time, because this will lead to
-  `Runtime Error:  OrderedDict mutated during iteration`.
-- `k8s`: Catch `mops` code exceptions within the `watch` event loop and log them without killing the
-  thread.
-
-### 3.9.20250908
-
-- Don't raise errors when serializing _relative_ Paths that are not an existing file. This will allow
-  relative Paths to be passed through _representing_ something (like an output directory) without
-  requiring the user to jump through a `str` hoop.
-
-### 3.9.20250902
-
-- Fixes release of leases/locks when a shim raises an Exception.
-
 ### 3.9.20250815
 
 - Adds more debugging info (mostly about the current thread) to lock writers. Hopefully this allows us to
