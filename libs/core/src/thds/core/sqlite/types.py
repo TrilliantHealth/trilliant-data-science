@@ -8,10 +8,12 @@ from thds.core.source import Source
 
 class DbAndTableP(ty.Protocol):
     @property  # read-only
-    def db_path(self) -> os.PathLike: ...
+    def db_path(self) -> os.PathLike:
+        ...
 
     @property  # read-only
-    def table_name(self) -> str: ...
+    def table_name(self) -> str:
+        ...
 
 
 class DbAndTable(ty.NamedTuple):
