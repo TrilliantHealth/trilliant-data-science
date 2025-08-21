@@ -1,7 +1,3 @@
-### 3.9.20250902
-
-- Fixes release of leases/locks when a shim raises an Exception.
-
 ### 3.9.20250815
 
 - Adds more debugging info (mostly about the current thread) to lock writers. Hopefully this allows us to
