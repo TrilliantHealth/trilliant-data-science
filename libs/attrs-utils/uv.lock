@@ -293,7 +293,7 @@ wheels = [
 
 [[package]]
 name = "thds-attrs-utils"
-version = "1.4"
+version = "1.5"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },

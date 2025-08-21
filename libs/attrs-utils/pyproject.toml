@@ -1,6 +1,6 @@
 [project]
 name = "thds.attrs-utils"
-version = "1.4"
+version = "1.5"
 # Patch version is a datetime determined upon release
 description = "Utilities for attrs record classes."
 readme = "README.md"

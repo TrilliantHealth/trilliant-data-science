@@ -7,6 +7,7 @@ from typing import Any, Callable, Sequence, Tuple, Type
 from cattr.converters import Converter, GenConverter
 
 from ..type_utils import is_literal_type, is_set_type, literal_base
+from . import errors
 
 T = ty.TypeVar("T")
 Struct = Callable[[Any, Type[T]], T]
@@ -78,7 +79,7 @@ def _structure_restricted_conversion(
 ) -> T:
     if type(value) in allowed_types:
         return parse(value)
-    raise TypeError(f"Refusing to structure value of type {type(value)} to type {_}")
+    raise errors.DisallowedConversionError(type(value), _)
 
 
 def structure_restricted_conversion(

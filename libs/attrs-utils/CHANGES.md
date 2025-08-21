@@ -1,3 +1,10 @@
+## 1.5
+
+- Adds a `cattrs.errors` submodule with custom exceptions and extensible utilities for pretty-printing
+  cattrs structuring errors.
+- Changes exception type of restricted type conversions from plain `TypeError` to a custom
+  `DisallowedConversionError` to allow for custom handling.
+
 ## 1.4
 
 - Requires `python>=3.9` now.

@@ -47,7 +47,7 @@ def test_newtype_base(newtype: Type, expected_base: Type):
 )
 def test_unwrap_optional(optional_type: Type, expected_base: Type):
     base = unwrap_optional(optional_type)
-    assert base is expected_base, (optional_type, base, expected_base)
+    assert base == expected_base, (optional_type, base, expected_base)
 
 
 @pytest.mark.parametrize(
