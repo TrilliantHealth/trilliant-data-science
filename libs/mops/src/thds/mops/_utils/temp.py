@@ -1,5 +1,4 @@
 """Utility to make returning files via their Paths less confusing in the application code."""
-
 import typing as ty
 from contextlib import contextmanager
 from pathlib import Path

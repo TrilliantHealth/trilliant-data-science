@@ -1,5 +1,4 @@
 """Functions for copying blobs across remote locations."""
-
 import datetime
 import random
 import time

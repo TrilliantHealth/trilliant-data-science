@@ -57,7 +57,7 @@ def test_nested():
         ),
     )
     quux = foobar_schema_cls().fields["quux"]
-    assert type(quux) is ma.fields.Nested
+    assert type(quux) == ma.fields.Nested
     quux_s = ty.cast(ma.Schema, quux.nested())  # type: ignore
     assert {"created_at", "data", "updated_at"} == set(quux_s.fields.keys())
     with pytest.raises(ma.validate.ValidationError):
