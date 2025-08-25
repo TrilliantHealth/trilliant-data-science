@@ -1,3 +1,8 @@
+### 4.1.20250825
+
+- `adls.copy.copy_file` checks if all hashes are equal to determine whether to copy src->dest when dest
+  already exists (and not just the MD5).
+
 ### 4.1.20250718
 
 - The global clients (file and blob container) will now be recreated even in forked processes, because it

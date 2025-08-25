@@ -1,4 +1,5 @@
 """Functions for copying blobs across remote locations."""
+
 import datetime
 import random
 import time
@@ -11,6 +12,7 @@ from thds.core import cache, log, parallel, thunks
 from .file_properties import exists, get_blob_properties, get_file_properties, is_directory
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client, get_global_blob_service_client
+from .hashes import extract_hashes_from_props
 from .sas_tokens import gen_blob_sas_token, get_user_delegation_key
 from .uri import UriIsh, parse_any
 
@@ -54,15 +56,13 @@ def _copy_file(
         dest.path
     )
 
-    def md5s_exist_and_are_equal() -> bool:
-        if (
-            src_md5 := src_blob_client.get_blob_properties().content_settings.content_md5
-        ) and src_md5 == dest_blob_client.get_blob_properties().content_settings.content_md5:
-            return True
-        return False
+    def hashes_exist_and_are_equal() -> bool:
+        src_blob_props = src_blob_client.get_blob_properties()
+        dest_blob_props = dest_blob_client.get_blob_properties()
+        return extract_hashes_from_props(src_blob_props) == extract_hashes_from_props(dest_blob_props)
 
     if dest_blob_client.exists():
-        if md5s_exist_and_are_equal():
+        if hashes_exist_and_are_equal():
             # no point in copying if the files are the same
             logger.info(
                 "%s already exists with the same md5 as the file at %s, no copy will occur", dest, src
