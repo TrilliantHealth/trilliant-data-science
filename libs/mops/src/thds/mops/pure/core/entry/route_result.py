@@ -19,11 +19,9 @@ class ResultChannel(ty.Protocol[T_contra]):
     A remote invocation can succeed with a result or fail with an exception.
     """
 
-    def return_value(self, __return_value: T_contra) -> None:
-        ...  # pragma: no cover
+    def return_value(self, __return_value: T_contra) -> None: ...  # pragma: no cover
 
-    def exception(self, __ex: Exception) -> None:
-        ...  # pragma: no cover
+    def exception(self, __ex: Exception) -> None: ...  # pragma: no cover
 
 
 logger = log.getLogger(__name__)

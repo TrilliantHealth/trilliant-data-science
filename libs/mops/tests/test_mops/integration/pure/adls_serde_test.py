@@ -1,4 +1,5 @@
 """Test that marking a specific object for shared serialization will work correctly"""
+
 import typing as ty
 
 from thds.mops.parallel import Thunk, parallel_yield_results
