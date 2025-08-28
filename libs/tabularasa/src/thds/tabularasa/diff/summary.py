@@ -140,12 +140,16 @@ def markdown_schema_diff_summary(
 ) -> ty.Iterator[str]:
     yield from _dropped_and_added(
         "Tables",
-        schema_diff.tables_dropped
-        if table_predicate is None
-        else {n: t for n, t in schema_diff.tables_dropped.items() if table_predicate(t)},
-        schema_diff.tables_added
-        if table_predicate is None
-        else {n: t for n, t in schema_diff.tables_dropped.items() if table_predicate(t)},
+        (
+            schema_diff.tables_dropped
+            if table_predicate is None
+            else {n: t for n, t in schema_diff.tables_dropped.items() if table_predicate(t)}
+        ),
+        (
+            schema_diff.tables_added
+            if table_predicate is None
+            else {n: t for n, t in schema_diff.tables_dropped.items() if table_predicate(t)}
+        ),
         heading_level,
     )
     heading = False

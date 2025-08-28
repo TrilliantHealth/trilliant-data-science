@@ -1,3 +1,7 @@
+### 0.11.3
+
+flake8 and black
+
 ### 0.11.2
 
 - upper bound on `pandera` version due to changes with `pandas` dependencies in that release

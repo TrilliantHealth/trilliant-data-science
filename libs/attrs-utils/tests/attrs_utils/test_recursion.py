@@ -1,5 +1,6 @@
 """Test structured recursion by implementing a JSON serializer and testing that the stdlib `json.loads`
 is an inverse."""
+
 import json
 import math
 from functools import partial

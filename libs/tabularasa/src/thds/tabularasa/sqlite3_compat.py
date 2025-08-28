@@ -13,6 +13,7 @@ of reference-data, and since that does not often happen on Mac
 laptops, this shim will allow us to defer doing extra work to get
 compiled pysqlite3 on Macs for the time being.
 """
+
 import os
 from logging import getLogger
 

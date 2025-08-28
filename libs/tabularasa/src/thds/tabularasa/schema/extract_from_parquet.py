@@ -4,6 +4,7 @@ You might want to use this to convert a Parquet file directly to
 SQLite without additional ceremony - use `tabularasa.to_sqlite` in
 conjunction with this.
 """
+
 import typing as ty
 from functools import partial
 from pathlib import Path

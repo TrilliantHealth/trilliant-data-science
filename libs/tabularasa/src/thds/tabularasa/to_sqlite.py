@@ -1,6 +1,7 @@
 """Helpers for taking an in-memory set of Tables and writing them to a
 SQLite database file without needing to go through a build process.
 """
+
 import os
 import typing as ty
 from pathlib import Path
@@ -47,9 +48,9 @@ def to_sqlite(sqlite_file_path: Path, *tables: Table, **data_paths_by_table_name
         "",
         table_predicate=lambda table: True,  # output all tables.
         data_path_overrides={
-            table.name: Path(table.doc)
-            if os.path.exists(table.doc)
-            else data_paths_by_table_name[table.name]
+            table.name: (
+                Path(table.doc) if os.path.exists(table.doc) else data_paths_by_table_name[table.name]
+            )
             for table in tables
         },
     )

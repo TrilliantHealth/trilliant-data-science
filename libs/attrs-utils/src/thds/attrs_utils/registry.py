@@ -11,12 +11,10 @@ _MISSING = object()
 
 class Registry(Dict[T, U]):
     @overload
-    def register(self, key: T) -> Callable[[U], U]:
-        ...
+    def register(self, key: T) -> Callable[[U], U]: ...
 
     @overload
-    def register(self, key: T, value: U) -> U:
-        ...
+    def register(self, key: T, value: U) -> U: ...
 
     def register(self, key: T, value=_MISSING):
         if value is _MISSING:

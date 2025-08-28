@@ -3,6 +3,7 @@
 The download will only occur once, and each thread will get its own
 SQLite connection, as is proper.
 """
+
 import typing as ty
 from pathlib import Path
 
