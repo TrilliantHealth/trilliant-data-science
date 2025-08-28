@@ -144,7 +144,7 @@ async def aenumerate(
 
 
 def iter_to_async(
-    sync_iter_factory: ty.Callable[[], ty.Iterable[T]],
+    sync_iter_factory: ty.Callable[[], ty.Iterable[T]]
 ) -> ty.Callable[[], ty.AsyncIterator[T]]:
     """Convert a synchronous iterable factory to an async iterator factory."""
 

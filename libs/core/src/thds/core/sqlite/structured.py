@@ -40,7 +40,8 @@ class UnknownColumns(ValueError):
 
 
 class _Table(ty.Protocol):
-    def __call__(self, ignore_mmap_size: bool = False) -> TableMeta: ...
+    def __call__(self, ignore_mmap_size: bool = False) -> TableMeta:
+        ...
 
 
 class StructTable(ty.Generic[T]):
@@ -100,7 +101,7 @@ class StructTable(ty.Generic[T]):
 
 
 def autometa_factory(
-    src: ty.Callable[[], DbPathAndTableName],
+    src: ty.Callable[[], DbPathAndTableName]
 ) -> ty.Callable[[ty.Optional[int]], ThreadLocalLazy[TableMeta]]:
     """Use this factory to defer the connection and other settings (e.g., mmap_size) within each thread"""
 

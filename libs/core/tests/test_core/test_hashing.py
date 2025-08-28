@@ -1,7 +1,6 @@
 """We're specifically testing that this library selects the 'correct'
 thing to hash when passes the very broad types that it accepts.
 """
-
 import hashlib
 from pathlib import Path
 
