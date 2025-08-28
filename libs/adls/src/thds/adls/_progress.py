@@ -53,8 +53,7 @@ def _blobs(n: list) -> str:
 
 
 class _Reporter(ty.Protocol):
-    def __call__(self, states: ty.List[ProgressState]):
-        ...
+    def __call__(self, states: ty.List[ProgressState]): ...
 
 
 class DumbReporter:
