@@ -112,14 +112,9 @@ def callback_events(
 ) -> None:
     """Suitable for use with a daemon thread."""
     for namespace, obj, event in event_yielder:
-        try:
-            should_exit = on_event(namespace, obj, event)
-            if should_exit:
-                break
-        except Exception:
-            logger.exception(
-                "Exception in k8s watch event callback [probably a bug in mops] - continuing..."
-            )
+        should_exit = on_event(namespace, obj, event)
+        if should_exit:
+            break
 
 
 def _default_get_name(obj: ty.Any) -> str:
