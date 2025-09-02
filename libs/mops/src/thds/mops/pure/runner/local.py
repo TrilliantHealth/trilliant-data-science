@@ -1,5 +1,4 @@
-"""Joins pickle functionality and Blob Store functionality to run functions remotely.
-"""
+"""Joins pickle functionality and Blob Store functionality to run functions remotely."""
 
 import threading
 import time
