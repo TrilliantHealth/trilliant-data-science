@@ -1,17 +1,3 @@
-## 1.46
-
-- adds attribute `.size` to `core.source.Source`.
-
-### 1.45.20250914
-
-- Adds comment about limitations of `yield_all` around yielding results before the input iterable is
-  exhausted. Also adds debug log to thunk invocation.
-
-### 1.45.20250908
-
-- Fix a few places where we were doing dynamic things with args, kwargs but not guarding against `func`
-  being a valid keyword argument for the underlying function.
-
 ### 1.45.20250815
 
 - Adds `thread_debug.py` which can be used to debug what thread you're in and what thread(s) might have

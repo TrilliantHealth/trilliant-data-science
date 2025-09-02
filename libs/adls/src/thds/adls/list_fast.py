@@ -31,7 +31,7 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[Blo
         # directly yield the blobs
         yield from yield_blob_meta(
             global_client.get_global_blob_container_client(fqn.sa, fqn.container),
-            fqn.path.rstrip("/") + "/",
+            fqn.path,
         )
         return
 

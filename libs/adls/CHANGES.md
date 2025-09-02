@@ -1,21 +1,3 @@
-## 4.3
-
-- Updates extension of `core.source`, allowing setting `Source.size` via `source.from_adls` and `Source`s
-  returned from `upload`.
-
-### 4.2.20250914
-
-Make `multilayer_yield_blob_meta` match directory path in base case.
-
-### 4.2.20250828
-
-- Add purple lab to `named_roots`
-
-### 4.2.20250825
-
-- `adls.copy.copy_file` checks if all hashes are equal to determine whether to copy src->dest when dest
-  already exists (and not just the MD5).
-
 ## 4.2
 
 - Add `list_fast` module with `multilayer_yield_blob_meta`, which can support (hopefully) several

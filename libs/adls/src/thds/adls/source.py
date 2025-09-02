@@ -30,9 +30,7 @@ def _adls_uri_source_download_handler(uri: str) -> ty.Optional[source.Downloader
 source.register_download_handler("thds.adls", _adls_uri_source_download_handler)
 
 
-def from_adls(
-    uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None, size: int = 0
-) -> source.Source:
+def from_adls(uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None) -> source.Source:
     """Flexible, public interface to creating Sources from any ADLS-like reference.
 
     Does NOT automatically fetch a checksumming hash from the ADLS URI if it's not
@@ -42,7 +40,7 @@ def from_adls(
     r_fqn = resolve_any(uri_or_fqn)
     if not r_fqn:
         raise ValueError(f"Could not resolve {uri_or_fqn} to an ADLS FQN")
-    return source.Source(str(r_fqn), hash, size)
+    return source.Source(str(r_fqn), hash)
 
 
 source.register_from_uri_handler(
@@ -57,15 +55,13 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
     """
     fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
     with blob_not_found_translation(fqn):
-        props = get_file_properties(fqn)
-        uri_hashes = hashes.extract_hashes_from_props(props)
+        uri_hashes = hashes.extract_hashes_from_props(get_file_properties(fqn))
         if not uri_hashes:
             raise ValueError(
                 f"ADLS file {fqn} must have a hash to use this function. "
                 "If you know the hash, use `from_adls` with the hash parameter."
             )
-        size = int(props.get("size")) or 0
-        return from_adls(fqn, next(iter(uri_hashes.values())), size)
+        return from_adls(fqn, next(iter(uri_hashes.values())))
 
 
 def with_md5b64(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:
