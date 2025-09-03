@@ -24,8 +24,7 @@ S = ty.TypeVar("S", SyncShim, FutureShim, Shim, covariant=True)
 
 
 class ShimBuilder(ty.Protocol, ty.Generic[S]):
-    def __call__(self, __f: ty.Callable, __args: Args, __kwargs: Kwargs) -> S:
-        ...  # pragma: no cover
+    def __call__(self, __f: ty.Callable, __args: Args, __kwargs: Kwargs) -> S: ...  # pragma: no cover
 
 
 SyncShimBuilder = ShimBuilder[SyncShim]
