@@ -4,6 +4,7 @@ configuring Schema load/dump behavior recursively.
 We have an additional layer of configuration for Schema _generation_,
 and that lives in _config.py.
 """
+
 import typing as ty
 
 SchemaMeta = ty.NewType("SchemaMeta", type)

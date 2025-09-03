@@ -32,8 +32,9 @@ def _is_schema(a: ty.Any):
 
 
 class NamedFieldsSchemaGenerator(Protocol):
-    def __call__(self, __attrs_class: type, **__fields: "NamedField") -> ty.Type[marshmallow.Schema]:
-        ...  # pragma: nocover
+    def __call__(
+        self, __attrs_class: type, **__fields: "NamedField"
+    ) -> ty.Type[marshmallow.Schema]: ...  # pragma: nocover
 
 
 class _NestedSchemaGenerator:
