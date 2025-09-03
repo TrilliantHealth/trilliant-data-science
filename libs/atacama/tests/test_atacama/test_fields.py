@@ -1,4 +1,5 @@
 """Test various field types that we support. Much thanks to `desert` for this mostly-unchanged code."""
+
 import typing as ty
 from enum import Enum
 
@@ -150,7 +151,7 @@ def test_new_types_are_unnested():
 
     moo = MooS().load(dict(my_int=4))
     assert moo.my_int == 4
-    assert type(moo.my_int) == int
+    assert type(moo.my_int) is int
 
 
 def test_new_types_are_recursively_handled():
@@ -165,4 +166,4 @@ def test_new_types_are_recursively_handled():
 
     goo = GooS().load(dict(my_fancy_float=42.42))
     assert goo.my_fancy_float == 42.42
-    assert type(goo.my_fancy_float) == float
+    assert type(goo.my_fancy_float) is float

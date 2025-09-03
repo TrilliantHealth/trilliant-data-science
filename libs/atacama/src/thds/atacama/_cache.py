@@ -1,4 +1,5 @@
 """A simple equality-based cache for schema generation."""
+
 import typing as ty
 from collections import defaultdict
 from functools import wraps
