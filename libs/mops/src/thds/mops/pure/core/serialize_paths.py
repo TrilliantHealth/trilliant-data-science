@@ -87,19 +87,9 @@ def _serialize_file_path_as_upload(
     once: once.Once, path_keyer: _ProcessLockingPathContentAddresser, stream: PathStream, local_src: Path
 ) -> ty.Optional[Downloader]:
     if not local_src.exists():
-        if not local_src.is_absolute():
-            return None  # relative paths that don't exist will be serialized as plain relative paths.
-
-        raise NotAFileError(
-            f"You asked mops to upload the absolute Path {local_src}, but it does not exist."
-        )
-
+        raise NotAFileError(f"You asked mops to upload the path {local_src}, but it does not exist.")
     if not local_src.is_file():
-        if not local_src.is_absolute():
-            return None  # relative paths that aren't files will be serialized as plain relative paths.
-        raise NotAFileError(
-            f"You asked mops to upload the absolute Path {local_src}, but it is not a file."
-        )
+        raise NotAFileError(f"You asked mops to upload the Path {local_src}, but it is not a file.")
 
     remote_root = path_keyer(local_src)
     # I am creating a root 'directory' so that we can put debug info
