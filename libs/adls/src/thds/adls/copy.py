@@ -1,5 +1,6 @@
 """Functions for copying blobs across remote locations."""
 
+import concurrent.futures
 import datetime
 import random
 import time
@@ -178,6 +179,8 @@ def copy_files(
     # would be cool to do this async, but using threads for quicker dev
     return list(
         parallel.yield_results(
-            [thunks.thunking(copy_wrapper)(src, dest) for src, dest in src_dest_fqn_pairs]
+            [thunks.thunking(copy_wrapper)(src, dest) for src, dest in src_dest_fqn_pairs],
+            executor_cm=concurrent.futures.ThreadPoolExecutor(max_workers=30),
+            # max_workers=30 prevents hitting system thread count limits (speaking from experience)
         )
     )
