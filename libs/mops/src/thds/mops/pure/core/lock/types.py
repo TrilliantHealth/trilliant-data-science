@@ -29,10 +29,8 @@ class LockAcquired(ty.Protocol):
 
     writer_id: str
 
-    def maintain(self) -> None:
-        ...  # pragma: no cover
+    def maintain(self) -> None: ...  # pragma: no cover
 
-    def release(self) -> None:
-        ...  # pragma: no cover
+    def release(self) -> None: ...  # pragma: no cover
 
     expire_s: float

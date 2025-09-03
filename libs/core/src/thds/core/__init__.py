@@ -30,6 +30,7 @@ from . import (  # noqa: F401
     parallel,
     prof,
     progress,
+    project_root,
     protocols,
     scope,
     source,
