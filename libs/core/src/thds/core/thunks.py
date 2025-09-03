@@ -19,7 +19,7 @@ class Thunk(ty.Generic[R]):
     args: P.args
     kwargs: P.kwargs
 
-    def __init__(self, func: ty.Callable[P, R], /, *args: P.args, **kwargs: P.kwargs):
+    def __init__(self, func: ty.Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs

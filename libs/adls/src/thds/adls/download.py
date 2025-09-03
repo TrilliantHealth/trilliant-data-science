@@ -161,7 +161,7 @@ IoResponse = ty.Union[FileProperties, None]
 def _assert_fp(fp: ty.Optional[FileProperties], fqn: AdlsFqn) -> None:
     assert fp, f"FileProperties for {fqn} should not be None."
     assert fp.name, f"FileProperties for {fqn} should have a name."
-    assert fp.name.strip("/") == fqn.path.strip("/"), (fp, fqn)
+    assert fp.name == fqn.path, (fp, fqn)
 
 
 _dl_scope = scope.Scope("adls.download")
