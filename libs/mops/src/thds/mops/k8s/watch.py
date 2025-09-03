@@ -36,8 +36,7 @@ class V1List(ty.Protocol[T]):
 
 
 class K8sList(ty.Protocol[T]):
-    def __call__(self, *args: ty.Any, namespace: str, **kwargs: ty.Any) -> V1List[T]:
-        ...
+    def __call__(self, *args: ty.Any, namespace: str, **kwargs: ty.Any) -> V1List[T]: ...
 
 
 # If this does not return a K8sList API method, the loop will exit

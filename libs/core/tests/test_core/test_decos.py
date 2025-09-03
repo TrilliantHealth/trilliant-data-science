@@ -29,7 +29,10 @@ def test_decos_composes_top_to_bottom(capsys):
 
         return wrapped
 
-    assert 2 == decos.compose(bardeco, bazdeco,)(
+    assert 2 == decos.compose(
+        bardeco,
+        bazdeco,
+    )(
         foo
     )(1)
 
