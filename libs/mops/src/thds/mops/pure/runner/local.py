@@ -193,34 +193,43 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # If something about our invocation fails,
         # we fail just as we would have previously, without any attempt to go
         # 'back' to waiting for someone else to compute the result.
-        lock.maintain_to_release(lock_owned)
-        # we don't actually need the release_lock here, because it will get
-        # 'recreated' in the PostShimResultGetter below, which is also where it gets called
+        release_lock_in_current_process = lock.maintain_to_release(lock_owned)
 
-        future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
+        try:
+            with _BEFORE_INVOCATION_SEMAPHORE:
+                log_invocation(f"Invoking {memo_uri}")
+                upload_invocation_and_deps()
 
-        with _BEFORE_INVOCATION_SEMAPHORE:
-            log_invocation(f"Invoking {memo_uri}")
-            upload_invocation_and_deps()
-
-        # can't hold the semaphore while we block on the shim, though.
-        shim = shim_builder(func, args_, kwargs_)
-        future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
-            (
-                memo_uri,
-                *metadata.format_invocation_cli_args(
-                    metadata.InvocationMetadata.new(pipeline_id, invoked_at, lock_owned.writer_id)
-                ),
+            # can't hold the semaphore while we block on the shim, though.
+            shim = shim_builder(func, args_, kwargs_)
+            future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
+                (
+                    memo_uri,
+                    *metadata.format_invocation_cli_args(
+                        metadata.InvocationMetadata.new(pipeline_id, invoked_at, lock_owned.writer_id)
+                    ),
+                )
             )
-        )
-        if hasattr(future_or_shim_result, "add_done_callback"):
-            # if the shim returns a Future, we wrap it.
-            logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
-            return futures.make_lazy(lock_maintaining_future)(
-                lock_owned, future_result_getter, future_or_shim_result
-            )
-        else:  # it's a synchronous shim - just process the result directly.
-            future_result_getter.release_lock = lock.maintain_to_release(lock_owned)
-            return futures.resolved(future_result_getter(future_or_shim_result))
+
+            future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
+            if hasattr(future_or_shim_result, "add_done_callback"):
+                # if the shim returns a Future, we wrap it.
+                logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
+                return futures.make_lazy(lock_maintaining_future)(
+                    lock_owned, future_result_getter, future_or_shim_result
+                )
+
+            else:  # it's a synchronous shim - just process the result directly.
+                future_result_getter.release_lock = release_lock_in_current_process
+                return futures.resolved(future_result_getter(future_or_shim_result))
+
+        except Exception:
+            try:
+                release_lock_in_current_process()
+            except Exception:
+                logger.exception(
+                    f"Failed to release lock {lock_owned.writer_id} after failed invocation."
+                )
+            raise
 
     return create_invocation_and_result_future
