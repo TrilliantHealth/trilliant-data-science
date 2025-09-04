@@ -1,4 +1,4 @@
-### 4.1.20250825
+### 4.2.20250825
 
 - `adls.copy.copy_file` checks if all hashes are equal to determine whether to copy src->dest when dest
   already exists (and not just the MD5).
