@@ -30,14 +30,14 @@ def sanitize_str(name: str) -> str:
 
 def construct_job_name(user_prefix: str, job_num: str) -> str:
     # we want some consistency here, but also some randomness in case the prefixes don't exist or aren't unique.
-    mops_name_part = "-".join([sanitize_str(job_num), str(os.getpid()), str(uuid.uuid4())[:8]])
+    mops_name_part = "-".join([sanitize_str(job_num), str(uuid.uuid4())[:8]])
     if len(mops_name_part) > 63:
-        # this should be _impossible_, because having a job num longer than even 20 digits would be an impossibly large
+        # this should be _unlikely_, because having a job num longer than even 20 digits would be an impossibly large
         # number of jobs. but just in case, we'll truncate it to the last 63 characters.
-        mops_name_part = mops_name_part[-63:]  # keep the most random part, to avoid collisions
+        mops_name_part = mops_name_part[-63:]  # prefer the most random part, to avoid collisions
 
     user_prefix = sanitize_str(user_prefix)
-    if user_prefix:
+    if user_prefix and len(mops_name_part) < 62:
         name = f"{user_prefix[:63 - 1 - len(mops_name_part)]}-{mops_name_part}"
     else:
         name = mops_name_part
@@ -90,7 +90,9 @@ def launch(
         raise ValueError("You cannot specify both full_name and name_prefix; use one or the other.")
 
     if not full_name:
-        name = construct_job_name(name_prefix, counts.to_name(counts.inc(counts.LAUNCH_COUNT)))
+        name = construct_job_name(
+            "-".join([name_prefix, str(os.getpid())]), counts.to_name(counts.inc(counts.LAUNCH_COUNT))
+        )
     else:
         name = full_name
 
