@@ -36,8 +36,9 @@ class MockTime:
 @pytest.fixture(scope="function")
 def mock_time():
     mock = MockTime()
-    with unittest.mock.patch("time.sleep", mock.sleep), unittest.mock.patch(
-        "time.perf_counter", mock.perf_counter
+    with (
+        unittest.mock.patch("time.sleep", mock.sleep),
+        unittest.mock.patch("time.perf_counter", mock.perf_counter),
     ):
         yield
 
