@@ -1,5 +1,4 @@
-"""Some utilities for running things in parallel - potentially large numbers of things.
-"""
+"""Some utilities for running things in parallel - potentially large numbers of things."""
 
 import concurrent.futures
 import itertools
@@ -22,11 +21,9 @@ logger = log.getLogger(__name__)
 
 
 class IterableWithLen(ty.Protocol[T_co]):
-    def __iter__(self) -> ty.Iterator[T_co]:
-        ...  # pragma: no cover
+    def __iter__(self) -> ty.Iterator[T_co]: ...  # pragma: no cover
 
-    def __len__(self) -> int:
-        ...  # pragma: no cover
+    def __len__(self) -> int: ...  # pragma: no cover
 
 
 class IteratorWithLen(ty.Generic[R]):
