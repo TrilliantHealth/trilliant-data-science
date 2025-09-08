@@ -33,8 +33,13 @@ def makes_some_metadata(foo: str) -> int:
 
 def test_metadata_is_available_in_result(caplog):
     with caplog.at_level(logging.INFO):
-        with metadata.INVOKER_CODE_VERSION.set_local("foobarVersion",), metadata.INVOKED_BY.set_local(
-            "testing-user",
+        with (
+            metadata.INVOKER_CODE_VERSION.set_local(
+                "foobarVersion",
+            ),
+            metadata.INVOKED_BY.set_local(
+                "testing-user",
+            ),
         ):
             # run it three times so we have some fun stuff to look at with mops-inspect.
             assert 3 == makes_some_metadata("3")
