@@ -1,4 +1,5 @@
 """Definitions of basic keyfuncs."""
+
 import inspect
 import typing as ty
 
@@ -24,8 +25,7 @@ class Keyfunc(ty.Protocol):
 
     def __call__(
         self, c: ty.Callable, __args: Args, __kwargs: Kwargs
-    ) -> ty.Tuple[ty.Callable, Args, Kwargs]:
-        ...  # pragma: nocover
+    ) -> ty.Tuple[ty.Callable, Args, Kwargs]: ...  # pragma: nocover
 
 
 ArgsOnlyKeyfunc = ty.Callable[..., ty.Tuple[Args, Kwargs]]
