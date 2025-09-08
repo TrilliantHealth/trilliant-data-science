@@ -65,11 +65,9 @@ class _ProcessLockingPathContentAddresser:
 
 
 class PathStream(ty.Protocol):
-    def local_to_remote(self, __path: Path, __key: str) -> None:
-        ...  # pragma: no cover
+    def local_to_remote(self, __path: Path, __key: str) -> None: ...  # pragma: no cover
 
-    def get_downloader(self, __key: str) -> Downloader:
-        ...  # pragma: no cover
+    def get_downloader(self, __key: str) -> Downloader: ...  # pragma: no cover
 
 
 class NotAFileError(ValueError):
