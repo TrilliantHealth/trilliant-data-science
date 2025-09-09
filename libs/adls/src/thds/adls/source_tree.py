@@ -8,6 +8,8 @@ from thds.core.source.tree import SourceTree
 
 from . import fqn, global_client, hashes, source, uri
 
+# TODO refactor BlobMeta into its own module.
+
 
 @dataclass
 class BlobMeta:

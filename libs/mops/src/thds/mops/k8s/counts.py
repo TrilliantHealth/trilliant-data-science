@@ -5,8 +5,7 @@ T = ty.TypeVar("T")
 
 
 class MpValue(ty.Protocol[T]):
-    def get_lock(self) -> ty.Any:
-        ...
+    def get_lock(self) -> ty.Any: ...
 
     value: T
 
