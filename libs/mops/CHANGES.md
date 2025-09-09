@@ -1,3 +1,9 @@
+### 3.9.20250908
+
+- Don't raise errors when serializing _relative_ Paths that are not an existing file. This will allow
+  relative Paths to be passed through _representing_ something (like an output directory) without
+  requiring the user to jump through a `str` hoop.
+
 ### 3.9.20250902
 
 - Fixes release of leases/locks when a shim raises an Exception.
