@@ -1,4 +1,5 @@
 """Translate ADLS URIs to ABFSS URIs (for use with Spark/Hadoop)."""
+
 from .fqn import AdlsFqn
 
 ABFSS_SCHEME = "abfss://"

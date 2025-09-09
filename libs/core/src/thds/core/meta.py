@@ -58,18 +58,15 @@ def format_name(name: str, format: NameFormatType = "git") -> str:
 
 
 @ty.overload
-def get_timestamp() -> str:
-    ...  # pragma: no cover
+def get_timestamp() -> str: ...  # pragma: no cover
 
 
 @ty.overload
-def get_timestamp(as_datetime: ty.Literal[True]) -> datetime:
-    ...  # pragma: no cover
+def get_timestamp(as_datetime: ty.Literal[True]) -> datetime: ...  # pragma: no cover
 
 
 @ty.overload
-def get_timestamp(as_datetime: ty.Literal[False]) -> str:
-    ...  # pragma: no cover
+def get_timestamp(as_datetime: ty.Literal[False]) -> str: ...  # pragma: no cover
 
 
 def get_timestamp(as_datetime: bool = False):
@@ -109,13 +106,11 @@ def extract_timestamp(version: str) -> str:
 
 
 @ty.overload
-def extract_timestamp(version: str, as_datetime: ty.Literal[True]) -> datetime:
-    ...  # pragma: no cover
+def extract_timestamp(version: str, as_datetime: ty.Literal[True]) -> datetime: ...  # pragma: no cover
 
 
 @ty.overload
-def extract_timestamp(version: str, as_datetime: ty.Literal[False]) -> str:
-    ...  # pragma: no cover
+def extract_timestamp(version: str, as_datetime: ty.Literal[False]) -> str: ...  # pragma: no cover
 
 
 def extract_timestamp(version: str, as_datetime: bool = False):
