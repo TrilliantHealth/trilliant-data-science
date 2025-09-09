@@ -59,7 +59,7 @@ def get_caller_info(skip: int = 2) -> CallerInfo:
 
 
 def bind_arguments(
-    func: ty.Callable, *args: ty.Sequence, **kwargs: ty.Mapping[str, ty.Any]
+    func: ty.Callable, /, *args: ty.Sequence, **kwargs: ty.Mapping[str, ty.Any]
 ) -> inspect.BoundArguments:
     bound = inspect.signature(func).bind(*args, **kwargs)
     bound.apply_defaults()
