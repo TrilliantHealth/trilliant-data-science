@@ -1,3 +1,7 @@
+### 4.2.20250828
+
+- Add purple lab to `named_roots`
+
 ## 4.2
 
 - Add `list_fast` module with `multilayer_yield_blob_meta`, which can support (hopefully) several
