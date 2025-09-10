@@ -5,7 +5,7 @@ import pytest
 from azure.storage.blob._models import BlobProperties
 from pytest_mock import MockFixture
 
-from thds.adls import ADLSFileSystem, copy, file_properties, fqn
+from thds.adls import ADLSFileSystem, copy, file_properties, fqn, hashes
 
 
 @pytest.fixture
@@ -46,6 +46,8 @@ def test_unit_wait_for_copy_fails(
 _FILE_TO_COPY_PATH = "test/read-only/DONT_DELETE_THESE_FILES.txt"
 _FILE_TO_COPY_OVERWRITE_PATH = "test/read-only/integration_nppes.zip"
 
+_FILE_TO_COPY_WITH_XXH3_128_IN_METADATA = "test/read-only/this-file-has-a-xxh3-128-in-its-metadata.txt"
+
 
 @pytest.fixture
 def copy_file_setup(
@@ -75,6 +77,26 @@ def test_integration_copy_file(copy_file_setup: copy.CopyInfo) -> None:
     assert copy_info.copy_occurred
     assert dest_blob_props.copy.status == "success"
     assert dest_blob_props.content_settings.content_md5 == src_blob_props.content_settings.content_md5
+
+
+def test_integration_copy_file_with_xxhash(
+    test_remote_root, tmp_remote_root, random_test_file_path
+) -> None:
+    src = test_remote_root / _FILE_TO_COPY_WITH_XXH3_128_IN_METADATA
+    dest = tmp_remote_root / (random_test_file_path + "-xxh3_128")
+
+    src_hashes = hashes.extract_hashes_from_props(file_properties.get_blob_properties(src))
+    assert "xxh3_128" in src_hashes
+
+    first_copy = copy.copy_file(src, dest)
+    assert first_copy.copy_occurred
+
+    dest_hashes = hashes.extract_hashes_from_props(file_properties.get_blob_properties(dest))
+    assert "xxh3_128" in dest_hashes
+    assert dest_hashes["xxh3_128"] == src_hashes["xxh3_128"]
+
+    second_copy = copy.copy_file(src, dest)
+    assert not second_copy.copy_occurred
 
 
 def test_integration_copy_file_same_src_dest(
