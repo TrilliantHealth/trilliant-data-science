@@ -8,12 +8,15 @@ from thds.core.source.tree import SourceTree
 
 from . import fqn, global_client, hashes, source, uri
 
+# TODO refactor BlobMeta into its own module.
+
 
 @dataclass
 class BlobMeta:
     path: str
     size: int
     hash: ty.Optional[hashing.Hash]
+    metadata: dict[str, str]
 
 
 def to_blob_meta(blob_props: BlobProperties) -> BlobMeta:
@@ -21,7 +24,14 @@ def to_blob_meta(blob_props: BlobProperties) -> BlobMeta:
         blob_props.name,
         blob_props.size,
         next(iter(hashes.extract_hashes_from_props(blob_props).values()), None),
+        blob_props.metadata or {},
     )
+
+
+def yield_blob_meta(container_client: ContainerClient, root_dir: str) -> ty.Iterator[BlobMeta]:
+    for blob_props in container_client.list_blobs(name_starts_with=root_dir, include=["metadata"]):
+        # `list_blobs` does not include metadata by default, so we need to explicitly specify including it
+        yield to_blob_meta(blob_props)
 
 
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.containerclient?view=azure-python#azure-storage-blob-containerclient-list-blobs
@@ -32,12 +42,11 @@ def list_blob_meta(
 ) -> ty.List[BlobMeta]:
     """Gets the path (relative to the SA/container root), size, and _a_ hash (if available) of all blobs in a directory."""
     return [
-        to_blob_meta(blob_props)
-        for blob_props in container_client.list_blobs(name_starts_with=root_dir, include=["metadata"])
-        # `list_blobs` does not include metadata by default, so we need to explicitly specify including it
-        if blob_props.size > 0
+        blob_meta
+        for blob_meta in yield_blob_meta(container_client, root_dir)
+        if blob_meta.size > 0
         # container client lists directories as blobs with size 0
-        and blob_props.name.endswith(match_suffix)
+        and blob_meta.path.endswith(match_suffix)
     ]
 
 
