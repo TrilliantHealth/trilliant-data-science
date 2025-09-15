@@ -85,6 +85,10 @@ def yield_all(
     same size as your iterable. If you want to throttle the number of
     parallel tasks, you should provide your own Executor - and for
     most mops purposes it should be a ThreadPoolExecutor.
+
+    Currently this function does not yield any results until the input iterable is exhausted,
+    even though some of the thunks may have been submitted and the workers have returned a result
+    to the local process.
     """
     files.bump_limits()
     len_or_none = try_len(thunks)
@@ -107,6 +111,9 @@ def yield_all(
     with executor_cm as executor:
         keys_onto_futures = {key: executor.submit(thunk) for key, thunk in thunks}
         future_ids_onto_keys = {id(future): key for key, future in keys_onto_futures.items()}
+        # While concurrent.futures.as_completed accepts an iterable as input, it
+        # does not yield any completed futures until the input iterable is
+        # exhausted.
         for i, future in enumerate(concurrent.futures.as_completed(keys_onto_futures.values()), start=1):
             thunk_key = future_ids_onto_keys[id(future)]
             try:
