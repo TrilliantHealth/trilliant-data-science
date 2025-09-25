@@ -441,19 +441,6 @@ This generates docs in ReStructuredText (rst) format in a directory structure sp
 [schema file](#the-schema-file)'s `build_options` section. As such, these docs are valid as input to the
 `sphinx` documentation build tool.
 
-## Validation and CI Integration
-
-### Validation Workflow
-
-Tabularasa performs validation at different stages:
-
-1. **Build Time (datagen)**: No validation by default. The build process focuses on transformation.
-1. **Read Time (optional)**: Pass a validation flag to the loader to validate against the schema.
-1. **CI/Test Time**: Primary key uniqueness and other constraints are validated in the test suite.
-
-If you push a parquet artifact with non-unique primary keys or constraint violations, CI will catch it
-with a test failure.
-
 ## Memory usage
 
 Your reference data may be fairly large, and in multiprocessing contexts it can be useful to share the
