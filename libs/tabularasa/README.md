@@ -454,16 +454,6 @@ Tabularasa performs validation at different stages:
 If you push a parquet artifact with non-unique primary keys or constraint violations, CI will catch it
 with a test failure.
 
-### CI Requirements
-
-For CI to work properly:
-
-- All input files must be accessible (either in version control for `local_data` or in ADLS for
-  `remote_data`)
-- Use URLs in dependencies if files are too large for version control
-- Ensure `tabularasa push` runs in your build pipeline to make artifacts available
-- Tests automatically validate all constraints defined in schema.yaml
-
 ## Memory usage
 
 Your reference data may be fairly large, and in multiprocessing contexts it can be useful to share the
