@@ -1,0 +1,74 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: false
+
+tables:
+  strings:
+    # string types
+    columns:
+      - name: uppercase
+        source_name: UPPERCASE
+        type:
+          custom: short_upper
+        nullable: true
+        doc: only short uppercase strings
+      - name: enum
+        source_name: 'e n u m'
+        type:
+          custom: string_enum
+        nullable: true
+        doc: only foo bar and baz
+      - name: lowercase
+        type:
+          custom: lower_no_punct
+        nullable: false
+        doc: only lowercase strings
+      - name: empty
+        type:
+          custom: empty
+        doc: only the empty string
+    primary_key: ['lowercase']
+    constraints:
+      - unique: ['uppercase']
+      - unique: ['uppercase', 'lowercase']
+    indexes:
+      - ['lowercase', 'enum']
+    doc: table with string columns
+    dependencies:
+      filename: tests/data/strings.csv
+types:
+  short_upper:
+    type: str
+    constraints:
+      - case: upper
+      - len_le: 5
+  lower_no_punct:
+    type: str
+    constraints:
+      - matches: '[\w\s]*'
+        fullmatch: true
+        case_sensitive: true
+  string_enum:
+    type: str
+    constraints:
+      - case: lower
+      - enum: [foo, bar, baz]
+        ordered: true
+      - len_ge: 3
+      - len_lt: 4  # only length 3 allowed
+  empty:
+    type: str
+    constraints:
+      - len_le: 0

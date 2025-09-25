@@ -1,0 +1,34 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  bools:
+    # bools
+    columns:
+      - name: boolean
+        type: bool
+        source_name: true-or-false
+        nullable: false
+        doc: just true or false
+      - name: trinary
+        type: bool
+        source_name: three-valued
+        doc: just true, false, or null
+        nullable: true
+    doc: table with bool columns
+    dependencies:
+      filename: tests/data/bools.csv
+      delimiter: '|'

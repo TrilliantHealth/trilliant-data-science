@@ -1,0 +1,32 @@
+import attr
+
+import thds.tabularasa.loaders.util
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Sequences:
+    """well-known integer sequences
+
+    :param n: natural number
+    :param fibonacci: fibonacci number
+    :param square: square number
+    :param triangular: triangular number
+    :param is_fibonacci: indicates whether n is a fibonacci number
+    """
+
+    n: int
+    fibonacci: int
+    square: int
+    triangular: int
+    is_fibonacci: bool
+
+
+load_sequences = thds.tabularasa.loaders.util.AttrsParquetLoader[Sequences](
+    table_name="sequences",
+    type_=Sequences,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

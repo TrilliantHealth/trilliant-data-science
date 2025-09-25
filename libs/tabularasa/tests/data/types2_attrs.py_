@@ -1,0 +1,43 @@
+import typing
+
+import attr
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Table1:
+    """just a table
+
+    :param foo: just an int
+    """
+
+    foo: typing.Literal[1, 2, 3]
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Table2:
+    """just another table
+
+    :param bar: just a mapping
+    """
+    bar: typing.Dict[typing.Literal["4", "5", "6"], str]
+
+
+# load_table1 = thds.tabularasa.loaders.util.AttrsParquetLoader[Table1](
+#     table_name='table1',
+#     type_=Table1,
+#     package='tests',
+#     data_dir='data/derived/',
+#     pyarrow_schema=None,
+#     md5=None,
+#     blob_store=None,
+# )
+#
+# load_table2 = thds.tabularasa.loaders.util.AttrsParquetLoader[Table2](
+#     table_name='table2',
+#     type_=Table2,
+#     package='tests',
+#     data_dir='data/derived/',
+#     pyarrow_schema=None,
+#     md5=None,
+#     blob_store=None,
+# )

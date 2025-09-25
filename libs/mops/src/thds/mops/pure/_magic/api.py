@@ -50,11 +50,6 @@ class _MagicApi:
         pipeline_id: str = "",
         calls: ty.Collection[ty.Callable] = tuple(),
     ) -> ty.Callable[[ty.Callable[P, R]], sauce.Magic[P, R]]:
-        """This is the main pure.magic() decorator.  It is designed to be applied directly
-        at the site of function definition, i.e. on the `def`.  We dynamically capture
-        the fully qualified name of the function being decorated and use that to
-        look up the appropriate 'magic' configuration at the time of each call to the function.
-        """
         return sauce.make_magic(_get_config(), shim_or_builder, blob_root, pipeline_id, calls)
 
     @staticmethod
@@ -63,29 +58,10 @@ class _MagicApi:
         *,
         blob_root: uris.UriResolvable = "",
         pipeline_id: str = "",
-        config_path: str = "",
     ) -> ty.Callable[[F], F]:  # cleaner type for certain use cases
-        """This alternative API is designed for more dynamic use cases - rather than
-        decorating a function def directly, you can use this to create a more generic
-        decorator that can be applied within other code (not at module-level).
-
-        However, you must never apply pure.magic.deco to the same function from multiple
-        places, as this means that you have multiple different uses sharing the same
-        configuration path, which will lead to subtle bugs.
-
-        We attempt to detect this and raise an error if it happens. If it does, you should
-        provide an explicit unique config_path for each usage.
-        """
         return ty.cast(
             ty.Callable[[F], F],
-            sauce.make_magic(
-                _get_config(),
-                shim_or_builder,
-                blob_root=blob_root,
-                pipeline_id=pipeline_id,
-                calls=tuple(),
-                config_path=config_path,
-            ),
+            _MagicApi.__call__(shim_or_builder, blob_root=blob_root, pipeline_id=pipeline_id),
         )
 
     @staticmethod
@@ -145,10 +121,6 @@ class _MagicApi:
         m_config.shim_bld.load_config(all_config)
         m_config.blob_root.load_config(all_config)
         m_config.pipeline_id.load_config(all_config)
-
-    @staticmethod
-    def config_path(func: ty.Callable) -> str:
-        return sauce.make_magic_config_path(func)
 
 
 magic: ty.Final = _MagicApi()

@@ -1,0 +1,6 @@
+CREATE TABLE ints(
+    col1 INT64 NOT NULL,
+    col2 INT32,
+    col3 UINT16 NOT NULL,
+    col4 UINT8 NOT NULL
+);

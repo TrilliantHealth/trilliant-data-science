@@ -1,0 +1,35 @@
+import datetime
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+ShortUpper = typing.NewType("ShortUpper", str)
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Arrays:
+    """table with array columns
+
+    :param pk: primary key
+    :param int_array: array of ints
+    :param nested_string_array: array of array of strings
+    :param nested_date_array: array of array of dates
+    """
+
+    pk: int
+    int_array: typing.Optional[typing.List[int]]
+    nested_string_array: typing.Optional[typing.List[typing.List[ShortUpper]]]
+    nested_date_array: typing.List[typing.List[datetime.date]]
+
+
+load_arrays = thds.tabularasa.loaders.util.AttrsParquetLoader[Arrays](
+    table_name="arrays",
+    type_=Arrays,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

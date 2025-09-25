@@ -1,0 +1,56 @@
+import datetime
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+ShortUpper = typing.NewType("ShortUpper", str)
+SmallInt = typing.NewType("SmallInt", int)
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Mappings:
+    """table with mapping columns
+
+    :param pk: primary key
+    :param string_to_int_mapping: mapping of string to int
+    :param int_to_string_mapping: mapping of int to string
+    """
+
+    pk: int
+    string_to_int_mapping: typing.Optional[typing.Dict[str, int]]
+    int_to_string_mapping: typing.Optional[typing.Dict[SmallInt, ShortUpper]]
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class NestedMappings:
+    """table with nested mapping columns
+
+    :param string_to_int_array: mapping of string to array of int
+    :param date_to_datetime_array: mapping of date to array of datetime
+    """
+
+    string_to_int_array: typing.Dict[str, typing.List[int]]
+    date_to_datetime_array: typing.Optional[typing.Dict[datetime.date, typing.List[datetime.datetime]]]
+
+
+load_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader[Mappings](
+    table_name="mappings",
+    type_=Mappings,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)
+
+load_nested_mappings = thds.tabularasa.loaders.util.AttrsParquetLoader[NestedMappings](
+    table_name="nested_mappings",
+    type_=NestedMappings,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

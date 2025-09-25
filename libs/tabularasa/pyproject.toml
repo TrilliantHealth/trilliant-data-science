@@ -1,0 +1,129 @@
+[project]
+name = "thds.tabularasa"
+version = "0.11.3"
+description = "Trilliant Health reference data build system."
+readme = "README.md"
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.10"
+dependencies = [
+  "attrs>=22.2",
+  "cattrs>=22.2",
+  "networkx>=3.0",
+  "numpy",
+  "packaging",
+  "pandas>=1.5",
+  "pandera>=0.20,<0.24",  # pandera moves to pandera.pandas in 0.24
+  "pydantic>=1.10.9,<2.0",
+  # V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin,
+  # see here: https://github.com/python/mypy/issues/15485.
+  "pyarrow>=10.0",
+  "pyyaml>=6.0.1",
+  "setuptools>=66.1.1",
+  "thds-adls",
+  "thds-core",
+  "typing-extensions",
+]
+
+[project.optional-dependencies]
+autoformat = [
+  "black",
+  "isort",
+]
+cli = [
+  "bourbaki.application>=0.10.12",
+  "ruamel.yaml",
+  "tabulate",
+  "typing-inspect",
+  # `typing-inspect` has issues with Python>=3.9 prior to these versions.
+]
+# Support for CLI operations - code and data generation.
+viz = ["pygraphviz"]
+# Support for visualizing computational/dependency DAGs.
+
+[project.scripts]
+tabularasa = "thds.tabularasa.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+[dependency-groups]
+dev = [
+  # type checks
+  "mypy~=1.11.0",
+  "mypy-extensions~=1.0",
+  "pandas-stubs",
+  "types-pyyaml",
+  "types-setuptools",
+  "types-tabulate",
+  # tests
+  "pytest~=7.2",
+  "pytest-cov~=4.0",
+  # ipython
+  "ipykernel",
+  "ipython",
+  "jupyter",
+  # docs
+  "sphinx",
+  "sphinx-autodoc-typehints",
+  "sphinx-rtd-theme",
+  # data build
+  # CLI/code generation ("cli" extra)
+  "bourbaki.application>=0.10.12",
+  "black",
+  "isort",
+  "ruamel.yaml",
+  "tabulate",
+  "typing-inspect"
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-adls = { path = "../../libs/adls", editable = true }
+thds-core = { path = "../../libs/core", editable = true }
+
+[tool.mono]
+omit_extras = ["viz"]
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.tabularasa"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    build/
+    | dist/
+    | \S+\.egg-info/
+)'''
+check_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+  "azure",
+  "bourbaki.*",
+  "google",
+  "networkx",
+  "pyarrow.*",
+  "pygraphviz",
+  "pysqlite3",
+  "ruamel.*",
+  "typing_inspect",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-m", "not integration"]
+markers = "integration"

@@ -1,0 +1,28 @@
+import typing
+
+import attr
+
+ShortUpper = typing.NewType("ShortUpper", str)
+SmallInt = typing.NewType("SmallInt", int)
+StringEnum = typing.Literal['foo', 'bar', 'baz']
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Table:
+    """just a table
+
+    :param foo: just an int
+    """
+
+    foo: int
+
+
+# load_table = thds.tabularasa.loaders.util.AttrsParquetLoader[Table](
+#     table_name='table',
+#     type_=Table,
+#     package='tests',
+#     data_dir='data/derived/',
+#     pyarrow_schema=None,
+#     md5=None,
+#     blob_store=None,
+# )

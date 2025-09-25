@@ -1,0 +1,37 @@
+import numpy as np
+import pandas as pd
+import pandera as pa
+
+import thds.tabularasa.compat  # noqa: F401
+import thds.tabularasa.loaders.util
+
+ints_schema = pa.DataFrameSchema(
+    columns=dict(
+        col1=pa.Column(np.dtype("int64"), checks=None, nullable=False, unique=False,),
+        col2=pa.Column(
+            pd.Int32Dtype(),  # nullable so use pandas extension type
+            checks=None,
+            nullable=True,
+            unique=False,
+        ),
+        col4=pa.Column(
+            np.dtype("uint8"), checks=[pa.Check.gt(0), pa.Check.le(10)], nullable=False, unique=False,
+        ),
+    ),
+    index=pa.Index(thds.tabularasa.compat.resolve_numeric_np_index_dtype_for_pd_version(np.dtype("uint16")), checks=None, nullable=False, unique=True, name="col3",),
+    checks=[pa.Check.unique_across_columns(["col1", "col3"])],
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+
+load_ints = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+    table_name="ints",
+    schema=ints_schema,
+    package="tests",
+    data_dir="data/derived/",
+    blob_store=None,
+    md5=None,
+    pyarrow_schema=None,
+)

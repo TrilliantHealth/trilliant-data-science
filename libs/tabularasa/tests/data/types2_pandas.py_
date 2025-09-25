@@ -1,0 +1,56 @@
+import numpy as np
+import pandas as pd
+import pandera as pa
+
+import thds.tabularasa.compat  # noqa: F401
+
+table1_schema = pa.DataFrameSchema(
+    columns={},
+    index=pa.Index(
+        pd.CategoricalDtype([1, 2, 3], ordered=True),
+        checks=[pa.Check.isin([1, 2, 3])],
+        nullable=False,
+        unique=True,
+        name="foo",
+    ),
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+table2_schema = pa.DataFrameSchema(
+    columns=dict(
+        bar=pa.Column(
+            np.dtype("object"),
+            checks=None,
+            nullable=False,
+            unique=False,
+        ),
+    ),
+    index=None,
+    checks=None,
+    coerce=False,
+    strict=True,
+    ordered=False,
+)
+
+# load_table1 = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+#     table_name="table1",
+#     schema=table1_schema,
+#     package="tests",
+#     data_dir="data/derived/",
+#     blob_store=None,
+#     md5=None,
+#     pyarrow_schema=None,
+# )
+#
+# load_table2 = thds.tabularasa.loaders.util.PandasParquetLoader.from_pandera_schema(
+#     table_name="table2",
+#     schema=table2_schema,
+#     package="tests",
+#     data_dir="data/derived/",
+#     blob_store=None,
+#     md5=None,
+#     pyarrow_schema=None,
+# )

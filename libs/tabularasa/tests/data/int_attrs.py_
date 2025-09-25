@@ -1,0 +1,34 @@
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+SmallInt = typing.NewType("SmallInt", int)
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Ints:
+    """table with int columns
+
+    :param col1: plain int
+    :param col2: nullable int
+    :param col3: small int
+    :param col4: even smaller int
+    """
+
+    col1: int
+    col2: typing.Optional[int]
+    col3: int
+    col4: SmallInt
+
+
+load_ints = thds.tabularasa.loaders.util.AttrsParquetLoader[Ints](
+    table_name="ints",
+    type_=Ints,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

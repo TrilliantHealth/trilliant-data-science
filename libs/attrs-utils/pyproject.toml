@@ -1,0 +1,75 @@
+[project]
+name = "thds.attrs-utils"
+version = "1.5"
+# Patch version is a datetime determined upon release
+description = "Utilities for attrs record classes."
+readme = "README.md"
+authors = [{name = "Trillianth Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "attrs>=22.2.0",
+    "returns", # TODO - remove this + refactor accordingly
+    "thds-core",
+    "typing-inspect",
+]
+
+[project.optional-dependencies]
+cattrs = ["cattrs>=22.2.0"]
+docstrings = ["docstring-parser"]
+jsonschema = ["fastjsonschema"]
+
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+[dependency-groups]
+dev = [
+    "cattrs>=22.2.0",
+    "docstring-parser",
+    "fastjsonschema",
+    "mypy~=1.11.0",
+    "mypy-extensions~=1.0",
+    "pytest~=7.2",
+    "pytest-cov~=4.0",
+    "pytest-mock~=3.10",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-core = { path = "../../libs/core", editable = true }
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.attrs_utils"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    build/
+    | dist/
+    | \S+\.egg-info/
+)'''
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastjsonschema",
+    "typing_inspect",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# do not run integration test by default, but CI will pick it up
+addopts = "-m 'not integration'"
+markers = ["integration"]
+testpaths = ["tests"]

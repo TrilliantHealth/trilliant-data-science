@@ -1,0 +1,37 @@
+import typing
+
+import attr
+
+import thds.tabularasa.loaders.util
+
+Empty = typing.NewType("Empty", str)
+LowerNoPunct = typing.NewType("LowerNoPunct", str)
+ShortUpper = typing.NewType("ShortUpper", str)
+StringEnum = typing.Literal["foo", "bar", "baz"]
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class Strings:
+    """table with string columns
+
+    :param uppercase: only short uppercase strings
+    :param enum: only foo bar and baz
+    :param lowercase: only lowercase strings
+    :param empty: only the empty string
+    """
+
+    uppercase: typing.Optional[ShortUpper]
+    enum: typing.Optional[StringEnum]
+    lowercase: LowerNoPunct
+    empty: Empty
+
+
+load_strings = thds.tabularasa.loaders.util.AttrsParquetLoader[Strings](
+    table_name="strings",
+    type_=Strings,
+    package="tests",
+    data_dir="data/derived/",
+    pyarrow_schema=None,
+    md5=None,
+    blob_store=None,
+)

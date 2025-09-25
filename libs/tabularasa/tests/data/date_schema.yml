@@ -1,0 +1,48 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  dates:
+    columns:
+      # dates and datetimes
+      - name: date1
+        type: date
+        source_name: date_1
+        doc: just year month and day
+      - name: date2
+        type: date
+        source_name: date_2
+        doc: also just year month and day
+        nullable: true
+      - name: datetime1
+        type: datetime
+        source_name: datetime_1
+        doc: timestamp to the second
+      - name: datetime2
+        type: datetime
+        source_name: datetime_2
+        doc: also timestamp to the second
+        nullable: true
+    doc: table with date and datetime columns
+    constraints:
+      - unique: ['date1']
+      - unique: ['datetime1', 'datetime2']
+    primary_key: ['date1', 'datetime2']
+    indexes:
+      - ['datetime2', 'datetime1']
+    dependencies:
+      filename: tests/data/dates.tsv
+      delimiter: '	'  # TAB

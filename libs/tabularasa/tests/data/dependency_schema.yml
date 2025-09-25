@@ -1,0 +1,86 @@
+---
+build_options:
+  attrs: true
+  pandas: true
+  sqlite_data: true
+  sqlite_interface: false
+  pyarrow: false
+  package_data_dir: data/derived/
+  transient_data_dir: data/transient/
+  derived_code_submodule: data
+  sqlite_db_path: data/run_time_test_db.db
+  use_newtypes: true
+  type_constraint_comments: true
+  validate_transient_tables: true
+  require_typing_extensions: true
+
+tables:
+  fibonaccis:
+    columns:
+      - name: n
+        type: uint32
+        doc: ignored
+      - name: fibonacci
+        type: uint32
+        doc: ignored
+    primary_key: ['n']
+    doc: ignored
+    transient: true
+    dependencies:
+      filename: tests/data/dependency_fibonaccis.csv
+  squares:
+    columns:
+      - name: n
+        type: uint32
+        doc: ignored
+      - name: square
+        type: uint32
+        doc: ignored
+    primary_key: ['n']
+    doc: ignored
+    transient: true
+    dependencies:
+      filename: tests/data/dependency_squares.csv
+  dangling_transient:
+    columns:
+      - name: n
+        type: uint32
+        doc: ignored
+    doc: ignored
+    transient: true
+    dependencies:
+      filename: tests/data/dependency_squares.csv
+  sequences:
+    columns:
+      - name: n
+        type: int16
+        doc: natural number
+      - name: fibonacci
+        type: int16
+        doc: fibonacci number
+      - name: square
+        type: int16
+        doc: square number
+      - name: triangular
+        type: int16
+        doc: triangular number
+      - name: is_fibonacci
+        type: bool
+        doc: indicates whether n is a fibonacci number
+    primary_key: ['n']
+    constraints:
+      - unique: ['n']
+      - unique: ['fibonacci']
+      - unique: ['square']
+      - unique: ['triangular']
+    indexes:
+      - ['n']
+      - ['square']
+      - ['triangular']
+      - ['fibonacci']
+    doc: well-known integer sequences
+    dependencies:
+      reference:
+        - fibonaccis
+        - squares
+      preprocessor: tests.tabularasa.conftest.preprocess_int_sequences_table
