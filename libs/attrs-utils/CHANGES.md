@@ -1,3 +1,11 @@
+## 1.6
+
+- Adds an `empty` submodule with a utility for generating empty instances of arbitrary types.
+- Adds a new `ConstructorFactory` class derived from `TypeRecursion` but with greater type-safety by
+  constraining the recursion to return only callables that construct instances of the input type.
+  - This is now used in both `attrs_utils.empty` and `attrs_utils.random.gen`, the latter of which has
+    improved type safety as a result.
+
 ## 1.5
 
 - Adds a `cattrs.errors` submodule with custom exceptions and extensible utilities for pretty-printing

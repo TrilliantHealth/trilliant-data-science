@@ -1,5 +1,6 @@
+import typing
 from functools import partial
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, TypeVar
 
 import attr
 from typing_inspect import is_tuple_type, is_typevar, is_union_type
@@ -130,3 +131,38 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
             if self.cached:
                 self.registry[obj] = result
         return result
+
+
+T = TypeVar("T")
+Constructor = typing.Callable[..., T]
+
+
+class ConstructorFactory(TypeRecursion[Params, Constructor]):
+    """Specialization of `TypeRecursion` for the common case of functions that take a type and return a function that
+    returns instances of that type. Common examples include random or default instance generators.
+
+    Consider the following example:
+
+    ```python
+    random_gen: TypeRecursion[[], Factory]]
+
+    random_int = random_gen(int)  # returns a function that generates random integers
+    random_str = random_gen(str)  # returns a function that generates random strings
+
+    def add_one(x: int) -> int:
+        return x + 1
+
+    add_one(random_int())  # totally fine
+    add_one(random_str())  # type error, but `mypy` doesn't catch it
+    ```
+
+    In this case, `add_one(random_str())` is a type error, but `mypy` doesn't catch it because `random_gen`'s signature
+    does not constrain the returned constructor as returning the same type as the input type. If, on the other hand,
+    `random_gen` had been typed as a `ConstructorFactory`, the type checker would be able to catch this error.
+    It is up to you as the implementer to ensure that your implementation of any `ConstructorFactory` actually respects
+    this constraint, since the implementation is too dynamic for most type checkers to verify this automatically, but if
+    you do so, then the type checker _can_ detect common errors downstream of any given constructor creation.
+    """
+
+    def __call__(self, type_: Type[T], *args: Params.args, **kwargs: Params.kwargs) -> Constructor[T]:  # type: ignore[override]
+        return super().__call__(type_)
