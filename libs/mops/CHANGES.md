@@ -1,7 +1,3 @@
-### 3.9.20251006
-
-- Updates extension of `core.source`, allowing storing and unpickling `Source.size` via `hashref`s.
-
 ### 3.9.20250929
 
 - `k8s`: During garbage collection of stale Uncertain Futures, don't iterate over them while also
