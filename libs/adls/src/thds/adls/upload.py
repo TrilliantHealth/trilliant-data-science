@@ -17,6 +17,7 @@ from . import azcopy, hashes
 from ._progress import report_upload_progress
 from ._upload import upload_decision_and_metadata
 from .conf import UPLOAD_FILE_MAX_CONCURRENCY
+from .file_lock import file_lock
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client
 from .ro_cache import Cache
@@ -100,6 +101,8 @@ def upload(
         _write_through_local_cache(write_through_cache.path(dest_), src)
         # we always use the original source file to upload, not the cached path,
         # because uploading from a shared location risks race conditions.
+
+    scope.enter(file_lock(str(dest_), locktype="upload"))
 
     blob_container_client = get_global_blob_container_client(dest_.sa, dest_.container)
     blob_client = blob_container_client.get_blob_client(dest_.path)
