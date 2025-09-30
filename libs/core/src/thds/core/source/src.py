@@ -45,8 +45,6 @@ class Source(os.PathLike):
     hash: ty.Optional[hashing.Hash] = None
     # hash and equality are based only on the _identity_ of the object,
     # not on the other properties that provide some caching functionality.
-    size: int = 0
-    # in bytes
 
     @property
     def cached_path(self) -> ty.Optional[Path]:
@@ -97,7 +95,7 @@ class Source(os.PathLike):
         return from_file(filename, hash, uri)
 
     @staticmethod
-    def from_uri(uri: str, hash: ty.Optional[hashing.Hash] = None, size: int = 0) -> "Source":
+    def from_uri(uri: str, hash: ty.Optional[hashing.Hash] = None) -> "Source":
         from ._construct import from_uri
 
-        return from_uri(uri, hash, size)
+        return from_uri(uri, hash)

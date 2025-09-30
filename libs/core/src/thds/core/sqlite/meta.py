@@ -37,50 +37,11 @@ def list_tables(connectable: Connectable, schema_name: str = "") -> ty.List[str]
 
 
 @autoconn_scope.bound
-def get_sql_defs_by_name(
-    connectable: Connectable, types: ty.Collection[str], *, schema_name: str = "main"
-) -> ty.Dict[str, str]:
-    conn = autoconnect(connectable)
-    return {
-        row[0]: row[1]
-        for row in conn.execute(
-            f"""
-            SELECT name, sql
-            FROM {fullname('sqlite_master', schema_name)}
-            WHERE type IN ({', '.join('?' for _ in types)})
-            AND sql is not null
-            """,
-            tuple(types),
-        )
-    }
-
-
 def get_tables(connectable: Connectable, *, schema_name: str = "main") -> ty.Dict[str, str]:
     """Keys of the returned dict are the names of tables in the database.
 
     Values of the returned dict are the raw SQL that can be used to recreate the table.
     """
-    return get_sql_defs_by_name(connectable, ["table"], schema_name=schema_name)
-
-
-def get_views(connectable: Connectable, *, schema_name: str = "main") -> ty.Dict[str, str]:
-    """Keys of the returned dict are the names of views in the database.
-
-    Values of the returned dict are the raw SQL that can be used to recreate the view.
-    """
-    return get_sql_defs_by_name(connectable, ["view"], schema_name=schema_name)
-
-
-def get_triggers(connectable: Connectable, *, schema_name: str = "main") -> dict[str, str]:
-    """Keys of the returned dict are the names of triggers in the database.
-    Values of the returned dict are the raw SQL that can be used to recreate the trigger.
-    """
-    return get_sql_defs_by_name(connectable, ["trigger"], schema_name=schema_name)
-
-
-@autoconn_scope.bound
-def get_virtual_tables(connectable: Connectable, *, schema_name: str = "main") -> dict[str, str]:
-    """Get virtual tables (FTS, etc.)."""
     conn = autoconnect(connectable)
     return {
         row[0]: row[1]
@@ -88,7 +49,8 @@ def get_virtual_tables(connectable: Connectable, *, schema_name: str = "main") -
             f"""
             SELECT name, sql
             FROM {fullname('sqlite_master', schema_name)}
-            WHERE type='table' AND sql LIKE 'CREATE VIRTUAL TABLE%'
+            WHERE type = 'table'
+            AND sql is not null
             """
         )
     }
