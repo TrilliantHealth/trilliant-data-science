@@ -73,9 +73,6 @@ def yield_all(
     thunks: ty.Iterable[ty.Tuple[H, ty.Callable[[], R]]],
     *,
     executor_cm: ty.Optional[ty.ContextManager[concurrent.futures.Executor]] = None,
-    fmt: ty.Callable[[str], str] = lambda x: x,
-    named: str = "",
-    progress_logger: ty.Callable[[str], ty.Any] = logger.info,
 ) -> ty.Iterator[ty.Tuple[H, ty.Union[R, Error]]]:
     """Stream your results so that you don't have to load them all into memory at the same
     time (necessarily). Also, yield (rather than raise) Exceptions, wrapped as Errors.
@@ -85,16 +82,9 @@ def yield_all(
     same size as your iterable. If you want to throttle the number of
     parallel tasks, you should provide your own Executor - and for
     most mops purposes it should be a ThreadPoolExecutor.
-
-    Currently this function does not yield any results until the input iterable is exhausted,
-    even though some of the thunks may have been submitted and the workers have returned a result
-    to the local process.
     """
     files.bump_limits()
     len_or_none = try_len(thunks)
-
-    num_tasks_log = "" if not len_or_none else f" of {len_or_none}"
-    named = f" {named} " if named else " result "
 
     if PARALLEL_OFF() or (len_or_none == 1 and not executor_cm):
         # don't actually transfer this to an executor we only have one task.
@@ -111,19 +101,12 @@ def yield_all(
     with executor_cm as executor:
         keys_onto_futures = {key: executor.submit(thunk) for key, thunk in thunks}
         future_ids_onto_keys = {id(future): key for key, future in keys_onto_futures.items()}
-        # While concurrent.futures.as_completed accepts an iterable as input, it
-        # does not yield any completed futures until the input iterable is
-        # exhausted.
-        for i, future in enumerate(concurrent.futures.as_completed(keys_onto_futures.values()), start=1):
+        for future in concurrent.futures.as_completed(keys_onto_futures.values()):
             thunk_key = future_ids_onto_keys[id(future)]
             try:
-                result = future.result()
-                yielder: tuple[H, ty.Union[R, Error]] = thunk_key, ty.cast(R, result)
+                yield thunk_key, ty.cast(R, future.result())
             except Exception as e:
-                yielder = thunk_key, Error(e)
-            finally:
-                progress_logger(fmt(f"Yielding{named}{i}{num_tasks_log}"))
-                yield yielder
+                yield thunk_key, Error(e)
 
 
 def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterator[ty.Tuple[H, R]]:
@@ -200,7 +183,6 @@ def yield_results(
             )
 
     summarize_exceptions(error_fmt, exceptions)
-    # TODO - when `core` moves to 3.11 start using an ExceptionGroup here
 
 
 def summarize_exceptions(
