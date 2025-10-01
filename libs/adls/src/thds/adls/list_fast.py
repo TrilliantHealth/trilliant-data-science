@@ -6,7 +6,7 @@ client instead of the file system client.
 
 import typing as ty
 
-from thds.core import log, parallel, thunks
+from thds.core import parallel, thunks
 
 from . import global_client
 from .fqn import AdlsFqn
@@ -15,16 +15,8 @@ from .source_tree import BlobMeta, to_blob_meta, yield_blob_meta
 R = ty.TypeVar("R")
 
 
-logger = log.getLogger(__name__)
-
-
 def _failfast_parallel(thunks: ty.Iterable[ty.Callable[[], R]]) -> ty.Iterator[R]:
-    yield from (
-        res
-        for _, res in parallel.failfast(
-            parallel.yield_all(parallel.create_keys(thunks), progress_logger=logger.debug)
-        )
-    )
+    yield from (res for _, res in parallel.failfast(parallel.yield_all(parallel.create_keys(thunks))))
 
 
 def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[BlobMeta]:
@@ -39,7 +31,7 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[Blo
         # directly yield the blobs
         yield from yield_blob_meta(
             global_client.get_global_blob_container_client(fqn.sa, fqn.container),
-            fqn.path.rstrip("/") + "/",
+            fqn.path,
         )
         return
 
