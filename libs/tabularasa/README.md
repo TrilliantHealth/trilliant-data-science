@@ -15,9 +15,10 @@ The schema file includes documentation, tabular schema definitions, type informa
 constraints (e.g. ranges, string patterns, and nullability), column-level constraints (e.g. uniqueness),
 file resource definitions, and build options controlling the output of the build system. Tables are built
 from raw data files which may take any form and may be stored either in the repository under version
-control or remotely in ADLS (with md5 hashes to ensure build consistency), but are packaged with the
-distribution as strictly-typed parquet files and optionally as a sqlite database archive file. Large
-package files may be omitted from the base distribution to be synced with an ADLS blob store at run time.
+control or remotely in ADLS (optionally pinned by an md5 hash to ensure build consistency), but are
+packaged with the distribution as strictly-typed parquet files and optionally as a sqlite database
+archive file. Large package files may be omitted from the base distribution to be synced with an ADLS
+blob store at run time.
 
 The sections of the schema file are as follows:
 
@@ -42,44 +43,6 @@ To get more detail on the structure of any of these sections, you may refer to t
 schema yaml file (with a few enriched fields). Instances of this class are validated and enriched to
 become instances of `thds.tabularasa.schema.metaschema.Schema`, which are then used in various build
 operations.
-
-### Core Concepts: How Tabularasa Controls Your Data
-
-Before diving into the details, it's important to understand how tabularasa controls and transforms your
-data:
-
-#### Column Ordering
-
-**Important**: The column order in your output parquet files is **entirely controlled by the order
-defined in schema.yaml**, not by the order in your preprocessor code or source data. Even if your
-preprocessor returns columns in a different order, tabularasa will reorder them to match the schema
-definition during the build process. This ensures consistency across all data artifacts.
-
-#### Primary Keys and Pandas Index
-
-When working with pandas DataFrames, be aware that **primary key columns become the DataFrame index** and
-effectively "disappear" from the regular columns. If you define `primary_key: [id, date]` in your schema,
-those columns will be accessible via `df.index` rather than `df['id']` or `df['date']`. This behavior is
-automatic and ensures efficient indexing for data access.
-
-#### Transient Tables
-
-Tables marked with `transient: true` are intermediate tables used during the build process but are not
-included in the final package distribution. Use transient tables for:
-
-- Raw input data that gets processed into final tables
-- Intermediate transformation steps
-- Large source data that shouldn't be shipped with the package
-
-#### External Data Philosophy
-
-Tabularasa follows a fundamental principle: **builds should never depend on external services**. All data
-is snapshotted internally to ensure reproducible builds. This means:
-
-- Data from external sources (APIs, remote CSVs, etc.) should be fetched and stored in version control or
-  ADLS
-- The `remote_data` section only references files in Trilliant's ADLS, never external URLs
-- This ensures builds are deterministic and not affected by external service availability
 
 ### The Data Interfaces
 
@@ -120,100 +83,10 @@ The simplest way to add new reference data to version control is to simply place
 define the schema of that data in the `tables` section of your [schema file](#the-schema-file), pointing
 the `dependencies.filename` of the table to the new CSV file.
 
-#### Choosing Between Local and Remote Data
-
-When deciding how to store your source data, consider these trade-offs:
-
-**Local Data Storage Patterns**
-
-Tabularasa supports two distinct patterns for managing local data files, each serving different
-organizational needs. The **direct file reference pattern** allows tables to specify their data source
-directly through `dependencies.filename`, providing a straightforward path to a file in the repository.
-When you need to update the data, you simply overwrite the file and run `tabularasa datagen` without
-making any schema changes. The framework reads the file directly using the provided path along with any
-CSV parsing parameters specified in the dependencies block. This approach works best for data files that
-are specific to a single table.
-
-The **shared data pattern** using the `local_data` section provides a more structured approach for
-managing data sources that multiple tables depend on. With this pattern, you define a named entry in the
-`local_data` section of your schema that contains not just the filename but comprehensive metadata
-including the data authority, source URL, update frequency, and documentation. Tables then reference
-these entries using `dependencies.local: [entry_name]`. When the preprocessor function executes, it
-receives a `LocalDataSpec` object that provides access to both the file (via the `full_path` property)
-and all associated metadata. This pattern is best when multiple tables need to derive data from the same
-source file, such as when several tables extract different subsets from a comprehensive dataset. This
-centralized definition allows consistency across all dependent tables and makes it easier to track data
-provenance and update schedules.
-
-Both patterns store files in version control, making them ideal for datasets under 10MB that require
-frequent updates. The key difference lies in organization and metadata management: direct references
-prioritize simplicity and speed, while the local_data pattern emphasizes structure, reusability, and
-documentation. Larger files should use remote storage instead.
-
-**Remote Data Storage in ADLS**
-
-Remote data storage through ADLS addresses the scalability limitations of local file storage. When source
-datasets exceed 10MB, the `remote_data` section of the schema file allows you to reference files stored
-in ADLS. Each remote data entry specifies paths to files in ADLS along with their MD5 hashes to ensure
-the correct version is downloaded during builds. While this approach keeps the repository lean, it
-requires a more structured workflow: you must upload source files to ADLS, calculate their MD5 hashes,
-and specify them in the schema. This additional complexity makes remote storage most suitable for stable,
-infrequently changing source datasets where the overhead of managing source file hashes is justified by
-the benefits of centralized storage and repository size optimization.
-
-Note that MD5 hash management differs by context: source files in `remote_data` require manual MD5 hash
-specification, while tables that generate parquet files have their MD5 hashes automatically calculated
-and updated by `tabularasa datagen`. Local source files referenced through `local_data` or
-`dependencies.filename` do not use MD5 hashes at all.
-
-Example workflow for monthly updates with local data:
-
-```yaml
-# schema.yaml - Direct file reference pattern
-tables:
-  my_monthly_data:
-    dependencies:
-      filename: build_data/monthly_data.csv  # Fixed filename
-      # Monthly: Download new CSV → overwrite file → datagen
-```
-
-Example of shared local_data pattern:
-
-```yaml
-# schema.yaml - Shared data pattern
-local_data:
-  census_data:  # Define once
-    filename: build_data/census_2023.xlsx
-    url: https://census.gov/data/...
-    authority: US Census Bureau
-    last_updated: 2023-07-01
-    update_frequency: Yearly
-
-tables:
-  state_demographics:
-    dependencies:
-      local: [census_data]  # Reference from multiple tables
-  county_statistics:
-    dependencies:
-      local: [census_data]  # Same source, consistent metadata
-```
-
-Example workflow for remote data:
-
-```yaml
-# schema.yaml
-remote_data:
-  my_large_data:
-    paths:
-    - name: data/large_file_2024_01.parquet
-      md5: abc123...  # Must update this hash for each new version
-```
-
 When changes are made to a table in `schema.yaml`, either the schema or the source data, be sure to
-update the associated derived package data file by running `tabularasa datagen <table-name>`. The table's
-MD5 hash will then be automatically updated to reflect the new generated parquet file either during this
-step or during pre-commit hook execution. See the
-[package data generation section](#generating-package-data) for more information on this.
+update the associated derived package data file by running `tabularasa datagen <table-name>`. The hash
+will then be updated to the new value either during this step or during pre-commit hook execution. See
+the [package data generation section](#generating-package-data) for more information on this.
 
 To understand all the ways of defining a table or file dependency, take a look at the schema file data
 model defined in the `thds.tabularasa.schema.metaschema._RawSchema` class. This represents an exact
@@ -328,10 +201,6 @@ present in your file tree. Each of the parquet files should have an associated m
 present at build time, and the md5 sum of the file matches the one indicated in `schema.yaml`, then the
 build step for that table can be skipped, saving you the wait.
 
-**Important**: These hashes are used to skip expensive local rebuilds, not to fetch data from a remote
-store. If your local parquet file's hash matches schema.yaml, tabularasa skips rebuilding it. If it
-doesn't match, the table is rebuilt from source data.
-
 To check the status of your local built data files with respect to the `schema.yaml` hashes, you can run
 
 ```bash
@@ -348,10 +217,6 @@ By default this will also update your generated data accessor source code, which
 in order to enable run-time integrity checks on fetch from the blob store, if you're using one.
 
 #### Syncing with the Blob Store
-
-**Important**: The `push`, `pull`, and `sync-blob-store` commands work **only with final parquet
-tables**, not with input source data. Input data (specified in `local_data` or `remote_data`) is only
-accessed during `datagen` execution.
 
 Under the section `remote_blob_store` in [the schema file](#the-schema-file), you may optionally specify
 a remote cloud storage location where built package data artifacts are stored. In case
