@@ -1,5 +1,4 @@
 import os
-import stat
 import sys
 import typing as ty
 from functools import partial
@@ -44,21 +43,20 @@ def from_file(
     responsibility to ensure that your file has been uploaded to the URI you provide.
     """
     path = path_from_uri(filename) if isinstance(filename, str) else Path(filename)
-    stats = path.stat()  # raises FileNotFoundError if file doesn't exist
-    if stat.S_ISDIR(stats.st_mode):
-        raise IsADirectoryError(path)
+    if not path.exists():
+        raise FileNotFoundError(path)
 
     file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
     if uri:
-        src = from_uri(uri, file_hash, stats.st_size)
+        src = from_uri(uri, file_hash)
     else:
-        src = Source(to_uri(path), file_hash, stats.st_size)
+        src = Source(to_uri(path), file_hash)
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
 
 class FromUri(ty.Protocol):
-    def __call__(self, hash: ty.Optional[Hash], size: int = 0) -> Source:
+    def __call__(self, hash: ty.Optional[Hash]) -> Source:
         """Closure over a URI that creates a Source from a URI.
 
         The Hash may be used to short-circuit creation that would result in creating
@@ -86,20 +84,13 @@ def register_from_uri_handler(key: str, handler: FromUriHandler):
     _FROM_URI_HANDLERS[key] = handler
 
 
-def _from_local_uri(uri: str, hash: ty.Optional[Hash], size: int = 0) -> Source:
-    """fulfill the FromUri interface"""
-    return from_file(path_from_uri(uri), hash)
-
-
-def _local_file_uri_handler(uri: str) -> ty.Optional[FromUri]:
-    return partial(_from_local_uri, uri) if is_file_uri(uri) else None
-
-
 _FROM_URI_HANDLERS: ty.Dict[str, FromUriHandler] = dict()
-register_from_uri_handler("local_file", _local_file_uri_handler)
+register_from_uri_handler(
+    "local_file", lambda uri: partial(from_file, path_from_uri(uri)) if is_file_uri(uri) else None
+)
 
 
-def from_uri(uri: str, hash: ty.Optional[Hash] = None, size: int = 0) -> Source:
+def from_uri(uri: str, hash: ty.Optional[Hash] = None) -> Source:
     """Create a read-only Source from a URI. The data should already exist at this remote
     URI, although Source itself can make no guarantee that it always represents real data
     - only that any data it does represent is read-only.
@@ -110,5 +101,5 @@ def from_uri(uri: str, hash: ty.Optional[Hash] = None, size: int = 0) -> Source:
     """
     for handler in _FROM_URI_HANDLERS.values():
         if from_uri_ := handler(uri):
-            return from_uri_(hash, size)
-    return Source(uri=uri, hash=hash, size=size)
+            return from_uri_(hash)
+    return Source(uri=uri, hash=hash)
