@@ -1,28 +1,3 @@
-### 0.13.0
-
-- Added auto-generation of bulk sqlite index loader methods. These allow querying for multiple keys in a
-  single round-trip to the sqlite database, improving performance when loading large numbers of rows
-  where cache hits may not be expected to be very helpful (the bulk query methods are not cached due to
-  the low likelihood of cache hits on entire collections of keys).
-
-### 0.12.1
-
-- The main sqlite data population routine, invokable via the `tabularasa init-sqlite` command or
-  `thds.tabularasa.data_dependencies.sqlite.populate_sqlite_db` function, now acquires a file lock on the
-  target database file to prevent concurrent writes, which could arise e.g. when performing
-  initializations inside worker processes in a multiprocessing context.
-
-## 0.12.0
-
-- in `tabularasa push`, switched `no_fail_if_absent` from a positional arg parsed to boolean to a flag
-  (`--no-fail-if-absent`)
-- imbued `--no-fail-if-absent` with semantics in the `taburasa sync-blob-store --down`/`tabularasa pull`
-  case (previously it only appled to the `--up`/`push` case). Now, if you attempt to sync a blob down
-  which has no corresponding blob in the blob store, there is no error.
-- in `tabularasa datagen`, the blob store sync down to local files is run with the new
-  `no_fail_if_absent` semantics. Any blobs which fail to sync, that are required in the build DAG, will
-  just be regenerated as part of the build, due to absence or hash mismatches.
-
 ### 0.11.3
 
 flake8 and black

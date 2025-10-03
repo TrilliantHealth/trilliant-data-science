@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.13.0"
+version = "0.11.3"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -8,7 +8,6 @@ requires-python = ">=3.10"
 dependencies = [
   "attrs>=22.2",
   "cattrs>=22.2",
-  "filelock",
   "networkx>=3.0",
   "numpy",
   "packaging",

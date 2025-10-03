@@ -15,10 +15,10 @@ The schema file includes documentation, tabular schema definitions, type informa
 constraints (e.g. ranges, string patterns, and nullability), column-level constraints (e.g. uniqueness),
 file resource definitions, and build options controlling the output of the build system. Tables are built
 from raw data files which may take any form and may be stored either in the repository under version
-control or remotely in a blob store such as ADLS (versioned with md5 hashes to ensure build availability
-and consistency), but are packaged with the distribution as strictly-typed parquet files and optionally
-as a sqlite database archive file. Large package files may be omitted from the base distribution to be
-synced with a blob store at run time.
+control or remotely in ADLS (optionally pinned by an md5 hash to ensure build consistency), but are
+packaged with the distribution as strictly-typed parquet files and optionally as a sqlite database
+archive file. Large package files may be omitted from the base distribution to be synced with an ADLS
+blob store at run time.
 
 The sections of the schema file are as follows:
 
@@ -29,13 +29,9 @@ The sections of the schema file are as follows:
 - `types`: any custom constrained column-level types you may wish to define and reference in your tables.
   These become both validation constraints expressed as `pandera` schemas, and `typing.Literal` types in
   the case of enums, or sometimes `typing.NewType`s depending on your build options.
-- `local_data`: specifications of local files in your repo that will be used to build your tables. Files
-  referenced here are expected to be version-controlled along with your code and so don't require hashes
-  for integrity checks. Note that tabularasa assumes the file on disk is the official committed version.
-  It cannot protect against builds with uncommitted local changes to these files.
+- `local_data`: specifications of local files in your repo that will be used to build your tables
 - `remote_data`: specifications of remote files that will be used to build your tables. Currently only
-  blob store backends like ADLS are supported. Files referenced here must be versioned with hashes to
-  ensure build integrity (MD5 is used currently).
+  ADLS is supported.
 - `remote_blob_store`: optional location to store large artifacts in post-build, in case you want to set
   a size limit above which your data files will not be packaged with your distribution. They can then be
   fetched at run time as needed.
@@ -47,43 +43,6 @@ To get more detail on the structure of any of these sections, you may refer to t
 schema yaml file (with a few enriched fields). Instances of this class are validated and enriched to
 become instances of `thds.tabularasa.schema.metaschema.Schema`, which are then used in various build
 operations.
-
-### Core Concepts: How Tabularasa Controls Your Data
-
-Before diving into the details, it's important to understand how tabularasa controls and transforms your
-data:
-
-#### Column Ordering
-
-**Important**: The column order in your output parquet files is **entirely controlled by the order
-defined in schema.yaml**, not by the order in your preprocessor code or source data. Even if your
-preprocessor returns columns in a different order, tabularasa will reorder them to match the schema
-definition during the build process. This ensures consistency across all data artifacts.
-
-#### Primary Keys and Pandas Index
-
-When working with pandas DataFrames, be aware that **primary key columns become the DataFrame index** and
-effectively "disappear" from the regular columns. If you define `primary_key: [id, date]` in your schema,
-those columns will be accessible via `df.index` rather than `df['id']` or `df['date']`. This behavior is
-automatic and ensures efficient indexing for data access.
-
-#### Transient Tables
-
-Tables marked with `transient: true` are intermediate tables used during the build process but are not
-included in the final package distribution. Use transient tables for:
-
-- Raw input data that gets processed into final tables
-- Intermediate transformation steps
-- Large source data that shouldn't be shipped with the package
-
-#### External Data Philosophy
-
-Tabularasa follows a fundamental principle: **builds should never depend on external services**. All data
-is snapshotted internally to ensure reproducible builds. This means:
-
-- Data from external sources (APIs, remote CSVs, etc.) should be fetched and stored in version control or
-  a blob store that you control (specified in the `remote_data` section)
-- This ensures builds are deterministic and not affected by external service availability or consistency
 
 ### The Data Interfaces
 
@@ -116,126 +75,18 @@ formatters such as `black`, since these change only the formatting and not the A
 To add a new table to the schema, place a new named entry under the `tables` section in your
 [schema file](#the-schema-file). Source data for the table is specified in the table's `dependencies`
 section. There are multiple ways to specify the source data, including version-controlled
-repository-local files and remote files. Source data can be a standard tabular text format (CSV, TSV,
-etc) which can be translated automatically into the table's typed schema, or some other data format that
-requires processing using a user-defined function specified under a `preprocessor` key.
+repository-local files and remote files. Source data can be a standard CSV which can be translated
+automatically into the table's typed schema, or some other data format that requires processing using a
+user-defined function specified under a `preprocessor` key.
 
 The simplest way to add new reference data to version control is to simply place a CSV in your repo, and
 define the schema of that data in the `tables` section of your [schema file](#the-schema-file), pointing
 the `dependencies.filename` of the table to the new CSV file.
 
-Note that this direct file reference approach works only with files that can unambiguously be interpreted
-into the table's schema. Currently this is implemented for character-delimited text files such as CSV/TSV
-(with many exposed options for parsing), but could be extended to other tabular formats in the future.
-
-#### Choosing Between Local and Remote Data
-
-When deciding how to store your source data, consider these trade-offs:
-
-**Local Data Storage Patterns**
-
-Tabularasa supports two distinct patterns for managing local data files, each serving different
-organizational needs. The **direct file reference pattern** allows tables to specify their data source
-directly through `dependencies.filename`, providing a straightforward path to a file in the repository.
-When you need to update the data, you simply overwrite the file and run
-`tabularasa datagen <your-table-name>` without making any schema changes. The framework reads the file
-directly using the provided path along with any parsing parameters specified in the dependencies block.
-This approach works best for data files that are specific to a single table and can be parsed
-unambiguously, requiring no custom code to interpret.
-
-The **shared data pattern** using the `local_data` section provides a more structured approach for
-managing data sources that multiple tables depend on. With this pattern, you define a named entry in the
-`local_data` section of your schema that contains not just the filename but comprehensive metadata
-including the data authority, source URL, update frequency, and documentation. Tables then reference
-these entries using `dependencies.local: [entry_name]`. When the preprocessor function executes, it
-receives a `LocalDataSpec` object that provides access to both the file (via the `full_path` property)
-and all associated metadata. This pattern is best when multiple tables need to derive data from the same
-source file, such as when several tables extract different subsets from a comprehensive dataset. This
-centralized definition allows consistency across all dependent tables and makes it easier to track data
-provenance and update schedules. The same metadata fields are available on all file reference types
-(direct references, `local_data`, and `remote_data`) since they all inherit from the same base schema.
-
-Both patterns store files in version control, making them ideal for smaller datasets that require
-frequent updates. There is no difference in documentation level or reusability between the two
-patterns—both require the same metadata and can be referenced throughout the derivation DAG (in the case
-of the direct reference pattern you would reference the derived _table_ rather than the raw file). The
-key difference is organizational: direct references provide a quick way to define a table from a single
-file inline, while `local_data` provides centralized definitions when multiple tables derive from the
-same source file. Larger files should use remote storage instead.
-
-**Remote Data Storage in Blob Store**
-
-Remote data storage through a blob store (e.g., ADLS) addresses the scalability limitations of local file
-storage. When source datasets too large for version control, the `remote_data` section of the schema file
-allows you to reference files stored in a blob store. Each remote data entry specifies paths to files in
-the blob store along with their MD5 hashes to ensure the correct version is downloaded during builds.
-While this approach keeps the repository lean, it requires a more structured workflow: you must upload
-source files to the blob store, calculate their MD5 hashes, and specify them in the schema. This
-additional complexity makes remote storage most suitable for stable, infrequently changing source
-datasets where the overhead of managing source file hashes is justified by the benefits of centralized
-storage and repository size optimization.
-
-Note that MD5 hash management differs by context: source files in `remote_data` require manual MD5 hash
-specification, while the derived parquet files underlying the tables in the schema have their MD5 hashes
-automatically calculated and updated by `tabularasa datagen`. Local source files referenced through
-`local_data` or `dependencies.filename` do not require MD5 hashes since they are assumed to be versioned
-by your version control system.
-
-Example workflow for monthly updates with local data:
-
-```yaml
-# schema.yaml - Direct file reference pattern
-tables:
-  my_monthly_data:
-    dependencies:
-      filename: build_data/monthly_data.csv
-      last_updated: 2024-01-15
-      update_frequency: Monthly
-      doc: "Monthly update: Download new CSV → overwrite file → datagen"
-```
-
-Example of shared local_data pattern:
-
-```yaml
-# schema.yaml - Shared data pattern
-local_data:
-  census_data:  # Define once
-    filename: build_data/census_2023.xlsx
-    url: https://census.gov/data/...
-    authority: US Census Bureau
-    last_updated: 2023-07-01
-    update_frequency: Yearly
-
-tables:
-  state_demographics:
-    dependencies:
-      local: [census_data]  # Reference from multiple tables
-  county_statistics:
-    dependencies:
-      local: [census_data]  # Same source, consistent metadata
-```
-
-Example workflow for remote data:
-
-```yaml
-# schema.yaml
-remote_data:
-  my_large_data:
-    paths:
-    - name: data/large_file_2024_01.parquet
-      md5: abc123...  # Must update this hash for each new version
-
-tables:
-  large_table:
-    dependencies:
-      remote: [my_large_data]  # Reference remote data
-```
-
 When changes are made to a table in `schema.yaml`, either the schema or the source data, be sure to
-update the associated derived package data file by running `tabularasa datagen <table-name>`. The table's
-MD5 hash, and those of any dependent derived tables downstream of it, will then be automatically updated
-to reflect the new generated parquet file either during this step or during pre-commit hook execution.
-See the [package data generation section](#generating-package-data) for more information on this.
+update the associated derived package data file by running `tabularasa datagen <table-name>`. The hash
+will then be updated to the new value either during this step or during pre-commit hook execution. See
+the [package data generation section](#generating-package-data) for more information on this.
 
 To understand all the ways of defining a table or file dependency, take a look at the schema file data
 model defined in the `thds.tabularasa.schema.metaschema._RawSchema` class. This represents an exact
@@ -303,10 +154,6 @@ error-prone task. It ensures that all your package data and associated hashes ar
 finally ensures that your peers will have up-to-date data when they get a cache miss after pulling your
 code changes.
 
-Any derived table upstream of those you request to build with `datagen` will be auto-synced from the blob
-store prior to the build running, if available, saving you the wait time of re-building them needlessly
-in case they're not already in your working tree.
-
 If you'd like to better understand what you changed after any `tabularasa datagen` invocation before you
 commit the result, you can run `tabularasa data-diff`. By default, this diffs the data as versioned in
 the working tree against the data as versioned in the HEAD commit. If you've already committed, you can
@@ -322,9 +169,9 @@ If you wish to regenerate _all_ package data tables from scratch, you can run
 tabularasa datagen
 ```
 
-This will remove _all_ pre-existing package data files and re-generate them. This is an extreme measure
-and should be used sparingly; in most cases, you will want to only those specific tables whose source
-data or derivation logic you know has changed.
+This will remove all pre-existing package data files and re-generate them. This is an extreme measure and
+should be used sparingly; in most cases, you will want to only those specific tables whose source data or
+derivation logic you know has changed.
 
 Note that if you have just cloned the repo or pulled a branch and wish to get your local package data
 up-to-date with the state on that branch, you don't need to re-derive all the data! Just
@@ -350,16 +197,15 @@ The code will print to stdout. Simply replace `pandas` with `attrs`, `sqlite`, `
 The build pipeline uses md5 hashes to prevent expensive re-builds in local runs. When the
 [build](#building) finishes, you will have several parquet files and possibly a sqlite database archive
 present in your file tree. Each of the parquet files should have an associated md5 checksum in
-`schema.yaml`, indicating the version of the data that should result from the build.
+`schema.yaml`, indicating the version of the data that should result from the build. If a file is already
+present at build time, and the md5 sum of the file matches the one indicated in `schema.yaml`, then the
+build step for that table can be skipped, saving you the wait.
 
 To check the status of your local built data files with respect to the `schema.yaml` hashes, you can run
 
 ```bash
 tabularasa check-hashes
 ```
-
-**Important**: The following shouldn't be required in normal usage: use with care and only if you know
-what you're doing!
 
 To sync the hashes in `schema.yaml` with those of your generated data you can run
 
@@ -368,15 +214,9 @@ tabularasa update-hashes
 ```
 
 By default this will also update your generated data accessor source code, which has the hashes embedded
-in order to enable run-time integrity checks on fetch from the blob store, if you're using one. In
-general, you _should not need to to this manually_ however, since `tabularasa datagen` will update the
-hashes for you as part of its normal operation.
+in order to enable run-time integrity checks on fetch from the blob store, if you're using one.
 
 #### Syncing with the Blob Store
-
-**Important**: The `push`, `pull`, and `sync-blob-store` commands work **only with final parquet
-tables**, not with input source data. Input data (specified in `local_data` or `remote_data`) is only
-accessed during `datagen` execution.
 
 Under the section `remote_blob_store` in [the schema file](#the-schema-file), you may optionally specify
 a remote cloud storage location where built package data artifacts are stored. In case
