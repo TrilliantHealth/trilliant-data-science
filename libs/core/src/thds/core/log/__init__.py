@@ -26,4 +26,4 @@ logger.info("testing 5")
 
 from .basic_config import DuplicateFilter, set_logger_to_console_level  # noqa: F401
 from .kw_formatter import ThdsCompactFormatter  # noqa: F401
-from .kw_logger import KwLogger, auto, getLogger, logger_context, make_th_formatters_safe  # noqa: F401
+from .kw_logger import KwLogger, getLogger, logger_context, make_th_formatters_safe  # noqa: F401

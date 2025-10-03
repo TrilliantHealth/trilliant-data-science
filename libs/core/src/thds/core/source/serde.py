@@ -36,7 +36,6 @@ def from_json(json_source: str, hash_parsers: ty.Collection[HashParser] = base_p
     return _construct.from_uri(
         uri=d["uri"],
         hash=next(filter(None, (p(d) for p in hash_parsers)), None),
-        size=d.get("size") or 0,
     )
 
 
@@ -58,7 +57,7 @@ def to_json(
     hash_dict = (
         next(filter(None, (ser(source.hash) for ser in hash_serializers if source.hash)), None)
     ) or dict()
-    return json.dumps(dict(uri=source.uri, size=source.size, **hash_dict))
+    return json.dumps(dict(uri=source.uri, **hash_dict))
 
 
 def from_unknown_user_path(path: types.StrOrPath, desired_uri: str) -> Source:
