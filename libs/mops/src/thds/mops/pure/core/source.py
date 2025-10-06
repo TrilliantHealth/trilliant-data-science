@@ -33,6 +33,7 @@ have a Source object returned to it while it performs low-level deserialization.
 """
 
 import io
+import json
 import sys
 import typing as ty
 from functools import partial
@@ -71,19 +72,44 @@ def _hashref_uri(hash: hashing.Hash, type: ty.Literal["local", "remote"]) -> str
     return to_uri(local_hashref)
 
 
-def _read_hashref(hashref_uri: str) -> str:
+class _HashrefMeta(ty.NamedTuple):
+    size: int
+
+    @classmethod
+    def empty(cls) -> "_HashrefMeta":
+        return cls(size=0)
+
+    def serialize(self) -> str:
+        serialized = json.dumps(self._asdict())
+        return serialized
+
+    @classmethod
+    def deserialize(cls, serialized: ty.Union[str, ty.Sequence[str]]) -> "_HashrefMeta":
+        s = serialized if isinstance(serialized, str) else serialized[0]
+        try:
+            return _HashrefMeta(**json.loads(s))
+        except json.JSONDecodeError:
+            logger.warning("Failed to deserialize hashref metadata '%s'", serialized)
+            return cls.empty()
+
+
+def _read_hashref(hashref_uri: str) -> ty.Tuple[str, _HashrefMeta]:
     """Return URI represented by this hashref. Performs IO."""
     uri_bytes = io.BytesIO()
     lookup_blob_store(hashref_uri).readbytesinto(hashref_uri, uri_bytes)
-    uri = uri_bytes.getvalue().decode()
+    content = uri_bytes.getvalue().decode()
+    uri, *rest = content.split("\n")
     assert uri, f"Hashref from {hashref_uri} is empty"
-    return uri
+    if not rest:
+        return uri, _HashrefMeta.empty()
+    return uri, _HashrefMeta.deserialize(rest)
 
 
-def _write_hashref(hashref_uri: str, uri: str) -> None:
+def _write_hashref(hashref_uri: str, uri: str, size: int) -> None:
     """Write URI to this hashref. Performs IO."""
     assert uri, f"Should never encode hashref ({hashref_uri}) pointing to empty URI"
-    lookup_blob_store(hashref_uri).putbytes(hashref_uri, uri.encode(), type_hint="text/plain")
+    content = "\n".join([uri, _HashrefMeta(size=size).serialize()])
+    lookup_blob_store(hashref_uri).putbytes(hashref_uri, content.encode(), type_hint="text/plain")
 
 
 def source_from_hashref(hash: hashing.Hash) -> Source:
@@ -92,7 +118,9 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
     local_file_hashref_uri = _hashref_uri(hash, "local")
     remote_hashref_uri = _hashref_uri(hash, "remote")
 
-    def remote_uri(allow_blob_not_found: bool = True) -> str:
+    def remote_uri_and_meta(
+        allow_blob_not_found: bool = True,
+    ) -> ty.Tuple[str, _HashrefMeta]:
         try:
             return _read_hashref(remote_hashref_uri)
         except Exception as e:
@@ -102,7 +130,7 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
                 # 'remote' blob not found is sometimes fine, but anything else is weird
                 # and we should raise.
                 raise
-            return ""
+            return "", _HashrefMeta.empty()
 
     try:
         # we might be on the same machine where this was originally invoked.
@@ -110,7 +138,9 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
         # Then, there's no need to bother grabbing the remote_uri
         # - but for debugging's sake, it's quite nice to actually
         # have the full remote URI as well even if we're ultimately going to use the local copy.
-        return source.from_file(_read_hashref(local_file_hashref_uri), hash=hash, uri=remote_uri())
+        local_uri, meta = _read_hashref(local_file_hashref_uri)
+        remote_uri, _ = remote_uri_and_meta()
+        return source.from_file(local_uri, hash=hash, uri=remote_uri, size=meta.size)
     except FileNotFoundError:
         # we are not on the same machine as the local ref. assume we need the remote URI.
         pass
@@ -120,14 +150,17 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
             raise
 
     # no local file, so we assume there must be a remote URI.
-    return source.from_uri(remote_uri(False), hash=hash)
+    remote_uri, meta = remote_uri_and_meta(False)
+    return source.from_uri(remote_uri, hash=hash, size=meta.size)
 
 
-def _upload_and_create_remote_hashref(local_path: Path, remote_uri: str, hash: hashing.Hash) -> None:
+def _upload_and_create_remote_hashref(
+    local_path: Path, remote_uri: str, hash: hashing.Hash, size: int
+) -> None:
     # exists only to provide a local (non-serializable) closure around local_path and remote_uri.
     lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
     # make sure we never overwrite a hashref until it's actually going to be valid.
-    _write_hashref(_hashref_uri(hash, "remote"), remote_uri)
+    _write_hashref(_hashref_uri(hash, "remote"), remote_uri, size)
 
 
 def _auto_remote_uri(hash: hashing.Hash) -> str:
@@ -155,7 +188,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         deferred_work.add(
             __name__ + "-localhashref",
             source_.hash,
-            partial(_write_hashref, _hashref_uri(source_.hash, "local"), str(local_path)),
+            partial(_write_hashref, _hashref_uri(source_.hash, "local"), str(local_path), source_.size),
         )
         # then also register pending upload - if the URI is a local file, we need to determine a
         # remote URI for this thing automagically; otherwise, use whatever was already
@@ -164,7 +197,9 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         deferred_work.add(
             __name__ + "-remotehashref",
             source_.hash,
-            partial(_upload_and_create_remote_hashref, local_path, remote_uri, source_.hash),
+            partial(
+                _upload_and_create_remote_hashref, local_path, remote_uri, source_.hash, source_.size
+            ),
         )
     else:
         # prepare to (later, if necessary) create a remote hashref, because this Source
@@ -172,7 +207,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         deferred_work.add(
             __name__,
             source_.hash,
-            partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri),
+            partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri, source_.size),
         )
 
     return hashing.Hash(algo=sys.intern(source_.hash.algo), bytes=source_.hash.bytes)
@@ -192,15 +227,17 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
 # just that mops must detect Sources in the return value and must force an upload on them.
 # In essence, this creates a bifurcated code path for Sources during serialization; if
 # we're "on the way out", we avoid uploading until it is clear that the data will be used
-# in a remote environment. Whereas "on the way back", we must always upload, and nothing
-# can or should be deferred; upload should happen at the time of serialization.
+# in a remote environment. Whereas "on the way back", we must always upload -- there, we
+# defer uploads until everything is serialized, then we perform all deferred uploads in
+# parallel, prior to writing the serialized result.
 #
 # Nevertheless, a local caller should still be able to short-circuit the _download_ by
 # using a locally-created File, if on the same machine where the local file was created.
 
 
 class SourceResult(ty.NamedTuple):
-    """Contains the fully-specified local URI and remote URI, plus (probably) a Hash.
+    """Contains the fully-specified local URI and remote URI, plus (probably) a Hash
+    and a size.
 
     Everything is defined right here. No need for any kind of dynamic lookup, and
     optimization buys us nothing, since memoization only operates on arguments.
@@ -209,6 +246,10 @@ class SourceResult(ty.NamedTuple):
     remote_uri: str
     hash: ty.Optional[hashing.Hash]
     file_uri: str
+
+    size: int = 0
+    # pickled instances of older versions of this namedtuple will be missing
+    # this field. we supply a default for backward-compatibility.
 
 
 class DuplicateSourceBasenameError(ValueError):
@@ -280,12 +321,14 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
     return SourceResult(remote_uri, source_.hash, source_.uri)
 
 
-def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], file_uri: str) -> Source:
+def source_from_source_result(
+    remote_uri: str, hash: ty.Optional[hashing.Hash], file_uri: str, size: int
+) -> Source:
     """Call when deserializing a remote function return value on the orchestrator side, to
     replace all SourceResults with the intended Source object.
     """
     if not file_uri:
-        return source.from_uri(remote_uri, hash=hash)
+        return source.from_uri(remote_uri, hash=hash, size=size)
 
     local_path = source.path_from_uri(file_uri)
 
@@ -299,13 +342,13 @@ def source_from_source_result(remote_uri: str, hash: ty.Optional[hashing.Hash], 
             # since there's a remote URI, it's possible a specific consumer might want to
             # get access to that directly, even though the default data access would still
             # be to use the local file.
-            return source.from_file(local_path, hash=hash, uri=remote_uri)
+            return source.from_file(local_path, hash=hash, uri=remote_uri, size=size)
 
         except Exception as e:
             logger.warning(
                 f"Unable to reuse destination local path {local_path} when constructing Source {remote_uri}: {e}"
             )
-    return source.from_uri(remote_uri, hash=hash)
+    return source.from_uri(remote_uri, hash=hash, size=size)
 
 
 def create_source_at_uri(filename: StrOrPath, destination_uri: str) -> Source:

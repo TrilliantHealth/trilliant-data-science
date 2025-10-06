@@ -108,13 +108,13 @@ def upload(
     blob_client = blob_container_client.get_blob_client(dest_.path)
     decision = upload_decision_and_metadata(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
 
-    def source_from_meta() -> source.Source:
+    def source_from_meta(size: ty.Optional[int] = None) -> source.Source:
         best_hash = next(iter(hashes.extract_hashes_from_metadata(decision.metadata)), None)
         if isinstance(src, Path):
             assert best_hash, "A hash should always be calculable for a local path."
             return source.from_file(src, hash=best_hash, uri=str(dest_))
 
-        return source.from_uri(str(dest_), hash=best_hash)
+        return source.from_uri(str(dest_), hash=best_hash, size=size or 0)
 
     if decision.upload_required:
         # set up some bookkeeping
@@ -168,4 +168,4 @@ def upload(
             **upload_data_kwargs,
         )
 
-    return source_from_meta()
+    return source_from_meta(n_bytes)

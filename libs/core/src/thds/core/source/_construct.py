@@ -34,7 +34,7 @@ def hash_file(path: Path, algo: str = "") -> Hash:
 
 
 def from_file(
-    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = ""
+    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = "", size: int = 0
 ) -> Source:
     """Create a read-only Source from a local file that already exists.
 
@@ -47,10 +47,11 @@ def from_file(
         raise FileNotFoundError(path)
 
     file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
+    file_size = size or path.stat().st_size
     if uri:
-        src = from_uri(uri, file_hash)
+        src = from_uri(uri, file_hash, file_size)
     else:
-        src = Source(to_uri(path), file_hash)
+        src = Source(to_uri(path), file_hash, file_size)
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
@@ -90,7 +91,7 @@ register_from_uri_handler(
 )
 
 
-def from_uri(uri: str, hash: ty.Optional[Hash] = None) -> Source:
+def from_uri(uri: str, hash: ty.Optional[Hash] = None, size: int = 0) -> Source:
     """Create a read-only Source from a URI. The data should already exist at this remote
     URI, although Source itself can make no guarantee that it always represents real data
     - only that any data it does represent is read-only.
@@ -102,4 +103,4 @@ def from_uri(uri: str, hash: ty.Optional[Hash] = None) -> Source:
     for handler in _FROM_URI_HANDLERS.values():
         if from_uri_ := handler(uri):
             return from_uri_(hash)
-    return Source(uri=uri, hash=hash)
+    return Source(uri=uri, hash=hash, size=size)

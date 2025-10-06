@@ -30,7 +30,9 @@ def _adls_uri_source_download_handler(uri: str) -> ty.Optional[source.Downloader
 source.register_download_handler("thds.adls", _adls_uri_source_download_handler)
 
 
-def from_adls(uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None) -> source.Source:
+def from_adls(
+    uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None, size: int = 0
+) -> source.Source:
     """Flexible, public interface to creating Sources from any ADLS-like reference.
 
     Does NOT automatically fetch a checksumming hash from the ADLS URI if it's not
@@ -40,7 +42,9 @@ def from_adls(uri_or_fqn: ty.Union[str, AdlsFqn], hash: ty.Optional[Hash] = None
     r_fqn = resolve_any(uri_or_fqn)
     if not r_fqn:
         raise ValueError(f"Could not resolve {uri_or_fqn} to an ADLS FQN")
-    return source.Source(str(r_fqn), hash)
+    if not size:
+        size = int(get_file_properties(r_fqn).get("size", 0))
+    return source.Source(str(r_fqn), hash, size)
 
 
 source.register_from_uri_handler(
