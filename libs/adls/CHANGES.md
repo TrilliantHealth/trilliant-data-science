@@ -1,8 +1,3 @@
-## 4.3
-
-- Updates extension of `core.source`, allowing setting `Source.size` via `source.from_adls` and `Source`s
-  returned from `upload`.
-
 ### 4.2.20250914
 
 Make `multilayer_yield_blob_meta` match directory path in base case.

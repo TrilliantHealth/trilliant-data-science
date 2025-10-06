@@ -60,7 +60,7 @@ def from_path(adls_path: uri.UriIsh, match_suffix: str = "") -> SourceTree:
     container_root = root_fqn.root()
     return SourceTree(
         sources=[
-            source.from_adls(container_root / blob_meta.path, hash=blob_meta.hash, size=blob_meta.size)
+            source.from_adls(container_root / blob_meta.path, hash=blob_meta.hash)
             for blob_meta in list_blob_meta(container_client, root_fqn.path, match_suffix=match_suffix)
         ],
         higher_logical_root=fqn.split(root_fqn)[-1],
