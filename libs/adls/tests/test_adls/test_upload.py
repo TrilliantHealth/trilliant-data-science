@@ -86,7 +86,7 @@ class Test_upload:
         src = Path(tmp_path / "1.txt")
         src.write_text("1234")
 
-        uploaded = upload(f"adls://thdsscratch/vtmp/adls/upload/{now}-{request.node.name}.txt", src)
+        uploaded = upload(f"adls://thdsscratch/vtmp/test/adls/upload/{now}-{request.node.name}.txt", src)
 
         assert uploaded.hash
         assert uploaded.hash.bytes == hashing.hash_using(src, hashes.default_hasher()).digest()
@@ -94,14 +94,18 @@ class Test_upload:
     def test_upload_bytes(self, request):
         bytes_ = "1234".encode()
 
-        uploaded = upload(f"adls://thdsscratch/vtmp/adls/upload/{now}-{request.node.name}.txt", bytes_)
+        uploaded = upload(
+            f"adls://thdsscratch/vtmp/test/adls/upload/{now}-{request.node.name}.txt", bytes_
+        )
 
         assert uploaded.hash
         assert uploaded.hash.bytes == hashing.hash_using(bytes_, hashes.default_hasher()).digest()
 
     def test_upload_bytes_io(self, request):
         buffer = io.BytesIO(b"1234")
-        uploaded = upload(f"adls://thdsscratch/vtmp/adls/upload/{now}-{request.node.name}.txt", buffer)
+        uploaded = upload(
+            f"adls://thdsscratch/vtmp/test/adls/upload/{now}-{request.node.name}.txt", buffer
+        )
 
         buffer.seek(0)
         expected_hash = hashing.hash_using(buffer, hashes.default_hasher()).digest()
@@ -113,7 +117,7 @@ class Test_upload:
                 yield str(i).encode()
 
         uploaded = upload(
-            f"adls://thdsscratch/vtmp/adls/upload/{now}-{request.node.name}.txt", _yield_bytes()
+            f"adls://thdsscratch/vtmp/test/adls/upload/{now}-{request.node.name}.txt", _yield_bytes()
         )
 
         assert uploaded.hash is None
