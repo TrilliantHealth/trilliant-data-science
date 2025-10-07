@@ -138,7 +138,7 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
         # Then, there's no need to bother grabbing the remote_uri
         # - but for debugging's sake, it's quite nice to actually
         # have the full remote URI as well even if we're ultimately going to use the local copy.
-        local_uri, meta = _read_hashref(local_file_hashref_uri)
+        local_uri, _ = _read_hashref(local_file_hashref_uri)
         remote_uri, _ = remote_uri_and_meta()
         return source.from_file(local_uri, hash=hash, uri=remote_uri)
     except FileNotFoundError:
