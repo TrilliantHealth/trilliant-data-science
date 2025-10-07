@@ -55,7 +55,7 @@ def from_file(
 
 
 class FromUri(ty.Protocol):
-    def __call__(self, hash: ty.Optional[Hash]) -> Source:
+    def __call__(self, hash: ty.Optional[Hash], size: int = 0) -> Source:
         """Closure over a URI that creates a Source from a URI.
 
         The Hash may be used to short-circuit creation that would result in creating
@@ -100,5 +100,5 @@ def from_uri(uri: str, hash: ty.Optional[Hash] = None, size: int = 0) -> Source:
     """
     for handler in _FROM_URI_HANDLERS.values():
         if from_uri_ := handler(uri):
-            return from_uri_(hash)
+            return from_uri_(hash, size)
     return Source(uri=uri, hash=hash, size=size)
