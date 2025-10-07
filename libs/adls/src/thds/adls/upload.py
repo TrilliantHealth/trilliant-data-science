@@ -38,8 +38,8 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
         out = scope.enter(tmp.temppath_same_fs(local_cache_path))
         if hasattr(data, "read") and hasattr(data, "seek"):
             with open(out, "wb") as f:
-                f.write(data.read())  # type: ignore
-            data.seek(0)  # type: ignore
+                f.write(data.read())
+            data.seek(0)
             link.link_or_copy(out, local_cache_path)
             return True
 

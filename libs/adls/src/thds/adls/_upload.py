@@ -38,7 +38,7 @@ def _try_default_hash(data: hashes.AnyStrSrc) -> ty.Optional[hashing.Hash]:
     return None
 
 
-UploadSrc = ty.Union[Path, bytes, ty.IO[ty.AnyStr], ty.Iterable[bytes]]
+UploadSrc = ty.Union[Path, bytes, ty.IO[bytes], ty.Iterable[bytes]]
 
 
 def upload_src_len(upload_src: UploadSrc, default: int = 0) -> int:
