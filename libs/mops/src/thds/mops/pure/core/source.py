@@ -87,7 +87,7 @@ class _HashrefMeta(ty.NamedTuple):
     def deserialize(cls, serialized: ty.Union[str, ty.Sequence[str]]) -> "_HashrefMeta":
         s = serialized if isinstance(serialized, str) else serialized[0]
         try:
-            return _HashrefMeta(**json.loads(s))
+            return cls(**json.loads(s))
         except json.JSONDecodeError:
             logger.warning("Failed to deserialize hashref metadata '%s'", serialized)
             return cls.empty()

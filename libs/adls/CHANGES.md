@@ -1,4 +1,4 @@
-### 4.2.20251006
+## 4.3
 
 - Updates extension of `core.source`, allowing setting `Source.size` via `source.from_adls` and `Source`s
   returned from `upload`.

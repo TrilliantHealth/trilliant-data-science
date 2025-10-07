@@ -36,7 +36,7 @@ def from_json(json_source: str, hash_parsers: ty.Collection[HashParser] = base_p
     return _construct.from_uri(
         uri=d["uri"],
         hash=next(filter(None, (p(d) for p in hash_parsers)), None),
-        size=d.get("size", 0),
+        size=d.get("size") or 0,
     )
 
 

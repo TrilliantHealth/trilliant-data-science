@@ -42,8 +42,6 @@ def from_adls(
     r_fqn = resolve_any(uri_or_fqn)
     if not r_fqn:
         raise ValueError(f"Could not resolve {uri_or_fqn} to an ADLS FQN")
-    if not size:
-        size = int(get_file_properties(r_fqn).get("size", 0))
     return source.Source(str(r_fqn), hash, size)
 
 
@@ -59,13 +57,15 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
     """
     fqn = AdlsFqn.parse(fqn_or_uri) if isinstance(fqn_or_uri, str) else fqn_or_uri
     with blob_not_found_translation(fqn):
-        uri_hashes = hashes.extract_hashes_from_props(get_file_properties(fqn))
+        props = get_file_properties(fqn)
+        uri_hashes = hashes.extract_hashes_from_props(props)
         if not uri_hashes:
             raise ValueError(
                 f"ADLS file {fqn} must have a hash to use this function. "
                 "If you know the hash, use `from_adls` with the hash parameter."
             )
-        return from_adls(fqn, next(iter(uri_hashes.values())))
+        size = int(props.get("size")) or 0
+        return from_adls(fqn, next(iter(uri_hashes.values())), size)
 
 
 def with_md5b64(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:

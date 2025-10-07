@@ -43,11 +43,11 @@ def from_file(
     responsibility to ensure that your file has been uploaded to the URI you provide.
     """
     path = path_from_uri(filename) if isinstance(filename, str) else Path(filename)
-    if not path.exists():
-        raise FileNotFoundError(path)
+    stats = path.stat()  # raises FileNotFoundError if file doesn't exist
 
     file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
-    file_size = size or path.stat().st_size
+    file_size = size or stats.st_size
+    # TODO: remove size parameter, just use `stats.st_size`
     if uri:
         src = from_uri(uri, file_hash, file_size)
     else:
