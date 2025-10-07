@@ -140,7 +140,7 @@ def source_from_hashref(hash: hashing.Hash) -> Source:
         # have the full remote URI as well even if we're ultimately going to use the local copy.
         local_uri, meta = _read_hashref(local_file_hashref_uri)
         remote_uri, _ = remote_uri_and_meta()
-        return source.from_file(local_uri, hash=hash, uri=remote_uri, size=meta.size)
+        return source.from_file(local_uri, hash=hash, uri=remote_uri)
     except FileNotFoundError:
         # we are not on the same machine as the local ref. assume we need the remote URI.
         pass
@@ -248,8 +248,8 @@ class SourceResult(ty.NamedTuple):
     file_uri: str
 
     size: int = 0
-    # pickled instances of older versions of this namedtuple will be missing
-    # this field. we supply a default for backward-compatibility.
+    # instances of older versions of this namedtuple will be missing this field.
+    # we supply a default for backward-compatibility.
 
 
 class DuplicateSourceBasenameError(ValueError):
@@ -288,7 +288,7 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
         else:
             file_uri = ""
             logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
-        return SourceResult(source_.uri, source_.hash, file_uri)
+        return SourceResult(source_.uri, source_.hash, file_uri, source_.size)
 
     # by definition, if this is a file URI, it now needs to be uploaded, because we could
     # be transferring back to an orchestrator on a different machine, but also because a
@@ -318,7 +318,7 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
         partial(_put_file_to_blob_store, local_path, remote_uri),
     )
     # upload must _always_ happen on remotely-returned Sources, as detailed above.
-    return SourceResult(remote_uri, source_.hash, source_.uri)
+    return SourceResult(remote_uri, source_.hash, source_.uri, source_.size)
 
 
 def source_from_source_result(
@@ -342,7 +342,7 @@ def source_from_source_result(
             # since there's a remote URI, it's possible a specific consumer might want to
             # get access to that directly, even though the default data access would still
             # be to use the local file.
-            return source.from_file(local_path, hash=hash, uri=remote_uri, size=size)
+            return source.from_file(local_path, hash=hash, uri=remote_uri)
 
         except Exception as e:
             logger.warning(

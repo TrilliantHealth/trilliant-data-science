@@ -34,7 +34,7 @@ def hash_file(path: Path, algo: str = "") -> Hash:
 
 
 def from_file(
-    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = "", size: int = 0
+    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = ""
 ) -> Source:
     """Create a read-only Source from a local file that already exists.
 
@@ -46,12 +46,10 @@ def from_file(
     stats = path.stat()  # raises FileNotFoundError if file doesn't exist
 
     file_hash = hash or hash_file(path)  # use automatic hash algo if not specified!
-    file_size = size or stats.st_size
-    # TODO: remove size parameter, just use `stats.st_size`
     if uri:
-        src = from_uri(uri, file_hash, file_size)
+        src = from_uri(uri, file_hash, stats.st_size)
     else:
-        src = Source(to_uri(path), file_hash, file_size)
+        src = Source(to_uri(path), file_hash, stats.st_size)
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
