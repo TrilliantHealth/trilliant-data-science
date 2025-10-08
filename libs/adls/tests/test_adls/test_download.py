@@ -17,7 +17,7 @@ from thds.adls.download import (
     async_download_or_use_verified,
     download_or_use_verified,
 )
-from thds.adls.download_lock import _clean_download_locks
+from thds.adls.file_lock import _clean_file_locks
 from thds.adls.global_client import get_global_fs_client
 from thds.adls.ro_cache import Cache, global_cache
 
@@ -266,8 +266,8 @@ def test_parallel_downloads_only_perform_a_single_download(
     assert reuse_count == 9
 
 
-def test_clean_download_locks(caplog: pytest.LogCaptureFixture):
-    num_deleted = _clean_download_locks()
+def test_clean_file_locks(caplog: pytest.LogCaptureFixture):
+    num_deleted = _clean_file_locks()
     print("deleted num lockfiles: ", num_deleted)
 
     for record in caplog.records:

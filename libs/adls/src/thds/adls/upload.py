@@ -15,17 +15,15 @@ from thds.core import files, fretry, link, log, scope, source, tmp
 
 from . import azcopy, hashes
 from ._progress import report_upload_progress
-from ._upload import upload_decision_and_metadata
+from ._upload import UploadSrc, upload_decision_and_metadata, upload_src_len
 from .conf import UPLOAD_FILE_MAX_CONCURRENCY
+from .file_lock import file_lock
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client
 from .ro_cache import Cache
 
 logger = log.getLogger(__name__)
 _SLOW_CONNECTION_WORKAROUND = 14400  # seconds
-
-
-UploadSrc = ty.Union[Path, bytes, ty.IO[ty.AnyStr], ty.Iterable[bytes]]
 
 
 def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Optional[Path]:
@@ -40,8 +38,8 @@ def _write_through_local_cache(local_cache_path: Path, data: UploadSrc) -> ty.Op
         out = scope.enter(tmp.temppath_same_fs(local_cache_path))
         if hasattr(data, "read") and hasattr(data, "seek"):
             with open(out, "wb") as f:
-                f.write(data.read())  # type: ignore
-            data.seek(0)  # type: ignore
+                f.write(data.read())
+            data.seek(0)
             link.link_or_copy(out, local_cache_path)
             return True
 
@@ -101,9 +99,12 @@ def upload(
         # we always use the original source file to upload, not the cached path,
         # because uploading from a shared location risks race conditions.
 
+    scope.enter(file_lock(str(dest_), locktype="upload"))
+
     blob_container_client = get_global_blob_container_client(dest_.sa, dest_.container)
     blob_client = blob_container_client.get_blob_client(dest_.path)
     decision = upload_decision_and_metadata(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
+    n_bytes = upload_src_len(src, default=0)
 
     def source_from_meta() -> source.Source:
         best_hash = next(iter(hashes.extract_hashes_from_metadata(decision.metadata)), None)
@@ -111,17 +112,14 @@ def upload(
             assert best_hash, "A hash should always be calculable for a local path."
             return source.from_file(src, hash=best_hash, uri=str(dest_))
 
-        return source.from_uri(str(dest_), hash=best_hash)
+        return source.from_uri(str(dest_), hash=best_hash, size=n_bytes)
 
     if decision.upload_required:
         # set up some bookkeeping
-        n_bytes = None  # if we pass 0 to upload_blob, it truncates the write now
         bytes_src: ty.Union[bytes, ty.IO, ty.Iterable[bytes]]
         if isinstance(src, Path):
-            n_bytes = src.stat().st_size
             bytes_src = scope.enter(open(src, "rb"))
         elif isinstance(src, bytes):
-            n_bytes = len(src)
             bytes_src = src
         else:
             bytes_src = src
@@ -129,7 +127,7 @@ def upload(
         if "metadata" in upload_data_kwargs:
             decision.metadata.update(upload_data_kwargs.pop("metadata"))
 
-        if azcopy.upload.should_use_azcopy(n_bytes or 0) and isinstance(src, Path):
+        if azcopy.upload.should_use_azcopy(n_bytes) and isinstance(src, Path):
             logger.info("Using azcopy to upload %s to %s", src, dest_)
             try:
                 azcopy.upload.run(
@@ -137,7 +135,7 @@ def upload(
                         src, dest_, content_type=content_type, metadata=decision.metadata, overwrite=True
                     ),
                     dest_,
-                    n_bytes or 0,
+                    n_bytes,
                 )
                 return source_from_meta()
 
@@ -155,9 +153,11 @@ def upload(
         # This is both faster, as well as simpler to reason about, and
         # in fact was the behavior I had been assuming all along...
         blob_client.upload_blob(
-            report_upload_progress(ty.cast(ty.IO, bytes_src), str(dest_), n_bytes or 0),
+            report_upload_progress(ty.cast(ty.IO, bytes_src), str(dest_), n_bytes),
             overwrite=True,
-            length=n_bytes,
+            length=(
+                n_bytes if n_bytes > 0 else None
+            ),  # if we pass 0 to upload_blob, it truncates the write now
             content_settings=upload_content_settings,
             connection_timeout=_SLOW_CONNECTION_WORKAROUND,
             max_concurrency=UPLOAD_FILE_MAX_CONCURRENCY(),
