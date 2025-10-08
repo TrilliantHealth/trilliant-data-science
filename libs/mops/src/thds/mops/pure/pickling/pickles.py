@@ -14,7 +14,7 @@ from pathlib import Path
 from thds.core import hashing, log, source
 
 from ..core.script_support import add_main_module_function, get_main_module_function
-from ..core.source import source_from_hashref, source_from_source_result
+from ..core.source import SourceResult, source_from_hashref, source_from_source_result
 from ..core.uris import get_bytes, lookup_blob_store
 
 logger = log.getLogger(__name__)
@@ -131,17 +131,15 @@ class UnpickleSourceHashrefArgument(ty.NamedTuple):
         return source_from_hashref(self.hash)
 
 
-class UnpickleSourceResult(ty.NamedTuple):
+class UnpickleSourceResult(SourceResult):
     """Stability for this is not critical, as it will only ever exist in the result
     payload, which does not participate in memoization.
     """
 
-    remote_uri: str
-    hash: ty.Optional[hashing.Hash]
-    file_uri: str
-
     def __call__(self) -> source.Source:
-        return source_from_source_result(*self)
+        return source_from_source_result(
+            remote_uri=self.remote_uri, hash=self.hash, file_uri=self.file_uri, size=self.size
+        )
 
 
 class UnpickleFunctionWithLogicKey(ty.NamedTuple):

@@ -1,4 +1,5 @@
 import dataclasses
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -43,9 +44,22 @@ def test_resolve_local_source(temp_file):
     # running this twice makes sure we cover the optimized reuse of the cached path.
 
 
+def test_from_file_includes_file_size(temp_file):
+    tfile = temp_file("12345")
+
+    source = from_file(tfile)
+    assert source.size == 5
+
+
 def test_from_file_fails_if_path_not_exists():
     with pytest.raises(FileNotFoundError):
         from_file(Path("does-not-exist"))
+
+
+def test_from_file_fails_if_path_is_dir():
+    with tempfile.TemporaryDirectory() as tempdir:
+        with pytest.raises(IsADirectoryError):
+            from_file(Path(tempdir))
 
 
 def test_from_uri_redirects_to_from_file_for_file_scheme(temp_file):
@@ -122,4 +136,7 @@ def test_to_json():
             ),
         )
     )
-    assert the_json == '{"uri": "foobar", "blake3b64": "3FpO24JAsBgSQFLDMCcGlvlncaY7RSUKXBfTAA6CM1U="}'
+    assert (
+        the_json
+        == '{"uri": "foobar", "size": 0, "blake3b64": "3FpO24JAsBgSQFLDMCcGlvlncaY7RSUKXBfTAA6CM1U="}'
+    )
