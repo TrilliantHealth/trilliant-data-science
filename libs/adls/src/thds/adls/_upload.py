@@ -38,17 +38,22 @@ def _try_default_hash(data: hashes.AnyStrSrc) -> ty.Optional[hashing.Hash]:
     return None
 
 
-def _too_small_to_skip_upload(data: hashes.AnyStrSrc, min_size_for_remote_check: int) -> bool:
-    def _len() -> int:
-        if isinstance(data, Path) and data.exists():
-            return data.stat().st_size
-        try:
-            return len(data)  # type: ignore
-        except TypeError as te:
-            logger.debug(f"failed to get length? {repr(te)} for {data}")
-            return min_size_for_remote_check + 1
+UploadSrc = ty.Union[Path, bytes, ty.IO[bytes], ty.Iterable[bytes]]
 
-    return _len() < min_size_for_remote_check
+
+def upload_src_len(upload_src: UploadSrc, default: int = 0) -> int:
+    if isinstance(upload_src, Path) and upload_src.exists():
+        return upload_src.stat().st_size
+    try:
+        return len(upload_src)  # type: ignore
+    except TypeError as te:
+        logger.debug(f"failed to get length? {repr(te)} for {upload_src!r}")
+        return default
+
+
+def _too_small_to_skip_upload(data: hashes.AnyStrSrc, min_size_for_remote_check: int) -> bool:
+    len_ = upload_src_len(data) or min_size_for_remote_check + 1
+    return len_ < min_size_for_remote_check
 
 
 class UploadDecision(ty.NamedTuple):

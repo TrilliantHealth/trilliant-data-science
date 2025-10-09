@@ -16,7 +16,7 @@ from thds.core.types import StrOrPath
 
 from . import azcopy, errors, etag, hashes
 from ._progress import report_download_progress
-from .download_lock import download_lock
+from .file_lock import file_lock
 from .fqn import AdlsFqn
 from .ro_cache import Cache, from_cache_path_to_local, from_local_path_to_cache
 
@@ -240,12 +240,12 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
     # No cache hit, so its time to prepare to download. if a cache was provided, we will
     # _put_ the resulting file in it.
 
-    file_lock = str(cache.path(fqn) if cache else local_path)
+    file_lock_str = str(cache.path(fqn) if cache else local_path)
     # create lockfile name from the (shared) cache path if present, otherwise the final
     # destination.  Non-cache users may then still incur multiple downloads in parallel,
     # but if you wanted to coordinate then you should probably have been using the global
     # cache in the first place.
-    _dl_scope.enter(download_lock(file_lock))
+    _dl_scope.enter(file_lock(file_lock_str))
 
     # re-attempt cache hit - we may have gotten the lock after somebody else downloaded
     if file_result := attempt_cache_hit():
