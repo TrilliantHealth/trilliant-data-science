@@ -94,7 +94,6 @@ def yield_all(
     len_or_none = try_len(thunks)
 
     num_tasks_log = "" if not len_or_none else f" of {len_or_none}"
-    named = f" {named} " if named else " result "
 
     if PARALLEL_OFF() or (len_or_none == 1 and not executor_cm):
         # don't actually transfer this to an executor we only have one task.
@@ -119,10 +118,12 @@ def yield_all(
             try:
                 result = future.result()
                 yielder: tuple[H, ty.Union[R, Error]] = thunk_key, ty.cast(R, result)
+                name = named or result.__class__.__name__
             except Exception as e:
                 yielder = thunk_key, Error(e)
+                name = named or e.__class__.__name__
             finally:
-                progress_logger(fmt(f"Yielding{named}{i}{num_tasks_log}"))
+                progress_logger(fmt(f"Yielding {name} {i}{num_tasks_log}"))
                 yield yielder
 
 
