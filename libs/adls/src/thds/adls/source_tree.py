@@ -10,10 +10,11 @@ def from_path(adls_path: uri.UriIsh, match_suffix: str = "") -> SourceTree:
     root_fqn = uri.parse_any(adls_path)
 
     return SourceTree(
-        sources=list(
+        sources=sorted(
             list_fast.multilayer_yield_sources(
                 root_fqn, layers=0, filter_=lambda blob: blob.path.endswith(match_suffix)
-            )
+            ),
+            key=lambda src: src.uri,
         ),
         higher_logical_root=fqn.split(root_fqn)[-1],
     )
