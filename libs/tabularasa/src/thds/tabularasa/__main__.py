@@ -721,8 +721,9 @@ class ReferenceDataManager:
         run_hash_update = bool(tables_to_update_hashes) and update_hashes
 
         if not no_sync:
-            # ensure local blobs are up-to-date before building
-            self.sync_blob_store(down=True)
+            # ensure local blobs are up-to-date before building, but don't fail if a remote blob is absent;
+            # we'll just regenerate it if it's needed for computing the current DAG
+            self.sync_blob_store(down=True, no_fail_if_absent=True)
 
         for table_name in tables_to_recompute:
             table = self.schema.tables[table_name]
@@ -938,6 +939,8 @@ class ReferenceDataManager:
                 if success:
                     return table.name
                 else:
+                    if down and no_fail_if_absent:
+                        return None
                     raise IOError(table.name)
 
         failed: List[str] = []
@@ -966,18 +969,26 @@ class ReferenceDataManager:
         self.logger.info(f"Success - build-time package data tables{tables_} synced {addendum}")
         return synced
 
-    def pull(self, tables: Optional[Set[str]] = None):
-        """Download all remote blobs to the local data directory, with integrity checks."""
-        self.sync_blob_store(down=True, tables=tables)
+    def pull(self, tables: Optional[Set[str]] = None, *, no_fail_if_absent: bool = False):
+        """Download all remote blobs to the local data directory, with integrity checks.
 
-    def push(self, no_fail_if_absent: bool = False):
+        :param tables: optional collection of table names to sync; all will be synced if not passed.
+        :param no_fail_if_absent: when passed, don't fail a download for lack of a remote blob being
+          present in the bob store with the expected hash for a version-controlled table. This is useful
+          in development workflows where you just want to regenerate/sync a particular table that you
+          generated once and then removed, but didn't push yet (leaving a dangling hash reference).
+        """
+        self.sync_blob_store(down=True, no_fail_if_absent=no_fail_if_absent, tables=tables)
+
+    def push(self, tables: Optional[Set[str]] = None, *, no_fail_if_absent: bool = False):
         """Upload all local data files to the remote blob store, with integrity checks.
 
+        :param tables: optional collection of table names to sync; all will be synced if not passed.
         :param no_fail_if_absent: when passed, don't fail an upload for lack of a local file being
           present with the expected hash for a version-controlled table. This is useful in development
           workflows where you just want to regenerate/sync a particular table that you've updated.
         """
-        self.sync_blob_store(up=True, no_fail_if_absent=no_fail_if_absent)
+        self.sync_blob_store(up=True, no_fail_if_absent=no_fail_if_absent, tables=tables)
 
     @output_handler(print_schema_diff_summary)
     def schema_diff(

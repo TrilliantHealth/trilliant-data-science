@@ -1,3 +1,14 @@
+## 0.12.0
+
+- in `tabularasa push`, switched `no_fail_if_absent` from a positional arg parsed to boolean to a flag
+  (`--no-fail-if-absent`)
+- imbued `--no-fail-if-absent` with semantics in the `taburasa sync-blob-store --down`/`tabularasa pull`
+  case (previously it only appled to the `--up`/`push` case). Now, if you attempt to sync a blob down
+  which has no corresponding blob in the blob store, there is no error.
+- in `tabularasa datagen`, the blob store sync down to local files is run with the new
+  `no_fail_if_absent` semantics. Any blobs which fail to sync, that are required in the build DAG, will
+  just be regenerated as part of the build, due to absence or hash mismatches.
+
 ### 0.11.3
 
 flake8 and black
