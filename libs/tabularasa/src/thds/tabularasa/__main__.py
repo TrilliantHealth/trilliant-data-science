@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -13,7 +14,7 @@ from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tu
 import networkx as nx
 import pkg_resources
 
-from thds.core import link, parallel
+from thds.core import parallel
 from thds.tabularasa.data_dependencies.adls import (
     ADLSFileIntegrityError,
     ADLSFileSystem,
@@ -729,7 +730,7 @@ class ReferenceDataManager:
             file_path = self.data_path_for(table)
             if file_path.exists():
                 self.logger.warning(f"Removing built file for table {table.name} at {file_path}")
-                file_path.unlink()
+                os.remove(file_path)
             else:
                 self.logger.info(f"No file found for table {table.name}; nothing to remove")
         try:
@@ -762,7 +763,7 @@ class ReferenceDataManager:
         for table in tables_to_update:
             table_name = table.name
             table_path = self.data_path_for(table)
-            if table_path.exists():
+            if os.path.exists(table_path):
                 md5 = hash_file(table_path)
                 old_md5 = table.md5
                 if old_md5 is None:
@@ -846,10 +847,10 @@ class ReferenceDataManager:
                 local_cache_path = paths[0].local_path
                 if sync_data.local_file_exists:
                     self.logger.warning(f"Removing existing file {sync_data.local_path}")
-                    sync_data.local_path.unlink()
+                    os.remove(sync_data.local_path)
                 self.logger.info(f"Linking downloaded file to local build file {sync_data.local_path}")
                 sync_data.local_path.parent.mkdir(parents=True, exist_ok=True)
-                link.link(local_cache_path, sync_data.local_path)
+                os.link(local_cache_path, sync_data.local_path)
             return True
 
     def sync_blob_store(
@@ -942,18 +943,16 @@ class ReferenceDataManager:
                         return None
                     raise IOError(table.name)
 
-        failed: list[tuple[str, Exception]] = []
+        failed: List[str] = []
         synced: List[str] = []
         for table_name, res in parallel.yield_all([(t.name, partial(inner, t)) for t in tables_to_sync]):
             if isinstance(res, parallel.Error):
-                failed.append((table_name, res.error))
+                failed.append(table_name)
             elif res is not None:
                 synced.append(table_name)
 
         if failed:
-            first_exc = failed[0][1]
-            table_names = [name for name, _ in failed]
-            raise RuntimeError(f"Sync failed for tables {', '.join(table_names)}") from first_exc
+            raise RuntimeError(f"Sync failed for tables {', '.join(failed)}")
 
         down_ = (
             f"to local build directory {pkg_resources.resource_filename(self.package, self.package_data_dir)}"

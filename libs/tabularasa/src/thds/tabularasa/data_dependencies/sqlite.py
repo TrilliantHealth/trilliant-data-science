@@ -8,7 +8,11 @@ from typing import Callable, Mapping, Optional, Union
 import pandas as pd
 
 from thds.tabularasa.loaders.parquet_util import TypeCheckLevel, pandas_maybe
-from thds.tabularasa.loaders.sqlite_util import bulk_write_connection, sqlite_preprocessor_for_type
+from thds.tabularasa.loaders.sqlite_util import (
+    bulk_write_context,
+    sqlite_connection,
+    sqlite_preprocessor_for_type,
+)
 from thds.tabularasa.loaders.util import PandasParquetLoader
 from thds.tabularasa.schema.compilation.sqlite import render_sql_index_schema, render_sql_table_schema
 from thds.tabularasa.schema.metaschema import Schema, Table, is_build_time_package_table
@@ -222,9 +226,7 @@ def populate_sqlite_db(
     table_predicate: Callable[[Table], bool] = is_build_time_package_table,
     data_path_overrides: Optional[Mapping[str, Path]] = None,
 ):
-    """Populate a sqlite database with data for a set of tables from a `reference_data.schema.Schema`.
-    Note that this can safely be called concurrently in multiple processes on the same database file; a file lock
-    is acquired on the database file and only released when the data insertion is complete.
+    """Populate a sqlite database with data for a set of tables from a `reference_data.schema.Schema`
 
     :param schema: the `reference_data.schema.Schema` object defining the data to be inserted
     :param db_package: name of the package where the database file is stored, if any. In case `None` is
@@ -261,10 +263,7 @@ def populate_sqlite_db(
     # gather all tables before executing any I/O
     insert_tables = [table for table in schema.filter_tables(table_predicate) if table.has_indexes]
 
-    if not insert_tables:
-        return
-
-    with bulk_write_connection(db_path, db_package, close=True) as con:
+    with bulk_write_context(sqlite_connection(db_path, db_package, read_only=False), close=True) as con:
         for table in insert_tables:
             table_filename: Optional[str]
             table_package: Optional[str]

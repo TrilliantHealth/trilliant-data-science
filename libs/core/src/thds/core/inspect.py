@@ -1,7 +1,6 @@
 import inspect
 import typing as ty
 from dataclasses import dataclass
-from types import ModuleType
 
 
 @dataclass(frozen=True)
@@ -33,7 +32,7 @@ def get_caller_info(skip: int = 2) -> CallerInfo:
     start = 0 + skip
     if len(stack) < start + 1:
         raise RuntimeError(f"The stack has less than f{skip} + 1 frames in it.")
-    parentframe = stack[start].frame
+    parentframe = stack[start][0]
 
     # full dotted name of caller module
     module_info = inspect.getmodule(parentframe)
@@ -69,27 +68,3 @@ def bind_arguments(
 
 def get_argument(arg_name: str, bound_arguments: inspect.BoundArguments) -> ty.Any:
     return bound_arguments.arguments[arg_name]
-
-
-def yield_caller_modules_and_frames(*skip: str) -> ty.Iterator[tuple[ModuleType, inspect.FrameInfo]]:
-    """Yields caller modules and their frame info, skipping any modules in the skip list."""
-    stack = inspect.stack()
-    skip = set(skip) | {__name__}  # type: ignore
-    for frame_info in stack[1:]:  # don't bother with the current frame, obviously
-        module = inspect.getmodule(frame_info.frame)
-        if module:
-            module_name = module.__name__
-            if module_name not in skip:
-                yield module, frame_info
-
-
-def caller_module_name(*skip: str) -> str:
-    """
-    Find the first caller module that is not in the skip list.
-    :param skip: module names to skip
-    :return: the first caller module name not in skip, or empty string if no module can be found
-    """
-    for module, _frame in yield_caller_modules_and_frames(*skip):
-        return module.__name__
-
-    return ""  # this is trivially distinguishable from a module name, so no need to force people to handle None
