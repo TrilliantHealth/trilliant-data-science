@@ -1,16 +1,3 @@
-## 1.49
-
-- Adds `uri_assign` module to provide a remote working 'directory' abstraction, mostly for `Source`.
-
-## 1.48
-
-- Adds `derive_partition_min_max` for calculating the min and max values of a range partition.
-
-## 1.47
-
-- Improve/regularize default logging for `core.parallel`, and add `named=` keyword argument to
-  `xf_mapping`.
-
 ## 1.46
 
 - adds attribute `.size` to `core.source.Source`.
