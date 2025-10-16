@@ -1,4 +1,3 @@
-import dataclasses
 import typing
 from functools import partial
 from typing import List, Optional, Tuple, Type, TypeVar
@@ -71,7 +70,6 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
         *,
         first: Optional[Tuple[Predicate[Type], RecF[Type, Params, U]]] = None,
         attrs: Optional[RecF[Type, Params, U]] = None,
-        dataclass: Optional[RecF[Type, Params, U]] = None,
         namedtuple: Optional[RecF[Type, Params, U]] = None,
         optional: Optional[RecF[Type, Params, U]] = None,
         union: Optional[RecF[Type, Params, U]] = None,
@@ -98,7 +96,6 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
                 (type_utils.is_literal_type, literal),
                 (type_utils.is_enum_type, enum),
                 (attr.has, attrs),
-                (dataclasses.is_dataclass, dataclass),
                 (type_utils.is_optional_type, optional),
                 (is_union_type, union),
                 (type_utils.is_set_type, set),
