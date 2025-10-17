@@ -5,7 +5,7 @@ import pickle
 import typing as ty
 from pathlib import Path
 
-from thds.core import config, files, log, pickle_visit, source
+from thds.core import config, log, pickle_visit, source
 from thds.mops.pure.core.memo import function_memospace
 from thds.mops.pure.core.metadata import get_invoked_by
 
@@ -152,7 +152,10 @@ def log_function_execution(
         log_entry["uris_in_rvalue"] = sorted(source_uris)
 
     try:
-        with files.atomic_text_writer(log_file) as file:
-            json.dump(log_entry, file, indent=2)
+        assert not log_file.exists(), f"Log file '{log_file}' should not already exist"
+        with log_file.open("w") as f:
+            json.dump(log_entry, f, indent=2)
     except Exception:
-        logger.exception(f"Failed to write mops function invocation log file at '{log_file}'")
+        logger.info(
+            f"Unable to write mops function invocation log file at '{log_file}' - you may have multiple callers for the same invocation"
+        )
