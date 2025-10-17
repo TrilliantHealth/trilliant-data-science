@@ -1,3 +1,8 @@
+### 0.12.2
+
+- Further simplification of sqlite bulk inserts. WAL mode is found to have little effect on performance
+  in this context, and mutates the database, so it has been removed to reduce complexity.
+
 ### 0.12.1
 
 - The main sqlite data population routine, invokable via the `tabularasa init-sqlite` command or
