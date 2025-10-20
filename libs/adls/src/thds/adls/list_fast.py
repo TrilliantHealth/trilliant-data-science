@@ -6,11 +6,12 @@ client instead of the file system client.
 
 import typing as ty
 
-from thds.core import log, parallel, thunks
+from thds.core import log, parallel, source, thunks
 
-from . import global_client
+from . import blob_meta, global_client
+from . import source as adls_source
 from .fqn import AdlsFqn
-from .source_tree import BlobMeta, to_blob_meta, yield_blob_meta
+from .uri import UriIsh, parse_any
 
 R = ty.TypeVar("R")
 
@@ -27,7 +28,7 @@ def _failfast_parallel(thunks: ty.Iterable[ty.Callable[[], R]]) -> ty.Iterator[R
     )
 
 
-def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[BlobMeta]:
+def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[blob_meta.BlobMeta]:
     """A fast way to find all blobs in a directory tree; we do this in parallel on
     subdirs, with as much nesting as necessary (though 1 level should be enough for most cases).
 
@@ -37,7 +38,7 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[Blo
     """
     if layers <= 0:
         # directly yield the blobs
-        yield from yield_blob_meta(
+        yield from blob_meta.yield_blob_meta(
             global_client.get_global_blob_container_client(fqn.sa, fqn.container),
             fqn.path.rstrip("/") + "/",
         )
@@ -77,8 +78,10 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[Blo
 
     blob_container_client = global_client.get_global_blob_container_client(fqn.sa, fqn.container)
 
-    def _get_blob_meta(blob_name: str) -> BlobMeta:
-        return to_blob_meta(blob_container_client.get_blob_client(blob_name).get_blob_properties())
+    def _get_blob_meta(blob_name: str) -> blob_meta.BlobMeta:
+        return blob_meta.to_blob_meta(
+            blob_container_client.get_blob_client(blob_name).get_blob_properties()
+        )
 
     for blob_meta_iter in (
         _failfast_parallel((thunks.thunking(_get_blob_meta)(file) for file in files)),
@@ -94,10 +97,22 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[Blo
         yield from blob_meta_iter
 
 
-def is_dir(blob_meta: BlobMeta) -> bool:  # TODO move to blob_meta.py once it exists
-    return blob_meta.metadata.get("hdi_isfolder", "false") == "true"
-
-
-def _list_blob_meta(fqn: AdlsFqn, layers: int = 1) -> list[BlobMeta]:
+def _list_blob_meta(fqn: AdlsFqn, layers: int = 1) -> list[blob_meta.BlobMeta]:
     """Only for use within multi_layer_yield_blobs."""
     return list(multilayer_yield_blob_meta(fqn, layers))
+
+
+def multilayer_yield_sources(
+    fqn_or_uri: UriIsh,
+    layers: int = 1,
+    filter_: ty.Callable[[blob_meta.BlobMeta], bool] = lambda _: True,
+) -> ty.Iterator[source.Source]:
+    """
+    if you want to list directories and files, use `multilayer_yield_blob_meta` instead
+    """
+    fqn = parse_any(fqn_or_uri)
+    root = fqn.root()
+    for blob in multilayer_yield_blob_meta(fqn, layers):
+        if not blob_meta.is_dir(blob) and filter_(blob):
+            # ^ a "dir" Source would not make sense
+            yield adls_source.from_adls(root / blob.path, hash=blob.hash, size=blob.size)
