@@ -1,8 +1,3 @@
-## 1.47
-
-- Improve/regularize default logging for `core.parallel`, and add `named=` keyword argument to
-  `xf_mapping`.
-
 ## 1.46
 
 - adds attribute `.size` to `core.source.Source`.
