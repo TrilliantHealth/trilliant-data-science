@@ -29,7 +29,7 @@ def apply_yaml(yaml_path: str) -> None:
     # NOTE: Prior to 32.0.0, this function doesn't actually server-side apply.
     # https://github.com/kubernetes-client/python/pull/2252
     # Hence the check above to use kubectl for older versions.
-    utils.create_from_yaml(client.ApiClient(), yaml_path)
+    utils.create_from_yaml(client.ApiClient(), yaml_path, apply=True)
 
 
 def create_yaml_template(yaml_str: str, **template_values: str) -> None:

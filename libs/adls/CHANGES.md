@@ -1,3 +1,8 @@
+## 4.4
+
+- Adds `adls.list_fast.multilayer_yield_sources`. Creates `adls.blob_meta` module and moves most of
+  `adls.source_tree` to it.
+
 ## 4.3
 
 - Updates extension of `core.source`, allowing setting `Source.size` via `source.from_adls` and `Source`s
