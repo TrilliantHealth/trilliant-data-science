@@ -2,6 +2,7 @@ from thds import core
 
 from . import (  # noqa: F401
     abfss,
+    blob_meta,
     defaults,
     etag,
     fqn,
