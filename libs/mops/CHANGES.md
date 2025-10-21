@@ -1,16 +1,3 @@
-### 3.9.20251021
-
-- Recognizing the potential for bugs when users call `pure.magic.deco` dynamically on the same function
-  for different use cases from different parts of the application, we now raise an Exception when we
-  detect the impending creation of a `Magic` object registered to the exact same fully qualified name as
-  a previously-registered one, plus a user affordance to set the `config_path` manually (on the call to
-  `.deco`) so that you can keep these dynamic uses in different parts of the config tree (and not step on
-  each other's shims, etc.).
-
-  This change may be experienced as backward-incompatible for some users, but as it was masking a bug in
-  their code, and we believe the instances to be relatively few, we are not considering this to be a
-  breaking change in `mops` itself.
-
 ### 3.9.20251006
 
 - Updates extension of `core.source`, allowing storing and unpickling `Source.size` via `hashref`s.
