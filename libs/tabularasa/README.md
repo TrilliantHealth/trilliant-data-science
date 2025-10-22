@@ -155,9 +155,11 @@ provenance and update schedules. The same metadata fields are available on all f
 (direct references, `local_data`, and `remote_data`) since they all inherit from the same base schema.
 
 Both patterns store files in version control, making them ideal for datasets under 10MB that require
-frequent updates. The key difference lies in organization and metadata management: direct references
-prioritize simplicity and speed, while the local_data pattern emphasizes structure, reusability, and
-documentation. Larger files should use remote storage instead.
+frequent updates. There is no difference in documentation level or reusability between the two
+patterns—both require the same metadata and can be referenced throughout the derivation DAG. The key
+difference is organizational: direct references provide a quick way to define a table from a single file
+inline, while `local_data` provides centralized definitions when multiple tables derive from the same
+source file. Larger files should use remote storage instead.
 
 **Remote Data Storage in Blob Store**
 
