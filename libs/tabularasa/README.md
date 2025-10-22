@@ -116,9 +116,9 @@ formatters such as `black`, since these change only the formatting and not the A
 To add a new table to the schema, place a new named entry under the `tables` section in your
 [schema file](#the-schema-file). Source data for the table is specified in the table's `dependencies`
 section. There are multiple ways to specify the source data, including version-controlled
-repository-local files and remote files. Source data can be a standard CSV which can be translated
-automatically into the table's typed schema, or some other data format that requires processing using a
-user-defined function specified under a `preprocessor` key.
+repository-local files and remote files. Source data can be a standard tabular text format (CSV, TSV,
+etc) which can be translated automatically into the table's typed schema, or some other data format that
+requires processing using a user-defined function specified under a `preprocessor` key.
 
 The simplest way to add new reference data to version control is to simply place a CSV in your repo, and
 define the schema of that data in the `tables` section of your [schema file](#the-schema-file), pointing
@@ -137,10 +137,11 @@ When deciding how to store your source data, consider these trade-offs:
 Tabularasa supports two distinct patterns for managing local data files, each serving different
 organizational needs. The **direct file reference pattern** allows tables to specify their data source
 directly through `dependencies.filename`, providing a straightforward path to a file in the repository.
-When you need to update the data, you simply overwrite the file and run `tabularasa datagen` without
-making any schema changes. The framework reads the file directly using the provided path along with any
-CSV parsing parameters specified in the dependencies block. This approach works best for data files that
-are specific to a single table.
+When you need to update the data, you simply overwrite the file and run
+`tabularasa datagen <your-table-name>` without making any schema changes. The framework reads the file
+directly using the provided path along with any parsing parameters specified in the dependencies block.
+This approach works best for data files that are specific to a single table and can be parsed
+unambiguously, requiring no custom code to interpret.
 
 The **shared data pattern** using the `local_data` section provides a more structured approach for
 managing data sources that multiple tables depend on. With this pattern, you define a named entry in the
@@ -154,24 +155,25 @@ centralized definition allows consistency across all dependent tables and makes 
 provenance and update schedules. The same metadata fields are available on all file reference types
 (direct references, `local_data`, and `remote_data`) since they all inherit from the same base schema.
 
-Both patterns store files in version control, making them ideal for datasets under 10MB that require
+Both patterns store files in version control, making them ideal for smaller datasets that require
 frequent updates. There is no difference in documentation level or reusability between the two
-patterns—both require the same metadata and can be referenced throughout the derivation DAG. The key
-difference is organizational: direct references provide a quick way to define a table from a single file
-inline, while `local_data` provides centralized definitions when multiple tables derive from the same
-source file. Larger files should use remote storage instead.
+patterns—both require the same metadata and can be referenced throughout the derivation DAG (in the case
+of the direct reference pattern you would reference the derived _table_ rather than the raw file). The
+key difference is organizational: direct references provide a quick way to define a table from a single
+file inline, while `local_data` provides centralized definitions when multiple tables derive from the
+same source file. Larger files should use remote storage instead.
 
 **Remote Data Storage in Blob Store**
 
 Remote data storage through a blob store (e.g., ADLS) addresses the scalability limitations of local file
-storage. When source datasets exceed 10MB, the `remote_data` section of the schema file allows you to
-reference files stored in a blob store. Each remote data entry specifies paths to files in the blob store
-along with their MD5 hashes to ensure the correct version is downloaded during builds. While this
-approach keeps the repository lean, it requires a more structured workflow: you must upload source files
-to the blob store, calculate their MD5 hashes, and specify them in the schema. This additional complexity
-makes remote storage most suitable for stable, infrequently changing source datasets where the overhead
-of managing source file hashes is justified by the benefits of centralized storage and repository size
-optimization.
+storage. When source datasets too large for version control, the `remote_data` section of the schema file
+allows you to reference files stored in a blob store. Each remote data entry specifies paths to files in
+the blob store along with their MD5 hashes to ensure the correct version is downloaded during builds.
+While this approach keeps the repository lean, it requires a more structured workflow: you must upload
+source files to the blob store, calculate their MD5 hashes, and specify them in the schema. This
+additional complexity makes remote storage most suitable for stable, infrequently changing source
+datasets where the overhead of managing source file hashes is justified by the benefits of centralized
+storage and repository size optimization.
 
 Note that MD5 hash management differs by context: source files in `remote_data` require manual MD5 hash
 specification, while the derived parquet files underlying the tables in the schema have their MD5 hashes
@@ -222,13 +224,18 @@ remote_data:
     paths:
     - name: data/large_file_2024_01.parquet
       md5: abc123...  # Must update this hash for each new version
+
+tables:
+  large_table:
+    dependencies:
+      remote: [my_large_data]  # Reference remote data
 ```
 
 When changes are made to a table in `schema.yaml`, either the schema or the source data, be sure to
 update the associated derived package data file by running `tabularasa datagen <table-name>`. The table's
-MD5 hash will then be automatically updated to reflect the new generated parquet file either during this
-step or during pre-commit hook execution. See the
-[package data generation section](#generating-package-data) for more information on this.
+MD5 hash, and those of any dependent derived tables downstream of it, will then be automatically updated
+to reflect the new generated parquet file either during this step or during pre-commit hook execution.
+See the [package data generation section](#generating-package-data) for more information on this.
 
 To understand all the ways of defining a table or file dependency, take a look at the schema file data
 model defined in the `thds.tabularasa.schema.metaschema._RawSchema` class. This represents an exact
@@ -315,9 +322,9 @@ If you wish to regenerate _all_ package data tables from scratch, you can run
 tabularasa datagen
 ```
 
-This will remove all pre-existing package data files and re-generate them. This is an extreme measure and
-should be used sparingly; in most cases, you will want to only those specific tables whose source data or
-derivation logic you know has changed.
+This will remove _all_ pre-existing package data files and re-generate them. This is an extreme measure
+and should be used sparingly; in most cases, you will want to only those specific tables whose source
+data or derivation logic you know has changed.
 
 Note that if you have just cloned the repo or pulled a branch and wish to get your local package data
 up-to-date with the state on that branch, you don't need to re-derive all the data! Just
