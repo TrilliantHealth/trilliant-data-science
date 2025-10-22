@@ -123,6 +123,10 @@ The simplest way to add new reference data to version control is to simply place
 define the schema of that data in the `tables` section of your [schema file](#the-schema-file), pointing
 the `dependencies.filename` of the table to the new CSV file.
 
+Note that this direct file reference approach works only with files that can unambiguously be interpreted
+into the table's schema. Currently this is implemented for character-delimited text files such as CSV/TSV
+(with many exposed options for parsing), but could be extended to other tabular formats in the future.
+
 #### Choosing Between Local and Remote Data
 
 When deciding how to store your source data, consider these trade-offs:
@@ -146,7 +150,8 @@ receives a `LocalDataSpec` object that provides access to both the file (via the
 and all associated metadata. This pattern is best when multiple tables need to derive data from the same
 source file, such as when several tables extract different subsets from a comprehensive dataset. This
 centralized definition allows consistency across all dependent tables and makes it easier to track data
-provenance and update schedules.
+provenance and update schedules. The same metadata fields are available on all file reference types
+(direct references, `local_data`, and `remote_data`) since they all inherit from the same base schema.
 
 Both patterns store files in version control, making them ideal for datasets under 10MB that require
 frequent updates. The key difference lies in organization and metadata management: direct references
