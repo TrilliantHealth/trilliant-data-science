@@ -15,10 +15,10 @@ The schema file includes documentation, tabular schema definitions, type informa
 constraints (e.g. ranges, string patterns, and nullability), column-level constraints (e.g. uniqueness),
 file resource definitions, and build options controlling the output of the build system. Tables are built
 from raw data files which may take any form and may be stored either in the repository under version
-control or remotely in a blob store such as ADLS (versioned with md5 hashes to ensure build consistency),
-but are packaged with the distribution as strictly-typed parquet files and optionally as a sqlite
-database archive file. Large package files may be omitted from the base distribution to be synced with a
-blob store at run time.
+control or remotely in a blob store such as ADLS (versioned with md5 hashes to ensure build availability
+and consistency), but are packaged with the distribution as strictly-typed parquet files and optionally
+as a sqlite database archive file. Large package files may be omitted from the base distribution to be
+synced with a blob store at run time.
 
 The sections of the schema file are as follows:
 
@@ -31,7 +31,8 @@ The sections of the schema file are as follows:
   the case of enums, or sometimes `typing.NewType`s depending on your build options.
 - `local_data`: specifications of local files in your repo that will be used to build your tables. Files
   referenced here are expected to be version-controlled along with your code and so don't require hashes
-  for integrity checks.
+  for integrity checks. Note that tabularasa assumes the file on disk is the official committed version.
+  It cannot protect against builds with uncommitted local changes to these files.
 - `remote_data`: specifications of remote files that will be used to build your tables. Currently only
   blob store backends like ADLS are supported. Files referenced here must be versioned with hashes to
   ensure build integrity (MD5 is used currently).
@@ -171,10 +172,10 @@ of managing source file hashes is justified by the benefits of centralized stora
 optimization.
 
 Note that MD5 hash management differs by context: source files in `remote_data` require manual MD5 hash
-specification, while tables that generate parquet files have their MD5 hashes automatically calculated
-and updated by `tabularasa datagen`. Local source files referenced through `local_data` or
-`dependencies.filename` do not require MD5 hashes since they are assumed to be versioned by your version
-control system.
+specification, while the derived parquet files underlying the tables in the schema have their MD5 hashes
+automatically calculated and updated by `tabularasa datagen`. Local source files referenced through
+`local_data` or `dependencies.filename` do not require MD5 hashes since they are assumed to be versioned
+by your version control system.
 
 Example workflow for monthly updates with local data:
 
@@ -184,6 +185,8 @@ tables:
   my_monthly_data:
     dependencies:
       filename: build_data/monthly_data.csv  # Fixed filename
+      last_updated: 2024-01-15
+      update_frequency: Monthly
       # Monthly: Download new CSV → overwrite file → datagen
 ```
 
