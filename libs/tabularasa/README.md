@@ -186,10 +186,10 @@ Example workflow for monthly updates with local data:
 tables:
   my_monthly_data:
     dependencies:
-      filename: build_data/monthly_data.csv  # Fixed filename
+      filename: build_data/monthly_data.csv
       last_updated: 2024-01-15
       update_frequency: Monthly
-      # Monthly: Download new CSV → overwrite file → datagen
+      doc: "Monthly update: Download new CSV → overwrite file → datagen"
 ```
 
 Example of shared local_data pattern:
