@@ -168,7 +168,8 @@ optimization.
 Note that MD5 hash management differs by context: source files in `remote_data` require manual MD5 hash
 specification, while tables that generate parquet files have their MD5 hashes automatically calculated
 and updated by `tabularasa datagen`. Local source files referenced through `local_data` or
-`dependencies.filename` do not use MD5 hashes at all.
+`dependencies.filename` do not require MD5 hashes since they are assumed to be versioned by your version
+control system.
 
 Example workflow for monthly updates with local data:
 
