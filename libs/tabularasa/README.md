@@ -15,10 +15,10 @@ The schema file includes documentation, tabular schema definitions, type informa
 constraints (e.g. ranges, string patterns, and nullability), column-level constraints (e.g. uniqueness),
 file resource definitions, and build options controlling the output of the build system. Tables are built
 from raw data files which may take any form and may be stored either in the repository under version
-control or remotely in a blob store such as ADLS (with md5 hashes to ensure build consistency), but are
-packaged with the distribution as strictly-typed parquet files and optionally as a sqlite database
-archive file. Large package files may be omitted from the base distribution to be synced with a blob
-store at run time.
+control or remotely in a blob store such as ADLS (versioned with md5 hashes to ensure build consistency),
+but are packaged with the distribution as strictly-typed parquet files and optionally as a sqlite
+database archive file. Large package files may be omitted from the base distribution to be synced with a
+blob store at run time.
 
 The sections of the schema file are as follows:
 
@@ -29,9 +29,12 @@ The sections of the schema file are as follows:
 - `types`: any custom constrained column-level types you may wish to define and reference in your tables.
   These become both validation constraints expressed as `pandera` schemas, and `typing.Literal` types in
   the case of enums, or sometimes `typing.NewType`s depending on your build options.
-- `local_data`: specifications of local files in your repo that will be used to build your tables
+- `local_data`: specifications of local files in your repo that will be used to build your tables. Files
+  referenced here are expected to be version-controlled along with your code and so don't require hashes
+  for integrity checks.
 - `remote_data`: specifications of remote files that will be used to build your tables. Currently only
-  blob store backends like ADLS are supported.
+  blob store backends like ADLS are supported. Files referenced here must be versioned with hashes to
+  ensure build integrity (MD5 is used currently).
 - `remote_blob_store`: optional location to store large artifacts in post-build, in case you want to set
   a size limit above which your data files will not be packaged with your distribution. They can then be
   fetched at run time as needed.
@@ -78,9 +81,8 @@ Tabularasa follows a fundamental principle: **builds should never depend on exte
 is snapshotted internally to ensure reproducible builds. This means:
 
 - Data from external sources (APIs, remote CSVs, etc.) should be fetched and stored in version control or
-  a blob store (e.g., ADLS)
-- The `remote_data` section only references files in the blob store, never external URLs
-- This ensures builds are deterministic and not affected by external service availability
+  a blob store that you control (specified in the `remote_data` section)
+- This ensures builds are deterministic and not affected by external service availability or consistency
 
 ### The Data Interfaces
 
