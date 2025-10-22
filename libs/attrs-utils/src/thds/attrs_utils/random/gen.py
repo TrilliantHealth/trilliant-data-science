@@ -1,7 +1,7 @@
 import collections
 import enum
 from functools import partial
-from typing import DefaultDict, Iterable, Tuple, Type, cast, get_args
+from typing import Any, DefaultDict, Iterable, Tuple, Type, cast, get_args
 
 import attr
 
@@ -118,7 +118,7 @@ def gen_collection(random_gen, type_: Type[collection.C]) -> Gen[collection.C]:
     return cast(Gen[collection.C], collection.random_collection_gen(cons, repeat_gen(v_gen)))
 
 
-random_gen: "type_recursion.ConstructorFactory[[]]" = type_recursion.ConstructorFactory(
+random_gen: "type_recursion.TypeRecursion[[], Gen[Any]]" = type_recursion.TypeRecursion(
     GEN_REGISTRY,
     attrs=gen_attrs,
     namedtuple=gen_namedtuple,
