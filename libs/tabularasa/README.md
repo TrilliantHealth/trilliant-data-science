@@ -286,6 +286,10 @@ error-prone task. It ensures that all your package data and associated hashes ar
 finally ensures that your peers will have up-to-date data when they get a cache miss after pulling your
 code changes.
 
+Any derived table upstream of those you request to build with `datagen` will be auto-synced from the blob
+store prior to the build running, if available, saving you the wait time of re-building them needlessly
+in case they're not already in your working tree.
+
 If you'd like to better understand what you changed after any `tabularasa datagen` invocation before you
 commit the result, you can run `tabularasa data-diff`. By default, this diffs the data as versioned in
 the working tree against the data as versioned in the HEAD commit. If you've already committed, you can
@@ -329,19 +333,16 @@ The code will print to stdout. Simply replace `pandas` with `attrs`, `sqlite`, `
 The build pipeline uses md5 hashes to prevent expensive re-builds in local runs. When the
 [build](#building) finishes, you will have several parquet files and possibly a sqlite database archive
 present in your file tree. Each of the parquet files should have an associated md5 checksum in
-`schema.yaml`, indicating the version of the data that should result from the build. If a file is already
-present at build time, and the md5 sum of the file matches the one indicated in `schema.yaml`, then the
-build step for that table can be skipped, saving you the wait.
-
-**Important**: These hashes are used to skip expensive local rebuilds, not to fetch data from a remote
-store. If your local parquet file's hash matches schema.yaml, tabularasa skips rebuilding it. If it
-doesn't match, the table is rebuilt from source data.
+`schema.yaml`, indicating the version of the data that should result from the build.
 
 To check the status of your local built data files with respect to the `schema.yaml` hashes, you can run
 
 ```bash
 tabularasa check-hashes
 ```
+
+**Important**: The following shouldn't be required in normal usage: use with care and only if you know
+what you're doing!
 
 To sync the hashes in `schema.yaml` with those of your generated data you can run
 
@@ -350,7 +351,9 @@ tabularasa update-hashes
 ```
 
 By default this will also update your generated data accessor source code, which has the hashes embedded
-in order to enable run-time integrity checks on fetch from the blob store, if you're using one.
+in order to enable run-time integrity checks on fetch from the blob store, if you're using one. In
+general, you _should not need to to this manually_ however, since `tabularasa datagen` will update the
+hashes for you as part of its normal operation.
 
 #### Syncing with the Blob Store
 
