@@ -1,3 +1,10 @@
+### 0.12.1
+
+- The main sqlite data population routine, invokable via the `tabularasa init-sqlite` command or
+  `thds.tabularasa.data_dependencies.sqlite.populate_sqlite_db` function, now acquires a file lock on the
+  target database file to prevent concurrent writes, which could arise e.g. when performing
+  initializations inside worker processes in a multiprocessing context.
+
 ## 0.12.0
 
 - in `tabularasa push`, switched `no_fail_if_absent` from a positional arg parsed to boolean to a flag
