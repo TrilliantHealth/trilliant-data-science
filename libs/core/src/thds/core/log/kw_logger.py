@@ -80,6 +80,16 @@ def getLogger(name: Optional[str] = None) -> logging.LoggerAdapter:
     return KwLogger(logging.getLogger(name), dict())
 
 
+def auto(*skip: str) -> logging.LoggerAdapter:
+    from .. import inspect
+
+    module_name = inspect.caller_module_name(__name__, *skip)
+    if not module_name:
+        raise ValueError("Cannot automatically determine caller module name for logger.")
+
+    return getLogger(module_name)
+
+
 def make_th_formatters_safe(logger: logging.Logger):
     """Non-adapted loggers may still run into our root format string,
     which expects _TH_REC_CTXT to be present on every LogRecord.
