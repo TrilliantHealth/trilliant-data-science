@@ -39,14 +39,33 @@ ATTRS_INDEX_ACCESSOR_TEMPLATE = """
         return self._db.sqlite_{index_kind}_query(
             self._record,
             \"\"\"
+            SELECT
+              {columns}
+            FROM {table_name}
+            INDEXED BY {index_name}
+            WHERE {condition};
+            \"\"\",
+            ({args},),
+        )
+"""
+
+ATTRS_BULK_INDEX_ACCESSOR_TEMPLATE = """
+    def {method_name}_bulk(self, {arg_name}: typing.Collection[{typed_args}]) -> typing.{return_type}[{class_name}]:
+        if {arg_name}:
+            return self._db.sqlite_{index_kind}_query(
+                self._record,
+                f\"\"\"
                 SELECT
                   {columns}
                 FROM {table_name}
                 INDEXED BY {index_name}
                 WHERE {condition};
-            \"\"\",
-            ({args},),
-        )
+                \"\"\",
+                {arg_name},
+                single_col={single_col},
+            )
+        else:
+            return iter(())
 """
 
 ATTRS_MAIN_LOADER_TEMPLATE = """class SQLiteLoader:
@@ -77,12 +96,28 @@ def render_attrs_loader_schema(table: metaschema.Table, build_options: metaschem
                 table, table.primary_key, column_lookup, pk=True, build_options=build_options
             )
         )
+        accessor_defs.append(
+            render_accessor_method(
+                table, table.primary_key, column_lookup, pk=True, bulk=True, build_options=build_options
+            )
+        )
 
     for idx in table.indexes:
         unique = frozenset(idx) in unq_constraints
         accessor_defs.append(
             render_accessor_method(
                 table, idx, column_lookup, pk=False, unique=unique, build_options=build_options
+            )
+        )
+        accessor_defs.append(
+            render_accessor_method(
+                table,
+                idx,
+                column_lookup,
+                pk=False,
+                unique=unique,
+                bulk=True,
+                build_options=build_options,
             )
         )
 
@@ -100,24 +135,48 @@ def render_accessor_method(
     build_options: metaschema.BuildOptions,
     pk: bool = False,
     unique: bool = False,
+    bulk: bool = False,
 ) -> str:
     index_column_names = tuple(map(metaschema.snake_case, index_columns))
     method_name = "pk" if pk else f"idx_{'_'.join(index_column_names)}"
-    index_kind = "pk" if pk or unique else "index"
-    return_type = "Optional" if pk or unique else "List"
+    index_kind = "bulk" if bulk else ("pk" if pk or unique else "index")
+    return_type = "Iterator" if bulk else ("Optional" if pk or unique else "List")
     # we use the `IS` operator to allow for comparison in case of nullable index columns
-    condition = " AND ".join([f"{column} IS (?)" for column in index_column_names])
-
-    return ATTRS_INDEX_ACCESSOR_TEMPLATE.format(
-        class_name=table.class_name,
-        method_name=method_name,
-        # use builtin types (as opposed to e.g. Literals and Newtypes) to make the API simpler to use
-        typed_args=", ".join(
+    arg_name = "__".join(index_column_names)
+    if bulk:
+        if len(index_column_names) == 1:
+            # for single-column indexes, we need to unpack the single value from the tuple
+            condition = f"{index_column_names[0]} IN ({{','.join('?' * len({arg_name}))}})"
+            typed_args = column_lookup[index_columns[0]].python_type_literal(
+                build_options=build_options, builtin=True
+            )
+            single_col = "True"
+        else:
+            type_strs = ", ".join(
+                column_lookup[col].python_type_literal(build_options=build_options, builtin=True)
+                for col in index_columns
+            )
+            typed_args = f"typing.Tuple[{type_strs}]"
+            param_tuple = f"({', '.join('?' * len(index_column_names))})"
+            condition = f"({', '.join(index_column_names)}) IN ({{','.join(['{param_tuple}'] * len({arg_name}))}})"
+            single_col = "False"
+    else:
+        condition = " AND ".join([f"{column} IS (?)" for column in index_column_names])
+        typed_args = ", ".join(
             [
                 render_attr_field_def(column_lookup[col], builtin=True, build_options=build_options)
                 for col in index_columns
             ]
-        ),
+        )
+        single_col = ""
+
+    return (ATTRS_BULK_INDEX_ACCESSOR_TEMPLATE if bulk else ATTRS_INDEX_ACCESSOR_TEMPLATE).format(
+        class_name=table.class_name,
+        method_name=method_name,
+        # use builtin types (as opposed to e.g. Literals and Newtypes) to make the API simpler to use
+        typed_args=typed_args,
+        arg_name=arg_name,
+        single_col=single_col,
         return_type=return_type,
         index_kind=index_kind,
         table_name=table.snake_case_name,
