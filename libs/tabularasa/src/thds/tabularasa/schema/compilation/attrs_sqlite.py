@@ -143,25 +143,34 @@ def render_accessor_method(
     return_type = "Iterator" if bulk else ("Optional" if pk or unique else "List")
     # we use the `IS` operator to allow for comparison in case of nullable index columns
     arg_name = "__".join(index_column_names)
+    nullsafe_condition = " AND ".join([f"{column} IS (?)" for column in index_column_names])
     if bulk:
+        columns = [column_lookup[col] for col in index_columns]
+        has_null_cols = any(col.nullable for col in columns)
         if len(index_column_names) == 1:
             # for single-column indexes, we need to unpack the single value from the tuple
-            condition = f"{index_column_names[0]} IN ({{','.join('?' * len({arg_name}))}})"
-            typed_args = column_lookup[index_columns[0]].python_type_literal(
-                build_options=build_options, builtin=True
-            )
+            typed_args = columns[0].python_type_literal(build_options=build_options, builtin=True)
+            if has_null_cols:
+                # sqlite IN operator unfortunately doesn't support a NULL == NULL variant, the way that IS does for =
+                condition = f"{{' OR '.join(['{index_column_names[0]} IS (?)'] * len({arg_name}))}}"
+            else:
+                condition = f"{index_column_names[0]} IN ({{','.join('?' * len({arg_name}))}})"
             single_col = "True"
         else:
             type_strs = ", ".join(
-                column_lookup[col].python_type_literal(build_options=build_options, builtin=True)
-                for col in index_columns
+                col.python_type_literal(build_options=build_options, builtin=True) for col in columns
             )
             typed_args = f"typing.Tuple[{type_strs}]"
-            param_tuple = f"({', '.join('?' * len(index_column_names))})"
-            condition = f"({', '.join(index_column_names)}) IN ({{','.join(['{param_tuple}'] * len({arg_name}))}})"
+            if has_null_cols:
+                # sqlite IN operator unfortunately doesn't support a NULL == NULL variant, the way that IS does for =
+                param_tuple = f"({nullsafe_condition})"
+                condition = f"{{' OR '.join(['{param_tuple}'] * len({arg_name}))}}"
+            else:
+                param_tuple = f"({', '.join('?' * len(index_column_names))})"
+                condition = f"({', '.join(index_column_names)}) IN ({{','.join(['{param_tuple}'] * len({arg_name}))}})"
             single_col = "False"
     else:
-        condition = " AND ".join([f"{column} IS (?)" for column in index_column_names])
+        condition = nullsafe_condition
         typed_args = ", ".join(
             [
                 render_attr_field_def(column_lookup[col], builtin=True, build_options=build_options)
