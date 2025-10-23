@@ -154,6 +154,10 @@ class ConfigTree(ty.Generic[V]):
     def __setitem__(self, key: str, value: V) -> None:
         self.setv(value, pathable=key)
 
+    def __contains__(self, key: str) -> bool:
+        """Only answers the specific question - does this exact key exist in the config?"""
+        return key in self.registry
+
     def load_config(self, config: ty.Mapping[str, ty.Any]) -> None:
         """Loads things with an inner key matching this name into the config.
 
