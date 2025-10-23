@@ -59,4 +59,4 @@ def maybe_t(
     return None
 
 
-Connectable = ty.Union[os.PathLike, sqlite3.Connection]
+Connectable = ty.Union[str, os.PathLike, sqlite3.Connection]

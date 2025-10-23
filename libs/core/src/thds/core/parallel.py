@@ -8,16 +8,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from uuid import uuid4
 
-from thds.core import concurrency, config, files, log
+from thds.core import concurrency, config, files, inspect, log
 
 PARALLEL_OFF = config.item("off", default=False, parse=config.tobool)
 # if you want to simplify a stack trace, this may be your friend
 
 R = ty.TypeVar("R")
 T_co = ty.TypeVar("T_co", covariant=True)
-
-
-logger = log.getLogger(__name__)
 
 
 class IterableWithLen(ty.Protocol[T_co]):
@@ -69,10 +66,21 @@ class Error:
 H = ty.TypeVar("H", bound=ty.Hashable)
 
 
+def _get_caller_logger(named: str) -> ty.Callable[[str], ty.Any]:
+    module_name = inspect.caller_module_name(__name__)
+    if module_name:
+        return log.getLogger(module_name).info if named else log.getLogger(module_name).debug
+    return log.getLogger(__name__).debug  # if not named, we default to debug level
+
+
 def yield_all(
     thunks: ty.Iterable[ty.Tuple[H, ty.Callable[[], R]]],
     *,
     executor_cm: ty.Optional[ty.ContextManager[concurrent.futures.Executor]] = None,
+    fmt: ty.Callable[[str], str] = lambda x: x,
+    error_fmt: ty.Callable[[str], str] = lambda x: x,
+    named: str = "",
+    progress_logger: ty.Optional[ty.Callable[[str], ty.Any]] = None,
 ) -> ty.Iterator[ty.Tuple[H, ty.Union[R, Error]]]:
     """Stream your results so that you don't have to load them all into memory at the same
     time (necessarily). Also, yield (rather than raise) Exceptions, wrapped as Errors.
@@ -82,9 +90,15 @@ def yield_all(
     same size as your iterable. If you want to throttle the number of
     parallel tasks, you should provide your own Executor - and for
     most mops purposes it should be a ThreadPoolExecutor.
+
+    Currently this function does not yield any results until the input iterable is exhausted,
+    even though some of the thunks may have been submitted and the workers have returned a result
+    to the local process.
     """
     files.bump_limits()
     len_or_none = try_len(thunks)
+
+    num_tasks_log = "" if not len_or_none else f" of {len_or_none}"
 
     if PARALLEL_OFF() or (len_or_none == 1 and not executor_cm):
         # don't actually transfer this to an executor we only have one task.
@@ -95,18 +109,33 @@ def yield_all(
                 yield key, Error(e)
         return  # we're done here
 
+    progress_logger = progress_logger or _get_caller_logger(named)
+
     executor_cm = executor_cm or concurrent.futures.ThreadPoolExecutor(
         max_workers=len_or_none or None, **concurrency.initcontext()
     )  # if len_or_none turns out to be zero, swap in a None which won't kill the executor
     with executor_cm as executor:
         keys_onto_futures = {key: executor.submit(thunk) for key, thunk in thunks}
         future_ids_onto_keys = {id(future): key for key, future in keys_onto_futures.items()}
-        for future in concurrent.futures.as_completed(keys_onto_futures.values()):
+        # While concurrent.futures.as_completed accepts an iterable as input, it
+        # does not yield any completed futures until the input iterable is
+        # exhausted.
+        num_exceptions = 0
+        for i, future in enumerate(concurrent.futures.as_completed(keys_onto_futures.values()), start=1):
             thunk_key = future_ids_onto_keys[id(future)]
+            error_suffix = (
+                error_fmt(f"; {num_exceptions} tasks have raised exceptions") if num_exceptions else ""
+            )
             try:
-                yield thunk_key, ty.cast(R, future.result())
+                result = future.result()
+                yielder: tuple[H, ty.Union[R, Error]] = thunk_key, ty.cast(R, result)
+                name = named or result.__class__.__name__
             except Exception as e:
-                yield thunk_key, Error(e)
+                yielder = thunk_key, Error(e)
+                name = named or e.__class__.__name__
+            finally:
+                progress_logger(fmt(f"Yielding {name} {i}{num_tasks_log}") + error_suffix)
+                yield yielder
 
 
 def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterator[ty.Tuple[H, R]]:
@@ -119,8 +148,10 @@ def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterat
         yield key, res
 
 
-def xf_mapping(thunks: ty.Mapping[H, ty.Callable[[], R]]) -> ty.Iterator[ty.Tuple[H, R]]:
-    return failfast(yield_all(IteratorWithLen(len(thunks), thunks.items())))
+def xf_mapping(
+    thunks: ty.Mapping[H, ty.Callable[[], R]], named: str = ""
+) -> ty.Iterator[ty.Tuple[H, R]]:
+    return failfast(yield_all(IteratorWithLen(len(thunks), thunks.items()), named=named))
 
 
 def create_keys(iterable: ty.Iterable[R]) -> ty.Iterator[ty.Tuple[str, R]]:
@@ -135,6 +166,9 @@ def create_keys(iterable: ty.Iterable[R]) -> ty.Iterator[ty.Tuple[str, R]]:
         return iter(with_keys)
 
 
+ERROR_LOGGER = log.getLogger(__name__)
+
+
 def yield_results(
     thunks: ty.Iterable[ty.Callable[[], R]],
     *,
@@ -142,9 +176,9 @@ def yield_results(
     error_fmt: ty.Callable[[str], str] = lambda x: x,
     success_fmt: ty.Callable[[str], str] = lambda x: x,
     named: str = "",
-    progress_logger: ty.Callable[[str], ty.Any] = logger.info,
+    progress_logger: ty.Optional[ty.Callable[[str], ty.Any]] = None,
 ) -> ty.Iterator[R]:
-    """Yield only the successful results of your Callables/Thunks.
+    """Yield only the successful results of your Callables/Thunks. Continue despite errors.
 
     If your iterable has a length, we will be able to log progress
     information. In most cases, this will be advantageous for you.
@@ -159,30 +193,30 @@ def yield_results(
 
     exceptions: ty.List[Exception] = list()
 
-    num_tasks = try_len(thunks)
-    num_tasks_log = "" if not num_tasks else f" of {num_tasks}"
-    named = f" {named} " if named else " result "
-
     for i, (_key, res) in enumerate(
-        yield_all(create_keys(thunks), executor_cm=executor_cm),
+        yield_all(
+            create_keys(thunks),
+            executor_cm=executor_cm,
+            named=named,
+            progress_logger=progress_logger,
+            fmt=success_fmt,
+            error_fmt=error_fmt,
+        ),
         start=1,
     ):
         if not isinstance(res, Error):
-            errors = error_fmt(f"; {len(exceptions)} tasks have raised exceptions") if exceptions else ""
-            progress_logger(success_fmt(f"Yielding{named}{i}{num_tasks_log} {errors}"))
             yield res
         else:
             exceptions.append(res.error)
             # print tracebacks as we go, so as not to defer potentially-helpful
             # debugging information while a long run is ongoing.
             traceback.print_exception(type(res.error), res.error, res.error.__traceback__)
-            logger.error(  # should only use logger.exception from an except block
-                error_fmt(
-                    f"Task {i}{num_tasks_log} errored with {type(res.error).__name__}({res.error})"
-                )
+            ERROR_LOGGER.error(  # should only use logger.exception from an except block
+                error_fmt(f"Task {i} errored with {type(res.error).__name__}({res.error})")
             )
 
     summarize_exceptions(error_fmt, exceptions)
+    # TODO - when `core` moves to 3.11 start using an ExceptionGroup here
 
 
 def summarize_exceptions(
@@ -199,10 +233,10 @@ def summarize_exceptions(
         most_common_type = None
         max_count = 0
         for _type, excs in by_type.items():
-            logger.error(error_fmt(f"{len(excs)} tasks failed with exception: " + _type.__name__))
+            ERROR_LOGGER.error(error_fmt(f"{len(excs)} tasks failed with exception: " + _type.__name__))
             if len(excs) > max_count:
                 max_count = len(excs)
                 most_common_type = _type
 
-        logger.info("Raising one of the most common exception type.")
+        ERROR_LOGGER.info("Raising one of the most common exception type.")
         raise by_type[most_common_type][0]  # type: ignore
