@@ -319,9 +319,11 @@ class AttrsSQLiteDatabase:
         and calls into sqlite at the cost of potentially re-loading the same records multiple times in case multiple
         calls pass overlapping keys. Since it isn't cached, it can also be lazyly evaluated as an iterator. Callers are
         encouraged to take advantage of this laziness where it may be useful."""
-        cursor = self._sqlite_con.execute(
-            query, args if single_col else list(itertools.chain.from_iterable(args))
-        )
+        if single_col:
+            args_ = args if isinstance(args, (list, tuple)) else list(args)
+        else:
+            args_ = list(itertools.chain.from_iterable(args))
+        cursor = self._sqlite_con.execute(query, args_)
         for row in cursor:
             yield clazz(*row)
 
