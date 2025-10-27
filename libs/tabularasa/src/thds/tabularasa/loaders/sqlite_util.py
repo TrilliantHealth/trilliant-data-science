@@ -1,6 +1,5 @@
 import contextlib
 import datetime
-import itertools
 import json
 import logging
 import os
@@ -293,39 +292,6 @@ class AttrsSQLiteDatabase:
         # build succeeds then we're guaranteed 0 or 1 results here
         result = self.sqlite_index_query(clazz, query, args)
         return result[0] if result else None
-
-    @ty.overload
-    def sqlite_bulk_query(
-        self,
-        clazz: ty.Callable[..., Record],
-        query: str,
-        args: ty.Collection[ty.Tuple],
-        single_col: ty.Literal[False],
-    ) -> ty.Iterator[Record]: ...
-
-    @ty.overload
-    def sqlite_bulk_query(
-        self,
-        clazz: ty.Callable[..., Record],
-        query: str,
-        args: ty.Collection,
-        single_col: ty.Literal[True],
-    ) -> ty.Iterator[Record]: ...
-
-    def sqlite_bulk_query(
-        self, clazz: ty.Callable[..., Record], query: str, args: ty.Collection, single_col: bool
-    ) -> ty.Iterator[Record]:
-        """Note: this method is intentionally left un-cached; it makes a tradeoff: minimize the number of disk acesses
-        and calls into sqlite at the cost of potentially re-loading the same records multiple times in case multiple
-        calls pass overlapping keys. Since it isn't cached, it can also be lazyly evaluated as an iterator. Callers are
-        encouraged to take advantage of this laziness where it may be useful."""
-        if single_col:
-            args_ = args if isinstance(args, (list, tuple)) else list(args)
-        else:
-            args_ = list(itertools.chain.from_iterable(args))
-        cursor = self._sqlite_con.execute(query, args_)
-        for row in cursor:
-            yield clazz(*row)
 
 
 # SQL pre/post processing

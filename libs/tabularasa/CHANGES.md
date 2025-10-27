@@ -1,10 +1,3 @@
-### 0.13.0
-
-- Added auto-generation of bulk sqlite index loader methods. These allow querying for multiple keys in a
-  single round-trip to the sqlite database, improving performance when loading large numbers of rows
-  where cache hits may not be expected to be very helpful (the bulk query methods are not cached due to
-  the low likelihood of cache hits on entire collections of keys).
-
 ### 0.12.1
 
 - The main sqlite data population routine, invokable via the `tabularasa init-sqlite` command or

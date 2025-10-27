@@ -9,7 +9,7 @@ from typing_extensions import ParamSpec
 from thds.core import futures, log, stack_context
 from thds.mops._utils import config_tree
 
-from ..core import file_blob_store, pipeline_id, pipeline_id_mask, uris
+from .. import core
 from ..core.memo.unique_name_for_function import full_name_and_callable
 from ..core.use_runner import use_runner
 from ..pickling.mprunner import MemoizingPicklingRunner
@@ -18,7 +18,7 @@ from ..runner.simple_shims import samethread_shim
 from ..runner.types import Shim, ShimBuilder
 from .shims import ShimName, ShimOrBuilder, to_shim_builder
 
-_local_root = lambda: f"file://{file_blob_store.MOPS_ROOT()}"  # noqa: E731
+_local_root = lambda: f"file://{core.file_blob_store.MOPS_ROOT()}"  # noqa: E731
 P = ParamSpec("P")
 R = ty.TypeVar("R")
 
@@ -31,7 +31,7 @@ class _MagicConfig:
             "mops.pure.magic.shim", parse=to_shim_builder  # type: ignore
         )
         self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
-            "mops.pure.magic.blob_root", parse=uris.to_lazy_uri
+            "mops.pure.magic.blob_root", parse=core.uris.to_lazy_uri
         )
         self.pipeline_id = config_tree.ConfigTree[str]("mops.pure.magic.pipeline_id")
         self.blob_root[""] = _local_root  # default Blob Store
@@ -78,7 +78,7 @@ class Magic(ty.Generic[P, R]):
 
         self.config = config
 
-        if p_id := pipeline_id_mask.extract_from_docstr(func, require=False):
+        if p_id := core.pipeline_id_mask.extract_from_docstr(func, require=False):
             # this allows the docstring pipeline id to become 'the most specific' config.
             self.config.pipeline_id.setv(p_id, self._magic_config_path)
         self._shim = stack_context.StackContext[ty.Union[None, ShimName, ShimOrBuilder]](
@@ -132,12 +132,12 @@ class Magic(ty.Generic[P, R]):
         function call, but returns a PFuture once either a result has been found or a a
         new invocation has been started.
         """
-        with pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self.runner.submit(self.__wrapped__, *args, **kwargs)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """This is the wrapped function - call this as though it were the function itself."""
-        with pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
@@ -158,7 +158,7 @@ class MagicReregistrationError(ValueError):
 def make_magic(
     config: _MagicConfig,
     shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None],
-    blob_root: uris.UriResolvable,
+    blob_root: core.uris.UriResolvable,
     pipeline_id: str,
     calls: ty.Collection[ty.Callable],
     *,
@@ -210,7 +210,7 @@ def make_magic(
         if shim_or_builder is not None:
             config.shim_bld[magic_config_path] = to_shim_builder(shim_or_builder)
         if blob_root:  # could be empty string
-            config.blob_root[magic_config_path] = uris.to_lazy_uri(blob_root)
+            config.blob_root[magic_config_path] = core.uris.to_lazy_uri(blob_root)
         if pipeline_id:  # could be empty string
             config.pipeline_id[magic_config_path] = pipeline_id
 
@@ -219,3 +219,44 @@ def make_magic(
         return Magic(func, config, magic_config_path, calls)
 
     return deco
+
+
+F = ty.TypeVar("F", bound=ty.Callable)
+
+
+def wand(
+    config: _MagicConfig,
+    shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
+    # None means 'pull from config' - 'off' means off.
+    *,
+    blob_root: core.uris.UriResolvable = "",
+    pipeline_id: str = "",
+    calls: ty.Collection[ty.Callable] = tuple(),
+) -> ty.Callable[[F], F]:
+    """A higher-order function factory that prefers your arguments but falls back to magic
+    config at the time of wrapping the function.
+
+    You are creating a magic wand, not doing magic. In fact, the wand doesn't actually use
+    Magic at all - it resolves things from config as soon as the function is _wrapped_,
+    not at the time of function call.
+    """
+
+    def deco_that_resolves_and_locks_in_config(func: F) -> F:
+        magic_config_path = make_magic_config_path(func)
+        shim_builder = (
+            to_shim_builder(shim_or_builder)
+            if shim_or_builder
+            else config.shim_bld.getv(magic_config_path)
+        )
+        if not shim_builder:  # this means 'off'
+            return func  # just run the function normally
+
+        blob_root_uri = (
+            core.uris.to_lazy_uri(blob_root) if blob_root else config.blob_root.getv(magic_config_path)()
+        )
+
+        return core.pipeline_id.set_pipeline_id_for_stack(
+            pipeline_id or config.pipeline_id.getv(magic_config_path)
+        )(use_runner(MemoizingPicklingRunner(shim_builder, blob_root_uri).calls(func, *calls))(func))
+
+    return deco_that_resolves_and_locks_in_config

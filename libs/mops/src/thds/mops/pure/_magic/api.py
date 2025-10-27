@@ -51,9 +51,14 @@ class _MagicApi:
         calls: ty.Collection[ty.Callable] = tuple(),
     ) -> ty.Callable[[ty.Callable[P, R]], sauce.Magic[P, R]]:
         """This is the main pure.magic() decorator.  It is designed to be applied directly
-        at the site of function definition, i.e. on the `def`.  We dynamically capture
-        the fully qualified name of the function being decorated and use that to
-        look up the appropriate 'magic' configuration at the time of each call to the function.
+        at the site of function definition, i.e. on the `def`.  We dynamically capture the
+        fully qualified name of the function being decorated and use that to look up the
+        appropriate 'magic' configuration at the time of each call to the function. Any
+        configuration passed here will be entered into the global magic config registry as
+        the 'base case' for this function.
+
+        DO NOT use this decorator multiple times on the same function, as this will overwrite
+        config globally in a way that is very hard to understand.
         """
         return sauce.make_magic(_get_config(), shim_or_builder, blob_root, pipeline_id, calls)
 
@@ -75,6 +80,11 @@ class _MagicApi:
 
         We attempt to detect this and raise an error if it happens. If it does, you should
         provide an explicit unique config_path for each usage.
+
+        NOTE: In many cases, you may be better off using pure.magic.wand instead, which
+        will allow you to prevent any 'outside' configuration from unintentionally
+        affecting your function, because the explicitly-provided configuration is used but
+        not entered into the global 'magic' config registry.
         """
         return ty.cast(
             ty.Callable[[F], F],
@@ -86,6 +96,26 @@ class _MagicApi:
                 calls=tuple(),
                 config_path=config_path,
             ),
+        )
+
+    @staticmethod
+    def wand(
+        shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
+        *,
+        blob_root: uris.UriResolvable = "",
+        pipeline_id: str = "",
+        calls: ty.Collection[ty.Callable] = tuple(),
+    ) -> ty.Callable[[F], F]:
+        """Meant for truly dynamic (i.e. runtime-controlled) use cases. This picks up
+        _current_ magic configuration at the time of wrapping the function, but does not allow
+        further magic configuration at the time of function call, and does not enter any
+        of the supplied configuration into the global 'magic' config registry.
+
+        Suitable for cases where you want to fall back to existing module and config-file
+        configuration at the time of wrapping the function for anything that you don't supply explicitly.
+        """
+        return sauce.wand(
+            _get_config(), shim_or_builder, blob_root=blob_root, pipeline_id=pipeline_id, calls=calls
         )
 
     @staticmethod
