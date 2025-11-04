@@ -29,7 +29,7 @@ def mock_sqlite_loader(
     loader_cls: ty.Type[L],
     data: ty.Mapping[str, ty.Collection[attrs.AttrsInstance]],
     package: ty.Optional[str],
-    schema_path: str,
+    schema_path: str = "schema.yaml",
     tmp_db_path: ty.Optional[StrOrPath] = None,
     validate: bool = False,
 ) -> L:
