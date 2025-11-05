@@ -30,22 +30,7 @@ can transfer large blob datasets quickly and reliably.
 | `uri`                                 | Normalize `adls://`, `abfss://`, `https://`, and `dbfs://` strings into `AdlsFqn` values (and vice versa). |
 | `global_client` / `shared_credential` | Shared, fork-safe Azure clients and credentials backing the public helpers above.                          |
 
-## Getting Started
-
-1. Ensure repo toolchains are installed (`mise trust`, `uv sync` from `libs/adls/` if you need an
-   isolated environment).
-
-1. Import the library via `from thds.adls import ...`. The package auto-registers hash algorithms with
-   `thds.core` on import.
-
-1. Configure named roots at application startup:
-
-   ```python
-   from thds.adls import named_roots, defaults, uri
-
-   named_roots.add(prod=uri.parse_uri("adls://storageAcct/container/"))
-   default_root = defaults.env_root()  # respects THDS_ENV by default
-   ```
+## Example Usage
 
 1. Use the caching helpers and Source integration:
 
