@@ -59,5 +59,3 @@ can transfer large blob datasets quickly and reliably.
 - **Extensibility:** Additional hash algorithms can be registered by importing dependent packages (e.g.,
   `blake3`). Named roots can be populated dynamically via environment-specific modules
   (`thds.adls._thds_defaults` hook).
-
-______________________________________________________________________
