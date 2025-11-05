@@ -28,9 +28,9 @@ L = ty.TypeVar("L", bound=_GeneratedSqliteLoader)
 def mock_sqlite_loader(
     loader_cls: ty.Type[L],
     data: ty.Mapping[str, ty.Collection[attrs.AttrsInstance]],
+    tmp_db_path: ty.Optional[StrOrPath],
     package: ty.Optional[str],
     schema_path: str = "schema.yaml",
-    tmp_db_path: ty.Optional[StrOrPath] = None,
     validate: bool = False,
 ) -> L:
     """Construct an instance of your custom generated sqlite loader from mocked data.
@@ -39,7 +39,8 @@ def mock_sqlite_loader(
     :param data: A mapping from table names to collections of attrs records representing rows.
     :param package: The root package name containing the schema and generated loader(s).
     :param schema_path: The path to the schema file within the package.
-    :param tmp_db_path: Optional path to a temporary sqlite database file. If None, an in-memory database is used.
+    :param tmp_db_path: Optional path to a file to use for the sqlite database. If None, a temporary file is created.
+      Note that in this case the temporary file will not be cleaned up until program exit.
     :param validate: Whether to validate data against the schema when inserting data into the database.
     :return: An instance of the specified sqlite loader class populated with the provided mocked data, with empty
       tables for any table names that were not included in the `data` mapping.
