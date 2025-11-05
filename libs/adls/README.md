@@ -6,43 +6,29 @@ can transfer large blob datasets quickly and reliably.
 
 ## Highlights
 
-- **Unified URIs & roots:** `adls://`, `https://`, `abfss://`, and `dbfs://` inputs resolve to canonical
-  `AdlsFqn` objects. Named roots and `defaults.env_root()` let apps avoid hardcoding
-  storage-account/container pairs.
-- **Hash-first workflows:** Registers `xxh3_128` (and optionally `blake3`) with `thds.core`, embeds
-  hashes into blob metadata on upload, and verifies hashes before and after download.
-- **Read-only cache:** A global, length-safe cache directory stores verified downloads and optionally
-  write-through uploads. Helpers hard-/soft-link or copy cache entries into local paths while keeping
-  cached bytes protected.
-- **azcopy acceleration:** Large transfers default to azcopy with tuned flags (`--check-md5=NoCheck`,
-  custom buffer/concurrency). Smaller files fall back to the Azure SDK automatically.
-- **Resilient downloads:** `download_or_use_verified` coordinates hash checks, download locks, retries,
-  and metadata back-fill through a coroutine controller shared by sync and async call sites.
-- **Upload symmetry:** `upload()` (and azcopy helpers) skip redundant uploads when hashes match, write
-  through the cache, and return fully-hashed `thds.core.Source` objects.
-- **Parallel listing & copying:** `list_fast` parallelizes blob enumeration, `source_tree` builds
-  hash-aware manifests, and `copy` functions move data between ADLS locations with SAS delegation and
-  optional completion waits.
-- **Shared clients & credentials:** Global factories widen HTTP connection pools, stay fork-safe, and use
-  thread-safe Azure credentials. Local macOS installs benefit from cached Azure CLI tokens; pods use
-  workload-identity-friendly defaults.
-- **CLI tools:** `uv run python -m thds.adls.tools.{download,upload,ls,ls_fast}` provide quick manual
-  entry points for common operations.
+- **Environment-aware paths first:** Almost every consumer starts by importing `fqn`, `AdlsFqn`, and
+  `defaults.env_root()` to build storage-account/container URIs that follow the current THDS environment.
+- **Cache-backed reads:** `download_to_cache` is the standard entry point for pulling blobs down with a
+  verified hash so local workflows, tests, and pipelines can operate on read-only copies.
+- **Bulk filesystem helpers:** `ADLSFileSystem` powers scripts and jobs that need to walk directories,
+  fetch batches of files, or mirror hive tables without re-implementing Azure SDK plumbing.
+- **Spark/Databricks bridges:** `abfss` and `uri` conversions keep analytics code agnostic to whether it
+  needs an `adls://`, `abfss://`, `https://`, or `dbfs://` view of the same path.
+- **Composable utilities:** Higher-level modules (cache, upload, copy, list) layer on top of those
+  imports so teams can opt into more advanced behavior without leaving the public API surface.
 
 ## Key Modules
 
-| Module                                                  | Purpose                                                                               |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `fqn`, `uri`, `abfss`, `dbfs`                           | Parse and format ADLS identifiers, scheme adapters, named roots.                      |
-| `cached`, `ro_cache`, `download_lock`                   | Read-only cache management, download throttling, directory mirroring.                 |
-| `download`, `azcopy.download`                           | Hash-verified downloads with azcopy fast path, SDK fallback, metadata reconciliation. |
-| `upload`, `azcopy.upload`, `_upload`                    | Hash-aware uploads, azcopy command builder/runner, retry logic for race-prone blobs.  |
-| `hashes`, `md5`, `etag`                                 | Hash registration, metadata extraction, compatibility utilities.                      |
-| `impl.ADLSFileSystem`                                   | Async Azure SDK wrapper for file/directory fetches and cache-aware operations.        |
-| `global_client`, `shared_credential`, `_fork_protector` | Fork-safe cached client factories and credential shims.                               |
-| `source`, `source_tree`, `list_fast`                    | Integration with `thds.core.Source` abstractions and fast blob manifest generation.   |
-| `copy`, `sas_tokens`                                    | Remote-to-remote data movement via SAS delegation and hash comparison.                |
-| `tools/*`                                               | Command-line entry points for download/upload/list workflows.                         |
+| Component                             | Typical usage in the monorepo                                                                              |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `fqn`                                 | Parse, validate, and join ADLS paths; used when materializing model datasets and configuring pipelines.    |
+| `AdlsFqn`                             | Strongly typed value passed between tasks and tests to represent a single blob or directory.               |
+| `defaults` / `named_roots`            | Resolve environment-specific storage roots (`defaults.env_root()`, `named_roots.require(...)`).            |
+| `download_to_cache` (`cached` module) | Bring a blob down to the shared read-only cache before analytics, feature builds, or test fixtures run.    |
+| `ADLSFileSystem` (`impl` module)      | Fetch or list entire directory trees and integrate with caching inside scripts and notebooks.              |
+| `abfss`                               | Translate `AdlsFqn` objects into `abfss://` URIs for Spark/Databricks jobs.                                |
+| `uri`                                 | Normalize `adls://`, `abfss://`, `https://`, and `dbfs://` strings into `AdlsFqn` values (and vice versa). |
+| `global_client` / `shared_credential` | Shared, fork-safe Azure clients and credentials backing the public helpers above.                          |
 
 ## Getting Started
 
@@ -67,7 +53,7 @@ can transfer large blob datasets quickly and reliably.
    from thds.adls import cached, upload, source
 
    cache_path = cached.download_to_cache("adls://acct/container/path/to/file")
-   src = upload.upload("adls://acct/container/path/out.parquet", cache_path)
+   src = upload("adls://acct/container/path/out.parquet", cache_path)
    verified = source.get_with_hash(src.uri)
    ```
 
