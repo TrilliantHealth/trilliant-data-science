@@ -60,13 +60,4 @@ can transfer large blob datasets quickly and reliably.
   `blake3`). Named roots can be populated dynamically via environment-specific modules
   (`thds.adls._thds_defaults` hook).
 
-## Testing & Tooling
-
-- Unit tests live under `libs/adls/tests/`; run with `uv run pytest`.
-- For integration/bulk validation, prefer `mono validate` from repo root.
-- When touching I/O logic, follow repo logging guidance (log paths, filters, row counts, key dtypes).
-
 ______________________________________________________________________
-
-Feel free to adapt this reference for onboarding docs or PRs. Contributions that improve coverage,
-performance, or docs are welcome—keep diffs focused and reversible.
