@@ -68,7 +68,7 @@ class PicklableFunction:
                 self.f = get_main_module_function(self.fname)  # type: ignore
             else:
                 mod = importlib.import_module(self.fmod)
-                self.f = getattr(mod, self.fname)
+            self.f = getattr(mod, self.fname)
             assert self.f is not None
             return self.f
         return self.f
