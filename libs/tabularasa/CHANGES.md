@@ -1,9 +1,8 @@
-### 0.14.0
+### 0.13.1
 
-- Added `thds.tabularasa.testing.mock_sqlite` submodule with `mock_sqlite_loader` function to facilitate
-  type-safe construction of mock tabularasa sqlite loaders for use in unit tests.
+- Retry occasional ADLS download failures automatically.
 
-### 0.13.0
+## 0.13.0
 
 - Added auto-generation of bulk sqlite index loader methods. These allow querying for multiple keys in a
   single round-trip to the sqlite database, improving performance when loading large numbers of rows
