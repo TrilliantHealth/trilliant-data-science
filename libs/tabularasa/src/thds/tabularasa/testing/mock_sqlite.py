@@ -33,7 +33,10 @@ def mock_sqlite_loader(
     schema_path: str = "schema.yaml",
     validate: bool = False,
 ) -> L:
-    """Construct an instance of your custom generated sqlite loader from mocked data.
+    """Construct an instance of your custom generated sqlite loader from mocked data. Note that this is guaranteed
+    typesafe because regardless of how you define your mock records, the resulting sqlite loader will be a true instance
+    of your generated loader class, and will have all the same lookup methods and will use all the same deserialization
+    logic for reading rows from the database and returning actual instances from your library's data model.
 
     :param loader_cls: The generated sqlite loader class to instantiate.
     :param data: A mapping from table names to collections of attrs records representing rows.
