@@ -2,7 +2,6 @@ from typing import Callable, Dict, Sequence, Type, TypeVar
 
 import attrs
 
-from ..params import attrs_fields_parameterized
 from ..registry import Registry
 from ..type_utils import is_namedtuple_type
 from .util import Gen, T
@@ -26,10 +25,10 @@ def random_attrs(
 
 def _register_random_gen_by_field(type_: Type[T], **gens: Gen):
     if attrs.has(type_):
-        fields = attrs_fields_parameterized(type_)
-        names: Sequence[str] = [f.name for f in fields]
+        fields = attrs.fields(type_)  # type: ignore
+        names = [f.name for f in fields]
     elif is_namedtuple_type(type_):
-        names = type_._fields
+        names = type_._fields  # type: ignore [attr-defined]
     else:
         raise TypeError(f"Don't know how to interpret {type_} as a record type")
 

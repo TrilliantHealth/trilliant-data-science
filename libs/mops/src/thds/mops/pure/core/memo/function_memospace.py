@@ -226,18 +226,6 @@ class MemoUriComponents(ty.NamedTuple):
     calls_functions: ty.List[str]
     args_hash: str
 
-    def invocation_unique_key(self) -> tuple[str, str]:
-        return (
-            "/".join(
-                [
-                    self.pipeline_id,
-                    f"{self.function_module}--{self.function_name}",
-                    self.function_logic_key,
-                ]
-            ),
-            self.args_hash,
-        )
-
 
 def parse_memo_uri(
     memo_uri: str,
