@@ -13,8 +13,7 @@ from thds.adls.global_client import get_global_fs_client
 from thds.core import config, fretry, home, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
-from ..core.control_cache import CONTROL_CACHE_TTL_IN_SECONDS, exists_with_expiry
-from ..core.types import AnyStrSrc, BlobStore
+from ..core.types import DISABLE_CONTROL_CACHE, AnyStrSrc, BlobStore
 
 T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
@@ -127,12 +126,12 @@ class DangerouslyCachingStore(AdlsBlobStore):
     environment, including automated ones.
     """
 
-    def __init__(self, root: Path, cache_ttl_in_seconds: int):
+    def __init__(self, root: Path):
         self._cache = adls.Cache(root.resolve(), ("ref", "hard"))
-        self._cache_ttl_in_seconds = cache_ttl_in_seconds
 
     def exists(self, remote_uri: str) -> bool:
-        if exists_with_expiry(self._cache.path(adls.fqn.parse(remote_uri)), self._cache_ttl_in_seconds):
+        cache_path = self._cache.path(adls.fqn.parse(remote_uri))
+        if cache_path.exists():
             return True
         return super().exists(remote_uri)
 
@@ -143,7 +142,7 @@ class DangerouslyCachingStore(AdlsBlobStore):
         # (see comment on getfile below...)
         fqn = adls.fqn.parse(remote_uri)
         cache_path = self._cache.path(fqn)
-        if not exists_with_expiry(cache_path, self._cache_ttl_in_seconds):
+        if not cache_path.exists():
             adls.download.download_or_use_verified(
                 get_global_fs_client(fqn.sa, fqn.container), fqn.path, cache_path, cache=self._cache
             )
@@ -163,7 +162,7 @@ class DangerouslyCachingStore(AdlsBlobStore):
         # completely empty this particular mops cache (and all its 'dangerous' behavior)
         # simply by deleting that one cache directory.
         cache_path = self._cache.path(adls.fqn.parse(remote_uri))
-        if exists_with_expiry(cache_path, self._cache_ttl_in_seconds):
+        if cache_path.exists():
             return cache_path
         outpath = super().getfile(remote_uri)
         link.link(outpath, cache_path)
@@ -179,7 +178,7 @@ def get_adls_blob_store(uri: str) -> ty.Optional[AdlsBlobStore]:
     if not uri.startswith(adls.ADLS_SCHEME):
         return None
 
-    if CONTROL_CACHE_TTL_IN_SECONDS() < 0 or not _DEFAULT_CONTROL_CACHE():
+    if DISABLE_CONTROL_CACHE() or not _DEFAULT_CONTROL_CACHE():
         return AdlsBlobStore()
 
-    return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE(), CONTROL_CACHE_TTL_IN_SECONDS())
+    return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE())

@@ -7,22 +7,19 @@ but if you're reading this in the distant future - those are its limitations.
 """
 
 import argparse
-import concurrent.futures
 import functools
 import io
-import json
 import os
 import re
 import subprocess
 import sys
 import typing as ty
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from pprint import pprint
 
 from thds import adls
-from thds.core import log, parallel, scope, thunks, tmp
+from thds.core import log, scope, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
 from thds.mops.pure.core.memo import results
@@ -300,72 +297,7 @@ def pickle_diff_two_uris(uri1: str, uri2: str) -> None:
     _run_diff_tool(path1, path2)
 
 
-def _diff_uris(uri: str, other_uris: ty.Collection[str]) -> ty.List[str]:
-    """Interactively diff the control file at `uri` against all others in `other_uris`."""
-    base_uri_path = scope.enter(tmp.temppath_same_fs())
-    _write_ire_to_path(get_control_file(uri), base_uri_path, uri)
-
-    def uri_menu(other_uri: str) -> ty.Optional[str]:
-        uri_choices = (
-            "\n    i to permanently ignore this URI,\n    p to 'pick' this URI for later review,"
-        )
-
-        choice = input(
-            "\nEnter to continue,"
-            "\n    q or Ctrl-C to quit,"
-            + (uri_choices if other_uri else "")
-            + "\n or type a regex to filter future results"
-            + " (prefix with ! to find non-matches, otherwise will find matches): "
-        )
-        if "i" == choice.lower():
-            if other_uri:
-                _IGNORES.ignore_uri(other_uri)
-        elif "p" == choice.lower():
-            if other_uri:
-                print(f"\nPicked URI: {other_uri}")
-                uri_menu("")  # re-prompt for regex
-                return other_uri
-            return ""
-
-        elif choice.lower() in {"q", "quit"}:
-            print("\n\nExiting diff loop.\n\n")
-            raise KeyboardInterrupt()
-        elif choice:
-            regex = choice
-            type = _MATCHES.add_regex(regex)
-            logger.info(f"Added <{type}> regex /{regex}/")
-        print()
-        return None
-
-    fs = uris.lookup_blob_store(uri)
-    control_type = _control_uri(uri)
-    other_uris = [fs.join(o_uri, control_type) for o_uri in other_uris]
-    other_uris = [o_uri for o_uri in other_uris if o_uri not in _IGNORES and o_uri != uri]
-
-    uris_picked = []
-    # prefetch_all_control_files
-    log.getLogger("thds.adls").setLevel("WARN")
-    for other_uri, control_file in parallel.yield_all(
-        [(other_uri, thunks.thunking(get_control_file)(other_uri)) for other_uri in other_uris],
-        executor_cm=concurrent.futures.ThreadPoolExecutor(max_workers=8),
-    ):
-        with tmp.temppath_same_fs() as path_for_other_uri:
-            _write_ire_to_path(control_file, path_for_other_uri, other_uri)  # type: ignore
-            if not _MATCHES.matches(path_for_other_uri.read_text()):
-                continue
-
-            _run_diff_tool(path_for_other_uri, base_uri_path)
-
-        try:
-            if uri_menu(other_uri):
-                uris_picked.append(other_uri)
-        except KeyboardInterrupt:
-            break
-
-    return uris_picked
-
-
-def _diff_memospace(uri: str) -> ty.List[str]:
+def _diff_memospace(uri: str, new_control: IRE) -> None:
     """Diff all siblings in the memospace against the new invocation.
 
     Ignore any that have been ignored previously.
@@ -376,98 +308,75 @@ def _diff_memospace(uri: str) -> ty.List[str]:
     # Therefore, the 'green' highlighted text will be the 'new' invocation,
     # and the red will be all the old ones that we loop over below.
     fs = uris.lookup_blob_store(uri)
-    memospace_uri = fs.join(*fs.split(uri)[: -2 if _control_uri(uri) else -1])
+
+    control_type = _control_uri(uri)
+    memospace_uri = fs.join(*fs.split(uri)[: -2 if control_type else -1])
     # go up two levels to find the memospace if necessary.
+
+    path_new = scope.enter(tmp.temppath_same_fs())
+    _write_ire_to_path(new_control, path_new, uri)
 
     logger.info(f"Diffing against all siblings in the memospace {memospace_uri}")
 
-    sibling_uris = fs.list(memospace_uri)  # type: ignore
-    sibling_uris = [s_uri for s_uri in sibling_uris if not uri.startswith(s_uri)]
-    # eliminate the URI itself - but we use prefix match because we might have specified invocation or something.
+    def sibling_menu(sibling_uri: str) -> None:
+        choice = input(
+            "Enter to continue, Ctrl-C to quit, `i` to permanently ignore this URI,"
+            " or type a regex to filter future results (prefix with ! to find non-matches, otherwise will find matches: "
+        )
+        if "i" == choice.lower():
+            _IGNORES.ignore_uri(sibling_uri)
+        elif choice:
+            regex = choice
+            type = _MATCHES.add_regex(regex)
+            logger.info(f"Added <{type}> regex /{regex}/")
 
-    if not sibling_uris:
+    sibling_uris = fs.list(memospace_uri)  # type: ignore
+    found_siblings = False
+
+    for sibling_uri in sibling_uris:
+        if uri.startswith(sibling_uri):
+            continue
+
+        found_siblings = True
+        sibling_uri = sibling_uri.rstrip("/")
+
+        if sibling_uri in _IGNORES:
+            continue
+
+        full_uri = fs.join(sibling_uri, control_type)
+        control_sibling = get_control_file(full_uri)
+        with tmp.temppath_same_fs() as path_sibling:
+            _write_ire_to_path(control_sibling, path_sibling, full_uri)
+            if not _MATCHES.matches(path_sibling.read_text()):
+                continue
+
+            _run_diff_tool(path_sibling, path_new)
+
+        sibling_menu(sibling_uri)
+
+    if not found_siblings:
         logger.warning(
             f"No memospace siblings found for '{memospace_uri}'"
             " - check your pipeline ID, function-logic-key (if any),"
             " and whether you're running in prod or dev."
         )
-        return []
-
-    return _diff_uris(uri, sibling_uris)
-
-
-def _load_run_summary_dir(run_dir: ty.Optional[str] = None) -> ty.List[ty.Dict[str, ty.Any]]:
-    from thds.mops.pure.tools.summarize.cli import auto_find_run_directory
-
-    run_dir_path = Path(run_dir or auto_find_run_directory())
-    logger.info(f'Diffing against memo URIs found in run directory: "{run_dir_path}"')
-    log_files = list(run_dir_path.glob("*.json"))
-    return [json.loads(log_file.read_text()) for log_file in log_files]
-
-
-def _diff_summary(
-    base_memo_uri: str,
-    run_dir: ty.Optional[str] = None,
-) -> ty.List[str]:
-    """Return cut-down summary"""
-
-    run_summaries = _load_run_summary_dir(run_dir)
-
-    # now order by which ones have the most similar prefix... though ideally we'd be
-    # taking into account the total length of common subsequences
-    def _common_prefix_len(s1: str, s2: str) -> int:
-        common_len = 0
-        for c1, c2 in zip(s1, s2):
-            if c1 != c2:
-                break
-            common_len += 1
-        return common_len
-
-    uris = [rs["memo_uri"] for rs in run_summaries]
-    uris = sorted(uris, key=functools.partial(_common_prefix_len, base_memo_uri), reverse=True)
-
-    return _diff_uris(base_memo_uri, uris)
 
 
 @scope.bound
-def _inspect_uri(uri: str, embed: bool) -> None:
-    inspect(_resolved_uri(uri), embed)  # print the main uri
+def _inspect_uri(uri: str, diff_memospace: bool, embed: bool) -> None:
+    uri = _resolved_uri(uri)
+    ire_curr = inspect(uri, embed)  # print the main uri
 
-
-def _write_picked_uris(picked_uris: ty.List[str]) -> None:
-    if picked_uris:
-        outfile = Path(".mops/inspect") / f"picked_uris-{datetime.now().isoformat()}.txt"
-        outfile.parent.mkdir(parents=True, exist_ok=True)
-        with open(outfile, "w") as f:
-            f.write("\n".join(picked_uris) + "\n")
-        print(f"Wrote picked URIs to {outfile} for later review.")
+    if diff_memospace:
+        _diff_memospace(uri, ire_curr)
 
 
 def main() -> None:
-    from thds.mops.pure.tools.summarize.run_summary import RUN_NAME
-
-    RUN_NAME.set_global("")  # disable run summary logging for this tool
-
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "uri",
         type=str,
         help="The URI of the first object to inspect. Can be adls:// or https:// or even abfss://",
-    )
-    parser.add_argument(
-        "--diff-summary",
-        "-s",
-        nargs="?",  # Makes the value optional
-        const="defaultdir",  # Value assigned if flag is present but no value is given
-        default=None,  # Value assigned if flag is not present
-        help="Diff against all memo URIs found in the run summary directory. Emit a file listing the URIs compared.",
-    )
-    parser.add_argument(
-        "--diff-picked",
-        "-p",
-        type=Path,
-        default=None,
-        help="Diff against previously picked URIs (from newline-separated text file) from a prior run of this tool.",
     )
     parser.add_argument(
         "--diff-memospace",
@@ -482,6 +391,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--diff-pickle-ops",
+        "-p",
         help="""Diff against the provided memo URI, but emit pickle opcodes rather than unpickling.""",
     )
     parser.add_argument(
@@ -492,26 +402,13 @@ def main() -> None:
     parser.add_argument("--embed", action="store_true", help="Embed an IPython shell after inspection.")
     args = parser.parse_args()
     args.uri = args.uri.rstrip("/")
-    if args.diff_memospace or args.diff_pickle_ops or args.diff_summary:
+    if args.diff_memospace or args.diff_pickle_ops:
         _check_diff_tool()
 
-    if args.diff_picked:
-        _write_picked_uris(
-            _diff_uris(
-                args.uri,
-                [line.strip() for line in open(args.diff_picked).read().splitlines() if line.strip()],
-            )
-        )
-    elif args.diff_pickle_ops:
+    if args.diff_pickle_ops:
         pickle_diff_two_uris(args.uri, args.diff_pickle_ops)
-    elif args.diff_summary:
-        _write_picked_uris(
-            _diff_summary(args.uri, None if args.diff_summary == "defaultdir" else args.diff_summary)
-        )
-    elif args.diff_memospace:
-        _write_picked_uris(_diff_memospace(args.uri))
     else:
-        _inspect_uri(args.uri, args.embed)
+        _inspect_uri(args.uri, args.diff_memospace, args.embed)
 
     if args.loop:
         prompt = "\nEnter another URI to inspect, or empty string to exit: "
@@ -520,7 +417,7 @@ def main() -> None:
             if args.diff_pickle_ops:
                 pickle_diff_two_uris(args.uri, uri)
             else:
-                _inspect_uri(uri, args.embed)
+                _inspect_uri(uri, args.diff_memospace, args.embed)
             uri = input(prompt)
 
 

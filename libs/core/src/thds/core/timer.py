@@ -56,10 +56,8 @@ tracker.merge(mod1.tracker)
 ```
 """
 
-import contextlib
 import json
 import time
-import typing as ty
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from functools import wraps
@@ -211,25 +209,3 @@ class TimeTracker:
                 if name != "total"
             }
         return {}
-
-
-@contextlib.contextmanager
-def elapsed(
-    logger: ty.Optional[ty.Callable[[str], ty.Any]] = None, *, name: str = ""
-) -> ty.Iterator[ty.Callable[[], float]]:
-    """Context manager/decorator to log the time taken by a block of code."""
-    start_time = time.perf_counter()
-
-    def _elapsed() -> float:
-        return time.perf_counter() - start_time
-
-    yield _elapsed  # you can call this yourself if you want to do something more complex
-
-    if logger or name:  # log for the user
-        to_end = _elapsed()
-        if not logger:
-            logger = log.getLogger(__name__).info
-
-        name = f" for {name}: " if name else ": "
-
-        logger(f"Time taken{name}{to_end:.4f} seconds")
