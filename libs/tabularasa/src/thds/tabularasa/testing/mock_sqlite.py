@@ -1,4 +1,5 @@
 import contextlib
+import inspect
 import sqlite3
 import tempfile
 import typing as ty
@@ -55,10 +56,13 @@ def mock_sqlite_loader(
       tables for any table names that were not included in the `data` mapping.
     """
     if package is None:
-        loader_module_path = loader_cls.__module__.split(".")
-        package_candidates = [
-            ".".join(loader_module_path[:i]) for i in range(len(loader_module_path), 0, -1)
-        ]
+        if package_ := inspect.signature(loader_cls).parameters["package"].default:
+            package_candidates = [package_]
+        else:
+            loader_module_path = loader_cls.__module__.split(".")
+            package_candidates = [
+                ".".join(loader_module_path[:i]) for i in range(len(loader_module_path), 0, -1)
+            ]
     else:
         package_candidates = [package]
 
