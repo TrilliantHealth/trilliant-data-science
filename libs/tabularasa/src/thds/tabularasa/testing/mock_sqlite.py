@@ -45,7 +45,8 @@ def mock_sqlite_loader(
 
     :param loader_cls: The generated sqlite loader class to instantiate.
     :param data: A mapping from table names to collections of attrs records representing rows.
-    :param package: The root package name containing the schema and generated loader(s).
+    :param package: The root package name containing the schema and generated loader(s). If omitted, it will be inferred
+      from the loader class's `__module__` attribute by climbing up until a schema file is found.
     :param schema_path: The path to the schema file within the package.
     :param tmp_db_path: Optional path to a file to use for the sqlite database. If None, a temporary file is created.
       Note that in this case the temporary file will not be cleaned up until program exit.
@@ -53,17 +54,42 @@ def mock_sqlite_loader(
     :return: An instance of the specified sqlite loader class populated with the provided mocked data, with empty
       tables for any table names that were not included in the `data` mapping.
     """
-    schema = load_schema(package, schema_path)
+    if package is None:
+        loader_module_path = loader_cls.__module__.split(".")
+        package_candidates = [
+            ".".join(loader_module_path[:i]) for i in range(len(loader_module_path), 0, -1)
+        ]
+    else:
+        package_candidates = [package]
+
+    for package_ in package_candidates:
+        try:
+            schema = load_schema(package_, schema_path)
+        except (ModuleNotFoundError, FileNotFoundError):
+            continue
+        else:
+            break
+    else:
+        raise ValueError(
+            f"Could not infer package containing schema from loader class {loader_cls.__qualname__}; "
+            "please specify the 'package' argument explicitly."
+        )
+
     if tmp_db_path is None:
         tmp_db_path = _UNTIL_EXIT_SCOPE.enter(tempfile.NamedTemporaryFile(suffix=".sqlite")).name
 
-    data_ = dict(data)
+    unknown_tables = set(data.keys()).difference(schema.tables.keys())
+    if unknown_tables:
+        raise ValueError(f"Data provided for unknown tables: {sorted(unknown_tables)}")
+
     with (
         tempfile.TemporaryDirectory() as tmpdir,
         contextlib.closing(sqlite3.connect(str(tmp_db_path))) as con,
     ):
+        # this tmpdir is only for staging parquet files before loading into sqlite; it's fine that they get deleted
+        # immediately after the database is populated
         for name, table in schema.tables.items():
-            rows = data_.pop(name, [])
+            rows = data.get(name, [])
             pa_table = pa.Table.from_pylist(
                 [attrs.asdict(row, recurse=True) for row in rows], schema=table.parquet_schema
             )
@@ -80,8 +106,5 @@ def mock_sqlite_loader(
                 validate=validate,
                 cast=False if validate else True,
             )
-
-    if data_:
-        raise ValueError(f"Data provided for unknown tables: {list(data_.keys())}")
 
     return loader_cls(package=None, db_path=str(tmp_db_path))
