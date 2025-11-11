@@ -1,3 +1,8 @@
+### 0.14.1
+
+- Further simplification of sqlite bulk inserts. WAL mode is found to have little effect on performance
+  in this context, and mutates the database, so it has been removed to reduce complexity.
+
 ## 0.14.0
 
 - Added `thds.tabularasa.testing.mock_sqlite` submodule with `mock_sqlite_loader` function to facilitate
@@ -6,8 +11,6 @@
 ### 0.13.1
 
 - Retry occasional ADLS download failures automatically.
-- Further simplification of sqlite bulk inserts. WAL mode is found to have little effect on performance
-  in this context, and mutates the database, so it has been removed to reduce complexity.
 
 ## 0.13.0
 
