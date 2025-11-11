@@ -943,16 +943,18 @@ class ReferenceDataManager:
                         return None
                     raise IOError(table.name)
 
-        failed: List[str] = []
+        failed: list[tuple[str, Exception]] = []
         synced: List[str] = []
         for table_name, res in parallel.yield_all([(t.name, partial(inner, t)) for t in tables_to_sync]):
             if isinstance(res, parallel.Error):
-                failed.append(table_name)
+                failed.append((table_name, res.error))
             elif res is not None:
                 synced.append(table_name)
 
         if failed:
-            raise RuntimeError(f"Sync failed for tables {', '.join(failed)}")
+            first_exc = failed[0][1]
+            table_names = [name for name, _ in failed]
+            raise RuntimeError(f"Sync failed for tables {', '.join(table_names)}") from first_exc
 
         down_ = (
             f"to local build directory {pkg_resources.resource_filename(self.package, self.package_data_dir)}"

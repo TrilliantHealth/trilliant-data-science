@@ -1,3 +1,11 @@
+## 3.10
+
+- New API: `pure.magic.wand` has been added to supersede uses of `pure.magic.deco` for dynamic use cases.
+  The idea is to capture your intended dynamic config (shim, blob root, pipeline id) at the time of
+  function wrapping, backed up by the _current_ global/magic config at the time of decoration - so this
+  avoids the bug we tried to work around in 3.9.20251021 where multiple users of the same function shared
+  the same config path and therefore shim.
+
 ### 3.9.20251021
 
 - Recognizing the potential for bugs when users call `pure.magic.deco` dynamically on the same function
