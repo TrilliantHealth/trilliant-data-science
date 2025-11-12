@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -12,6 +13,7 @@ from typing import Callable, Optional, Type
 import attr
 import cattrs.preconf.json
 import pkg_resources
+from filelock import FileLock
 from typing_inspect import get_args, get_origin, is_literal_type, is_optional_type, is_union_type
 
 from thds.core.types import StrOrPath
@@ -145,6 +147,13 @@ def nonnull_type_of(t: Type) -> Type:
     return ty.Union[nonnull_types]  # type: ignore
 
 
+def to_local_path(path: StrOrPath, package: Optional[str] = None) -> Path:
+    if package is None:
+        return Path(path)
+    else:
+        return Path(pkg_resources.resource_filename(package, str(path)))
+
+
 def set_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
     logger = logging.getLogger(__name__)
     logger.debug("Setting pragmas for bulk write optimization")
@@ -177,14 +186,33 @@ def unset_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
 
 
 @contextlib.contextmanager
-def bulk_write_context(con: sqlite3.Connection, close: bool):
-    set_bulk_write_mode(con)
-    try:
-        yield con
-    finally:
-        unset_bulk_write_mode(con)
-        if close:
-            con.close()
+def bulk_write_connection(
+    db_path: StrOrPath, db_package: Optional[str] = None, close: bool = True
+) -> ty.Generator[sqlite3.Connection, None, None]:
+    """Context manager to set/unset bulk write mode on a sqlite connection. Sets pragmas for efficient bulk writes,
+    such as loosening synchronous and locking modes. If `close` is True, the connection will be closed on exit.
+    Since setting the pragmas may mutate the database file, and since by design this context manager exists to enable
+    bulk writes which intentionally mutate the database, if a `db_path` (and optionally `db_package`, if specified as
+    package data) is given, we also acquire a file lock on the database file on entry and release it on exit.
+    """
+    db_path_ = to_local_path(db_path, db_package).absolute()
+    lock_path = db_path_.with_suffix(".lock")
+    lock = FileLock(lock_path)
+    logger = logging.getLogger(__name__)
+    logger.info("PID %d: Acquiring lock on %s", os.getpid(), lock_path)
+    with lock:
+        con = sqlite_connection(db_path, db_package, read_only=False)
+        set_bulk_write_mode(con)
+        try:
+            yield con
+        finally:
+            unset_bulk_write_mode(con)
+
+            if close:
+                con.close()
+
+            if lock_path.exists():
+                os.remove(lock_path)
 
 
 def sqlite_connection(
@@ -194,18 +222,13 @@ def sqlite_connection(
     mmap_size: Optional[int] = None,
     read_only: bool = False,
 ):
-    if package is None:
-        db_filename = db_path
-    else:
-        db_filename = pkg_resources.resource_filename(package, str(db_path))
-
-    db_full_path = str(Path(db_filename).absolute())
+    db_full_path = to_local_path(db_path, package)
 
     logger = logging.getLogger(__name__)
-    logger.info(f"Connecting to sqlite database: {db_filename}")
+    logger.info(f"Connecting to sqlite database: {db_full_path}")
     # sqlite3.PARSE_DECLTYPES will cover parsing dates/datetimes from the db
     con = sqlite3.connect(
-        db_full_path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=not read_only
+        db_full_path.absolute(), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=not read_only
     )
     if mmap_size is not None:
         logger.info(f"Setting sqlite mmap size to {mmap_size}")
@@ -270,6 +293,39 @@ class AttrsSQLiteDatabase:
         # build succeeds then we're guaranteed 0 or 1 results here
         result = self.sqlite_index_query(clazz, query, args)
         return result[0] if result else None
+
+    @ty.overload
+    def sqlite_bulk_query(
+        self,
+        clazz: ty.Callable[..., Record],
+        query: str,
+        args: ty.Collection[ty.Tuple],
+        single_col: ty.Literal[False],
+    ) -> ty.Iterator[Record]: ...
+
+    @ty.overload
+    def sqlite_bulk_query(
+        self,
+        clazz: ty.Callable[..., Record],
+        query: str,
+        args: ty.Collection,
+        single_col: ty.Literal[True],
+    ) -> ty.Iterator[Record]: ...
+
+    def sqlite_bulk_query(
+        self, clazz: ty.Callable[..., Record], query: str, args: ty.Collection, single_col: bool
+    ) -> ty.Iterator[Record]:
+        """Note: this method is intentionally left un-cached; it makes a tradeoff: minimize the number of disk acesses
+        and calls into sqlite at the cost of potentially re-loading the same records multiple times in case multiple
+        calls pass overlapping keys. Since it isn't cached, it can also be lazyly evaluated as an iterator. Callers are
+        encouraged to take advantage of this laziness where it may be useful."""
+        if single_col:
+            args_ = args if isinstance(args, (list, tuple)) else list(args)
+        else:
+            args_ = list(itertools.chain.from_iterable(args))
+        cursor = self._sqlite_con.execute(query, args_)
+        for row in cursor:
+            yield clazz(*row)
 
 
 # SQL pre/post processing

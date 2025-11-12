@@ -1,3 +1,26 @@
+### 0.14.0
+
+- Added `thds.tabularasa.testing.mock_sqlite` submodule with `mock_sqlite_loader` function to facilitate
+  type-safe construction of mock tabularasa sqlite loaders for use in unit tests.
+
+### 0.13.1
+
+- Retry occasional ADLS download failures automatically.
+
+## 0.13.0
+
+- Added auto-generation of bulk sqlite index loader methods. These allow querying for multiple keys in a
+  single round-trip to the sqlite database, improving performance when loading large numbers of rows
+  where cache hits may not be expected to be very helpful (the bulk query methods are not cached due to
+  the low likelihood of cache hits on entire collections of keys).
+
+### 0.12.1
+
+- The main sqlite data population routine, invokable via the `tabularasa init-sqlite` command or
+  `thds.tabularasa.data_dependencies.sqlite.populate_sqlite_db` function, now acquires a file lock on the
+  target database file to prevent concurrent writes, which could arise e.g. when performing
+  initializations inside worker processes in a multiprocessing context.
+
 ## 0.12.0
 
 - in `tabularasa push`, switched `no_fail_if_absent` from a positional arg parsed to boolean to a flag
