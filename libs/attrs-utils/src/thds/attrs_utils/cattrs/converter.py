@@ -15,7 +15,7 @@ UnStruct = Callable[[Any], T]
 StructFactory = Callable[[Any], Struct[T]]
 
 
-PREJSON_UNSTRUCTURE_COLLECTION_OVERRIDES: ty.Mapping[Type, Callable[[], ty.Collection]] = {
+PREJSON_UNSTRUCTURE_COLLECTION_OVERRIDES = {
     ty.Set: list,
     ty.FrozenSet: list,
     ty.AbstractSet: list,
@@ -173,7 +173,7 @@ def default_converter(
     prefer_attrib_converters: bool = True,
     unstruct_collection_overrides: ty.Mapping[
         Type, Callable[[], ty.Collection]
-    ] = PREJSON_UNSTRUCTURE_COLLECTION_OVERRIDES,
+    ] = PREJSON_UNSTRUCTURE_COLLECTION_OVERRIDES,  # type: ignore [assignment]
 ) -> Converter:
     return GenConverter(
         unstruct_collection_overrides=unstruct_collection_overrides,
