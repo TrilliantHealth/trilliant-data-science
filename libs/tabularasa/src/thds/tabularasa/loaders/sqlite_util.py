@@ -22,6 +22,7 @@ from thds.tabularasa.sqlite3_compat import sqlite3
 
 DEFAULT_ATTR_SQLITE_CACHE_SIZE = 100_000
 DEFAULT_MMAP_BYTES = int(os.environ.get("TABULA_RASA_DEFAULT_MMAP_BYTES", 8_589_934_592))  # 8 GB
+DISABLE_WAL_MODE = bool(os.environ.get("REF_D_DISABLE_SQLITE_WAL_MODE", False))
 
 PARAMETERIZABLE_BUILTINS = sys.version_info >= (3, 9)
 
@@ -158,6 +159,11 @@ def set_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
     logger.debug("Setting pragmas for bulk write optimization")
     # https://www.sqlite.org/pragma.html#pragma_synchronous
     _log_exec_sql(logger, con, "PRAGMA synchronous = 0")  # OFF
+    # https://www.sqlite.org/pragma.html#pragma_journal_mode
+    if not DISABLE_WAL_MODE:
+        _log_exec_sql(logger, con, "PRAGMA journal_mode = WAL")
+    # https://www.sqlite.org/pragma.html#pragma_locking_mode
+    _log_exec_sql(logger, con, "PRAGMA locking_mode = EXCLUSIVE")
 
     return con
 
@@ -165,7 +171,16 @@ def set_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
 def unset_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:
     logger = logging.getLogger(__name__)
     logger.debug("Setting pragmas for bulk write optimization")
+    # https://www.sqlite.org/pragma.html#pragma_journal_mode
+    # resetting this to the default. This is a property of the database, rather than the connection.
+    # the other settings are connection-specific.
+    # according to the docs, the WAL journal mode should be disabled before the locking mode is restored,
+    # else any attempt to do so is a no-op.
+    _log_exec_sql(logger, con, "PRAGMA journal_mode = DELETE")
+    # https://www.sqlite.org/pragma.html#pragma_synchronous
     _log_exec_sql(logger, con, "PRAGMA synchronous = 2")  # FULL (default)
+    # https://www.sqlite.org/pragma.html#pragma_locking_mode
+    _log_exec_sql(logger, con, "PRAGMA locking_mode = NORMAL")
 
     return con
 
@@ -176,10 +191,9 @@ def bulk_write_connection(
 ) -> ty.Generator[sqlite3.Connection, None, None]:
     """Context manager to set/unset bulk write mode on a sqlite connection. Sets pragmas for efficient bulk writes,
     such as loosening synchronous and locking modes. If `close` is True, the connection will be closed on exit.
-    To avoid bulk insert routines being run by other processes concurrently, we also acquire a file lock on the
-    database file on entry and release it on exit. Other processes attempting to perform bulk writes to the same file
-    will block until the lock is released. In the case of tabularasa init-sqlite, the semantics then imply that those
-    workers will perform no writes at all, since metadata will indicate that the data in the file is up-to-date.
+    Since setting the pragmas may mutate the database file, and since by design this context manager exists to enable
+    bulk writes which intentionally mutate the database, if a `db_path` (and optionally `db_package`, if specified as
+    package data) is given, we also acquire a file lock on the database file on entry and release it on exit.
     """
     db_path_ = to_local_path(db_path, db_package).absolute()
     lock_path = db_path_.with_suffix(".lock")
