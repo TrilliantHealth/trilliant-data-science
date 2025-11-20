@@ -12,8 +12,7 @@ transforming, checking, generating, or anything else you'd want to do with types
 - Heterogeneous tuple types, e.g. `typing.Tuple[A, B, C]`
 - Variadic tuple types, e.g. `Tuple[T, ...]`
 - `typing.NamedTuple` record types
-- `attrs`-defined record types, including generics with type variables
-- `dataclasses`-defined record types, including generics with type variables
+- `attrs`-defined record types
 - Union types using `typing.Union`
 - `typing.Literal`
 - `typing.Annotated`
@@ -74,7 +73,7 @@ You can create a callable to generate instances of a given type as follows:
 
 ```python
 import itertools
-from typing import Dict, Generic, Literal, NewType, Optional, Tuple, TypeVar
+from typing import Dict, Literal, NewType, Optional, Tuple
 import attr
 from thds.attrs_utils.random.builtin import random_bool_gen, random_int_gen, random_str_gen
 from thds.attrs_utils.random.tuple import random_tuple_gen
@@ -90,20 +89,18 @@ class Record1:
     a: Optional[str]
     b: Tuple[int, bool]
 
-ID = TypeVar("ID")
+ID = NewType("ID", int)
 Key = Literal["foo", "bar", "baz"]
 
 @attr.define
-class Record2(Generic[ID]):
+class Record2:
     id: ID
     records: Dict[Key, Record1]
 
-MyID = NewType("MyID", int)
-
 ids = itertools.count(1)
-random_gen.register(MyID, lambda: next(ids))
+random_gen.register(ID, lambda: next(ids))
 
-random_record = random_gen(Record2[MyID])
+random_record = random_gen(Record2)
 
 print(random_record())
 print(random_record())

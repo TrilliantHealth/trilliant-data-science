@@ -1,8 +1,3 @@
-### 0.14.2
-
-- Fix bug where an `os.link` could fail if the path already existed, by using `core.link.link` which does
-  an atomic link via a `move/rename`.
-
 ### 0.14.1
 
 - Further simplification of sqlite bulk inserts. WAL mode is found to have little effect on performance
