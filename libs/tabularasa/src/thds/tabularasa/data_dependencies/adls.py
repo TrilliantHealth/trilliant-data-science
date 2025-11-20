@@ -6,6 +6,7 @@ from typing import List, Optional, Protocol, Union
 import attr
 
 from thds.adls import ADLSFileSystem, fqn
+from thds.core import fretry
 from thds.tabularasa.schema.files import ADLSDataSpec, RemoteBlobStoreSpec
 
 CACHE_DIR = ".cache/"
@@ -40,6 +41,7 @@ def adls_filesystem(account: str, filesystem: str, cache_dir: Optional[Union[Pat
     return ADLSFileSystem(account, filesystem, cache_dir=cache_dir)
 
 
+@fretry.retry_regular(fretry.is_exc(Exception), fretry.n_times(3))
 def sync_adls_data(
     adls_spec: ADLSDataSpec, cache_dir: Optional[Union[Path, str]] = CACHE_DIR
 ) -> List[ADLSDownloadResult]:
