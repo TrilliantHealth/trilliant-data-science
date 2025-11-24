@@ -112,7 +112,7 @@ class WeightedSemaphore:
         self._value = value
         self._cond = threading.Condition()
 
-    def acquire(self, n: int = 1, block: bool = True, timeout: None | float = None) -> bool:
+    def acquire(self, n: int = 1, block: bool = True, timeout: ty.Optional[float] = None) -> bool:
         if n <= 0:
             raise ValueError("Acquire count must be > 0")
 
