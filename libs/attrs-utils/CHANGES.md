@@ -1,7 +1,8 @@
 ## 1.7
 
-- Adds new `params` submodule with utilities for inspecting and parameterizing generic types.
-- Adds general support for generic types in `TypeRecursion`.
+- Adds new `params` submodule with utilities for inspecting and parameterizing generic types. These can
+  be used in conjunction with `TypeRecursion` to implement custom handling of generic record types.
+- Adds general support for `dataclasses`-defined record types in `TypeRecursion`.
 
 ## 1.6
 
