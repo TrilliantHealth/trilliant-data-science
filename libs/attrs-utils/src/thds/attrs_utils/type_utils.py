@@ -2,13 +2,12 @@ import collections
 import enum
 import inspect
 import typing
-from typing import Callable, List, Mapping, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, List, Optional, Tuple, Type, TypeVar, Union
 
 import attr
 from typing_inspect import (
     get_args,
     get_origin,
-    get_parameters,
     is_literal_type,
     is_new_type,
     is_optional_type,
@@ -158,18 +157,9 @@ def concrete_constructor(type_: Type[T]) -> Callable[..., T]:
     return ORIGIN_TO_CONSTRUCTOR[type_] if origin is None else ORIGIN_TO_CONSTRUCTOR[origin]
 
 
-def parameterize(
-    type_: Union[Type, TypeVar], params: Mapping[TypeVar, Union[TypeVar, Type]]
-) -> Union[Type, TypeVar]:
-    if isinstance(type_, TypeVar):
-        return params.get(type_, type_)
-    else:
-        tparams = get_parameters(type_)
-        new_args = tuple(params.get(t, t) for t in tparams)
-        return type_[new_args]
-
-
 def bases(type_: Type, predicate: Optional[Callable[[Type], bool]] = None) -> List[Type]:
+    if get_args(type_):
+        type_ = get_origin(type_)
     if not inspect.isclass(type_):
         raise TypeError(
             f"{bases.__module__}.{bases.__name__} can be called only on concrete classes; got {type_}"
