@@ -51,6 +51,10 @@ def attrs_fields_parameterized(
     This appears to be true even for classes decorated with `attrs.resolve_types`, which may only resolve ForwardRefs.
     This function has the same signature as `attrs.fields` but returns `Attribute`s with fully resolved `type` attributes.
     """
+    try:
+        attrs_cls = attrs.resolve_types(attrs_cls, include_extras=True)
+    except Exception:
+        pass
 
     return list(
         map(
