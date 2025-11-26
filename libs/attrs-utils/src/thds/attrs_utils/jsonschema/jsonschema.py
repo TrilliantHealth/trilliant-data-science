@@ -13,6 +13,7 @@ from thds.core import scope
 from thds.core.stack_context import StackContext
 
 from ..cattrs import DEFAULT_JSON_CONVERTER
+from ..params import attrs_fields_parameterized
 from ..recursion import RecF, value_error
 from ..registry import Registry
 from ..type_recursion import TypeRecursion
@@ -181,7 +182,7 @@ def gen_jsonschema_attrs(
     all_attributes_required = AllAttributesRequired()
 
     type_ = attr.resolve_types(type_)
-    attrs = attr.fields(type_)
+    attrs = attrs_fields_parameterized(type_)
     properties: Dict[str, Any] = {}
     required: List[str] = []
 
