@@ -214,7 +214,7 @@ def gen_jsonschema_attrs(
                 default = None if null_default else at.default
                 attr_schema[DEFAULT] = serializer(default)
 
-        properties[at.name] = attr_schema  # type: ignore
+        properties[at.name] = attr_schema
 
     return object_(properties=properties, required=required, additionalProperties=False)
 

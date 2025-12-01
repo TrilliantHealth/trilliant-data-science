@@ -27,7 +27,7 @@ def check_literal(instancecheck, type_: Type):
 
 def check_attrs(instancecheck, type_: Type[attrs.AttrsInstance]):
     # this _should_ typecheck according to my understanding of attrs.AttrsInstance but it is not
-    fields = attrs_fields_parameterized(type_)  # type: ignore [misc]
+    fields = attrs_fields_parameterized(type_)
     names = tuple(f.name for f in fields)
     types = (f.type for f in fields)
     return util.check_attrs(
