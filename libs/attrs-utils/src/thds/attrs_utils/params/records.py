@@ -64,16 +64,6 @@ def attrs_fields_parameterized(
     )
 
 
-def _update_dataclass_field_type(
-    source: dataclasses.Field,
-    **updates,
-) -> dataclasses.Field:
-    new_field = copy.copy(source)
-    for name, value in updates.items():
-        setattr(new_field, name, value)
-    return new_field
-
-
 def _parameterize_dataclass_field(
     field_origins: ty.Mapping[str, ty.Type],
     field: dataclasses.Field,
