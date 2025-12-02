@@ -46,7 +46,7 @@ class DBaz(DBar[V]):
 @attrs.define(slots=False)
 # slots=False to allow multiple bases without layout issues
 class Qux(ty.Generic[X, W], Foo[W], Baz[X]):
-    t: W
+    t: W  # specializing from Foo where this is Optional[W]
     w: W
     x: X
     baz: Baz[X]
@@ -78,3 +78,13 @@ class NotGenericAtAll(NonGeneric):
 @dataclasses.dataclass
 class DNotGenericAtAll(DNonGeneric):
     bar: DBar[bool]
+
+
+@attrs.define
+class PartiallyGeneric(NonGeneric, ty.Generic[T]):
+    foo: Foo[T]
+
+
+@dataclasses.dataclass
+class DPartiallyGeneric(DNonGeneric, ty.Generic[T]):
+    foo: DFoo[T]

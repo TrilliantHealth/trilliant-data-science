@@ -13,10 +13,12 @@ from .conftest import (
     DFoo,
     DNonGeneric,
     DNotGenericAtAll,
+    DPartiallyGeneric,
     DQux,
     Foo,
     NonGeneric,
     NotGenericAtAll,
+    PartiallyGeneric,
     Qux,
     T,
     U,
@@ -132,6 +134,16 @@ TV = TypeVar("TV")
             DNotGenericAtAll,
             (DNotGenericAtAll, DQux[int, str], DFoo[str], DBaz[int], DBar[int]),
             id="dataclasses deep inheritance with concrete types and non-generic subclass",
+        ),
+        pytest.param(
+            PartiallyGeneric[U],
+            (PartiallyGeneric[U], NonGeneric, Qux[int, str], Foo[str], Baz[int], Bar[int]),
+            id="attrs partially generic reused typevar",
+        ),
+        pytest.param(
+            DPartiallyGeneric,
+            (DPartiallyGeneric[T], DNonGeneric, DQux[int, str], DFoo[str], DBaz[int], DBar[int]),
+            id="dataclasses partially generic reused typevar",
         ),
         # The following tests are for standard library generics. Currently, parameterized_mro does not trace the
         # inheritance relationships of these (which would require some delicate tracking of relationships between
