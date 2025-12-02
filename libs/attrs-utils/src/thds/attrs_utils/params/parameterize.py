@@ -10,10 +10,48 @@ from ..utils import signature_preserving_cache
 from .utils import TypeOrVar, origin_params_and_args
 
 
+@ty.overload
+def parameterize(
+    type_: ty.TypeVar,
+    params: ty.Union[ty.Mapping[ty.TypeVar, TypeOrVar], ty.Type],
+) -> TypeOrVar: ...
+
+
+@ty.overload
 def parameterize(
     type_: ty.Type,
     params: ty.Union[ty.Mapping[ty.TypeVar, TypeOrVar], ty.Type],
-) -> ty.Type:
+) -> ty.Type: ...
+
+
+def parameterize(
+    type_: TypeOrVar,
+    params: ty.Union[ty.Mapping[ty.TypeVar, TypeOrVar], ty.Type],
+) -> TypeOrVar:
+    """Given a generic type (or type variable) `type_` and a mapping from type variables to concrete types, return a new
+    type where the type variables have been substituted according to the mapping. If `params` is itself a parameterized
+    generic type, extract its type parameters and arguments and use those to build the mapping. If `type_` is not
+    generic, return it unchanged.
+
+    Examples:
+        >>> from typing import Generic, TypeVar, List, Dict
+        >>> T = TypeVar('T')
+        >>> U = TypeVar('U')
+        >>> V = TypeVar('V')
+        >>> parameterize(int, {T: str}) == int
+        True
+        >>> parameterize(T, {T: int}) == int
+        True
+        >>> parameterize(List[T], {T: str}) == List[str]
+        True
+        >>> parameterize(Dict[T, U], {T: int, U: str, V: float}) == Dict[int, str]
+        True
+        >>> class MyGeneric(Generic[T, U]): ...
+        >>> parameterize(MyGeneric, MyGeneric[int, str]) == MyGeneric[int, str]
+        True
+        >>> parameterize(List[T], MyGeneric[int, str]) == List[int]
+        True
+    """
     if not isinstance(params, ty.Mapping):
         _, params_, args, _ = origin_params_and_args(params)
         return parameterize(type_, dict(zip(params_, args)))
@@ -29,7 +67,7 @@ def parameterize(
 @signature_preserving_cache
 def parameterized_mro(type_: ty.Type) -> ty.Tuple[ty.Type, ...]:
     """All generic bases of a generic type, with type parameters substituted according to their specification in `type_`,
-    in python method resolution order. In case `type_`
+    in python method resolution order. In case `type_` is not generic, just return the standard MRO.
     """
     # property-based test idea:
     #   map(partial(parameterize, args), parameterized_bases(t)) == parameterized_bases(t[args])
