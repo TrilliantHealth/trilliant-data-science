@@ -68,11 +68,9 @@ def attrs_fields_parameterized(
     This appears to be true even for classes decorated with `attrs.resolve_types`, which may only resolve ForwardRefs.
     This function has the same signature as `attrs.fields` but returns `Attribute`s with fully resolved `type` attributes.
     """
-    try:
-        attrs.resolve_types(ti.get_origin(attrs_cls) or attrs_cls, include_extras=True)
-    except Exception:
-        pass
-
+    attrs.resolve_types(
+        ti.get_origin(attrs_cls) or attrs_cls, include_extras=True
+    )  # this mutates in place
     origins = field_origins(attrs_cls)
     return [_parameterize_attrs_or_dataclass_field(origins, field) for field in attrs.fields(attrs_cls)]
 
