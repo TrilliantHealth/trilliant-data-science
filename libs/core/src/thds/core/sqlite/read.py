@@ -33,6 +33,33 @@ def matching_select(
     conn.row_factory = old_row_factory
 
 
+def matching_select_all(
+    table_name: str,
+    conn: Connection,
+    to_match: ty.Mapping[str, list[ty.Any]],
+    columns: ty.Sequence[str] = tuple(),
+) -> ty.Iterator[ty.Mapping[str, ty.Any]]:
+    """Get a single row from a table by key.
+
+    This is susceptible to SQL injection because the keys are
+    formatted directly. Do _not_ give external users the ability to
+    call this function directly and specify any of its keys.
+    """
+    cols = ", ".join(columns) if columns else "*"
+
+    qs = " AND ".join(f"{k} IN (?)" for k in to_match.keys())
+    where = f"WHERE {qs}" if qs else ""
+    # because we control the whole query, we're matching on the 'dumb' ? placeholder.
+
+    old_row_factory = conn.row_factory
+    conn.row_factory = Row  # this is an optimized approach to getting 'mappings' (with key names)
+    value_strings = [",".join(str(v)) for v in to_match.values()]
+
+    for row in conn.execute(f"SELECT {cols} FROM {table_name} {where}", tuple(value_strings)):
+        yield row
+    conn.row_factory = old_row_factory
+
+
 matching = matching_select  # alias
 
 

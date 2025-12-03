@@ -122,10 +122,6 @@ def log_function_execution(
         logger.debug("Not writing function summary for %s", memo_uri)
         return
 
-    if not RUN_NAME():
-        logger.debug("mops run summary is disabled.")
-        return
-
     invoked_at = metadata.invoked_at if metadata else dt.datetime.utcnow()
 
     parts = function_memospace.parse_memo_uri(memo_uri, runner_prefix)

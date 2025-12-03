@@ -5,6 +5,8 @@ from pathlib import Path
 
 from typing_extensions import Protocol
 
+from thds.core import config
+
 T = ty.TypeVar("T")
 F = ty.TypeVar("F", bound=ty.Callable)
 
@@ -55,6 +57,16 @@ class NotARunnerContext(Exception):
 
 
 AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
+
+
+DISABLE_CONTROL_CACHE = config.item(
+    "thds.mops.pure.disable_control_cache", default=False, parse=config.tobool
+)
+# set the above to True in order to specifically opt out of read-path caching of
+# mops-created files. This can apply to a local (stack) context, or can
+# apply globally to the process. The former may be used selectively within mops
+# for issues of known correctness, e.g. locks, whereas the latter will be useful
+# for debugging any cases where files have been remotely deleted.
 
 
 class BlobStore(Protocol):

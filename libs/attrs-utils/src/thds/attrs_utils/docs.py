@@ -7,7 +7,7 @@ from typing import Callable, Dict, List, Literal, Optional, Set, Type
 
 from docstring_parser import Docstring, DocstringMeta, DocstringParam, Style, parse
 
-from .type_utils import bases, get_origin
+from .type_utils import bases
 
 DocCombineSpec = Literal["first", "join"]
 
@@ -29,7 +29,6 @@ def record_class_docs(
     join_sep: str = "\n\n",
     require_complete: bool = False,
 ) -> Docstring:
-    cls = get_origin(cls) or cls  # unwrap parameterized generics
     base_clss = [c for c in bases(cls, filter_bases) if c is not object]
 
     docs = [parse(c.__doc__, style=style) for c in base_clss if c.__doc__]
