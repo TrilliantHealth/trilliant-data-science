@@ -2,13 +2,13 @@ import collections
 import enum
 import inspect
 import typing
-from typing import Callable, List, Mapping, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, List, Optional, Tuple, Type, TypeVar, Union
 
 import attr
+from typing_extensions import TypeIs
 from typing_inspect import (
     get_args,
     get_origin,
-    get_parameters,
     is_literal_type,
     is_new_type,
     is_optional_type,
@@ -97,7 +97,7 @@ def enum_base(type_: Type) -> Type:
 def unwrap_optional(type_: Type) -> Type:
     if is_optional_type(type_):
         args = get_args(type_)
-        return Union[tuple(a for a in args if a is not type(None))]  # type: ignore  # noqa:E721
+        return Union[tuple(a for a in args if a is not type(None))]  # type: ignore[return-value]  # noqa:E721
     else:
         return type_
 
@@ -116,30 +116,30 @@ def unwrap_annotated(type_: Type) -> Type:
     return type_
 
 
-def is_enum_type(type_: Type) -> bool:
+def is_enum_type(type_: Type) -> TypeIs[Type[enum.Enum]]:
     return isinstance(type_, type) and issubclass(type_, enum.Enum)
 
 
-def is_collection_type(type_: Type) -> bool:
+def is_collection_type(type_: Type) -> TypeIs[Type[typing.Collection]]:
     origin = get_origin(type_)
     return (type_ in COLLECTION_TYPES) if origin is None else (origin in COLLECTION_TYPES)
 
 
-def is_mapping_type(type_: Type) -> bool:
+def is_mapping_type(type_: Type) -> TypeIs[Type[typing.Mapping]]:
     origin = get_origin(type_)
     return (type_ in MAPPING_TYPES) if origin is None else (origin in MAPPING_TYPES)
 
 
-def is_set_type(type_: Type) -> bool:
+def is_set_type(type_: Type) -> TypeIs[Type[typing.AbstractSet]]:
     origin = get_origin(type_)
     return (type_ in UNIQUE_COLLECTION_TYPES) if origin is None else (origin in UNIQUE_COLLECTION_TYPES)
 
 
-def is_namedtuple_type(type_: Type) -> bool:
+def is_namedtuple_type(type_: Type) -> TypeIs[Type[typing.NamedTuple]]:
     return getattr(type_, "__bases__", None) == (tuple,) and hasattr(type_, "_fields")
 
 
-def is_variadic_tuple_type(type_: Type) -> bool:
+def is_variadic_tuple_type(type_: Type) -> TypeIs[Type[typing.Tuple[typing.Any, ...]]]:
     if is_tuple_type(type_):
         args = get_args(type_)
         return len(args) == 2 and args[-1] is Ellipsis
@@ -153,23 +153,14 @@ def is_builtin_type(type_: Type) -> bool:
 
 def concrete_constructor(type_: Type[T]) -> Callable[..., T]:
     if is_namedtuple_type(type_):
-        return type_
+        return type_  # type: ignore[return-value]
     origin = get_origin(type_)
     return ORIGIN_TO_CONSTRUCTOR[type_] if origin is None else ORIGIN_TO_CONSTRUCTOR[origin]
 
 
-def parameterize(
-    type_: Union[Type, TypeVar], params: Mapping[TypeVar, Union[TypeVar, Type]]
-) -> Union[Type, TypeVar]:
-    if isinstance(type_, TypeVar):
-        return params.get(type_, type_)
-    else:
-        tparams = get_parameters(type_)
-        new_args = tuple(params.get(t, t) for t in tparams)
-        return type_[new_args]
-
-
 def bases(type_: Type, predicate: Optional[Callable[[Type], bool]] = None) -> List[Type]:
+    if get_args(type_):
+        type_ = get_origin(type_)
     if not inspect.isclass(type_):
         raise TypeError(
             f"{bases.__module__}.{bases.__name__} can be called only on concrete classes; got {type_}"
