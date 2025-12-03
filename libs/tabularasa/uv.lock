@@ -2897,7 +2897,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.49"
+version = "1.47"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },
@@ -2922,7 +2922,7 @@ dev = [
 
 [[package]]
 name = "thds-tabularasa"
-version = "0.14.3"
+version = "0.14.1"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },

@@ -8,5 +8,4 @@ from ._construct import set_file_autohash  # noqa: F401
 from ._construct import from_file, from_uri, path_from_uri, register_from_uri_handler  # noqa: F401
 from ._construct_tree import tree_from_directory  # noqa: F401
 from ._download import Downloader, register_download_handler  # noqa: F401
-from ._upload import Uploader, register_upload_handler, upload  # noqa: F401
 from .src import Source  # noqa: F401
