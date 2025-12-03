@@ -1,22 +1,3 @@
-## 3.12
-
-- Replaces the `DISABLE_CONTROL_CACHE` config with `CONTROL_CACHE_TTL_IN_SECONDS`. The functionality of
-  `DISABLE_CONTROL_CACHE` can mostly be achieved by setting `CONTROL_CACHE_TTL_IN_SECONDS` to 0, except
-  that it results in cache items being refreshed.
-
-## 3.11
-
-- `mops-inspect` now has `--diff-summary` and `--diff-picked`. Use `--diff-summary` to diff a given URI
-  against any local run summary (by default the most recent, using `.mops/summary`), prioritizing memo
-  URIs that have a long prefix match (usually the same pipeline id and function name). Use `p` to 'pick'
-  URIs into a file for later re-comparison. Use `--diff-picked` with that file as input (so you can
-  provide the file to other people or record your debugging work).
-
-### 3.10.20251114
-
-- Store and unpickle `Source.size` in the absence of a `hashref`. This is a backwards-incompatible change
-  for mops functions taking source objects without hashes as arguments.
-
 ## 3.10
 
 - New API: `pure.magic.wand` has been added to supersede uses of `pure.magic.deco` for dynamic use cases.

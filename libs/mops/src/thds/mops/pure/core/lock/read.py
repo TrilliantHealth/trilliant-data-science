@@ -4,7 +4,7 @@ import typing as ty
 
 from thds.core import log
 
-from ..control_cache import CONTROL_CACHE_TTL_IN_SECONDS
+from ..types import DISABLE_CONTROL_CACHE
 from ..uris import lookup_blob_store
 from .types import LockContents
 
@@ -17,7 +17,7 @@ def get_writer_id(lock_contents: LockContents) -> str:
 
 def make_read_lockfile(lock_uri: str) -> ty.Callable[[], ty.Optional[LockContents]]:
     def read_lockfile() -> ty.Optional[LockContents]:
-        with CONTROL_CACHE_TTL_IN_SECONDS.set_local(0):
+        with DISABLE_CONTROL_CACHE.set_local(True):
             blob_store = lookup_blob_store(lock_uri)
 
         while True:
