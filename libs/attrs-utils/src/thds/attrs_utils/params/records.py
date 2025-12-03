@@ -34,7 +34,7 @@ def _replace_dataclass_field_type(
 ) -> dataclasses.Field:
     new_field = copy.copy(dataclass_field)
     new_field.type = new_type  # type: ignore[assignment]
-    # ^ mypy thinks dataclasses.Field.type is always 'type', but it can be any type hint
+    # ^ NOTE: mypy thinks dataclasses.Field.type is always 'type', but it can be any type hint
     return new_field
 
 
