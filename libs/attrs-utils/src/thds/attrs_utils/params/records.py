@@ -2,7 +2,6 @@
 
 import copy
 import dataclasses
-import functools
 import typing as ty
 
 import attrs
@@ -10,6 +9,7 @@ import typing_inspect as ti
 
 from ..utils import signature_preserving_cache
 from .parameterize import parameterize, parameterized_mro
+from .utils import TypeOrVar
 
 
 def field_origins(
@@ -29,16 +29,33 @@ def field_origins(
     return field_origins
 
 
-def _parameterize_attrs_field(
+def _replace_dataclass_field_type(
+    dataclass_field: dataclasses.Field, new_type: TypeOrVar
+) -> dataclasses.Field:
+    new_field = copy.copy(dataclass_field)
+    new_field.type = new_type  # type: ignore[assignment]
+    # ^ mypy thinks dataclasses.Field.type is always 'type', but it can be any type hint
+    return new_field
+
+
+_FT = ty.TypeVar("_FT", attrs.Attribute, dataclasses.Field)
+
+
+def _parameterize_attrs_or_dataclass_field(
     field_origins: ty.Mapping[str, ty.Type],
-    field: attrs.Attribute,
-) -> attrs.Attribute:
-    if parameterized_origin := field_origins.get(field.name):
-        if field.type is None:
+    field: _FT,
+) -> _FT:
+    if (parameterized_origin := field_origins.get(field.name)) is not None:
+        field_type = type(None) if field.type is None else field.type
+        # shouldn't happen in pracice after type resolution, but we keep it here to make mypy happy
+        concrete_type = parameterize(field_type, parameterized_origin)
+        if concrete_type == field.type:
             return field
-        else:
-            concrete_type = parameterize(field.type, parameterized_origin)
+        elif isinstance(field, attrs.Attribute):
             return field.evolve(type=concrete_type)
+        else:
+            # dataclasses.Field
+            return _replace_dataclass_field_type(field, concrete_type)
     else:
         return field
 
@@ -52,32 +69,20 @@ def attrs_fields_parameterized(
     This function has the same signature as `attrs.fields` but returns `Attribute`s with fully resolved `type` attributes.
     """
     try:
-        attrs_cls = attrs.resolve_types(attrs_cls, include_extras=True)
+        attrs.resolve_types(ti.get_origin(attrs_cls) or attrs_cls, include_extras=True)
     except Exception:
         pass
 
-    return list(
-        map(
-            functools.partial(_parameterize_attrs_field, field_origins(attrs_cls)),
-            attrs.fields(attrs_cls),
-        )
-    )
+    origins = field_origins(attrs_cls)
+    return [_parameterize_attrs_or_dataclass_field(origins, field) for field in attrs.fields(attrs_cls)]
 
 
-def _parameterize_dataclass_field(
-    field_origins: ty.Mapping[str, ty.Type],
-    field: dataclasses.Field,
-) -> dataclasses.Field:
-    if parameterized_origin := field_origins.get(field.name):
-        concrete_type = parameterize(field.type, parameterized_origin)
-        if concrete_type == field.type:
-            return field
-        else:
-            new_field = copy.copy(field)
-            new_field.type = concrete_type
-            return new_field
-    else:
-        return field
+def _resolve_dataclass_fields(
+    dataclass_cls: ty.Type,
+) -> ty.Tuple[dataclasses.Field, ...]:
+    resolved_annotations = ty.get_type_hints(dataclass_cls, include_extras=True)
+    fields = dataclasses.fields(dataclass_cls)
+    return tuple(_replace_dataclass_field_type(f, resolved_annotations[f.name]) for f in fields)
 
 
 @signature_preserving_cache
@@ -88,9 +93,8 @@ def dataclass_fields_parameterized(
     This function has the same signature as `dataclasses.fields` but returns `Field`s with fully resolved `type` attributes.
     """
 
-    return list(
-        map(
-            functools.partial(_parameterize_dataclass_field, field_origins(dataclass_cls)),
-            dataclasses.fields(ti.get_origin(dataclass_cls) or dataclass_cls),
-        )
-    )
+    origins = field_origins(dataclass_cls)
+    return [
+        _parameterize_attrs_or_dataclass_field(origins, field)
+        for field in _resolve_dataclass_fields(ti.get_origin(dataclass_cls) or dataclass_cls)
+    ]

@@ -15,12 +15,12 @@ X = ty.TypeVar("X")
 
 @attrs.define
 class Foo(ty.Generic[T]):
-    t: ty.Optional[T]
+    t: ty.Optional["T"]
 
 
 @dataclasses.dataclass
 class DFoo(ty.Generic[T]):
-    t: ty.Optional[T]
+    t: "ty.Optional[T]"
 
 
 @attrs.define(slots=False)
@@ -30,12 +30,12 @@ class Bar(ty.Generic[U]):
 
 @dataclasses.dataclass
 class DBar(ty.Generic[U]):
-    u: U
+    u: "U"
 
 
 @attrs.define(slots=False)
 class Baz(Bar[V]):
-    v: V
+    v: "V"
 
 
 @dataclasses.dataclass
@@ -49,14 +49,14 @@ class Qux(ty.Generic[X, W], Foo[W], Baz[X]):
     t: W  # specializing from Foo where this is Optional[W]
     w: W
     x: X
-    baz: Baz[X]
+    baz: "Baz[X]"
 
 
 @dataclasses.dataclass
 class DQux(ty.Generic[X, W], DFoo[W], DBaz[X]):
-    t: W
+    t: "W"
     w: W
-    x: X
+    x: "X"
     baz: DBaz[X]
 
 
@@ -67,12 +67,12 @@ class NonGeneric(Qux[int, str]):
 
 @dataclasses.dataclass
 class DNonGeneric(DQux[int, str]):
-    z: bool
+    z: "bool"
 
 
 @attrs.define
 class NotGenericAtAll(NonGeneric):
-    bar: Bar[bool]
+    bar: "Bar[bool]"
 
 
 @dataclasses.dataclass
@@ -87,4 +87,4 @@ class PartiallyGeneric(NonGeneric, ty.Generic[T]):
 
 @dataclasses.dataclass
 class DPartiallyGeneric(DNonGeneric, ty.Generic[T]):
-    foo: DFoo[T]
+    foo: "DFoo[T]"
