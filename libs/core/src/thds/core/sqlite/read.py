@@ -39,7 +39,7 @@ def matching_select_all(
     to_match: ty.Mapping[str, list[ty.Any]],
     columns: ty.Sequence[str] = tuple(),
 ) -> ty.Iterator[ty.Mapping[str, ty.Any]]:
-    """Get a single row from a table by key.
+    """Get rows from a table by matching columns against lists of values.
 
     This is susceptible to SQL injection because the keys are
     formatted directly. Do _not_ give external users the ability to
@@ -47,15 +47,19 @@ def matching_select_all(
     """
     cols = ", ".join(columns) if columns else "*"
 
-    qs = " AND ".join(f"{k} IN (?)" for k in to_match.keys())
-    where = f"WHERE {qs}" if qs else ""
-    # because we control the whole query, we're matching on the 'dumb' ? placeholder.
+    where_parts = []
+    all_values = []
+    for k, values in to_match.items():
+        placeholders = ", ".join("?" * len(values))
+        where_parts.append(f"{k} IN ({placeholders})")
+        all_values.extend(values)
+
+    where = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
 
     old_row_factory = conn.row_factory
     conn.row_factory = Row  # this is an optimized approach to getting 'mappings' (with key names)
-    value_strings = [",".join(str(v)) for v in to_match.values()]
 
-    for row in conn.execute(f"SELECT {cols} FROM {table_name} {where}", tuple(value_strings)):
+    for row in conn.execute(f"SELECT {cols} FROM {table_name} {where}", all_values):
         yield row
     conn.row_factory = old_row_factory
 
