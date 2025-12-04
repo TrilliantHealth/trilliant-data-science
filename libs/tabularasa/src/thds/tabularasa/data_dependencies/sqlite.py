@@ -222,7 +222,9 @@ def populate_sqlite_db(
     table_predicate: Callable[[Table], bool] = is_build_time_package_table,
     data_path_overrides: Optional[Mapping[str, Path]] = None,
 ):
-    """Populate a sqlite database with data for a set of tables from a `reference_data.schema.Schema`
+    """Populate a sqlite database with data for a set of tables from a `reference_data.schema.Schema`.
+    Note that this can safely be called concurrently in multiple processes on the same database file; a file lock
+    is acquired on the database file and only released when the data insertion is complete.
 
     :param schema: the `reference_data.schema.Schema` object defining the data to be inserted
     :param db_package: name of the package where the database file is stored, if any. In case `None` is
@@ -258,6 +260,9 @@ def populate_sqlite_db(
     """
     # gather all tables before executing any I/O
     insert_tables = [table for table in schema.filter_tables(table_predicate) if table.has_indexes]
+
+    if not insert_tables:
+        return
 
     with bulk_write_connection(db_path, db_package, close=True) as con:
         for table in insert_tables:
