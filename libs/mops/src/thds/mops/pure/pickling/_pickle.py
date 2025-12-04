@@ -152,7 +152,7 @@ class SourceArgumentPickler:
             uri_or_hash = prepare_source_argument(maybe_source)
             if isinstance(uri_or_hash, hashing.Hash):
                 return ty.cast(_DeserSource, UnpickleSourceHashrefArgument(uri_or_hash))
-            return ty.cast(_DeserSource, UnpickleSourceUriArgument(uri_or_hash))
+            return ty.cast(_DeserSource, UnpickleSourceUriArgument(uri_or_hash, maybe_source.size))
             # I do not understand why these casts are necessary to avoid mypy errors.
             # I think it has something to do with NamedTuples being the underlying
             # object type that is expected to support __call__(self) -> Foo,

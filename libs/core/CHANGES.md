@@ -1,3 +1,7 @@
+## 1.48
+
+- Adds `derive_partition_min_max` for calculating the min and max values of a range partition.
+
 ## 1.47
 
 - Improve/regularize default logging for `core.parallel`, and add `named=` keyword argument to

@@ -21,8 +21,10 @@ def random_seed():
 def test_random_gen(type: ty.Type[T]):
     # check that a generator can be constructed
     gen = random_gen(type)
-    # check that it can be called
-    value = gen()
-
     check = instancecheck(type)
-    assert check(value)
+
+    for _ in range(10):
+        # check that it can be called
+        value = gen()
+
+        assert check(value)
