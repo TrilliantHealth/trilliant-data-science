@@ -1,3 +1,8 @@
+### 3.10.20251114
+
+- Store and unpickle `Source.size` in the absence of a `hashref`. This is a backwards-incompatible change
+  for mops functions taking source objects without hashes as arguments.
+
 ## 3.10
 
 - New API: `pure.magic.wand` has been added to supersede uses of `pure.magic.deco` for dynamic use cases.

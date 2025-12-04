@@ -1,11 +1,12 @@
 import collections
 import enum
 from functools import partial
-from typing import DefaultDict, Iterable, Tuple, Type, cast, get_args
+from typing import DefaultDict, Iterable, NamedTuple, Tuple, Type, TypeVar, cast, get_args
 
 import attr
 
 from .. import recursion, type_recursion, type_utils
+from ..params import attrs_fields_parameterized
 from . import attrs, collection, optional, tuple, union
 from .registry import GEN_REGISTRY
 from .util import Gen, T, U, choice_gen, juxtapose_gen, repeat_gen
@@ -29,7 +30,7 @@ def gen_enum(random_gen, type_: Type[T]) -> Gen[T]:
 
 
 def gen_attrs(random_gen, type_: Type[attr.AttrsInstance]) -> Gen[attr.AttrsInstance]:
-    fields = attr.fields(type_)  # type: ignore [arg-type,misc]
+    fields = attrs_fields_parameterized(type_)
     kw_only_fields = [f for f in fields if f.kw_only]
     overrides = attrs.CUSTOM_ATTRS_BY_FIELD_REGISTRY.get(type_)
 
@@ -48,9 +49,12 @@ def gen_attrs(random_gen, type_: Type[attr.AttrsInstance]) -> Gen[attr.AttrsInst
         return tuple.random_namedtuple_gen(type_, *field_gens)
 
 
-def gen_namedtuple(random_gen, type_: Type[T]) -> Gen[T]:
-    field_names = type_._fields  # type: ignore [attr-defined]
-    field_types = (type_.__annotations__[name] for name in field_names)  # type: ignore [attr-defined]
+NT = TypeVar("NT", bound=NamedTuple)
+
+
+def gen_namedtuple(random_gen, type_: Type[NT]) -> Gen[NT]:
+    field_names = type_._fields
+    field_types = (type_.__annotations__[name] for name in field_names)
     overrides = attrs.CUSTOM_ATTRS_BY_FIELD_REGISTRY.get(type_)
     if overrides:
         return tuple.random_namedtuple_gen(
