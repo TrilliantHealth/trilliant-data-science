@@ -111,9 +111,10 @@ class UnpickleSourceUriArgument(ty.NamedTuple):
     """
 
     uri: str
+    size: int = 0
 
     def __call__(self) -> source.Source:
-        return source.from_uri(self.uri)
+        return source.from_uri(self.uri, None, self.size)
 
 
 class UnpickleSourceHashrefArgument(ty.NamedTuple):

@@ -3,6 +3,7 @@ from typing import Any, NamedTuple, Type, cast, get_args, get_origin
 import attrs
 
 from .. import recursion, type_utils
+from ..params import attrs_fields_parameterized
 from ..type_recursion import TypeRecursion
 from . import util
 from .registry import ISINSTANCE_REGISTRY
@@ -26,7 +27,7 @@ def check_literal(instancecheck, type_: Type):
 
 def check_attrs(instancecheck, type_: Type[attrs.AttrsInstance]):
     # this _should_ typecheck according to my understanding of attrs.AttrsInstance but it is not
-    fields = attrs.fields(type_)  # type: ignore [misc]
+    fields = attrs_fields_parameterized(type_)
     names = tuple(f.name for f in fields)
     types = (f.type for f in fields)
     return util.check_attrs(
