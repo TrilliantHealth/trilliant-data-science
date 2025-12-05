@@ -6,9 +6,10 @@ import uuid
 import warnings
 from functools import partial
 
-import attr
+import attrs
 
 from . import recursion, type_recursion, type_utils
+from .params import attrs_fields_parameterized
 from .registry import Registry
 from .type_recursion import Constructor
 
@@ -67,9 +68,9 @@ def _record_constructor(
     return f
 
 
-def empty_attrs(empty_gen, type_: ty.Type[attr.AttrsInstance]) -> Constructor[attr.AttrsInstance]:
-    fields = attr.fields(type_)
-    defaults = {f.name: empty_gen(f.type) for f in fields if f.default is attr.NOTHING}
+def empty_attrs(empty_gen, type_: ty.Type[attrs.AttrsInstance]) -> Constructor[attrs.AttrsInstance]:
+    fields = attrs_fields_parameterized(type_)
+    defaults = {f.name: empty_gen(f.type) for f in fields if f.default is attrs.NOTHING}
     # keep the original defaults and default factories
     return _record_constructor(type_, defaults)
 

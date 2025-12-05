@@ -30,7 +30,7 @@ class Registry(Dict[T, U]):
 
     def cache(self, func: Callable[[T], U]) -> Callable[[T], U]:
         cached = partial(_check_cache, self, func)
-        return wraps(func)(cached)  # type: ignore [return-value]
+        return wraps(func)(cached)
 
 
 def _check_cache(cache: Dict[T, U], func: Callable[[T], U], key: T) -> U:
