@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from ..conftest import ReferenceDataTestCase
 
 
@@ -31,6 +33,15 @@ def test_attrs_sqlite_loader(test_case_with_attrs_sqlite_module: ReferenceDataTe
                     # field-for-field equality check
                     assert actual == expected
 
+                    if len(pk) == 1:
+                        # test bulk method for single-field PKs
+                        actual_bulk = loader.pk_bulk([pk[0], pk[0]])
+                    else:
+                        actual_bulk = loader.pk_bulk([pk, pk])
+
+                    actual_bulk_list = list(actual_bulk)
+                    assert actual_bulk_list == [expected]
+
             # check the round trip from ground truth tuple index field values through query and back to
             # tuples - note, we check for containment because there may be multiple results
             for index in table.indexes:
@@ -38,9 +49,14 @@ def test_attrs_sqlite_loader(test_case_with_attrs_sqlite_module: ReferenceDataTe
                 # check for corresponding index method
                 method_name = "_".join(["idx", *index])
                 assert hasattr(loader, method_name)
-                # get the index method from the loader class
                 method = getattr(loader, method_name)
                 assert callable(method)
+
+                method_name_bulk = f"{method_name}_bulk"
+                assert hasattr(loader, method_name_bulk)
+                method_bulk = getattr(loader, method_name_bulk)
+                assert callable(method_bulk)
+
                 # find indices of the index columns in the tuples
                 idx_ixs = [columns.index(name) for name in index]
                 for tup in tuples:
@@ -56,6 +72,15 @@ def test_attrs_sqlite_loader(test_case_with_attrs_sqlite_module: ReferenceDataTe
                         # containment check
                         assert expected in result
 
+                    if len(index) == 1:
+                        # test bulk method for single-field indexes
+                        result_bulk = method_bulk([idx[0], idx[0]])
+                    else:
+                        result_bulk = method_bulk([idx, idx])
+
+                    assert isinstance(result_bulk, Generator)
+                    result_bulk_list = list(result_bulk)
+                    assert expected in result_bulk_list
         else:
             # should be no loader if there are no indexes
             assert loader is None
