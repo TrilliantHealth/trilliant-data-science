@@ -15,15 +15,15 @@ MD5 = "md5"
 logger = log.getLogger(__name__)
 
 
-def _from_b64(d: dict) -> ty.Optional[hashing.Hash]:
-    for key in d.keys():
+def _from_b64(m: ty.Mapping) -> ty.Optional[hashing.Hash]:
+    for key in m.keys():
         if key.endswith("b64"):
             algo = key[:-3]
-            return hashing.Hash(algo=algo, bytes=hashing.db64(d[key]))
+            return hashing.Hash(algo=algo, bytes=hashing.db64(m[key]))
     return None
 
 
-HashParser = ty.Callable[[dict], ty.Optional[hashing.Hash]]
+HashParser = ty.Callable[[ty.Mapping], ty.Optional[hashing.Hash]]
 _BASE_PARSERS = (_from_b64,)
 
 
@@ -31,13 +31,19 @@ def base_parsers() -> ty.Tuple[HashParser, ...]:
     return _BASE_PARSERS
 
 
+def from_mapping(
+    mapping_source: ty.Mapping, hash_parsers: ty.Collection[HashParser] = base_parsers()
+) -> Source:
+    return _construct.from_uri(
+        uri=mapping_source["uri"],
+        hash=next(filter(None, (p(mapping_source) for p in hash_parsers)), None),
+        size=mapping_source.get("size") or 0,
+    )
+
+
 def from_json(json_source: str, hash_parsers: ty.Collection[HashParser] = base_parsers()) -> Source:
     d = json.loads(json_source)
-    return _construct.from_uri(
-        uri=d["uri"],
-        hash=next(filter(None, (p(d) for p in hash_parsers)), None),
-        size=d.get("size") or 0,
-    )
+    return from_mapping(d, hash_parsers=hash_parsers)
 
 
 def _very_generic_b64_hash_serializer(hash: hashing.Hash) -> dict:
@@ -52,13 +58,19 @@ def base_hash_serializers() -> ty.Tuple[HashSerializer, ...]:
     return _BASE_HASH_SERIALIZERS
 
 
-def to_json(
+def to_dict(
     source: Source, hash_serializers: ty.Collection[HashSerializer] = base_hash_serializers()
-) -> str:
+) -> dict:
     hash_dict = (
         next(filter(None, (ser(source.hash) for ser in hash_serializers if source.hash)), None)
     ) or dict()
-    return json.dumps(dict(uri=source.uri, size=source.size, **hash_dict))
+    return dict(uri=source.uri, size=source.size, **hash_dict)
+
+
+def to_json(
+    source: Source, hash_serializers: ty.Collection[HashSerializer] = base_hash_serializers()
+) -> str:
+    return json.dumps(to_dict(source, hash_serializers=hash_serializers))
 
 
 def from_unknown_user_path(path: types.StrOrPath, desired_uri: str) -> Source:
