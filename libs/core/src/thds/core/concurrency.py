@@ -1,6 +1,9 @@
 """Utilities for working with concurrency in Python."""
 
+import contextlib
 import contextvars
+import threading
+import time
 import typing as ty
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
@@ -99,3 +102,66 @@ _GLOBAL_NAMED_LOCKS = LockSet[str, Lock](Lock)
 
 def named_lock(name: str) -> Lock:
     return _GLOBAL_NAMED_LOCKS.get(name)
+
+
+class WeightedSemaphore:
+    def __init__(self, value: int):
+        if value <= 0:
+            raise ValueError("Initial value must be > 0")
+        self._total = value
+        self._value = value
+        self._cond = threading.Condition()
+
+    def acquire(self, n: int = 1, block: bool = True, timeout: ty.Optional[float] = None) -> bool:
+        if n <= 0:
+            raise ValueError("Acquire count must be > 0")
+
+        with self._cond:
+            if not block and self._value < n:
+                return False
+
+            if timeout is None:
+                while self._value < n:
+                    self._cond.wait()
+            else:
+                end_time = time.monotonic() + timeout
+                while self._value < n:
+                    remaining = end_time - time.monotonic()
+                    if remaining <= 0:
+                        return False
+                    self._cond.wait(remaining)
+
+            self._value -= n
+            return True
+
+    def release(self, n: int = 1) -> None:
+        if n <= 0:
+            raise ValueError("Release count must be > 0")
+
+        with self._cond:
+            self._value += n
+            self._cond.notify_all()
+
+    def available(self) -> int:
+        with self._cond:
+            return self._value
+
+    @property
+    def total(self) -> int:
+        return self._total
+
+    def __enter__(self) -> "WeightedSemaphore":
+        # default to acquiring 1 unit if not used through acquire_context
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.release()
+
+    @contextlib.contextmanager
+    def acquire_context(self, n: int) -> ty.Iterator["WeightedSemaphore"]:
+        self.acquire(n)
+        try:
+            yield self
+        finally:
+            self.release(n)
