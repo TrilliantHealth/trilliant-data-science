@@ -10,7 +10,7 @@ from thds.core.types import StrOrPath
 
 from .connect import row_connect
 from .meta import column_names, get_tables, primary_key_cols
-from .read import matching, matching_select_all
+from .read import matching
 from .types import T, TableSource
 
 SQLITE_CACHE_SIZE = config.item("cache_size", 100_000)
@@ -67,17 +67,6 @@ class StructTable(ty.Generic[T]):
         tbl = self._tbl()
         try:
             for item in matching(tbl.name, tbl.conn, where):
-                yield self.from_item(item)
-        except OperationalError as e:
-            if unknown_cols := (set(where) - tbl.colnames):
-                raise UnknownColumns(f"Can't match on columns that don't exist: {unknown_cols}")
-            else:
-                raise e
-
-    def matching_all(self, **where: ty.Any) -> ty.Iterator[T]:
-        tbl = self._tbl()
-        try:
-            for item in matching_select_all(tbl.name, tbl.conn, where):
                 yield self.from_item(item)
         except OperationalError as e:
             if unknown_cols := (set(where) - tbl.colnames):
