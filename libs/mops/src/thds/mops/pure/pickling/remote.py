@@ -141,7 +141,11 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
 
     # any recursively-called functions that use metadata will retain the original invoker.
 
-    def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
+    def _extract_invocation_unique_key(memo_uri: str) -> tuple[str, str]:
+        """from adls://sa/cont/mops2-mpf/pipeline/id/thds.foo.bar:function/argshash
+
+        returns ("thds.foo.bar:function", "argshash")
+        """
         parts = fs.split(memo_uri)
         try:
             runner_idx = parts.index(mprunner.RUNNER_NAME)
@@ -149,8 +153,10 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
             raise ValueError(
                 f"Unable to find the runner name {mprunner.RUNNER_NAME} in parts {parts}"
             ) from ve
-        invocation_parts = parts[runner_idx + 1 :]
-        return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
+        invocation_parts = parts[runner_idx + 1 :]  # remove everything prior to the module/function
+        mod_func_flk_and_callers = invocation_parts[:-1]
+        args_kwargs_hash = invocation_parts[-1]
+        return fs.join(*mod_func_flk_and_callers), args_kwargs_hash
 
     lock_error = scope.enter(_manage_lock(fs.join(memo_uri, "lock"), invocation_metadata.invoker_uuid))
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))

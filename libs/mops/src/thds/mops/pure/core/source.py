@@ -47,7 +47,7 @@ from thds.core.types import StrOrPath
 
 from . import deferred_work
 from .content_addressed import wordybin_content_addressed
-from .output_naming import invocation_output_uri
+from .output_naming import mops_uri_assignment
 from .uris import active_storage_root, lookup_blob_store
 
 _REMOTE_HASHREF_PREFIX = "mops2-hashrefs"
@@ -163,8 +163,8 @@ def _upload_and_create_remote_hashref(
     _write_hashref(_hashref_uri(hash, "remote"), remote_uri, size)
 
 
-def _auto_remote_uri(hash: hashing.Hash) -> str:
-    """Pick a remote URI for a file/source that has the given hash.
+def _auto_remote_argument_uri(hash: hashing.Hash) -> str:
+    """Pick a remote URI for a file/source _input_ (argument) that has the given hash.
 
     The underlying implementation is shared with the content-addressing that is used
     throughout mops.
@@ -193,9 +193,11 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # then also register pending upload - if the URI is a local file, we need to determine a
         # remote URI for this thing automagically; otherwise, use whatever was already
         # specified by the Source itself.
-        remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_uri(source_.hash)
+        remote_uri = (
+            source_.uri if not is_file_uri(source_.uri) else _auto_remote_argument_uri(source_.hash)
+        )
         deferred_work.add(
-            __name__ + "-remotehashref",
+            __name__ + "-upload-and-create-remotehashref",
             source_.hash,
             partial(
                 _upload_and_create_remote_hashref, local_path, remote_uri, source_.hash, source_.size
@@ -205,7 +207,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # prepare to (later, if necessary) create a remote hashref, because this Source
         # represents a non-local resource.
         deferred_work.add(
-            __name__,
+            __name__ + "-write-hashref",
             source_.hash,
             partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri, source_.size),
         )
@@ -274,7 +276,21 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
     guaranteed to be in a remote context, which provides an invocation output root URI
     where we can safely place any named output.
     """
+
+    def check_duplicate_source_uris(remote_uri: str) -> None:
+        if remote_uri in existing_uris:
+            raise DuplicateSourceBasenameError(
+                f"Duplicate blob store URI {remote_uri} found in SourceResultPickler."
+                " This is usually an indication that you have two files with the same name in two different directories,"
+                " and are trying to convert them into Source objects with automatically-assigned URIs."
+                " Per the documentation, all output Source objects must either have unique basenames or "
+                " must use a URI assignment algorithm that can take directory structure into account."
+            )
+
     if not is_file_uri(source_.uri):
+        # a remote URI is already provided.
+        check_duplicate_source_uris(source_.uri)
+
         if source_.cached_path and Path(source_.cached_path).exists():
             # it exists locally - an upload may be necessary.
             file_uri = to_uri(source_.cached_path)
@@ -296,21 +312,12 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
     local_path = source.path_from_uri(source_.uri)
     assert local_path.exists(), f"{local_path} does not exist"
     logger.info("Automatically selecting a remote URI for a Source being returned.")
-    remote_uri = invocation_output_uri(name=local_path.name)
-    # the line above is a bit of opinionated magic. it uses the 'end' of the filename
-    # to automagically assign a meaningful name to the output remote URI.
-    #
+    remote_uri = mops_uri_assignment(local_path)
     # If users do not like this automatically assigned remote URI name, they can construct
     # the Source themselves and provide a remote URI (as well as, optionally, a
     # local_path), and we will use their remote URI.
-    if remote_uri in existing_uris:
-        raise DuplicateSourceBasenameError(
-            f"Duplicate blob store URI {remote_uri} found in SourceResultPickler."
-            " This is usually an indication that you have two files with the same name in two different directories,"
-            " and are trying to convert them into Source objects with automatically-assigned URIs."
-            " Per the documentation, all output Source objects without explicitly assigned remote URIs must be provided"
-            " with unique basenames, in order to allow retention of the basename for usability and debugging."
-        )
+
+    check_duplicate_source_uris(remote_uri)
 
     deferred_work.add(
         __name__ + "-derived-source-result",

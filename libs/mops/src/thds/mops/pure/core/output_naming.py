@@ -1,12 +1,17 @@
 ## utilities for providing remote context for naming things uniquely:
 import typing as ty
+from contextlib import contextmanager
+from os import PathLike
 
+from thds.core import uri_assign
 from thds.core.stack_context import StackContext
 
 from . import types, uris
 
 PipelineFunctionUniqueKey = StackContext("Mops2PipelineFunctionUniqueKey", default="")
+# e.g. "nppes/2023/thds.nppes.intake:run@flk-251225"
 FunctionArgumentsHashUniqueKey = StackContext("Mops2FunctionArgumentsHashUniqueKey", default="")
+# e.g. "CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs"
 
 
 def pipeline_function_invocation_unique_key() -> ty.Optional[ty.Tuple[str, str]]:
@@ -50,3 +55,16 @@ def invocation_output_uri(storage_root: uris.UriIsh = "", name: str = "") -> str
         name,
         # we use the name twice now, so that the final part of the path also has a file extension
     )
+
+
+def mops_uri_assignment(pathlike: ty.Union[str, PathLike]) -> str:
+    # uses the newer core URI assignment logic, which includes path from current working
+    # directory where possible.
+    return uri_assign.replace_working_dirs_with_prefix(invocation_output_uri(), pathlike)
+
+
+@contextmanager
+def uri_assignment_context() -> ty.Iterator[None]:
+    """Context manager to add mops2 URI assignment hook."""
+    with uri_assign.add_hook(mops_uri_assignment):
+        yield
