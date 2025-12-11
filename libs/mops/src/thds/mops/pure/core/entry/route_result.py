@@ -8,7 +8,11 @@ import typing as ty
 from thds.core import log, scope
 
 from .. import deferred_work
-from ..output_naming import FunctionArgumentsHashUniqueKey, PipelineFunctionUniqueKey
+from ..output_naming import (
+    FunctionArgumentsHashUniqueKey,
+    PipelineFunctionUniqueKey,
+    uri_assignment_context,
+)
 
 T_contra = ty.TypeVar("T_contra", contravariant=True)
 
@@ -33,16 +37,18 @@ def route_return_value_or_exception(
     channel: ResultChannel[T_contra],
     do_work_return_value: ty.Callable[[], T_contra],
     pipeline_id: str = "",
-    pipeline_function_and_arguments_unique_key: ty.Optional[ty.Tuple[str, str]] = None,
+    invocation_unique_key: ty.Optional[tuple[str, str]] = None,
 ) -> None:
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     _routing_scope.enter(deferred_work.open_context())
 
     _routing_scope.enter(log.logger_context(remote=pipeline_id))
-    if pipeline_function_and_arguments_unique_key:
-        pf_key, args_key = pipeline_function_and_arguments_unique_key
+    if invocation_unique_key:
+        pf_key, args_key = invocation_unique_key
         _routing_scope.enter(PipelineFunctionUniqueKey.set(pf_key))
         _routing_scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
+        _routing_scope.enter(uri_assignment_context())
+
     try:
         # i want to _only_ run the user's function inside this try-catch.
         # If mops itself has a bug, we should not be recording that as
