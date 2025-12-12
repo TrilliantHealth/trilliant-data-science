@@ -1,12 +1,5 @@
 import typing as ty
-
-<<<<<<< HEAD
-from contextlib import contextmanager
-
-=======
 from os import PathLike
-
->>>>>>> 0d1dc56529 (core.source: remove upload-by-default behavior)
 from pathlib import Path
 
 from thds.core.hashing import Hash
@@ -49,7 +42,7 @@ def _LocalFileHandler(uri: str) -> ty.Optional[Uploader]:
         if not local_path.exists():
             raise FileNotFoundError(local_path)
         # For local file URIs, we simply link/copy the file.
-        # if the URI _is_ the file's current location, this is a no-op.
+        # if the URI _is_ the file's current location, link_or_copy is a no-op.
         lpath.parent.mkdir(parents=True, exist_ok=True)
         link_or_copy(local_path, lpath)
 
