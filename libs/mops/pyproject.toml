@@ -1,6 +1,6 @@
 [project]
 name = "thds.mops"
-version = "3.9"
+version = "3.11"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
 readme = "docs/pypi_readme.md"

@@ -10,9 +10,10 @@ running your functions locally with mops xref:#off[completely out of the loop]. 
 these approaches is the right choice for specific situations, and setting things up for
 this to work should be as easy as we can make it.
 
-NOTE: The `pure.magic` group of APIs is designed to be used at the module level, during
-import, as it modifies the global state of your `mops` configuration. For stack-local
-modifications, a future API is envisioned.
+WARNING: The `pure.magic` decorator and its corresponding configuration APIs are designed
+to be used only at the module level, during import, as they modify the global 'magic'
+state of your `mops` configuration. For runtime (stack-local) function-wrapping, see
+xref:pure-magic-wand[pure.magic.wand].
 
 == `@pure.magic` - the easy button
 
@@ -311,3 +312,34 @@ pure.magic.shim('samethread')
 NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `samethread` shim for
 `func1` will not be used - everything under `foo.bar` would be a non-mops passthrough
 function call.
+
+== `pure.magic.wand`
+
+> Dynamic/runtime application of `pure.magic`
+
+Because `pure.magic` implements a global registry for configuration, it is designed to be
+applied as a decorator directly to function ``def``s at the root of a module. While it will
+_work_ when applied as a higher-order function (rather than a decorator), it will cause
+spooky action at a distance because of how everything is connected via that global
+registry. Think of this like monkey-patching - you _can_ have a different part of your
+program completely _replace_ another part of your program at runtime, but _should_ you?
+
+However, different people prefer different approaches, and some prefer a truly dynamic
+approach where it is only at runtime that functions have `mops` applied. This was always
+possible using `use_runner` and `MemoizingPicklingRunner` manually, but this API was
+harder to discover, and crucially, missed a specific user demand for "partially magic"
+configurations. The most common use case seems to be "use the magic/global blob_root and
+pipeline_id, but use an explicitly-provided shim (which is sized to match the specific
+runtime of the function)."
+
+We now support this use case explicitly with `pure.magic.wand` - a higher order function
+that captures your explicit config, and then, at the time of later application to a
+specific function, fills in any missing configuration from the magic global registry.
+
+In principle this can work with any of the three config types even though the dominant use
+case is likely to be dynamic shims.
+
+CAUTION: This function is expected to be called _inside_ other code, at runtime. In other
+words, it will always be applied as `pure.magic.wand(...)(func)`, and never to be used for
+module-global ``def``s as `@pure.magic.wand`, as it does not create a Magic object and
+therefore will not participate in the standard magic configuration in predictable ways.
