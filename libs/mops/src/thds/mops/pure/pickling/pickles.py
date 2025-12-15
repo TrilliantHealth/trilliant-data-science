@@ -68,7 +68,7 @@ class PicklableFunction:
                 self.f = get_main_module_function(self.fname)  # type: ignore
             else:
                 mod = importlib.import_module(self.fmod)
-            self.f = getattr(mod, self.fname)
+                self.f = getattr(mod, self.fname)
             assert self.f is not None
             return self.f
         return self.f
@@ -111,9 +111,10 @@ class UnpickleSourceUriArgument(ty.NamedTuple):
     """
 
     uri: str
+    size: int = 0
 
     def __call__(self) -> source.Source:
-        return source.from_uri(self.uri)
+        return source.from_uri(self.uri, None, self.size)
 
 
 class UnpickleSourceHashrefArgument(ty.NamedTuple):
