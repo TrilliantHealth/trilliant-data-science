@@ -7,28 +7,11 @@ from thds.core import uri_assign
 from thds.core.stack_context import StackContext
 
 from . import types, uris
+from .memo import function_memospace
 
-PipelineFunctionUniqueKey = StackContext("Mops2PipelineFunctionUniqueKey", default="")
-# e.g. "nppes/2023/thds.nppes.intake:run@flk-251225"
-FunctionArgumentsHashUniqueKey = StackContext("Mops2FunctionArgumentsHashUniqueKey", default="")
-# e.g. "CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs"
-
-
-def pipeline_function_invocation_unique_key() -> ty.Optional[ty.Tuple[str, str]]:
-    """A runner may provide a value for the underlying components, and
-    if it does, the first string is required to be unique across all
-    _separate_ functions running within a given pipeline id, and the
-    second string is required to be unique for every unique invocation
-    of that same function.
-
-    If your code is _not_ running inside a mops runner, or
-    the mops runner does not provide a value for this, you will
-    instead get None.
-    """
-    pfi_key = PipelineFunctionUniqueKey(), FunctionArgumentsHashUniqueKey()
-    if "" in pfi_key:  # if either of the elements was not supplied, we don't have anything!
-        return None
-    return pfi_key
+MEMO_URI_COMPONENTS = StackContext[ty.Optional[function_memospace.MemoUriComponents]](
+    "MemoUriComponents", default=None
+)
 
 
 def invocation_output_uri(storage_root: uris.UriIsh = "", name: str = "") -> str:
@@ -42,12 +25,13 @@ def invocation_output_uri(storage_root: uris.UriIsh = "", name: str = "") -> str
     nppes/2023/thds.nppes.intake:run/<name goes here>/CoastOilAsset.IVZ9KplQKlNgxQHav0jIMUS9p4Kbn3N481e0Uvs
     """
     storage_root = str(storage_root or uris.ACTIVE_STORAGE_ROOT())
-    pf_fa = pipeline_function_invocation_unique_key()
-    if not pf_fa:
+    memo_uri_components = MEMO_URI_COMPONENTS()
+    if not memo_uri_components:
         raise types.NotARunnerContext(
             "`invocation_output_uri` must be used in a `thds.mops.pure` runner context."
         )
-    pipeline_function_key, function_arguments_key = pf_fa
+
+    pipeline_function_key, function_arguments_key = memo_uri_components.invocation_unique_key()
     return uris.lookup_blob_store(storage_root).join(
         storage_root,
         pipeline_function_key,
@@ -64,7 +48,10 @@ def mops_uri_assignment(pathlike: ty.Union[str, PathLike]) -> str:
 
 
 @contextmanager
-def uri_assignment_context() -> ty.Iterator[None]:
+def uri_assignment_context(
+    memo_uri: str, runner_prefix: str = ""
+) -> ty.Iterator[function_memospace.MemoUriComponents]:
     """Context manager to add mops2 URI assignment hook."""
-    with uri_assign.add_hook(mops_uri_assignment):
-        yield
+    memo_uri_components = function_memospace.parse_memo_uri(memo_uri, runner_prefix)
+    with MEMO_URI_COMPONENTS.set(memo_uri_components), uri_assign.add_hook(mops_uri_assignment):
+        yield memo_uri_components
