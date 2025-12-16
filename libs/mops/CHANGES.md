@@ -1,9 +1,3 @@
-## 3.12
-
-- Replaces the `DISABLE_CONTROL_CACHE` config with `CONTROL_CACHE_TTL_IN_SECONDS`. The functionality of
-  `DISABLE_CONTROL_CACHE` can mostly be achieved by setting `CONTROL_CACHE_TTL_IN_SECONDS` to 0, except
-  that it results in cache items being refreshed.
-
 ## 3.11
 
 - `mops-inspect` now has `--diff-summary` and `--diff-picked`. Use `--diff-summary` to diff a given URI

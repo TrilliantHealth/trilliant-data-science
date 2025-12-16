@@ -3,7 +3,7 @@ import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import files, hashing, types
+from .. import hashing, types
 
 
 @dataclass(frozen=True)
@@ -101,19 +101,3 @@ class Source(os.PathLike):
         from ._construct import from_uri
 
         return from_uri(uri, hash, size)
-
-    def __setstate__(self, state: dict[str, ty.Any]) -> None:
-        # we want to support URI assignment and upload on creation, but for many cases,
-        # Source will be created in a process where no URI assignment hooks are
-        # registered.  So, for any that represent local files, we check here whether the
-        # URI is the file URI and provide a second chance for URI assignment via hook.
-        cached_path = state.get("__cached_path", None)
-        uri = state.get("uri") or ""
-
-        if cached_path is not None and files.is_file_uri(uri):
-            from .. import uri_assign
-
-            state["uri"] = uri_assign.for_path(cached_path) or uri
-
-        for k, v in state.items():
-            super().__setattr__(k, v)
