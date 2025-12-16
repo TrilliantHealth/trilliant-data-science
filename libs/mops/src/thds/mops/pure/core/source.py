@@ -306,10 +306,14 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
             logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
         return SourceResult(source_.uri, source_.hash, file_uri, source_.size)
 
-    # by definition, if this is a file URI, it now needs to be uploaded, because we could
+    if not source_.cached_path or not source_.cached_path.exists():
+        return SourceResult(source_.uri, source_.hash, "", source_.size)
+
+    # if this is a Source with a cached path, we _must_ upload it, because we might
     # be transferring back to an orchestrator on a different machine, but also because a
     # future caller on a different machine could try to use this memoized result.
-    local_path = source.path_from_uri(source_.uri)
+
+    local_path = source_.cached_path
     assert local_path.exists(), f"{local_path} does not exist"
     logger.info("Automatically selecting a remote URI for a Source being returned.")
     remote_uri = mops_uri_assignment(local_path)

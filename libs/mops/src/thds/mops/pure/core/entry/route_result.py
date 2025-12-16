@@ -8,11 +8,7 @@ import typing as ty
 from thds.core import log, scope
 
 from .. import deferred_work
-from ..output_naming import (
-    FunctionArgumentsHashUniqueKey,
-    PipelineFunctionUniqueKey,
-    uri_assignment_context,
-)
+from ..output_naming import uri_assignment_context
 
 T_contra = ty.TypeVar("T_contra", contravariant=True)
 
@@ -36,18 +32,13 @@ _routing_scope = scope.Scope()
 def route_return_value_or_exception(
     channel: ResultChannel[T_contra],
     do_work_return_value: ty.Callable[[], T_contra],
-    pipeline_id: str = "",
-    invocation_unique_key: ty.Optional[tuple[str, str]] = None,
+    memo_uri: str,
+    runner_prefix: str = "",  # this must be present in your memo URI
 ) -> None:
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     _routing_scope.enter(deferred_work.open_context())
-
-    _routing_scope.enter(log.logger_context(remote=pipeline_id))
-    if invocation_unique_key:
-        pf_key, args_key = invocation_unique_key
-        _routing_scope.enter(PipelineFunctionUniqueKey.set(pf_key))
-        _routing_scope.enter(FunctionArgumentsHashUniqueKey.set(args_key))
-        _routing_scope.enter(uri_assignment_context())
+    memo_uri_components = _routing_scope.enter(uri_assignment_context(memo_uri, runner_prefix))
+    _routing_scope.enter(log.logger_context(remote=memo_uri_components.pipeline_id))
 
     try:
         # i want to _only_ run the user's function inside this try-catch.
