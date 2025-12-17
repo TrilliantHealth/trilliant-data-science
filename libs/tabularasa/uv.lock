@@ -2922,7 +2922,7 @@ dev = [
 
 [[package]]
 name = "thds-tabularasa"
-version = "0.14.2"
+version = "0.14.1"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
