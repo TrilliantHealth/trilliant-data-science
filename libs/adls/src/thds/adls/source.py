@@ -6,7 +6,6 @@ from thds.core import source
 from thds.core.hashing import Hash
 
 from . import cached, hashes, md5
-from .cached import upload_through_cache
 from .errors import blob_not_found_translation
 from .file_properties import get_file_properties
 from .fqn import AdlsFqn
@@ -72,17 +71,3 @@ def get_with_hash(fqn_or_uri: ty.Union[AdlsFqn, str]) -> source.Source:
 def with_md5b64(uri_or_fqn: ty.Union[str, AdlsFqn], *, md5b64: str = "") -> source.Source:
     """Meant for older use cases where we had an MD5"""
     return from_adls(uri_or_fqn, md5.to_hash(md5b64) if md5b64 else None)
-
-
-def _upload_handler(dest_uri: str) -> ty.Optional[source.Uploader]:
-    if dest_fqn := resolve_uri(dest_uri):
-
-        def upload_to_adls(local_path: Path, hash: ty.Optional[Hash]) -> None:
-            upload_through_cache(dest_fqn, local_path)
-
-        return upload_to_adls
-
-    return None
-
-
-source.register_upload_handler("thds.adls", _upload_handler)
