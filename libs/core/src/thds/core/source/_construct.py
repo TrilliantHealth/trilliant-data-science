@@ -1,11 +1,11 @@
-import os
 import stat
 import sys
 import typing as ty
 from functools import partial
+from os import PathLike
 from pathlib import Path
 
-from .. import log
+from .. import log, uri_assign
 from ..files import is_file_uri, path_from_uri, to_uri
 from ..hash_cache import filehash
 from ..hashing import Hash, Hasher, add_named_hash
@@ -35,13 +35,22 @@ def hash_file(path: Path, algo: str = "") -> Hash:
 
 
 def from_file(
-    filename: ty.Union[str, os.PathLike], hash: ty.Optional[Hash] = None, uri: str = ""
+    filename: ty.Union[str, PathLike],
+    hash: ty.Optional[Hash] = None,
+    uri: str = "",
 ) -> Source:
     """Create a read-only Source from a local file that already exists.
 
     If URI is passed, the local file will be read and hashed, but the final URI in the
-    Source will be the one provided explicitly. NO UPLOAD IS PERFORMED. It is your
-    responsibility to ensure that your file has been uploaded to the URI you provide.
+    Source will be the one provided explicitly.
+    If no URI is passed, the Source will have a URI assigned; either from a registered
+    URI assignment hook, or simply the file:// URI for the local file.
+
+    NO UPLOAD IS PERFORMED. It is your responsibility to ensure that your file has been
+    uploaded to the URI you provide.
+
+    If you _do_ want to perform an immediate upload, you may prefer to use `source.upload`
+    to construct the Source object.
     """
     path = path_from_uri(filename) if isinstance(filename, str) else Path(filename)
     stats = path.stat()  # raises FileNotFoundError if file doesn't exist
@@ -52,7 +61,10 @@ def from_file(
     if uri:
         src = from_uri(uri, file_hash, stats.st_size)
     else:
-        src = Source(to_uri(path), file_hash, stats.st_size)
+        assigned_uri = uri_assign.for_path(path)
+        # if somebody has registered a URI assignment hook, we always call it on file-only Source construction.
+        src = Source(assigned_uri or to_uri(path), file_hash, stats.st_size)
+        # otherwise, we fall back to the local file path as a URI.
     src._set_cached_path(path)  # internally, it's okay to hack around immutability.
     return src
 
