@@ -184,6 +184,7 @@ def bulk_write_connection(
     db_path_ = to_local_path(db_path, db_package).absolute()
     lock_path = db_path_.with_suffix(".lock")
     lock = FileLock(lock_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(__name__)
     logger.info("PID %d: Acquiring lock on %s", os.getpid(), lock_path)
     with lock:
@@ -207,7 +208,7 @@ def sqlite_connection(
     *,
     mmap_size: Optional[int] = None,
     read_only: bool = False,
-):
+) -> sqlite3.Connection:
     db_full_path = to_local_path(db_path, package)
 
     logger = logging.getLogger(__name__)
@@ -225,7 +226,7 @@ def sqlite_connection(
 
 def _log_exec_sql(
     logger: logging.Logger, con: sqlite3.Connection, statement: str, level: int = logging.DEBUG
-):
+) -> None:
     logger.log(level, "sqlite: %s", statement)
     con.execute(statement)
 

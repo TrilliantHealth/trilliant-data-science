@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -14,7 +13,7 @@ from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tu
 import networkx as nx
 import pkg_resources
 
-from thds.core import parallel
+from thds.core import link, parallel
 from thds.tabularasa.data_dependencies.adls import (
     ADLSFileIntegrityError,
     ADLSFileSystem,
@@ -730,7 +729,7 @@ class ReferenceDataManager:
             file_path = self.data_path_for(table)
             if file_path.exists():
                 self.logger.warning(f"Removing built file for table {table.name} at {file_path}")
-                os.remove(file_path)
+                file_path.unlink()
             else:
                 self.logger.info(f"No file found for table {table.name}; nothing to remove")
         try:
@@ -763,7 +762,7 @@ class ReferenceDataManager:
         for table in tables_to_update:
             table_name = table.name
             table_path = self.data_path_for(table)
-            if os.path.exists(table_path):
+            if table_path.exists():
                 md5 = hash_file(table_path)
                 old_md5 = table.md5
                 if old_md5 is None:
@@ -847,10 +846,10 @@ class ReferenceDataManager:
                 local_cache_path = paths[0].local_path
                 if sync_data.local_file_exists:
                     self.logger.warning(f"Removing existing file {sync_data.local_path}")
-                    os.remove(sync_data.local_path)
+                    sync_data.local_path.unlink()
                 self.logger.info(f"Linking downloaded file to local build file {sync_data.local_path}")
                 sync_data.local_path.parent.mkdir(parents=True, exist_ok=True)
-                os.link(local_cache_path, sync_data.local_path)
+                link.link(local_cache_path, sync_data.local_path)
             return True
 
     def sync_blob_store(
