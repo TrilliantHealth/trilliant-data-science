@@ -108,11 +108,12 @@ def test_remote_source_with_no_hash_just_communicates_uri(prep, temp_file):  # 4
 # 2. we have a local source and we return to a remote environment
 # 3. we have a remote-only source. (this needs to be an integration test)
 
-_VALID_MEMO_URI = "file://foo/bar/mops2-mpf/pipelineid/module--function/argskwargshash"
-
 
 def test_local_source_returned_to_local(prep, temp_file):  # 1
-    with output_naming.uri_assignment_context(_VALID_MEMO_URI):
+    with (
+        output_naming.PipelineFunctionUniqueKey.set("test"),
+        output_naming.FunctionArgumentsHashUniqueKey.set("abcdefg"),
+    ):
         test_file = temp_file("local source returned to local")
         initial_source = source.from_file(test_file)
         source_result = prepare_source_result(initial_source)
@@ -123,7 +124,10 @@ def test_local_source_returned_to_local(prep, temp_file):  # 1
 
 
 def test_local_source_returned_to_remote(prep, temp_file):  # 2
-    with output_naming.uri_assignment_context(_VALID_MEMO_URI):
+    with (
+        output_naming.PipelineFunctionUniqueKey.set("test"),
+        output_naming.FunctionArgumentsHashUniqueKey.set("123456"),
+    ):
         test_file = temp_file("local source returned to remote")
         initial_source = source.from_file(test_file)
         source_result = prepare_source_result(initial_source)
