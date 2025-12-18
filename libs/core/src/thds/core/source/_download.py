@@ -29,7 +29,7 @@ class Downloader(ty.Protocol):
 
 
 class DownloadHandler(ty.Protocol):
-    def __call__(self, uri: str) -> ty.Optional[Downloader]:
+    def __call__(self, uri: str, /) -> ty.Optional[Downloader]:
         """Returns a Downloader containing the URI if this URI can be handled.  Returns
         None if this URI cannot be handled.
         """
@@ -37,7 +37,7 @@ class DownloadHandler(ty.Protocol):
 
 def _LocalFileHandler(uri: str) -> ty.Optional[Downloader]:
     if not is_file_uri(uri):
-        return None
+        return None  # not to be handled by this handler
 
     def download_file(hash: ty.Optional[Hash]) -> Path:
         lpath = path_from_uri(uri)
