@@ -140,18 +140,6 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     fs = uris.lookup_blob_store(memo_uri)
 
     # any recursively-called functions that use metadata will retain the original invoker.
-
-    def _extract_invocation_unique_key(memo_uri: str) -> ty.Tuple[str, str]:
-        parts = fs.split(memo_uri)
-        try:
-            runner_idx = parts.index(mprunner.RUNNER_NAME)
-        except ValueError as ve:
-            raise ValueError(
-                f"Unable to find the runner name {mprunner.RUNNER_NAME} in parts {parts}"
-            ) from ve
-        invocation_parts = parts[runner_idx + 1 :]
-        return fs.join(*invocation_parts[:-1]), invocation_parts[-1]
-
     lock_error = scope.enter(_manage_lock(fs.join(memo_uri, "lock"), invocation_metadata.invoker_uuid))
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
 
@@ -188,6 +176,6 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
             started_at,
         ),
         ty.cast(ty.Callable[[], T], do_work_return_result),
-        invocation_metadata.pipeline_id,
-        _extract_invocation_unique_key(memo_uri),
+        memo_uri,
+        mprunner.RUNNER_NAME,
     )

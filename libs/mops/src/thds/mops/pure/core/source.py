@@ -47,7 +47,7 @@ from thds.core.types import StrOrPath
 
 from . import deferred_work
 from .content_addressed import wordybin_content_addressed
-from .output_naming import invocation_output_uri
+from .output_naming import mops_uri_assignment
 from .uris import active_storage_root, lookup_blob_store
 
 _REMOTE_HASHREF_PREFIX = "mops2-hashrefs"
@@ -163,8 +163,8 @@ def _upload_and_create_remote_hashref(
     _write_hashref(_hashref_uri(hash, "remote"), remote_uri, size)
 
 
-def _auto_remote_uri(hash: hashing.Hash) -> str:
-    """Pick a remote URI for a file/source that has the given hash.
+def _auto_remote_arg_uri(hash: hashing.Hash) -> str:
+    """Pick a remote URI for a file/source _input_ (argument) that has the given hash.
 
     The underlying implementation is shared with the content-addressing that is used
     throughout mops.
@@ -193,9 +193,9 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # then also register pending upload - if the URI is a local file, we need to determine a
         # remote URI for this thing automagically; otherwise, use whatever was already
         # specified by the Source itself.
-        remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_uri(source_.hash)
+        remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_arg_uri(source_.hash)
         deferred_work.add(
-            __name__ + "-remotehashref",
+            __name__ + "-upload-and-create-remotehashref",
             source_.hash,
             partial(
                 _upload_and_create_remote_hashref, local_path, remote_uri, source_.hash, source_.size
@@ -205,7 +205,7 @@ def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
         # prepare to (later, if necessary) create a remote hashref, because this Source
         # represents a non-local resource.
         deferred_work.add(
-            __name__,
+            __name__ + "-write-hashref",
             source_.hash,
             partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri, source_.size),
         )
@@ -274,51 +274,41 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
     guaranteed to be in a remote context, which provides an invocation output root URI
     where we can safely place any named output.
     """
-    if not is_file_uri(source_.uri):
-        if source_.cached_path and Path(source_.cached_path).exists():
-            # it exists locally - an upload may be necessary.
-            file_uri = to_uri(source_.cached_path)
-            if source_.uri not in existing_uris:
-                logger.info("Using existing remote URI on Source %s", source_.uri)
-                deferred_work.add(
-                    __name__ + "-chosen-source-result",
-                    source_.uri,
-                    partial(_put_file_to_blob_store, source_.cached_path, source_.uri),
-                )
-        else:
-            file_uri = ""
-            logger.debug("Creating a SourceResult for a URI that is presumed to already be uploaded.")
-        return SourceResult(source_.uri, source_.hash, file_uri, source_.size)
 
-    # by definition, if this is a file URI, it now needs to be uploaded, because we could
-    # be transferring back to an orchestrator on a different machine, but also because a
-    # future caller on a different machine could try to use this memoized result.
-    local_path = source.path_from_uri(source_.uri)
-    assert local_path.exists(), f"{local_path} does not exist"
-    logger.info("Automatically selecting a remote URI for a Source being returned.")
-    remote_uri = invocation_output_uri(name=local_path.name)
-    # the line above is a bit of opinionated magic. it uses the 'end' of the filename
-    # to automagically assign a meaningful name to the output remote URI.
-    #
-    # If users do not like this automatically assigned remote URI name, they can construct
-    # the Source themselves and provide a remote URI (as well as, optionally, a
-    # local_path), and we will use their remote URI.
+    # pick a remote URI
+    if not source_.uri or is_file_uri(source_.uri):
+        assert (
+            source_.cached_path
+        ), f"Source with no URI must have a local path to assign a remote URI from: {source_}"
+        logger.info(f"Assigning remote URI for Source with local path {source_.cached_path}")
+        remote_uri = mops_uri_assignment(source_.cached_path)
+    else:
+        remote_uri = source_.uri
+        logger.debug("Using existing remote URI on Source %s", remote_uri)
+
+    # check it for duplication because we're nice - but someday this needs to move to uri_assign.
     if remote_uri in existing_uris:
         raise DuplicateSourceBasenameError(
             f"Duplicate blob store URI {remote_uri} found in SourceResultPickler."
             " This is usually an indication that you have two files with the same name in two different directories,"
             " and are trying to convert them into Source objects with automatically-assigned URIs."
-            " Per the documentation, all output Source objects without explicitly assigned remote URIs must be provided"
-            " with unique basenames, in order to allow retention of the basename for usability and debugging."
+            " Per the documentation, all output Source objects must either have unique basenames or "
+            " must use a URI assignment algorithm that can take directory structure into account."
         )
 
-    deferred_work.add(
-        __name__ + "-derived-source-result",
-        remote_uri,
-        partial(_put_file_to_blob_store, local_path, remote_uri),
-    )
-    # upload must _always_ happen on remotely-returned Sources, as detailed above.
-    return SourceResult(remote_uri, source_.hash, source_.uri, source_.size)
+    # if we have a file path, make sure that gets sent to the uploader.
+    if source_.cached_path and Path(source_.cached_path).exists():
+        file_uri = to_uri(source_.cached_path)
+        deferred_work.add(
+            __name__ + "-chosen-source-result",
+            remote_uri,
+            partial(_put_file_to_blob_store, source_.cached_path, remote_uri),
+        )
+    else:
+        logger.debug("Creating SourceResult for URI %s that is presumed to be uploaded.", remote_uri)
+        file_uri = ""
+
+    return SourceResult(remote_uri, source_.hash, file_uri, source_.size)
 
 
 def source_from_source_result(
