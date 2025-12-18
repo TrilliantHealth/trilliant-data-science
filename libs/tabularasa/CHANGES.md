@@ -1,7 +1,3 @@
-### 0.14.3
-
-- (hopefully) fix bug where a `FileLock` could fail because its directory did not exist.
-
 ### 0.14.2
 
 - Fix bug where an `os.link` could fail if the path already existed, by using `core.link.link` which does

@@ -95,11 +95,9 @@ separate processes, though threads are your best bet for the large majority of s
   possible.
 
 * If you need an output location that is a directory, use
-  `pure.adls.invocation_output_fqn(name='foobar')` - as with `source.from_file`, the
-  storage root will be automatically derived from the root of your mops execution
-  context.footnote:[The `invocation_output_fqn` directory approach does _not_ work
-  transparently if you remove `mops` - if you have a need for directories to be supported
-  transparently in local and remote use cases, let's talk!]
+  `thds.core.uri_assign.for_path(your_path)` - as with `source.from_file`, the
+  storage root will be automatically derived from the root of your `mops` execution context.
+  This will continue to work even if you run your function outside of `mops`.
 
 ## Runner bypass
 
