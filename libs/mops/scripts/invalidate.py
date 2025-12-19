@@ -4,13 +4,12 @@ from pathlib import Path
 
 from thds import adls
 from thds.mops.pure.adls.blob_store import _DEFAULT_CONTROL_CACHE, DangerouslyCachingStore
-from thds.mops.pure.core.control_cache import CONTROL_CACHE_TTL_IN_SECONDS
 
-store = DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE(), CONTROL_CACHE_TTL_IN_SECONDS())
+store = DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE())
 
 
-# delete the file at the given ADLS URI
-# also delete the locally cached file
+# delete the file at the given URI
+# also delete the
 
 
 def invalidate_cache(mops_fqn: adls.AdlsFqn) -> None:
