@@ -179,7 +179,7 @@ def get_adls_blob_store(uri: str) -> ty.Optional[AdlsBlobStore]:
     if not uri.startswith(adls.ADLS_SCHEME):
         return None
 
-    if not _DEFAULT_CONTROL_CACHE():
+    if CONTROL_CACHE_TTL_IN_SECONDS() < 0 or not _DEFAULT_CONTROL_CACHE():
         return AdlsBlobStore()
 
     return DangerouslyCachingStore(_DEFAULT_CONTROL_CACHE(), CONTROL_CACHE_TTL_IN_SECONDS())
