@@ -17,7 +17,12 @@ def get_writer_id(lock_contents: LockContents) -> str:
 
 def make_read_lockfile(lock_uri: str) -> ty.Callable[[], ty.Optional[LockContents]]:
     def read_lockfile() -> ty.Optional[LockContents]:
-        with CONTROL_CACHE_TTL_IN_SECONDS.set_local(0):
+        # A negative value results in the cache blob store not being used. The
+        # important part is that this bypasses the hash check. This avoids a
+        # race condition where the lockfile is overwritten by the local
+        # runner after the remote runner reads the remote hash but _before_
+        # it downloads the file, resulting in a `HashMismatchError`.
+        with CONTROL_CACHE_TTL_IN_SECONDS.set_local(-1):
             blob_store = lookup_blob_store(lock_uri)
 
         while True:
