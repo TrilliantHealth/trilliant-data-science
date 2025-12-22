@@ -1,3 +1,10 @@
+## 3.12.20251222
+
+- Negative `CONTROL_CACHE_TTL_IN_SECONDS` values now result in the control cache being bypassed
+  completely. This avoids a race condition where the lockfile is overwritten by the local runner after
+  the remote runner reads the remote hash but _before_ it downloads the file, resulting in a
+  `HashMismatchError`.
+
 ## 3.12
 
 - Replaces the `DISABLE_CONTROL_CACHE` config with `CONTROL_CACHE_TTL_IN_SECONDS`. The functionality of
