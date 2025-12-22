@@ -1,3 +1,16 @@
+## 3.12.20251222
+
+- Negative `CONTROL_CACHE_TTL_IN_SECONDS` values now result in the control cache being bypassed
+  completely. This avoids a race condition where the lockfile is overwritten by the local runner after
+  the remote runner reads the remote hash but _before_ it downloads the file, resulting in a
+  `HashMismatchError`.
+
+## 3.12
+
+- Replaces the `DISABLE_CONTROL_CACHE` config with `CONTROL_CACHE_TTL_IN_SECONDS`. The functionality of
+  `DISABLE_CONTROL_CACHE` can mostly be achieved by setting `CONTROL_CACHE_TTL_IN_SECONDS` to 0, except
+  that it results in cache items being refreshed.
+
 ## 3.11
 
 - `mops-inspect` now has `--diff-summary` and `--diff-picked`. Use `--diff-summary` to diff a given URI
