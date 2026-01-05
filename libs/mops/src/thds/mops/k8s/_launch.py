@@ -122,15 +122,12 @@ def launch(
             client.V1EnvVar(name="MOPS_IMAGE_RECURSIVE_REF", value=container_image),
             # by setting these, things will be 'reentrant' if it is necessary to launch jobs within this job.
         ]
-
-        def add_env_var(name: str, value: ty.Any) -> None:
-            env_list.append(client.V1EnvVar(name=name, value=str(value)))
-
         if env_vars is not None:
             for env_name, env_value in env_vars.items():
-                add_env_var(env_name, env_value)
-
-        add_env_var(config.k8s_namespace_env_var_key(), config.k8s_namespace())
+                env_list.append(client.V1EnvVar(name=env_name, value=env_value))
+        env_list.append(
+            client.V1EnvVar(name=config.k8s_namespace_env_var_key(), value=config.k8s_namespace())
+        )
 
         logger.debug("Creating container definition ...")
         logger.debug("Setting container CPU/RAM requirements ...")
@@ -151,10 +148,6 @@ def launch(
                 requests=resource_requests,
                 limits=resource_limits,
             )
-            if resource_requests and (cpu_request := resource_requests.get("cpu")):
-                add_env_var(core.cpus.GUARANTEE.envname, cpu_request)
-            if resource_limits and (cpu_limit := resource_limits.get("cpu")):
-                add_env_var(core.cpus.LIMIT.envname, cpu_limit)
 
         container = client.V1Container(**v1_container_args)
         logger.debug("Creating podspec definition ...")
@@ -187,8 +180,6 @@ def launch(
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:
         with _SIMULTANEOUS_LAUNCHES:
-            # This ensures the config is loaded before the the batch API client is created.
-            load_config()
             upsert_namespace(config.k8s_namespace())
             # we do the job transform after actually upserting the namespace so that
             # the transform can use the namespace if necessary.

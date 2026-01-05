@@ -1,14 +1,3 @@
-### 1.50.20260107
-
-- Fix `cpus.guarantee()` and `cpus.limit()` bug causing a boolean value to be returned instead of a
-  float.
-
-## 1.50
-
-- Add `cpus.guarantee()` and `cpus.limit()` so that we can directly inject this information rather than
-  relying on incomplete system APIs for it. I still don't understand why Kubernetes doesn't just inject
-  this information into each container...
-
 ## 1.49
 
 - Adds `uri_assign` module to provide a remote working 'directory' abstraction, mostly for `Source`.
