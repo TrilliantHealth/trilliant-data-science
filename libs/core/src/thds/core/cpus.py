@@ -1,10 +1,9 @@
 import multiprocessing
 import os
 import typing as ty
-from functools import lru_cache
 from pathlib import Path
 
-from . import config, log
+from . import log
 
 _CPU_QUOTA_PATH = Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")
 _CPU_PERIOD_PATH = Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us")
@@ -97,31 +96,3 @@ def available_cpu_count() -> int:
 
 def ci_sensitive_cpu_count(default_num_workers_for_ci: int = 4) -> int:
     return default_num_workers_for_ci if "CI" in os.environ else available_cpu_count()
-
-
-GUARANTEE = config.item("guarantee", default=0.0, parse=float)
-# THDS_CORE_CPUS_GUARANTEE, akin to 'requests' in k8s
-LIMIT = config.item("limit", default=0.0, parse=float)
-# THDS_CORE_CPUS_LIMIT, akin to 'limits' in k8s
-
-
-@lru_cache()  # should not be changing during process lifetime
-def guarantee() -> float:
-    """Use this if you're interested in the actually-assigned number of CPUs guaranteed to you
-    by an external system, as set via the environment variable THDS_CORE_CPUS_GUARANTEE.
-    """
-    if GUARANTEE() > 0:
-        return GUARANTEE()
-
-    return available_cpu_count()
-
-
-@lru_cache()  # should not be changing during process lifetime
-def limit() -> float:
-    """Use this if you're interested in the actual maximum number of CPUs available to you
-    by an external system, as set via the environment variable THDS_CORE_CPUS_LIMIT.
-    """
-    if LIMIT() > 0:
-        return LIMIT()
-
-    return available_cpu_count()
