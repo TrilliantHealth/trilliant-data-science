@@ -189,13 +189,12 @@ def make_remote_lock_writer(lock_dir_uri: str, expected_writer_id: str = "") -> 
 
     The return value is intended to be passed to add_lock_to_maintenance_daemon.
     """
-
     try:
         lock_uri = make_lock_uri(lock_dir_uri)
         read_lockfile = make_read_lockfile(lock_uri)
         lock_contents = read_lockfile()
-    except Exception:
-        logger.exception(f"Could not read lockfile: {lock_uri}")
+    except Exception as exc:
+        raise CannotMaintainLock(f"Could not read lockfile in lock dir: {lock_dir_uri}") from exc
 
     if not lock_contents:
         raise CannotMaintainLock(f"Lock does not exist: {lock_uri}")
