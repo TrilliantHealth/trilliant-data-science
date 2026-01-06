@@ -172,11 +172,6 @@ class ConfigItem(ty.Generic[T]):
     def __repr__(self) -> str:
         return f"ConfigItem('{self.name}', {self()})"
 
-    @property
-    def envname(self) -> str:
-        """The environment variable name to set this config item that is most compatible with various shells."""
-        return _sanitize_env(self.name).upper()
-
 
 def tobool(s_or_b: ty.Union[str, bool]) -> bool:
     """A reasonable implementation that we could expand in the future."""
