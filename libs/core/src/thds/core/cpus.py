@@ -110,8 +110,8 @@ def guarantee() -> float:
     """Use this if you're interested in the actually-assigned number of CPUs guaranteed to you
     by an external system, as set via the environment variable THDS_CORE_CPUS_GUARANTEE.
     """
-    if GUARANTEE() > 0:
-        return GUARANTEE()
+    if cpu_guarantee := GUARANTEE() > 0:
+        return cpu_guarantee
 
     return available_cpu_count()
 
@@ -121,7 +121,7 @@ def limit() -> float:
     """Use this if you're interested in the actual maximum number of CPUs available to you
     by an external system, as set via the environment variable THDS_CORE_CPUS_LIMIT.
     """
-    if LIMIT() > 0:
-        return LIMIT()
+    if cpu_limit := LIMIT() > 0:
+        return cpu_limit
 
     return available_cpu_count()
