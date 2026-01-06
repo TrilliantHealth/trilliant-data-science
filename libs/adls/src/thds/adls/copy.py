@@ -10,7 +10,6 @@ from azure.storage.blob import BlobSasPermissions, BlobServiceClient, UserDelega
 
 from thds.core import cache, log, parallel, thunks
 
-from ._etag import ETAG_FAKE_HASH_NAME
 from .file_properties import exists, get_blob_properties, get_file_properties, is_directory
 from .fqn import AdlsFqn
 from .global_client import get_global_blob_container_client, get_global_blob_service_client
@@ -61,18 +60,7 @@ def _copy_file(
     def hashes_exist_and_are_equal() -> bool:
         src_blob_props = src_blob_client.get_blob_properties()
         dest_blob_props = dest_blob_client.get_blob_properties()
-        # exclude etag from comparison since it's unique per blob and will always differ
-        src_hashes = {
-            k: v
-            for k, v in extract_hashes_from_props(src_blob_props).items()
-            if k != ETAG_FAKE_HASH_NAME
-        }
-        dest_hashes = {
-            k: v
-            for k, v in extract_hashes_from_props(dest_blob_props).items()
-            if k != ETAG_FAKE_HASH_NAME
-        }
-        return src_hashes == dest_hashes
+        return extract_hashes_from_props(src_blob_props) == extract_hashes_from_props(dest_blob_props)
 
     if dest_blob_client.exists():
         if hashes_exist_and_are_equal():
