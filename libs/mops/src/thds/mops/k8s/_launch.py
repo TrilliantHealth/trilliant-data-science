@@ -187,8 +187,6 @@ def launch(
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:
         with _SIMULTANEOUS_LAUNCHES:
-            # This ensures the config is loaded before the the batch API client is created.
-            load_config()
             upsert_namespace(config.k8s_namespace())
             # we do the job transform after actually upserting the namespace so that
             # the transform can use the namespace if necessary.

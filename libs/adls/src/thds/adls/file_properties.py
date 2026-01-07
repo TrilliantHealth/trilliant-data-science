@@ -38,10 +38,6 @@ class PropertiesP(ty.Protocol):
     metadata: ty.Any
 
     @property
-    def etag(self) -> ty.Union[str, None, ty.Any]:
-        pass
-
-    @property
     def content_settings(self) -> ContentSettingsP:
         pass
 
