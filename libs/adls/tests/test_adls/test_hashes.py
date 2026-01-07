@@ -19,7 +19,6 @@ class FakeFileProperties:
     name: str
     metadata: dict
     content_settings: FakeContentSettings
-    etag: str = ""
 
 
 def test_basic_preferred_hash():

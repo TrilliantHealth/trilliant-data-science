@@ -1,6 +1,5 @@
 import contextlib
 import os
-import sys
 import typing as ty
 from functools import partial
 
@@ -10,7 +9,6 @@ from thds.core import hash_cache, hashing, log, source, types
 from thds.core.hashing import Hash, SomehowReadable
 
 from . import errors, file_properties
-from ._etag import ETAG_FAKE_HASH_NAME, add_to_etag_cache, extract_etag_bytes, hash_file_fake_etag
 from .fqn import AdlsFqn
 
 logger = log.getLogger(__name__)
@@ -55,9 +53,6 @@ def hash_path_for_algo(
     algo: str,
 ) -> ty.Callable[[types.StrOrPath], ty.Optional[hashing.Hash]]:
     """Return a function that hashes a path for the given algorithm."""
-    if algo == ETAG_FAKE_HASH_NAME:
-        return hash_file_fake_etag
-
     return partial(_hash_path_if_exists, partial(hash_cache.filehash, algo))
 
 
@@ -82,13 +77,6 @@ def extract_hashes_from_props(
     hashes = list(extract_hashes_from_metadata(props.metadata or dict()))
     if props.content_settings and props.content_settings.content_md5:
         hashes.append(hashing.Hash("md5", bytes(props.content_settings.content_md5)))
-
-    if props.etag:
-        # this is the final fallback. it cannot be checked locally, but at least
-        # it can be checked against what exists remotely the next time we want to use it.
-        if etag_bytes := extract_etag_bytes(props.etag):
-            hashes.append(hashing.Hash(sys.intern(ETAG_FAKE_HASH_NAME), etag_bytes))
-
     return {h.algo: h for h in hashes}
 
 
@@ -99,6 +87,10 @@ def verify_hashes_before_and_after_download(
     fqn: AdlsFqn,
     local_dest: types.StrOrPath,
 ) -> ty.Iterator[None]:
+    # if expected_hash:
+    #     check_reasonable_md5b64(expected_md5b64)
+    # if remote_md5b64:
+    #     check_reasonable_md5b64(remote_md5b64)
     if remote_hash and expected_hash and remote_hash != expected_hash:
         raise errors.HashMismatchError(
             f"ADLS thinks the {remote_hash.algo} of {fqn} is {hashing.b64(remote_hash.bytes)},"
@@ -113,16 +105,11 @@ def verify_hashes_before_and_after_download(
         expected_algo = remote_hash.algo
 
     if not expected_algo:
-        # if we have neither a user-provided hash nor a remotely-found hash, then we have nothing to check.
+        # if we have neither a user-provided hash nor a remotely-foun9d hash, then we have nothing to check.
         return
 
-    assert expected_hash or remote_hash, "At least one of expected or remote hash must be present."
     with log.logger_context(hash_for="after-download"):
-        if expected_algo == ETAG_FAKE_HASH_NAME:
-            assert remote_hash, f"An Etag hash should always originate remotely: {fqn}"
-            local_hash = add_to_etag_cache(local_dest, remote_hash.bytes)
-        else:
-            local_hash = hash_cache.filehash(expected_algo, local_dest)
+        local_hash = hash_cache.filehash(expected_algo, local_dest)
 
     if remote_hash and remote_hash != local_hash:
         raise errors.HashMismatchError(
@@ -153,10 +140,6 @@ def create_hash_metadata_if_missing(
 ) -> dict:
     if not (file_properties and new_hash):
         # without file properties, we can't match the etag when we try to set this.
-        return dict()
-
-    if new_hash.algo == ETAG_FAKE_HASH_NAME:
-        # we never want to write etag-based hashes into metadata.
         return dict()
 
     existing_metadata = file_properties.metadata or dict()
