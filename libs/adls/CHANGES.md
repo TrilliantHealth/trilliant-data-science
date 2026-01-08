@@ -1,4 +1,4 @@
-### 4.5
+## 4.5
 
 - Support ETag as a 'hash', even though it cannot be computed locally, by _storing_ the etag locally and
   using an actual hash (xxhash) of the file to look up the etag. The theory is that a given xxhash will
