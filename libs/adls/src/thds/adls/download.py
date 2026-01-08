@@ -118,7 +118,7 @@ def _attempt_cache_hit(
     with log.logger_context(hash_for="before-download-dest"):
         local_hash = hash_path_if_exists(local_path)
     if local_hash == expected_hash:
-        logger.debug("Local path matches %s - no need to look further", expected_hash.algo)
+        logger.debug("Local path matches '%s' hash - no need to look further", expected_hash.algo)
         if cache:
             cache_path = cache.path(fqn)
             with log.logger_context(hash_for="before-download-cache"):
@@ -235,6 +235,12 @@ def _download_or_use_verified_cached_coroutine(  # noqa: C901
 
     # attempt cache hits before taking a lock, to avoid contention for existing files.
     if file_result := attempt_cache_hit():
+        logger.debug(
+            "No download - found cached version of %s using expected %s at %s",
+            fqn,
+            expected_hash,
+            file_result.hit,
+        )
         return file_result  # noqa: B901
 
     # No cache hit, so its time to prepare to download. if a cache was provided, we will

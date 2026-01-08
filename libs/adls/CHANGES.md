@@ -1,3 +1,10 @@
+### 4.5
+
+- Support ETag as a 'hash', even though it cannot be computed locally, by _storing_ the etag locally and
+  using an actual hash (xxhash) of the file to look up the etag. The theory is that a given xxhash will
+  only ever map to one etag in actual practice - and the consequence if it's not the case will be
+  additional downloads, so no errors will result.
+
 ## 4.4
 
 - Adds `adls.list_fast.multilayer_yield_sources`. Creates `adls.blob_meta` module and moves most of
