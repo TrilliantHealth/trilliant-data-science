@@ -350,11 +350,15 @@ def download_or_use_verified(
     *,
     expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
+    set_remote_hash: bool = True,
 ) -> ty.Optional[Path]:
     """Download a file or use the existing, cached copy if one exists in the cache and is verifiable.
 
     Note that you will get a logged warning if `local_path` already exists when you call
     this function.
+
+    If set_remote_hash is False, the function will not attempt to set hash metadata on the
+    remote file after download. This is useful when downloading from read-only locations.
     """
     file_properties = None
     try:
@@ -378,7 +382,9 @@ def download_or_use_verified(
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
     except StopIteration as si:
-        if meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash):
+        if set_remote_hash and (
+            meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash)
+        ):
             try:
                 logger.info(f"Setting missing {si.value.hash.algo} hash for {remote_key}")
                 assert file_properties
@@ -405,6 +411,7 @@ async def async_download_or_use_verified(
     *,
     expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
+    set_remote_hash: bool = True,
 ) -> ty.Optional[Path]:
     file_properties = None
     try:
@@ -435,7 +442,9 @@ async def async_download_or_use_verified(
                 raise ValueError(f"Unexpected coroutine request: {co_request}")
 
     except StopIteration as si:
-        if meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash):
+        if set_remote_hash and (
+            meta := hashes.create_hash_metadata_if_missing(file_properties, si.value.hash)
+        ):
             try:
                 logger.info(f"Setting missing Hash for {remote_key}")
                 assert file_properties
