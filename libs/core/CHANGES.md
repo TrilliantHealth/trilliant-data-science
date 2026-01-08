@@ -1,3 +1,8 @@
+### 1.50.20260107
+
+- Fix `cpus.guarantee()` and `cpus.limit()` bug causing a boolean value to be returned instead of a
+  float.
+
 ## 1.50
 
 - Add `cpus.guarantee()` and `cpus.limit()` so that we can directly inject this information rather than
