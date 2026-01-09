@@ -152,3 +152,102 @@ async def test_integration_etag_cache_miss_different_paths_no_local_file(
         rf.fs_client, rf.key, local_path_2, set_remote_hash=False
     )
     assert cache_hit_3, "Third download should be cache hit"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_integration_etag_blob_api_list_then_dfs_api_download(
+    tmp_remote_root: AdlsRoot, test_dest: Path
+):
+    """Regression test: ETags from Blob API listing must match DFS API download.
+
+    This tests the specific scenario that was broken before the fix in _etag.py:
+    - list_blobs (Blob API) returns ETags WITHOUT quotes: '0x8DE1DBAB15C03E1'
+    - get_file_properties (DFS API) returns ETags WITH quotes: '"0x8DE1DBAB15C03E1"'
+
+    Before the fix, extract_etag_bytes() would produce different byte representations
+    for the same ETag value depending on whether it was quoted, causing HashMismatchError
+    when a file was listed via Blob API but downloaded via DFS API.
+
+    This is the exact flow used by list_fast + Source.path() in unified-asset.
+    """
+    from azure.storage.blob import ContainerClient
+
+    from thds.adls._etag import ETAG_FAKE_HASH_NAME, extract_etag_bytes
+    from thds.adls.global_client import get_global_fs_client
+    from thds.adls.shared_credential import SharedCredential
+    from thds.core.hashing import Hash
+
+    storage_account, container = tmp_remote_root
+    unique_id = uuid4().hex
+    key = f"test/thds.adls/etag-blob-dfs-regression/{unique_id}.txt"
+    content = f"blob-dfs etag regression test {unique_id}".encode()
+
+    # Upload via DFS API (simulating external data that has no hash metadata)
+    fs_client = get_global_fs_client(storage_account, container)
+    file_client = fs_client.get_file_client(key)
+    file_client.upload_data(content, overwrite=True)
+
+    try:
+        # Step 1: List via Blob API (like list_fast does) - returns UNQUOTED etag
+        blob_container = ContainerClient(
+            account_url=f"https://{storage_account}.blob.core.windows.net",
+            container_name=container,
+            credential=SharedCredential(),
+        )
+        blob_props = None
+        for blob in blob_container.list_blobs(name_starts_with=key):
+            blob_props = blob
+            break
+
+        assert blob_props is not None, "File should be listable via Blob API"
+        blob_etag = blob_props.etag
+        # Blob API list_blobs returns unquoted etags
+        assert not blob_etag.startswith(
+            '"'
+        ), f"list_blobs should return unquoted etag, got {blob_etag!r}"
+
+        # Step 2: Get properties via DFS API (like download does) - returns QUOTED etag
+        dfs_props = file_client.get_file_properties()
+        dfs_etag = dfs_props.etag
+        # DFS API get_file_properties returns quoted etags
+        assert dfs_etag
+        assert dfs_etag.startswith(
+            '"'
+        ), f"get_file_properties should return quoted etag, got {dfs_etag!r}"
+
+        # Step 3: Verify both ETags produce the SAME byte representation
+        # This is the core of the regression test - before the fix, these would differ
+        blob_etag_bytes = extract_etag_bytes(blob_etag)
+        dfs_etag_bytes = extract_etag_bytes(dfs_etag)
+
+        assert blob_etag_bytes == dfs_etag_bytes, (
+            f"ETags from Blob API and DFS API should produce identical bytes!\n"
+            f"  Blob API etag: {blob_etag!r} -> {blob_etag_bytes.hex()}\n"
+            f"  DFS API etag:  {dfs_etag!r} -> {dfs_etag_bytes.hex()}"
+        )
+
+        # Step 4: Simulate the full flow: create expected hash from Blob API etag,
+        # then download with DFS API verification
+        expected_hash = Hash(ETAG_FAKE_HASH_NAME, blob_etag_bytes)
+        local_path = test_dest / f"blob_dfs_regression_{unique_id}.txt"
+
+        # This should NOT raise HashMismatchError
+        # (before the fix, it would fail because blob_etag_bytes != dfs_etag_bytes)
+        await async_download_or_use_verified(
+            _async_adls_fs_client(storage_account, container),
+            key,
+            local_path,
+            expected_hash=expected_hash,
+            set_remote_hash=False,
+        )
+
+        assert local_path.exists()
+        assert local_path.read_bytes() == content
+
+    finally:
+        # Cleanup
+        try:
+            file_client.delete_file()
+        except Exception:
+            pass
