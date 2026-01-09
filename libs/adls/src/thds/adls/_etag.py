@@ -12,8 +12,11 @@ logger = log.getLogger(__name__)
 
 
 def extract_etag_bytes(etag_str: str) -> bytes:
-    # ADLS etags are quoted strings, so we need to strip the quotes
-    return int(etag_str.strip('"'), 16).to_bytes((len(etag_str) - 2 + 1) // 2, byteorder="big")
+    # ADLS etags may or may not be quoted depending on the API used:
+    # list_blobs returns unquoted, get_*_properties returns quoted.
+    # Strip quotes first, then calculate byte length from the stripped string.
+    stripped = etag_str.strip('"')
+    return int(stripped, 16).to_bytes((len(stripped) - 2 + 1) // 2, byteorder="big")
 
 
 _ETAG_CACHE = config.item("cache-path", home.HOMEDIR() / ".thds/adls/xxhash-onto-etag", parse=Path)
