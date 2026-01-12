@@ -44,15 +44,20 @@ def test_extract_etag_bytes_standard_format():
 def test_extract_etag_bytes_various_lengths():
     """Test etag extraction with various lengths.
 
-    The byte length is derived from the string length (excluding quotes),
-    so '"0x1"' becomes 2 bytes (padded), not 1 byte.
+    The byte length is derived from the STRIPPED string length,
+    so both quoted and unquoted etags produce the same byte representation.
     """
     test_cases = [
-        # (etag_str, expected_bytes) - length = (len(etag) - 2 + 1) // 2
-        ('"0x1"', bytes.fromhex("0001")),  # len=5, (5-2+1)//2 = 2 bytes
-        ('"0xFF"', bytes.fromhex("00FF")),  # len=6, (6-2+1)//2 = 2 bytes
-        ('"0x1234"', bytes.fromhex("001234")),  # len=8, (8-2+1)//2 = 3 bytes
-        ('"0xABCDEF"', bytes.fromhex("00ABCDEF")),  # len=10, (10-2+1)//2 = 4 bytes
+        # (etag_str, expected_bytes) - length = (len(stripped) - 2 + 1) // 2
+        # where stripped = etag_str.strip('"')
+        ('"0x1"', bytes.fromhex("01")),  # stripped='0x1', len=3, (3-2+1)//2 = 1 byte
+        ("0x1", bytes.fromhex("01")),  # same value, no quotes, same result
+        ('"0xFF"', bytes.fromhex("FF")),  # stripped='0xFF', len=4, (4-2+1)//2 = 1 byte
+        ("0xFF", bytes.fromhex("FF")),  # same value, no quotes, same result
+        ('"0x1234"', bytes.fromhex("1234")),  # stripped='0x1234', len=6, (6-2+1)//2 = 2 bytes
+        ("0x1234", bytes.fromhex("1234")),  # same value, no quotes, same result
+        ('"0xABCDEF"', bytes.fromhex("ABCDEF")),  # stripped='0xABCDEF', len=8, (8-2+1)//2 = 3 bytes
+        ("0xABCDEF", bytes.fromhex("ABCDEF")),  # same value, no quotes, same result
     ]
     for etag_str, expected in test_cases:
         result = extract_etag_bytes(etag_str)
