@@ -1,3 +1,9 @@
+## 3.13
+
+- Exposes a more low-level `k8s.batching.add_to_batch` function, which can be used within a shim builder,
+  allowing further control over how a batch is run, e.g. determining pod cpu count from individual
+  invocation args.
+
 ## 3.12.20251222
 
 - Negative `CONTROL_CACHE_TTL_IN_SECONDS` values now result in the control cache being bypassed
