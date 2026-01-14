@@ -1,16 +1,10 @@
-### 3.13.20260114
-
-- Refreshes kubernetes config during k8s batching atexit handler. This fixes a bug where the python SDK
-  deletes the SSL cert file in its own atexit handler and the k8s shim then uses a stale config
-  referencing this file.
-
 ## 3.13
 
 - Exposes a more low-level `k8s.batching.add_to_batch` function, which can be used within a shim builder,
   allowing further control over how a batch is run, e.g. determining pod cpu count from individual
   invocation args.
 
-### 3.12.20251222
+## 3.12.20251222
 
 - Negative `CONTROL_CACHE_TTL_IN_SECONDS` values now result in the control cache being bypassed
   completely. This avoids a race condition where the lockfile is overwritten by the local runner after

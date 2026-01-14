@@ -17,25 +17,13 @@ import multiprocessing
 import os
 import threading
 import typing as ty
-from functools import wraps
 
 from thds.core import cpus, futures, log
 
-from . import _launch, auth, counts
+from . import _launch, counts
 
 T = ty.TypeVar("T")
 logger = log.getLogger(__name__)
-
-F = ty.TypeVar("F", bound=ty.Callable)
-
-
-def _clear_config_cache(f: F) -> F:
-    @wraps(f)
-    def _wrapped(*args, **kwargs):  # type: ignore
-        auth.load_config.cache_clear()  # type: ignore
-        return f(*args, **kwargs)
-
-    return ty.cast(F, _wrapped)
 
 
 class _AtExitBatcher(ty.Generic[T]):
@@ -48,15 +36,7 @@ class _AtExitBatcher(ty.Generic[T]):
     def add(self, item: T) -> None:
         with self._lock:
             if not self._registered:
-                # The kubernetes python SDK _also_ has an atexit handler, which
-                # removes the temp file containing the SSL cert. That atexit
-                # handler is called before this handler, since it is registered
-                # after. If we reuse the cached config, which references that
-                # temp file which no longer exists, we get the error:
-                # `SSLError(FileNotFoundError(2, 'No such file or directory'))`.
-                # Instead, we first clear the cached config, which causes the
-                # cert file to be recreated when the config is loaded again.
-                atexit.register(_clear_config_cache(self.process))
+                atexit.register(self.process)
                 # ensure we flush on process exit, since we don't know how many items are coming
                 self._registered = True
             self.batch.append(item)
@@ -115,6 +95,10 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
             log_lvl = logger.warning if len(batch) < self._max_batch_size else logger.info
             log_lvl(f"Processing batch of len {len(batch)} with job name {self._job_name}")
             self._submit_func(batch)
+
+
+F = ty.TypeVar("F", bound=ty.Callable)
+FunctionDecorator = ty.Callable[[F], F]
 
 
 _BATCHER: ty.Optional[K8sJobBatchingShim] = None
