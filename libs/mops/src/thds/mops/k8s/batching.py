@@ -17,13 +17,25 @@ import multiprocessing
 import os
 import threading
 import typing as ty
+from functools import wraps
 
 from thds.core import cpus, futures, log
 
-from . import _launch, counts
+from . import _launch, auth, counts
 
 T = ty.TypeVar("T")
 logger = log.getLogger(__name__)
+
+F = ty.TypeVar("F", bound=ty.Callable)
+
+
+def _clear_config_cache(f: F) -> F:
+    @wraps(f)
+    def _wrapped(*args, **kwargs):  # type: ignore
+        auth.load_config.cache_clear()  # type: ignore
+        return f(*args, **kwargs)
+
+    return ty.cast(F, _wrapped)
 
 
 class _AtExitBatcher(ty.Generic[T]):
@@ -36,7 +48,15 @@ class _AtExitBatcher(ty.Generic[T]):
     def add(self, item: T) -> None:
         with self._lock:
             if not self._registered:
-                atexit.register(self.process)
+                # The kubernetes python SDK _also_ has an atexit handler, which
+                # removes the temp file containing the SSL cert. That atexit
+                # handler is called before this handler, since it is registered
+                # after. If we reuse the cached config, which references that
+                # temp file which no longer exists, we get the error:
+                # `SSLError(FileNotFoundError(2, 'No such file or directory'))`.
+                # Instead, we first clear the cached config, which causes the
+                # cert file to be recreated when the config is loaded again.
+                atexit.register(_clear_config_cache(self.process))
                 # ensure we flush on process exit, since we don't know how many items are coming
                 self._registered = True
             self.batch.append(item)
@@ -75,15 +95,19 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
         job_num = counts.inc(self._job_counter)
         return _launch.construct_job_name(self._job_prefix, counts.to_name(job_num))
 
-    def add_to_named_job(self, mops_invocation: ty.Sequence[str]) -> str:
-        """Returns job name for the invocation."""
+    def add_to_named_job(self, args_builder: ty.Callable[[], ty.Sequence[str]]) -> str:
+        """Returns job name for the invocation. args_builder should be a closure
+        around any additional state needed for running a batch. We do it this
+        way so that this function can be called within the same lock.
+        """
         with self._lock:
             if not self._job_name:
                 self._job_name = self._get_new_name()
             if len(self.batch) >= self._max_batch_size:
                 self.process()
                 self._job_name = self._get_new_name()
-            super().add(" ".join(mops_invocation))
+
+            super().add(" ".join(args_builder()))
             return self._job_name
 
     def _process_batch(self, batch: ty.Collection[str]) -> None:
@@ -91,10 +115,6 @@ class K8sJobBatchingShim(_AtExitBatcher[str]):
             log_lvl = logger.warning if len(batch) < self._max_batch_size else logger.info
             log_lvl(f"Processing batch of len {len(batch)} with job name {self._job_name}")
             self._submit_func(batch)
-
-
-F = ty.TypeVar("F", bound=ty.Callable)
-FunctionDecorator = ty.Callable[[F], F]
 
 
 _BATCHER: ty.Optional[K8sJobBatchingShim] = None
@@ -182,13 +202,23 @@ def make_counting_process_pool_executor(
     )
 
 
-def shim(args: ty.Sequence[str]) -> futures.PFuture[bool]:
+def add_to_batch(args_builder: ty.Callable[[], ty.Sequence[str]]) -> futures.PFuture[bool]:
+    """
+    args_builder should be a closure around any additional state that needs to
+    be kept for batching, e.g. it can be used for determining batch cpu count
+    from individual invocation args.
+    """
     # This thing needs to return a lazy Uncertain Future that contains a job name, so that Job can be polled on
     # ... but the job does not exist yet! So the batcher is in charge of creating the job name
     # upfront, and then ensuring that it gets used when the job is created.
     assert _BATCHER is not None, "Batcher must be initialized before using the batching shim."
-    job_name = _BATCHER.add_to_named_job(args)
+    job_name = _BATCHER.add_to_named_job(args_builder)
     return _launch.create_lazy_job_logging_future(job_name)
+
+
+def shim(args: ty.Sequence[str]) -> futures.PFuture[bool]:
+    """Use this shim if you don't need any additional setup around running a batch"""
+    return add_to_batch(lambda: args)
 
 
 def batched(iterable: ty.Iterable[T], n: int, *, strict: bool = False) -> ty.Iterator[tuple[T, ...]]:
