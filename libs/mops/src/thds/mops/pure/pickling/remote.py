@@ -177,5 +177,5 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         ),
         ty.cast(ty.Callable[[], T], do_work_return_result),
         memo_uri,
-        mprunner.RUNNER_NAME,
+        mprunner.RUNNER_NAME,  # auto-detected as runner name, not prefix
     )

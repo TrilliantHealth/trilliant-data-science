@@ -1,3 +1,10 @@
+### 3.13.20260120
+
+- Fixes URI duplication bug in `parse_memo_uri` where passing just the runner name (e.g., "mops2-mpf")
+  instead of a full prefix would cause incorrect slicing, corrupting extracted pipeline IDs and causing
+  path duplication in output URIs. The function now auto-detects whether the input is a full prefix or a
+  runner name and handles both correctly.
+
 ### 3.13.20260114
 
 - Refreshes kubernetes config during k8s batching atexit handler. This fixes a bug where the python SDK

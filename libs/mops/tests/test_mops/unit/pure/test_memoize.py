@@ -117,3 +117,27 @@ def test_parse_memo_uri():
     assert memo_parts.function_name == "fx"
     assert memo_parts.function_logic_key == "flk45"
     assert memo_parts.args_hash == "PurseHowCorgi-89723098273409283742938742"
+
+
+def test_parse_memo_uri_with_runner_name_instead_of_prefix():
+    """Test that passing just the runner name (not full prefix) correctly extracts the prefix.
+
+    This was a bug where passing "mops2-mpf" instead of "adls://foo/bar/mops2-mpf"
+    would cause incorrect slicing, corrupting the pipeline_id.
+    """
+    memo_uri = "adls://thdsscratch/tmp/mops2-mpf/my-pipeline/module--func/ARGSHASH"
+
+    # Passing just runner name should auto-detect and extract full prefix
+    parts_with_name = parse_memo_uri(memo_uri, runner_prefix="mops2-mpf")
+    assert parts_with_name.runner_prefix == "adls://thdsscratch/tmp/mops2-mpf"
+    assert parts_with_name.pipeline_id == "my-pipeline"
+
+    # Passing full prefix should work the same
+    parts_with_prefix = parse_memo_uri(memo_uri, runner_prefix="adls://thdsscratch/tmp/mops2-mpf")
+    assert parts_with_prefix.runner_prefix == "adls://thdsscratch/tmp/mops2-mpf"
+    assert parts_with_prefix.pipeline_id == "my-pipeline"
+
+    # Passing empty string should fall back to default runner name
+    parts_empty = parse_memo_uri(memo_uri, runner_prefix="")
+    assert parts_empty.runner_prefix == "adls://thdsscratch/tmp/mops2-mpf"
+    assert parts_empty.pipeline_id == "my-pipeline"

@@ -239,35 +239,53 @@ class MemoUriComponents(ty.NamedTuple):
         )
 
 
+DEFAULT_RUNNER_NAME = "mops2-mpf"
+
+
 def parse_memo_uri(
     memo_uri: str,
-    runner_prefix: str = "",  # the part up to but not including the pipeline_id
+    runner_prefix: str = "",
     separator: str = "/",
-    backward_compat_split: str = "mops2-mpf",
 ) -> MemoUriComponents:
-    if not runner_prefix:
-        # this is in order to help with backward compatibilty for mops summaries that
-        # didn't store any of this. providing memospace is a more precise way to handle this.
-        if backward_compat_split not in memo_uri:
-            raise ValueError("Cannot determine the components of a memo URI with no memospace")
-        parts = memo_uri.split(backward_compat_split, 1)
-        assert len(parts) > 1, parts
-        runner_prefix = separator.join((parts[0].rstrip(separator), backward_compat_split))
+    """Parse a memo URI into its constituent components.
 
-    runner_prefix = runner_prefix.rstrip(separator)
+    The runner_prefix parameter accepts either:
+    - A full runner prefix (e.g., "adls://storage/root/mops2-mpf") - used directly
+      if it matches the start of memo_uri
+    - A runner name (e.g., "mops2-mpf") - used to extract the full prefix from memo_uri
+    - Empty string - falls back to DEFAULT_RUNNER_NAME ("mops2-mpf")
+
+    Auto-detection: If the provided value appears at the start of memo_uri, it's
+    treated as a full prefix. Otherwise, it's treated as a runner name and the
+    full prefix is extracted by finding its first occurrence in the URI.
+    """
+    runner_prefix_or_name = runner_prefix or DEFAULT_RUNNER_NAME
+
+    # Auto-detect: is this a full prefix (starts the URI) or a runner name (found within)?
+    if memo_uri.startswith(runner_prefix_or_name):
+        # It's a full prefix - use directly
+        resolved_prefix = runner_prefix_or_name
+    elif runner_prefix_or_name in memo_uri:
+        # It's a runner name - extract the full prefix
+        parts = memo_uri.split(runner_prefix_or_name, 1)
+        resolved_prefix = separator.join((parts[0].rstrip(separator), runner_prefix_or_name))
+    else:
+        raise ValueError(f"Cannot parse memo URI: '{runner_prefix_or_name}' not found in '{memo_uri}'")
+
+    resolved_prefix = resolved_prefix.rstrip(separator)
     rest, args_hash = memo_uri.rsplit(separator, 1)  # args hash is last component
 
     remaining_prefix, full_function_name, calls_functions = calls.split_off_calls_strings(
         rest, separator
     )
 
-    pipeline_id = remaining_prefix[len(runner_prefix) :]
+    pipeline_id = remaining_prefix[len(resolved_prefix) :]
     pipeline_id = pipeline_id.strip(separator)
 
     function_parts = parse_unique_name(full_function_name)
 
     return MemoUriComponents(
-        runner_prefix,
+        resolved_prefix,
         pipeline_id,
         function_parts.module,
         function_parts.name,
