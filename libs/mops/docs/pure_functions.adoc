@@ -23,8 +23,7 @@ Practically speaking, some things to avoid/remove from your functions:
 - Any kind of randomness, including `datetime.now()` and friends.
 - Non-random things that present to link:serialization.adoc[`pickle`] as random, including the built-in `set`.footnote:[We expect to eventually support `set` transparently with a serialization shim, but this has not yet made it to the top of the backlog]
 - References to files or other state external to the function (with exceptions for explicit passing
-  of filesystem primitives as described link:./optimizations.adoc#paths[here], or
-  via link:../../core/src/thds/core/source.py[`core.Source`])
+  of filesystem primitives via link:./source.adoc[`core.Source`])
 - References to large amounts of static reference data. If possible, select only the data you need before
   passing it to the function. If not, see the docs on
   link:./optimizations.adoc#large-shared-objects[large shared objects]

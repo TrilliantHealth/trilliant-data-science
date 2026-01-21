@@ -305,6 +305,14 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
             partial(_put_file_to_blob_store, source_.cached_path, remote_uri),
         )
     else:
+        if source_.cached_path:
+            logger.warning(
+                "Source has cached_path '%s' but file no longer exists. "
+                "This often indicates a temporary file was deleted before mops could upload it. "
+                "Consider using a persistent output directory (e.g., '.out/') instead of temp files. "
+                "See mops Source documentation for recommended patterns.",
+                source_.cached_path,
+            )
         logger.debug("Creating SourceResult for URI %s that is presumed to be uploaded.", remote_uri)
         file_uri = ""
 

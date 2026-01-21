@@ -1,4 +1,4 @@
-link:optimizations.adoc[↑]
+link:source.adoc[↑]
 
 # Non-optimized large-file sources and sinks via `pathlib.Path` (deprecated)
 

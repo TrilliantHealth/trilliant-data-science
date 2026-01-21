@@ -1,0 +1,160 @@
+link:../README.adoc[↑]
+
+# Source: File-based Inputs and Outputs
+
+`thds.core.source.Source` is the recommended abstraction for passing file-based data into and out of `mops`-decorated functions. It provides significant optimizations over raw `pathlib.Path` and preserves the "droppability" of `mops` — your code should work identically whether `mops` is enabled or not.
+
+## Why Source?
+
+On a basic level, `Source` represents two conceptually different possibilities for data availability:
+
+- available on the local filesystem
+- available remotely, but able to be downloaded to the local filesystem when opened for reading
+
+By using this abstraction, functions can obey
+link:https://en.wikipedia.org/wiki/Robustness_principle[Postel's law] and take advantage of the
+link:https://en.wikipedia.org/wiki/Liskov_substitution_principle[Liskov substitution principle]: your function code does not need to change depending on where the data is coming from (local file or remote URI), and callers have maximum control over where they source data and what they receive.
+
+## Creating Sources
+
+`Source` objects should be created via:
+
+- `thds.core.source.from_file(path)` — for local files
+- `thds.core.source.from_uri(uri)` — for remote data (e.g., `adls://...`)
+- `thds.adls.source.from_adls(fqn)` — if you have an `AdlsFqn`
+
+## Recommended Output Patterns
+
+****
+When creating output files that will be returned as `Source` objects, **prefer creating them in a persistent subdirectory of your current working directory** rather than using temporary directories.
+
+The conventional pattern is:
+
+[source,python]
+----
+from pathlib import Path
+from thds.core.source import Source, from_file
+
+def my_function(...) -> Source:
+    output_path = Path.cwd() / '.out' / 'my_result.parquet'
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ... write your data to output_path ...
+
+    return from_file(output_path)
+----
+****
+
+=== Why `.out/` instead of temp directories?
+
+**1. Droppability**: If you remove `mops` from your application, your code should still produce useful output. A file written to `./.out/my_result.parquet` is immediately usable by any downstream consumer — human or program. A file written to `/var/tmp/xyz123/result.parquet` disappears when the temp context closes, leaving nothing behind.
+
+**2. Automatic URI assignment**: `mops` derives remote URIs based on the _relative path from the current working directory_. Files in `./.out/` get clean, predictable URIs that include your chosen filename. This makes debugging and inspecting memoized results much easier.
+
+**3. Reproducibility**: Persistent output directories make it trivial to inspect intermediate outputs, compare results across runs, and debug issues without re-running computations.
+
+## Anti-patterns to Avoid
+
+=== Context-managed temporary files
+
+[source,python]
+----
+# !! ANTIPATTERN - DO NOT DO THIS !!
+from thds.core import scope, tmp
+
+@pure.magic()
+@scope.bound  # <-- this is the problem
+def make_a_file() -> Source:
+    tmp_file = scope.enter(tmp.temppath_same_fs())
+    with open(tmp_file, "w") as f:
+        f.write("hello!")
+    return from_file(tmp_file)  # File will be DELETED before mops can upload!
+----
+
+The `@scope.bound` decorator (or any context manager that cleans up temp files) closes when your function returns. This means:
+
+1. Your function creates a temp file and writes data to it
+2. Your function returns a `Source` pointing to that file
+3. The `@scope.bound` context exits, **deleting the temp file**
+4. `mops` tries to upload the file... but it's gone!
+
+This antipattern hardcodes your runtime environment to be "mops-only" — without mops, you'd have no output at all. That defeats the purpose of using `Source` in the first place.
+
+=== When you really need temp files
+
+If you have a legitimate reason to use temporary files (e.g., disk space constraints), use `mops.tempdir()` which provides a temp directory that persists until the interpreter exits:
+
+[source,python]
+----
+from thds.mops import tempdir
+
+@pure.magic()
+def make_a_file() -> Source:
+    output = tempdir() / "my_output.txt"
+    with open(output, "w") as f:
+        f.write("hello!")
+    return from_file(output)
+----
+
+However, this still means your code won't produce local output without `mops`. Prefer the `.out/` pattern when possible.
+
+## Automatic URI Assignment
+
+When you return a `Source` created via `from_file()`, `mops` will:
+
+1. Automatically assign a remote URI based on the invocation output URI plus the file's path relative to cwd (stripping any `.out/` prefix)
+2. Upload the local file to that derived remote URI just before writing the memoized result
+
+For example: `/home/user/project/.out/reports/snow_white.txt` might become `adls://ds/tmp/pipeline/my_function/VaultAskBrain.hPUok14h4T8/reports/snow_white.txt`
+
+NOTE: Files under your cwd can share basenames as long as they have different relative paths (e.g., `./a/result.parquet` and `./b/result.parquet` are fine). Files outside cwd fall back to basename-only naming and must have unique basenames.
+
+## Manually Specifying URIs
+
+To skip the automatic remote naming behavior, use `mops.pure.create_source_at_uri`, which uploads the file immediately:
+
+[source,python]
+----
+from thds.mops.pure import create_source_at_uri
+
+source = create_source_at_uri(local_path, "adls://my-sa/container/explicit/path.txt")
+----
+
+WARNING: This risks name collisions, including the possibility of overwriting data meant to be read-only for a downstream process.
+
+## Example
+
+[source,python]
+----
+from pathlib import Path
+from thds.core.source import Source, from_file
+
+def remote_func(src_a: Source, src_b: Source) -> Source:
+    outf = Path.cwd() / '.out' / 'c.txt'
+    outf.parent.mkdir(parents=True, exist_ok=True)
+    with open(outf, 'w') as wf:
+        # you can `open` a Source object directly
+        wf.write(open(src_a).read() + '\n' + open(src_b).read())
+    return from_file(outf)
+
+
+def orchestrator():
+    src_a = from_file('a.txt')
+    src_b = from_file(Path('b.txt'))  # works with Path, too
+    src_c = remote_func(src_a, src_b)
+    assert open(src_c).read() == open(src_a).read() + '\n' + src_b.path().read_text()
+    # Sources can be opened; they can also be turned into Path objects.
+----
+
+This code works whether or not `mops` is in play, producing exactly the same results. If your function runs on a different machine with `mops`, there won't be a `.out/c.txt` locally (side-effects aren't propagated), but if you run locally (with `@pure.magic()` or without `mops` entirely), the file _will_ exist and be usable.
+
+## Technical Notes
+
+- `source.uri` for a file that exists locally will be a file URI (`file://...`)
+- `source.uri` for a file that doesn't exist locally will be the remote URI (`adls://...`)
+- The current implementation does not support efficient byte-range seeking — the entire file must be downloaded before access
+
+## Related Documentation
+
+- link:./paths.adoc[Non-optimized Path handling (deprecated)]
+- link:./optimizations.adoc[Other optimizations (large shared objects)]

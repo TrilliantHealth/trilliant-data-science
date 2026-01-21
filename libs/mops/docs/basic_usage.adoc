@@ -81,7 +81,7 @@ separate processes, though threads are your best bet for the large majority of s
 
 ## Output locations
 
-`mops` has several link:optimizations.adoc[optimizations] to help with the overhead of transferring work to and from remote runners. The one you'll need most often is a representation of large input and output data.
+`mops` has several link:optimizations.adoc[optimizations] to help with the overhead of transferring work to and from remote runners. The most important one is link:source.adoc[Source], an abstraction for large input and output data.
 
 * When defining a location for large output data that is a single file, use
   `thds.core.source.from_file` to create a `Source` object. `Source` is an `os.PathLike`,
