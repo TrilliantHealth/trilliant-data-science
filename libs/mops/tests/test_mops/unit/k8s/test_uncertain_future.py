@@ -72,7 +72,7 @@ def test_concurrent_mutation_during_active_iteration_does_not_raise():
     # This should NOT raise "RuntimeError: OrderedDict mutated during iteration"
     # because we iterate over a snapshot, not the live dict
     try:
-        tracker.update(None, None)
+        tracker.gc_stale()
     except RuntimeError as e:
         if "mutated during iteration" in str(e):
             pytest.fail(f"Got the race condition we're trying to prevent: {e}")

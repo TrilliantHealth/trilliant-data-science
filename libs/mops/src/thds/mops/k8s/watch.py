@@ -1,6 +1,37 @@
-"""K8s SDK watching is very unreliable for lots of reasons.
+"""K8s watch reliability: challenges and mitigations.
 
-This is a general-purpose fix for using watchers in a thread reliably.
+The Kubernetes Python client's watch mechanism is fundamentally unreliable:
+- Events can be silently dropped by the API server or lost in transit
+- Watch streams can hang indefinitely without raising exceptions
+- The client's watch.stop() only sets a flag checked between iterations -
+  it cannot interrupt a blocking socket read
+
+Our highest priority is getting live event updates from k8s as quickly as
+possible, because until that's happening, we cannot quickly react to finished
+jobs. Every mitigation here exists to ensure we maintain a reliable event flow.
+
+Mitigations implemented:
+1. **Short server timeout (2 min)**: Forces periodic re-LIST even if stream hangs.
+   Server-side timeout is more reliable than client-side read timeout.
+
+2. **Watchdog thread**: Monitors event flow and forcefully closes the underlying
+   HTTP response if no events received within timeout. This interrupts blocking
+   socket reads that watch.stop() cannot.
+
+3. **GC deferral during FETCH**: The watch has two phases - FETCH (batch snapshot
+   from LIST) and stream (real-time events). Staleness GC must not run during
+   FETCH because we haven't updated all timestamps yet - running GC would timeout
+   jobs we simply haven't reached in the iteration.
+
+4. **Backup fetch before timeout**: Before timing out a job, we make a direct API
+   call to check its actual state. This recovers jobs whose completion events
+   were missed by the watch.
+
+5. **Race condition fix in create_future**: When creating a future for a job the
+   watch has already seen, immediately update it with cached data.
+
+These layers are all necessary because no single mechanism is sufficient given
+the unreliability of the underlying k8s watch API.
 """
 
 import queue
@@ -46,6 +77,66 @@ EventType = ty.Literal["FETCH", "ADDED", "MODIFIED", "DELETED"]
 OnEvent = ty.Callable[[str, T, EventType], ty.Optional[bool]]
 
 
+class WatchdogTimeout(Exception):
+    """Raised when the watchdog detects the watch stream is stuck."""
+
+
+def _start_watchdog(
+    watch_obj: k8s_watch.Watch,
+    last_event_time: ty.List[float],  # mutable container for sharing between threads
+    timeout_seconds: int,
+    object_type_hint: str,
+) -> ty.Callable[[], None]:
+    """Start a watchdog thread that stops the watch if no events received within timeout.
+
+    Returns a callable to stop the watchdog cleanly (minimal interface for internal use).
+
+    Note: watch.stop() alone is not sufficient because it only sets a flag that's checked
+    between iterations - it can't interrupt a blocking socket read. We also close the
+    underlying response to forcefully interrupt the stream.
+    """
+    stop_event = threading.Event()
+
+    def watchdog() -> None:
+        logger.info(f"Watchdog started for {object_type_hint} (timeout={timeout_seconds}s)")
+        try:
+            while not stop_event.is_set():
+                stop_event.wait(timeout_seconds / 2)  # check twice per timeout period
+                if stop_event.is_set():
+                    logger.debug(f"Watchdog {object_type_hint}: stop_event set, exiting cleanly")
+                    return
+
+                elapsed = _watch_timer() - last_event_time[0]
+                logger.info(
+                    f"Watchdog {object_type_hint}: elapsed={elapsed:.1f}s (threshold={timeout_seconds}s)"
+                )
+                if elapsed > timeout_seconds:
+                    logger.warning(
+                        f"Watchdog: No {object_type_hint} events for {elapsed:.1f}s "
+                        f"(timeout={timeout_seconds}s) - forcing restart"
+                    )
+                    # First call stop() to set the flag
+                    watch_obj.stop()
+                    # Then forcefully close the underlying response to interrupt blocking read
+                    # The resp attribute is set when stream() starts iterating
+                    if hasattr(watch_obj, "resp") and watch_obj.resp:
+                        try:
+                            watch_obj.resp.close()
+                            watch_obj.resp.release_conn()
+                            logger.info(f"Watchdog {object_type_hint}: closed response connection")
+                        except Exception as close_err:
+                            logger.debug(
+                                f"Watchdog {object_type_hint}: error closing response: {close_err}"
+                            )
+                    return
+        except Exception as e:
+            logger.exception(f"Watchdog {object_type_hint} died with exception: {e}")
+
+    thread = threading.Thread(target=watchdog, daemon=True)
+    thread.start()
+    return stop_event.set
+
+
 def yield_objects_from_list(
     namespace: str,
     get_list_method: GetListMethod[T],
@@ -62,7 +153,12 @@ def yield_objects_from_list(
     ex = None
     if init:
         init()
+    loop_count = 0
+    events_yielded = 0
+    # Watchdog timeout: use server_timeout as the max time we'll wait for any event
+    watchdog_timeout = server_timeout
     while True:
+        loop_count += 1
         try:
             load_config()
             list_method = get_list_method(namespace, ex)
@@ -71,32 +167,63 @@ def yield_objects_from_list(
                 return
 
             initial_list = list_method(namespace=namespace)
-            logger.debug(
-                f"Listed {len(initial_list.items)} {object_type_hint} in namespace: {namespace}"
+            logger.info(
+                f"Watch loop #{loop_count}: Listed {len(initial_list.items)} {object_type_hint} "
+                f"in {namespace} (resource_version={initial_list.metadata.resource_version})"
             )
-            for object in initial_list.items:
-                yield namespace, object, "FETCH"
 
-            if initial_list.metadata._continue:
-                logger.warning(
-                    f"We did not fetch the whole list of {object_type_hint} the first time..."
-                )
-            for evt in k8s_watch.Watch().stream(
-                list_method,
-                namespace=namespace,
-                resource_version=initial_list.metadata.resource_version,
-                **kwargs,
-                timeout_seconds=server_timeout,
-                _request_timeout=(connection_timeout, read_timeout),
-            ):
-                object = evt.get("object")
-                if object:
-                    yield namespace, object, evt["type"]
-                # once we've received events, let the resource version
-                # be managed automatically if possible.
-        except urllib3.exceptions.ProtocolError:
+            # Create watch with watchdog monitoring BEFORE FETCH phase
+            # This ensures the watchdog protects both FETCH and stream phases
+            watch = k8s_watch.Watch()
+            last_event_time = [_watch_timer()]  # mutable container for watchdog thread
+            watchdog_stop = _start_watchdog(watch, last_event_time, watchdog_timeout, object_type_hint)
+
+            try:
+                # Yield FETCH events, updating watchdog timestamp for each
+                for object in initial_list.items:
+                    last_event_time[0] = _watch_timer()  # update for watchdog during FETCH
+                    events_yielded += 1
+                    yield namespace, object, "FETCH"
+
+                if initial_list.metadata._continue:
+                    logger.warning(
+                        f"We did not fetch the whole list of {object_type_hint} the first time..."
+                    )
+
+                for evt in watch.stream(
+                    list_method,
+                    namespace=namespace,
+                    resource_version=initial_list.metadata.resource_version,
+                    **kwargs,
+                    timeout_seconds=server_timeout,
+                    _request_timeout=(connection_timeout, read_timeout),
+                ):
+                    last_event_time[0] = _watch_timer()  # update for watchdog
+                    object = evt.get("object")
+                    if object:
+                        events_yielded += 1
+                        yield namespace, object, evt["type"]
+                    # once we've received events, let the resource version
+                    # be managed automatically if possible.
+            finally:
+                watchdog_stop()  # stop the watchdog thread
+
+            # If we get here, the stream ended normally (server timeout or watch.stop())
+            logger.info(
+                f"Watch loop #{loop_count}: Stream ended after {events_yielded} events - restarting"
+            )
+
+        except urllib3.exceptions.ProtocolError as pe:
+            logger.warning(
+                f"Watch loop #{loop_count}: ProtocolError after {events_yielded} events - "
+                f"{type(pe).__name__}: {pe}"
+            )
             ex = None
         except urllib3.exceptions.ReadTimeoutError:
+            logger.info(
+                f"Watch loop #{loop_count}: ReadTimeoutError after {events_yielded} events "
+                "- restarting"
+            )
             ex = None
         except Exception as e:
             too_old = parse_too_old_resource_version(e)
@@ -332,8 +459,9 @@ class WatchingObjectSource(ty.Generic[T]):
         self._seen_objects = _SeenObjectContainer[tuple[str, str], T](
             lambda namespace_and_name: backup_fetch(*namespace_and_name) if backup_fetch else None
         )
+        self._last_gc_time = 0.0  # for rate-limiting staleness GC
 
-    def _add_object(self, namespace: str, obj: T, _event_type: EventType) -> None:
+    def _add_object(self, namespace: str, obj: T, event_type: EventType) -> None:
         """This is where we receive updates from the k8s API."""
         if not obj:
             logger.warning(f"Received null/empty {self.typename}")
@@ -343,6 +471,18 @@ class WatchingObjectSource(ty.Generic[T]):
         self._seen_objects.set_object(key, obj)
         self._uncertain_futures.update(key, obj)
         logger.debug("%s %s updated", self.typename, key)
+
+        # Rate-limited staleness GC: run at most every 30 seconds
+        # Skip GC entirely during FETCH phase - we're processing a batch snapshot
+        # and haven't updated last_seen_at for all jobs yet. Running GC now would
+        # timeout jobs we simply haven't reached in the iteration.
+        if event_type == "FETCH":
+            return
+
+        now = _watch_timer()
+        if now - self._last_gc_time > 30:
+            self._uncertain_futures.gc_stale()
+            self._last_gc_time = now
 
     def _start_namespace_watcher_thread(self, namespace: str) -> None:
         create_watch_thread(
@@ -374,4 +514,11 @@ class WatchingObjectSource(ty.Generic[T]):
         """
         namespace = namespace or config.k8s_namespace()
         self._limiter(namespace, self._start_namespace_watcher_thread)
-        return self._uncertain_futures.create((namespace, obj_name), interpreter)
+        key = (namespace, obj_name)
+        fut = self._uncertain_futures.create(key, interpreter)
+        # If we already have a cached object for this key, immediately update the future
+        # with it. This handles the race condition where the watch saw the object before
+        # the future was created, so the interpreter was never called with the actual data.
+        if cached_obj := self._seen_objects._objs.get(key):
+            self._uncertain_futures.update(key, cached_obj)
+        return fut

@@ -18,8 +18,11 @@ k8s_job_cleanup_ttl_seconds_after_completion = config.item(
 )
 
 # https://github.com/kubernetes-client/python/blob/master/examples/watch/timeout-settings.md
+# Server timeout is enforced server-side and more reliable than client-side read timeout.
+# We use 2 minutes to ensure the watch restarts regularly and re-lists jobs, providing
+# a reliable fallback when the watch stream stops delivering events (which happens often).
 k8s_watch_server_timeout_seconds = config.item(
-    "mops.k8s.watch.server_timeout", int(timedelta(hours=1).total_seconds()), parse=int
+    "mops.k8s.watch.server_timeout", int(timedelta(minutes=2).total_seconds()), parse=int
 )
 k8s_watch_connection_timeout_seconds = config.item(
     "mops.k8s.watch.connection_timeout", int(timedelta(seconds=5).total_seconds()), parse=int

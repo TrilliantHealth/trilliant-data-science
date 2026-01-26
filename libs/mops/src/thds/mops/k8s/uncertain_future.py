@@ -119,49 +119,56 @@ class UncertainFuturesTracker(ty.Generic[K, R_0]):
 
         return futshim.future
 
+    def _interpret_event(self, fut_state: _FuturesState[R_0], r_0: ty.Optional[R_0]) -> None:
+        """Interpret an event for all futures associated with a given state."""
+        for future_shim_that_is_done in core.parallel.yield_results(
+            [
+                core.thunks.thunking(futshim.interpret)(r_0, fut_state.last_seen_at)
+                for futshim in fut_state.futshims
+            ],
+            progress_logger=core.log.getLogger(__name__).debug,
+            named="UncertainFuturesTracker.update",
+        ):
+            if future_shim_that_is_done is not None:
+                # the Future is done, so we can remove it from the list of Futures.
+                fut_state.futshims.discard(future_shim_that_is_done)
+
     def update(self, key: ty.Optional[K], r_0: ty.Optional[R_0]) -> None:
         """Update the keyed Futures based on their interpreters.
 
-        Also check any stale Futures - Futures that have not seen an update (via their key) in a while.
+        This method only updates the specific key's state and interprets the event.
+        It does NOT run garbage collection for stale futures - call gc_stale() separately
+        when appropriate (e.g., rate-limited by time).
 
-        If `key` is None, we will update all Futures that have been created so far.
+        If `key` is None, this is a no-op. Use gc_stale() to check stale futures.
         """
+        if key is None:
+            return
 
-        def interpret_event(fut_state: _FuturesState[R_0], inner_r_0: ty.Optional[R_0]) -> None:
-            for future_shim_that_is_done in core.parallel.yield_results(
-                [
-                    core.thunks.thunking(futshim.interpret)(inner_r_0, fut_state.last_seen_at)
-                    for futshim in fut_state.futshims
-                ],
-                progress_logger=core.log.getLogger(__name__).debug,
-                named="UncertainFuturesTracker.update",
-            ):
-                if future_shim_that_is_done is not None:
-                    # the Future is done, so we can remove it from the list of Futures.
-                    fut_state.futshims.discard(future_shim_that_is_done)
+        with self._lock:
+            if key not in self._keyed_futures_state:
+                self._keyed_futures_state[key] = _FuturesState(set(), last_seen_at=official_timer())
+            else:
+                # maintain our ordered dict so we can handle garbage collection of stale Futures.
+                self._keyed_futures_state.move_to_end(key)
+                self._keyed_futures_state[key].last_seen_at = official_timer()
 
-        if key is not None:
-            with self._lock:
-                if key not in self._keyed_futures_state:
-                    self._keyed_futures_state[key] = _FuturesState(set(), last_seen_at=official_timer())
-                else:
-                    # maintain our ordered dict so we can handle garbage collection of stale Futures.
-                    self._keyed_futures_state.move_to_end(key)
-                    self._keyed_futures_state[key].last_seen_at = official_timer()
+        if fut_state := self._keyed_futures_state.get(key):
+            self._interpret_event(fut_state, r_0)
 
-            if fut_state := self._keyed_futures_state.get(key):
-                interpret_event(fut_state, r_0)
+    def gc_stale(self) -> None:
+        """Garbage collect any Futures that haven't been updated in a while.
 
-        #
-        # 'garbage collect' any Futures that haven't been updated in a while.
-        #
+        Call this periodically (e.g., every 30 seconds) rather than on every update.
+        Futures are ordered by last_seen_at, so we stop checking once we hit a non-stale one.
+        """
         with self._lock:
             safe_futures = list(self._keyed_futures_state.values())
             # this avoids holding the lock, but also avoids RuntimeError: OrderedDict mutated during iteration
         now = official_timer()
         for futs_state in safe_futures:
             if now > futs_state.last_seen_at + self._check_stale_seconds:
-                interpret_event(futs_state, None)
+                self._interpret_event(futs_state, None)
                 # None means we have no new information about the object.
                 # the interpreter must decide what to do with that, plus the last seen time.
 

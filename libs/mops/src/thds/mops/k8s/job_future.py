@@ -7,11 +7,11 @@ from thds.core import futures, log
 from thds.termtool.colorize import colorized
 
 from . import config, counts, uncertain_future
-from .jobs import is_job_failed, is_job_succeeded, job_source
+from .jobs import get_job, is_job_failed, is_job_succeeded, job_source
 
 logger = log.getLogger(__name__)
 
-UNUSUAL = colorized(fg="white", bg="yellow")
+UNUSUAL = colorized(fg="white", bg="orange")
 SUCCEEDED = colorized(fg="white", bg="blue")
 FAILED = colorized(fg="white", bg="red")
 
@@ -39,6 +39,67 @@ def _check_newly_finished(job_name: str, namespace: str = "") -> str:
 
 class K8sJobFailedError(Exception):
     """Raised by `launch` when a Job is seen to terminate in a Failed state."""
+
+
+def _check_job_before_timeout(
+    job_name: str, namespace: str, job_seen: bool, time_since_last_seen: float
+) -> ty.Union[bool, uncertain_future.NotYetDone, None]:
+    """Check actual job state before timing out.
+
+    This is called when we haven't seen updates for a job in a while (staleness timeout).
+    The purpose is to recover from watch unreliability - we do a direct API fetch to see
+    what's really happening with the job.
+
+    Returns:
+        True: Job definitely succeeded - resolve future successfully
+        False: Unusual success (currently unused)
+        NotYetDone: Job is still running - keep waiting, don't timeout
+        None: Can't determine state - proceed with timeout (job doesn't exist or fetch failed)
+    """
+    try:
+        # get_job uses the existing cache + backup fetch abstraction
+        fetched = get_job(job_name, namespace)
+        if fetched:
+            if is_job_succeeded(fetched):
+                logger.warning(
+                    UNUSUAL(
+                        f"Job {job_name} was not seen by watch but EXISTS and SUCCEEDED in k8s "
+                        f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s) - recovering"
+                    )
+                )
+                return True
+
+            if is_job_failed(fetched):
+                logger.error(
+                    f"Job {job_name} was not seen by watch but EXISTS and FAILED in k8s "
+                    f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s)"
+                )
+                raise K8sJobFailedError(
+                    f"Job {job_name} failed (found via backup fetch): {fetched.status}"
+                )
+
+            # Job exists and is still running - the watch just isn't giving us updates,
+            # but the job is fine. Keep waiting rather than timing out.
+            logger.info(
+                f"Job {job_name} still running (backup fetch confirmed) - "
+                f"watch stale for {time_since_last_seen:.1f}s but job is healthy"
+            )
+            return uncertain_future.NotYetDone()
+
+        # Job doesn't exist in k8s - this is a real problem, proceed with timeout
+        logger.error(
+            f"Job {job_name} does not exist in k8s "
+            f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s)"
+        )
+    except K8sJobFailedError:
+        raise  # re-raise job failures
+    except Exception as e:
+        logger.error(
+            f"Backup fetch failed for {job_name}: {type(e).__name__}: {e} "
+            f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s)"
+        )
+
+    return None  # proceed with timeout
 
 
 def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures.PFuture[bool]:
@@ -69,6 +130,12 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
             time_since_last_seen = uncertain_future.official_timer() - last_seen_at
             if time_since_last_seen > config.k8s_watch_object_stale_seconds():
                 # this is 5 minutes by default as of 2025-07-15.
+                # Before timing out, check the actual job state - we might be able to recover
+                ns = namespace or config.k8s_namespace()
+                recovery_result = _check_job_before_timeout(job_name, ns, JOB_SEEN, time_since_last_seen)
+                if recovery_result is not None:
+                    return recovery_result
+
                 raise TimeoutError(
                     f"Job {job_name} has not been seen for {time_since_last_seen:.1f} seconds - assuming failure!"
                 )
