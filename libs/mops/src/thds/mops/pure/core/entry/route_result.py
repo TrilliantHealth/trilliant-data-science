@@ -34,10 +34,13 @@ def route_return_value_or_exception(
     do_work_return_value: ty.Callable[[], T_contra],
     memo_uri: str,
     runner_prefix: str = "",  # this must be present in your memo URI
+    invocation_run_id: str = "",
 ) -> None:
     """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
     _routing_scope.enter(deferred_work.open_context())
-    memo_uri_components = _routing_scope.enter(uri_assignment_context(memo_uri, runner_prefix))
+    memo_uri_components = _routing_scope.enter(
+        uri_assignment_context(memo_uri, runner_prefix, invocation_run_id)
+    )
     _routing_scope.enter(log.logger_context(remote=memo_uri_components.pipeline_id))
 
     try:

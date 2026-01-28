@@ -43,7 +43,7 @@ Look inside the `~/.mops/mops2-mpf` directory. You'll see the folder `magic`. Th
 
 Look inside `~/.mops/mops2-mpf/magic`. You'll see the folder `+__main__--fibonacci+`. This is the `+{module}--{function.__name__}+` for your function. This keeps each and every function in your system distinct from every other, no matter what.
 
-Look inside `+~/.mops/mops2-mpf/magic/__main__--fibonacci+`. You'll see 30 directories, each with an odd three-word name with more base64-encoded gibberish after it. This is the SHA256 hash of the arguments to your function - in this case, only `n`. Inside each of these is an `invocation`, a `result`, a `lock` directory, and a `result-metadata-...` file. The only ones you care about are `invocation` and `result`.
+Look inside `+~/.mops/mops2-mpf/magic/__main__--fibonacci+`. You'll see 30 directories, each with an odd three-word name with more base64-encoded gibberish after it. This is the SHA256 hash of the arguments to your function - in this case, only `n`. Inside each of these is an `invocation`, a `result`, a `lock` directory, and a `result-metadata-<run_id>.txt` file (where `run_id` looks like `2601271523-SkirtBus` - a timestamp plus two random words). The only ones you care about are `invocation` and `result`. For more on the storage structure and debugging, see link:debugging.adoc[Debugging].
 
 Run `+mops-inspect file://~/.mops/mops2-mpf/magic/__main__--fibonacci/GhostJamLayer._ClxDsKdEb8h6isreN4jt8R0cVmsIIemKaADUOs+`. You should see output that looks something like:
 

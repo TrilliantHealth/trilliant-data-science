@@ -1,9 +1,11 @@
 import contextlib
+import os
 import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import cached_property
 
+from thds import humenc
 from thds.core import log, scope
 
 from ..._utils.once import Once
@@ -20,6 +22,22 @@ from . import _pickle, mprunner, pickles, sha256_b64
 logger = log.getLogger(__name__)
 
 
+def _generate_run_id(started_at: datetime) -> str:
+    """Generate a unique run ID for this execution.
+
+    Format: YYMMDDHHmm-TwoWords (e.g., 2601271523-SkirtBus)
+
+    The timestamp provides ordering and human-readable "when", while the two
+    random humenc words provide uniqueness within the same minute. This ID is
+    used both for output paths and metadata filenames, allowing easy correlation
+    during debugging.
+    """
+    timestamp = started_at.strftime("%y%m%d%H%M")
+    random_words = humenc.encode(os.urandom(2))
+
+    return f"{timestamp}-{random_words}"
+
+
 @dataclass  # needed for cached_property
 class _ResultExcWithMetadataChannel:
     fs: BlobStore
@@ -27,6 +45,7 @@ class _ResultExcWithMetadataChannel:
     call_id: str
     invocation_metadata: metadata.InvocationMetadata
     started_at: datetime
+    run_id: str
 
     @cached_property
     def _metadata_header(self) -> bytes:
@@ -36,7 +55,7 @@ class _ResultExcWithMetadataChannel:
         the metadata can be trusted to be accurate.
         """
         result_metadata = metadata.ResultMetadata.from_invocation(
-            self.invocation_metadata, self.started_at, datetime.now(tz=timezone.utc)
+            self.invocation_metadata, self.started_at, datetime.now(tz=timezone.utc), self.run_id
         )
         logger.info(f"Remote code version: {result_metadata.remote_code_version}")
         return metadata.format_result_header(result_metadata).encode("utf-8")
@@ -45,9 +64,12 @@ class _ResultExcWithMetadataChannel:
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.
         If you see more than one of these files in a directory, that usually means either
         the success was preceded by a failure, _or_ it means that there was an (unusual) race condition.
+
+        The run_id in the filename matches the run_id used for output paths, making it
+        easy to correlate metadata with its corresponding outputs.
         """
         self.fs.putbytes(
-            self.fs.join(self.call_id, f"{prefix}-metadata-{self.invocation_metadata.invoker_uuid}.txt"),
+            self.fs.join(self.call_id, f"{prefix}-metadata-{self.run_id}.txt"),
             self._metadata_header,
             type_hint="text/plain",
         )
@@ -134,6 +156,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     As of v3, we now expect a number of (required) metadata arguments with every invocation.
     """
     started_at = datetime.now(tz=timezone.utc)  # capture this timestamp right at the outset.
+    run_id = _generate_run_id(started_at)
     invocation_metadata = metadata.parse_invocation_metadata_args(metadata_args)
     metadata.INVOKED_BY.set_global(invocation_metadata.invoked_by)
     pipeline_id.set_pipeline_id(invocation_metadata.pipeline_id)
@@ -174,8 +197,10 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
             memo_uri,
             invocation_metadata,
             started_at,
+            run_id,
         ),
         ty.cast(ty.Callable[[], T], do_work_return_result),
         memo_uri,
         mprunner.RUNNER_NAME,  # auto-detected as runner name, not prefix
+        invocation_run_id=run_id,
     )

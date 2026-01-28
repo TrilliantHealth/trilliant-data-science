@@ -83,10 +83,16 @@ class ResultMetadata(InvocationMetadata):
     result_wall_minutes: float  # between remote_ended_at and invoked_at
     # we're using minutes because it's a more human-friendly unit of time,
     # and if you want the raw seconds you can always compute it from the original datetimes.
+    run_id: str = ""
+    # unique identifier for this execution, used in output paths and metadata filenames.
+    # format: YYMMDDHHmm-TwoWords (e.g., 2601271523-SkirtBus)
 
     @staticmethod
     def from_invocation(
-        invocation_metadata: InvocationMetadata, started_at: datetime, ended_at: datetime
+        invocation_metadata: InvocationMetadata,
+        started_at: datetime,
+        ended_at: datetime,
+        run_id: str = "",
     ) -> "ResultMetadata":
         return ResultMetadata(
             **vars(invocation_metadata),
@@ -95,6 +101,7 @@ class ResultMetadata(InvocationMetadata):
             remote_ended_at=ended_at,
             remote_wall_minutes=(ended_at - started_at).total_seconds() / 60,
             result_wall_minutes=(ended_at - invocation_metadata.invoked_at).total_seconds() / 60,
+            run_id=run_id,
         )
 
 
@@ -154,6 +161,11 @@ def result_metadata_parser() -> argparse.ArgumentParser:
         "--result-wall-minutes",
         help="The computed wall time in minutes between the remote end and the invocation time.",
         type=float,
+    )
+    parser.add_argument(
+        "--run-id",
+        help="Unique identifier for this execution (format: YYMMDDHHmm-TwoWords).",
+        default="",
     )
     return parser
 

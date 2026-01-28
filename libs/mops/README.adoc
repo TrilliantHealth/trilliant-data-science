@@ -42,7 +42,8 @@ It has some link:docs/limitations.adoc[limitations].
 
 ## Tools & Debugging
 
-* link:docs/tools.adoc[Here are some tools for debugging] your functions that are running under `mops`.
+* link:docs/tools.adoc[CLI tools] for inspecting and summarizing mops invocations
+* link:docs/debugging.adoc[Debugging guide] - storage structure, metadata files, run IDs, and diagnosing race conditions
 
 ## Development
 

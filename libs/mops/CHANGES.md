@@ -1,3 +1,13 @@
+### 3.13.20260128
+
+- Prevents output path collisions when multiple executions of the same function run concurrently. Each
+  execution now writes outputs to a unique `<run_id>/` subdirectory (format: `YYMMDDHHmm-TwoWords`, e.g.,
+  `2601271523-SkirtBus`). This fixes `HashMismatchError` that could occur when k8s ran a Job twice and
+  the second run overwrote the first run's output files. The run_id also appears in metadata filenames
+  and `ResultMetadata` for debugging correlation.
+- Adds `docs/debugging.adoc` covering storage structure, run IDs, metadata files, and diagnosing race
+  conditions.
+
 ### 3.13.20260120
 
 - Fixes URI duplication bug in `parse_memo_uri` where passing just the runner name (e.g., "mops2-mpf")

@@ -1,0 +1,129 @@
+link:../README.adoc[↑]
+
+# Debugging mops
+
+This document covers how to debug issues with mops invocations, understand the storage structure, and diagnose problems like race conditions or failed runs.
+
+## Storage Structure
+
+When a mops function runs, it creates files in a predictable hierarchy:
+
+----
+<blob_root>/mops2-mpf/<pipeline_id>/<module>--<function>/<args_hash>/
+├── invocation          # Pickled function + args
+├── result              # Pickled return value (or absent if failed)
+├── exception           # Pickled exception (if function raised)
+├── lock/               # Lock files for coordinating concurrent runs
+└── *-metadata-<run_id>.txt   # Debug metadata files
+----
+
+### Run IDs
+
+Each execution generates a unique **run ID** in the format `YYMMDDHHmm-TwoWords`, for example `2601271523-SkirtBus`.
+
+* The timestamp (`2601271523`) is when the execution started (UTC): year, month, day, hour, minute
+* The two words (`SkirtBus`) are random, generated from 2 bytes via humenc
+
+This run ID appears in three places:
+
+1. **Result metadata**: The `run_id` field in `ResultMetadata`, embedded as text at the start of `result` and `exception` files
+2. **Metadata filenames**: `result-metadata-2601271523-SkirtBus.txt`
+3. **Output paths**: When your function writes outputs via `invocation_output_uri()`, they go under a `<run_id>/` subdirectory
+
+This makes it easy to correlate "which outputs came from which run" during debugging. You can read the `result` file header to confirm which run produced it.
+
+### Why two words?
+
+We deliberately use 2 humenc words (not 3+) so that run IDs are visually distinct from content hashes (which use 3+ words). Experienced users can immediately recognize "this is a run ID" vs "this is an args/kwargs hash".
+
+## Metadata Files
+
+Metadata files are written alongside results to aid debugging. They contain information like:
+
+* `run_id` - unique identifier for this execution (e.g., `2601271523-SkirtBus`)
+* `invoked_at` - when the orchestrator triggered the invocation
+* `invoked_by` - who/what triggered it (e.g., `peter.gaultney@hostname`)
+* `invoker_code_version` - CalGitVer of the invoking code
+* `remote_started_at` / `remote_ended_at` - actual execution timestamps
+* `pipeline_id` - which pipeline this belongs to
+
+### Metadata file prefixes
+
+* `result-metadata-<run_id>.txt` - successful completion
+* `exception-metadata-<run_id>.txt` - function raised an exception
+* `lost-race-metadata-<run_id>.txt` - another run already wrote a result (detected before serialization)
+* `lost-race-after-serialization-metadata-<run_id>.txt` - lost race detected after serialization
+
+If you see multiple metadata files in the same directory, it usually means:
+
+* A success was preceded by a failure (exception then result)
+* Multiple runs raced (multiple `lost-race` files, or one winner + losers)
+
+## Diagnosing Race Conditions
+
+When the same function+args runs multiple times concurrently (due to at-least-once semantics in distributed systems), each run writes to its own output directory under the `<run_id>/` hierarchy.
+
+### Scenario: Multiple runs for the same invocation
+
+Browse to `<blob_root>/.../some-function/<args_hash>/` in Azure Storage Explorer. You might see:
+
+----
+<args_hash>/
+├── 2601271520-SkirtBus/     # First run's outputs
+│   └── output.parquet
+├── 2601271521-GhostJam/     # Second run's outputs (ran 1 minute later)
+│   └── output.parquet
+├── result                   # Whichever run won
+├── result-metadata-2601271520-SkirtBus.txt
+└── lost-race-metadata-2601271521-GhostJam.txt
+----
+
+The `result` file references URIs pointing to one run's outputs (the winner). The loser's outputs exist but aren't referenced.
+
+### Distinguishing race types
+
+By examining metadata files:
+
+* **Same run_id timestamp, different words** = truly simultaneous races
+* **Different timestamps** = runs started at different times (maybe k8s retry, lock expiry, etc.)
+
+The `invoker_uuid` in the metadata (separate from run_id) tells you about lock ownership:
+
+* **Same invoker_uuid** = same lock holder, but multiple actual executions (e.g., k8s ran multiple pods from the same Job)
+* **Different invoker_uuid** = different lock holders raced
+
+## Using mops-inspect
+
+The `mops-inspect` CLI tool lets you examine invocations and results:
+
+[source,bash]
+----
+mops-inspect "adls://container/path/to/<args_hash>"
+----
+
+This shows the function, args, result, exception (if any), and metadata in a readable format.
+
+## Common Issues
+
+### Lock-related issues
+
+See link:invocation_locks.adoc[Invocation Locks] for details on lock behavior, timeouts, and stolen locks.
+
+### Non-deterministic outputs break memoization
+
+If your function produces different bytes for the same inputs (common with Parquet metadata, random seeds, timestamps in output, etc.), your function is not truly pure. This causes problems when the runtime executes your function more than once:
+
+1. The first run produces output with hash A
+2. Downstream memoized functions consume that output (keyed on hash A)
+3. The runtime re-executes your function (k8s retry, lock expiry, etc.)
+4. The second run produces output with hash B
+5. Downstream functions now see a _different_ input hash - their memoization is invalidated
+
+This can cascade through your pipeline, effectively "undoing" memoization for everything downstream.
+
+**Solutions:**
+
+* Sort your output data deterministically
+* Strip volatile metadata (timestamps, random IDs, etc.)
+* Use deterministic seeds for any randomness
+* Ensure serialization is stable (e.g., `sort_keys=True` for JSON)
