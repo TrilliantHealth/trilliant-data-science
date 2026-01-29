@@ -7,12 +7,16 @@ debugging, monitoring, or other purposes.
 
 import argparse
 import getpass
+import importlib
+import logging
 import os
 import typing as ty
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from thds.core import calgitver, config, hostname
+
+_logger = logging.getLogger(__name__)
 
 try:
     _CALGITVER = calgitver.calgitver()
@@ -23,7 +27,40 @@ except calgitver.git.NO_GIT:
 INVOKER_CODE_VERSION = config.item("mops.metadata.local.invoker_code_version", _CALGITVER)
 INVOKED_BY = config.item("mops.metadata.local.invoked_by", "")
 REMOTE_CODE_VERSION = config.item("mops.metadata.remote.code_version", "")
+EXTRA_METADATA_GENERATOR = config.item("mops.metadata.extra_generator", default="")
+# Dotted import path to a callable that generates extra metadata fields.
+# The callable signature is: (ResultMetadata) -> dict[str, str]
+# Return key-value pairs to include in the metadata file under "=== Extra Metadata ===".
 # set the remote code version inside your docker image or other environment.
+
+MetadataGenerator = ty.Callable[["ResultMetadata"], ty.Dict[str, str]]
+
+
+def load_metadata_generator() -> ty.Optional[MetadataGenerator]:
+    """Load the configured extra metadata generator, if any."""
+    import_path = EXTRA_METADATA_GENERATOR()
+    if not import_path:
+        return None
+
+    try:
+        module_path, func_name = import_path.rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        func = getattr(module, func_name)
+        return ty.cast(MetadataGenerator, func)
+    except (ValueError, ImportError, AttributeError) as e:
+        _logger.warning(f"Failed to load extra metadata generator '{import_path}': {e}")
+        return None
+
+
+def format_extra_metadata(extra: ty.Dict[str, str]) -> str:
+    """Format extra metadata dict as lines for the metadata file."""
+    if not extra:
+        return ""
+
+    lines = ["", "=== Extra Metadata ==="]
+    for key, value in sorted(extra.items()):
+        lines.append(f"{key}={value}")
+    return "\n".join(lines) + "\n"
 
 
 def get_invoker_code_version() -> str:
@@ -86,6 +123,8 @@ class ResultMetadata(InvocationMetadata):
     run_id: str = ""
     # unique identifier for this execution, used in output paths and metadata filenames.
     # format: YYMMDDHHmm-TwoWords (e.g., 2601271523-SkirtBus)
+    extra: ty.Dict[str, str] = field(default_factory=dict)
+    # extra metadata from generators (e.g., grafana_logs, k8s_pod_name)
 
     @staticmethod
     def from_invocation(
@@ -182,20 +221,50 @@ def parse_invocation_metadata_args(args: ty.Sequence[str]) -> InvocationMetadata
 def parse_result_metadata(metadata_keyvals: ty.Sequence[str]) -> ResultMetadata:
     """Parse metadata values from a result list.
 
-    Metadata args are of the form key=value, and are separated by commas.
+    Metadata args are of the form key=value, and are separated by newlines.
+    Continues through whitelisted sections (=== Extra Metadata ===) but stops
+    at any other === section (forward-compatible with future sections).
 
-    Usually you'll be splitting an initial text string on newline, but we don't do that for you here.
+    Extra key=value pairs not recognized by the parser are captured in the
+    `extra` field, making them available to tools like mops-inspect.
     """
+    # Sections we explicitly want to parse through
+    whitelisted_sections = {"=== Extra Metadata ==="}
 
-    def to_arg(kv: str) -> str:
+    filtered_lines: ty.List[str] = []
+    for line in metadata_keyvals:
+        # Stop at any === section we don't explicitly whitelist
+        if line.startswith("===") and line not in whitelisted_sections:
+            break
+
+        # Skip whitelisted section headers (they're just visual markers)
+        if line in whitelisted_sections:
+            continue
+
+        if line:
+            filtered_lines.append(line)
+
+    def to_arg(kv: str) -> ty.Optional[str]:
         try:
             key, value = kv.split("=", 1)
             return f"--{key.replace('_', '-')}={value}"
         except ValueError:
-            raise ValueError(f"Unable to parse metadata key-value pair {kv}. Must be key=value.")
+            return None
 
-    metadata = result_metadata_parser().parse_args([to_arg(kv) for kv in metadata_keyvals if kv])
-    return ResultMetadata(**vars(metadata))
+    args = [a for a in (to_arg(kv) for kv in filtered_lines) if a is not None]
+    metadata, unknown = result_metadata_parser().parse_known_args(args)
+
+    # Capture extra key=value pairs that weren't recognized by the parser.
+    # Skip 'extra' itself - old files may have written extra={} which we don't want to nest.
+    extra: ty.Dict[str, str] = {}
+    for arg in unknown:
+        if arg.startswith("--") and "=" in arg:
+            key, value = arg[2:].split("=", 1)
+            key = key.replace("-", "_")
+            if key != "extra":
+                extra[key] = value
+
+    return ResultMetadata(**vars(metadata), extra=extra)
 
 
 def _format_metadata(
@@ -220,7 +289,8 @@ def _format_metadata(
     return [
         f"{prefix}{k.replace('_', '-')}={nospaces_to_str(v)}"
         for k, v in vars(metadata).items()
-        if v is not None and v != ""
+        # skip 'extra' - it's a dict handled separately by format_extra_metadata
+        if v is not None and v != "" and k != "extra"
     ]
 
 

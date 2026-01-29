@@ -54,6 +54,113 @@ Metadata files are written alongside results to aid debugging. They contain info
 * `lost-race-metadata-<run_id>.txt` - another run already wrote a result (detected before serialization)
 * `lost-race-after-serialization-metadata-<run_id>.txt` - lost race detected after serialization
 
+### Exception diagnostics
+
+When a function raises an exception, the `exception-metadata-<run_id>.txt` file includes extended diagnostic information beyond the standard metadata fields:
+
+----
+invoked-at=2026-01-28T15:23:45.123456+00:00
+invoked-by=peter.gaultney@hostname
+... (standard metadata fields) ...
+
+=== Exception ===
+type=ValueError
+message=Something went wrong with the data
+
+=== Stack Trace ===
+Traceback (most recent call last):
+  File "/app/pipeline.py", line 42, in process_data
+    result = transform(data)
+  File "/app/transforms.py", line 18, in transform
+    raise ValueError("Something went wrong with the data")
+ValueError: Something went wrong with the data
+
+=== Environment ===
+python_version=3.11.4
+python_implementation=CPython
+platform=Linux-5.15.0-x86_64-with-glibc2.31
+
+=== Installed Packages ===
+numpy==1.25.0
+pandas==2.1.0
+... (all installed packages) ...
+----
+
+This information helps debug remote execution failures without needing to unpickle the exception or access the original environment. The stack trace is in plain text, readable by humans and LLMs alike.
+
+### Result diagnostics for long-running functions
+
+When a function completes successfully and took at least 1 second (configurable via `mops.result_diagnostics_threshold_seconds`), the `result-metadata-<run_id>.txt` file includes environment diagnostics:
+
+----
+invoked-at=2026-01-28T15:23:45.123456+00:00
+... (standard metadata fields) ...
+
+=== Environment ===
+python_version=3.11.4
+python_implementation=CPython
+platform=Linux-5.15.0-x86_64-with-glibc2.31
+
+=== Installed Packages ===
+numpy==1.25.0
+pandas==2.1.0
+... (all installed packages) ...
+----
+
+This helps debug environment-related issues (wrong package versions, platform differences, etc.) even for successful runs. The overhead is minimal (~20-40ms) compared to the function execution time.
+
+To configure the threshold:
+
+* Set `mops.result_diagnostics_threshold_seconds=0` to always include diagnostics
+* Set `mops.result_diagnostics_threshold_seconds=-1` to disable (never include)
+* Default is 1 second
+
+### Custom metadata generator
+
+You can configure a custom function to add extra metadata fields to every result and exception metadata file. This is useful for adding contextual information like Grafana log URLs, Kubernetes pod names, or other environment-specific debugging links.
+
+Configure via:
+----
+mops.metadata.extra_generator=mypackage.mymodule.my_generator
+----
+
+The generator function signature is:
+[source,python]
+----
+import os
+from thds.mops.pure.core.metadata import ResultMetadata
+
+def my_generator(result_metadata: ResultMetadata) -> dict[str, str]:
+    """Generate extra metadata fields.
+
+    Args:
+        result_metadata: Contains run_id, invoked_at, pipeline_id, etc.
+
+    Returns:
+        Key-value pairs to add under "=== Extra Metadata ===" section
+    """
+    pod_name = os.environ.get("HOSTNAME", "unknown")
+    return {
+        "grafana_logs": f"https://grafana.example.com/explore?pod={pod_name}",
+        "k8s_namespace": os.environ.get("NAMESPACE", "unknown"),
+    }
+----
+
+The extra metadata appears after the standard metadata and before diagnostics:
+----
+invoked-at=2026-01-28T15:23:45.123456+00:00
+... (standard metadata fields) ...
+
+=== Extra Metadata ===
+grafana_logs=https://grafana.example.com/explore?pod=myjob-abc123
+k8s_namespace=production
+
+=== Environment ===
+... (diagnostics if applicable) ...
+----
+
+If the generator function raises an exception, it is logged as a warning and no extra metadata is added (the execution continues normally).
+
 If you see multiple metadata files in the same directory, it usually means:
 
 * A success was preceded by a failure (exception then result)

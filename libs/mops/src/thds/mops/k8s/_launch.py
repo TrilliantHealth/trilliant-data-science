@@ -1,5 +1,6 @@
 """Provides an abstraction for launching Docker images on Kubernetes and waiting until they finish."""
 
+import importlib
 import os
 import threading
 import typing as ty
@@ -9,6 +10,7 @@ from functools import partial
 from kubernetes import client
 
 from thds import core
+from thds.mops.pure.core.metadata import EXTRA_METADATA_GENERATOR
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
@@ -17,7 +19,34 @@ from ._shared import logger
 from .auth import load_config, upsert_namespace
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
-from .thds_std import embed_thds_auth
+
+JobTransform = ty.Callable[["client.models.V1Job"], "client.models.V1Job"]
+
+JOB_TRANSFORM = core.config.item("mops.k8s.job_transform", default="")
+# Dotted import path to a callable that transforms the V1Job before launch.
+# Signature: (V1Job) -> V1Job. Used for auth embedding (e.g., Azure Workload Identity).
+# If not set, the job is launched without transformation.
+# TH users get this configured via east_config.toml to point to thds_std.embed_thds_auth.
+
+
+def _identity_transform(v1_job_body: "client.models.V1Job") -> "client.models.V1Job":
+    return v1_job_body
+
+
+def _load_job_transform() -> JobTransform:
+    """Load the configured job transform function, or return identity transform."""
+    import_path = JOB_TRANSFORM()
+    if not import_path:
+        return _identity_transform
+
+    try:
+        module_path, func_name = import_path.rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        return ty.cast(JobTransform, getattr(module, func_name))
+    except (ValueError, ImportError, AttributeError) as e:
+        logger.warning(f"Failed to load job transform '{import_path}': {e}")
+        return _identity_transform
+
 
 LAUNCHED = colorized(fg="white", bg="green")
 
@@ -51,7 +80,7 @@ JOB_NAME = core.stack_context.StackContext("job_name", "")
 
 
 @core.scope.bound
-def launch(
+def launch(  # noqa: C901
     container_image: str,
     args: ty.Sequence[str],
     *,
@@ -64,8 +93,9 @@ def launch(
     full_name: str = "",
     dry_run: bool = False,
     suppress_logs: bool = False,
-    transform_job: ty.Callable[[client.models.V1Job], client.models.V1Job] = embed_thds_auth,
-    # this is a default for now. later if we share this code we'll need to have a wrapper interface
+    transform_job: ty.Optional[JobTransform] = None,
+    # If None, loads from config (mops.k8s.job_transform). TH users get embed_thds_auth via
+    # east_config.toml. OSS users can configure their own or leave empty for no transform.
     service_account_name: str = "",
 ) -> core.futures.LazyFuture[bool]:
     """Launch a Kubernetes job.
@@ -131,6 +161,12 @@ def launch(
                 add_env_var(env_name, env_value)
 
         add_env_var(config.k8s_namespace_env_var_key(), config.k8s_namespace())
+        add_env_var("MOPS_K8S_JOB_NAME", name)
+        # Pass the extra_metadata_generator config to the remote side via env var.
+        # This is needed because east_config.toml is only loaded on the local side
+        # (when thds_std is imported). Only set if configured - OSS users won't have this.
+        if extra_meta_gen := EXTRA_METADATA_GENERATOR():
+            add_env_var("MOPS_METADATA_EXTRA_GENERATOR", extra_meta_gen)
 
         logger.debug("Creating container definition ...")
         logger.debug("Setting container CPU/RAM requirements ...")
@@ -151,10 +187,16 @@ def launch(
                 requests=resource_requests,
                 limits=resource_limits,
             )
-            if resource_requests and (cpu_request := resource_requests.get("cpu")):
-                add_env_var(core.cpus.GUARANTEE.envname, cpu_request)
-            if resource_limits and (cpu_limit := resource_limits.get("cpu")):
-                add_env_var(core.cpus.LIMIT.envname, cpu_limit)
+            if resource_requests:
+                if cpu_request := resource_requests.get("cpu"):
+                    add_env_var(core.cpus.GUARANTEE.envname, cpu_request)
+                if memory_request := resource_requests.get("memory"):
+                    add_env_var("MOPS_K8S_MEMORY_GUARANTEE", memory_request)
+            if resource_limits:
+                if cpu_limit := resource_limits.get("cpu"):
+                    add_env_var(core.cpus.LIMIT.envname, cpu_limit)
+                if memory_limit := resource_limits.get("memory"):
+                    add_env_var("MOPS_K8S_MEMORY_LIMIT", memory_limit)
 
         container = client.V1Container(**v1_container_args)
         logger.debug("Creating podspec definition ...")
@@ -177,7 +219,8 @@ def launch(
         return v1_job_body
 
     def job_with_all_transforms() -> client.models.V1Job:
-        return transform_job(assemble_base_job())
+        actual_transform = transform_job if transform_job is not None else _load_job_transform()
+        return actual_transform(assemble_base_job())
 
     if dry_run:
         job_with_all_transforms()

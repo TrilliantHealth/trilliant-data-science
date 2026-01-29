@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from functools import cached_property
 
 from thds import humenc
-from thds.core import log, scope
+from thds.core import config, log, scope
 
+from ..._utils.diagnostics import format_environment_diagnostics, format_exception_diagnostics
 from ..._utils.once import Once
 from ..core import deferred_work, lock, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
@@ -20,6 +21,13 @@ from ..runner import strings
 from . import _pickle, mprunner, pickles, sha256_b64
 
 logger = log.getLogger(__name__)
+
+_RESULT_DIAGNOSTICS_THRESHOLD_SECONDS = config.item(
+    "mops.result_diagnostics_threshold_seconds", default=1, parse=int
+)
+# When a successful result takes longer than this many seconds, include
+# environment diagnostics (Python version, installed packages) in the
+# result-metadata file. Set to 0 to always include, or -1 to disable.
 
 
 def _generate_run_id(started_at: datetime) -> str:
@@ -48,19 +56,37 @@ class _ResultExcWithMetadataChannel:
     run_id: str
 
     @cached_property
+    def _result_metadata(self) -> metadata.ResultMetadata:
+        """Lazily compute ResultMetadata (used by header and extra metadata)."""
+        return metadata.ResultMetadata.from_invocation(
+            self.invocation_metadata, self.started_at, datetime.now(tz=timezone.utc), self.run_id
+        )
+
+    @cached_property
     def _metadata_header(self) -> bytes:
         """This is always embedded _alongside_ the actual return value or exception.
         This is to make sure that whatever metadata is in the result is atomically
         part of the result, such that in the rare case of racing invocations,
         the metadata can be trusted to be accurate.
         """
-        result_metadata = metadata.ResultMetadata.from_invocation(
-            self.invocation_metadata, self.started_at, datetime.now(tz=timezone.utc), self.run_id
-        )
-        logger.info(f"Remote code version: {result_metadata.remote_code_version}")
-        return metadata.format_result_header(result_metadata).encode("utf-8")
+        logger.info(f"Remote code version: {self._result_metadata.remote_code_version}")
+        return metadata.format_result_header(self._result_metadata).encode("utf-8")
 
-    def _write_metadata_only(self, prefix: str) -> None:
+    @cached_property
+    def _extra_metadata_content(self) -> bytes:
+        """Generate extra metadata using the configured generator, if any."""
+        generator = metadata.load_metadata_generator()
+        if generator is None:
+            return b""
+
+        try:
+            extra = generator(self._result_metadata)
+            return metadata.format_extra_metadata(extra).encode("utf-8")
+        except Exception as e:
+            logger.warning(f"Extra metadata generator failed: {e}")
+            return b""
+
+    def _write_metadata_only(self, prefix: str, extra_content: bytes = b"") -> None:
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.
         If you see more than one of these files in a directory, that usually means either
         the success was preceded by a failure, _or_ it means that there was an (unusual) race condition.
@@ -70,7 +96,7 @@ class _ResultExcWithMetadataChannel:
         """
         self.fs.putbytes(
             self.fs.join(self.call_id, f"{prefix}-metadata-{self.run_id}.txt"),
-            self._metadata_header,
+            self._metadata_header + self._extra_metadata_content + extra_content,
             type_hint="text/plain",
         )
 
@@ -107,10 +133,18 @@ class _ResultExcWithMetadataChannel:
         # that to avoid the race condition.
         self.fs.putbytes(
             result_uri,
-            self._metadata_header + return_value_bytes,
+            self._metadata_header + self._extra_metadata_content + return_value_bytes,
             type_hint="application/mops-return-value",
         )
-        self._write_metadata_only("result")
+
+        diagnostics = b""
+        threshold = _RESULT_DIAGNOSTICS_THRESHOLD_SECONDS()
+        if threshold >= 0:
+            elapsed = (datetime.now(tz=timezone.utc) - self.started_at).total_seconds()
+            if elapsed >= threshold:
+                diagnostics = format_environment_diagnostics().encode("utf-8")
+
+        self._write_metadata_only("result", diagnostics)
 
     def exception(self, exc: Exception) -> None:
         exc_bytes = _pickle.gimme_bytes(self.dumper, exc)
@@ -119,7 +153,8 @@ class _ResultExcWithMetadataChannel:
             self._metadata_header + exc_bytes,
             type_hint="application/mops-exception",
         )
-        self._write_metadata_only("exception")
+        diagnostics = format_exception_diagnostics(exc).encode("utf-8")
+        self._write_metadata_only("exception", diagnostics)
 
 
 def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:

@@ -1,3 +1,22 @@
+## 3.14
+
+- **Grafana log URL metadata** (TH-only): Result metadata files now include a `grafana_logs` URL that
+  links directly to relevant logs in Grafana for k8s jobs. This makes debugging pipeline failures much
+  easier - just click the link to see logs with the correct time range and pod filter pre-populated. The
+  metadata also includes `k8s_pod_name`, `k8s_job_name`, `k8s_namespace`, `k8s_image`,
+  `k8s_cpus_guarantee`, `k8s_cpus_limit`, `k8s_memory_guarantee`, and `k8s_memory_limit` for debugging
+  context.
+- Adds `mops.metadata.extra_generator` config option for custom metadata generators. Set this to a dotted
+  import path (e.g., `mymodule.my_generator`) pointing to a function with signature
+  `(ResultMetadata) -> dict[str, str]`. The returned key-value pairs are included in both the result file
+  and metadata file, making them visible in `mops-inspect` output via `ResultMetadata.extra`.
+- Adds `mops.k8s.job_transform` config option for customizing k8s Job objects before launch. Set this to
+  a dotted import path pointing to a function with signature `(V1Job) -> V1Job`. TH users get
+  `embed_thds_auth` configured by default; OSS users can configure their own auth embedding or leave
+  empty for no transformation.
+- Passes `MOPS_K8S_JOB_NAME`, `MOPS_K8S_MEMORY_GUARANTEE`, and `MOPS_K8S_MEMORY_LIMIT` environment
+  variables to k8s jobs for use by metadata generators.
+
 ### 3.13.20260128
 
 - Prevents output path collisions when multiple executions of the same function run concurrently. Each
