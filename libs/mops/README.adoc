@@ -53,8 +53,8 @@ Also look at our link:CHANGES.md[changelog].
 
 ### Running tests
 
-* `poetry run pytest tests --test-uri-root file://./mops-tests`
-* `poetry run pytest tests -m integration --test-uri-root file://./mops-tests`
+* `uv run pytest tests --test-uri-root file://./mops-tests`
+* `uv run pytest tests -m integration --test-uri-root file://./mops-tests`
 
 If you want to run tests against a non-bundled blob store, you will need to make sure that
 blob store is installed in the venv before running the tests.

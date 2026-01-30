@@ -19,7 +19,7 @@ link:./pure_functions.adoc[pure function] and is implemented as or wrapped by Py
 > If you're trying to wrap a Docker image that you can't or don't want to install `mops` on, you'll need
 > to use the low-level imperative API instead.
 
-You will need to construct a `k8s_shell` with configuration appropriate to the Python function that will
+You will need to construct a `k8s.shim` with configuration appropriate to the Python function that will
 ultimately be invoked remotely. This includes specifying the name of your Docker container as well as
 providing resource requests or limitations. For example, you might create a module called `k8s_shim.py`:
 
@@ -70,7 +70,7 @@ observed to leak memory over the course of long runs, and a separate OS thread i
 scraped.
 
 Either set the `MOPS_NO_K8S_LOGS` environment variable, or programmatically pass `suppress_logs=True` to
-either `k8s_shell` (declarative API) or `launch` (imperative API).
+either `k8s.shim` (declarative API) or `launch` (imperative API).
 
 ## Common failure modes
 

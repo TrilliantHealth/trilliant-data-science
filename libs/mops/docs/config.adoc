@@ -2,6 +2,8 @@ link:../README.adoc[↑]
 
 # Configuring `mops`
 
+NOTE: For the most common configuration options, see link:./magic.adoc#config-file[magic] instead.
+
 We use a https://toml.io/en/[TOML] configuration file format, and if you wish to configure `mops` differently,
 there are _several_ link:../src/thds/mops/config.py[different] approaches that you can take, depending on
 which is most convenient for your use case.

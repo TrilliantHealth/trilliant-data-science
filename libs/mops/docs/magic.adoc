@@ -2,8 +2,8 @@ link:../README.adoc[↑]
 
 # pure.magic
 
-Magic is a new API that we're trialling for `mops`. This ties together a lot of
-functionality that has already been available in `mops.pure`, but the hope is to provide
+Magic is the new & preferred API for core `mops` usage. This ties together a lot of
+functionality that has already been available in `mops.pure`, but it provides
 an interface that makes it a lot simpler for users to move between development workflows
 and production ones, including running your functions locally with mops in the loop, and
 running your functions locally with mops xref:#off[completely out of the loop]. Each of
@@ -201,7 +201,7 @@ are consumed in the rest of the module.
 ----
 from thds.mops import pure
 
-pure.magic.blob_store('adls://lazing/sunday')
+pure.magic.blob_root('adls://lazing/sunday')
 ----
 
 .`+foo/bar/__init__.py+`
@@ -283,6 +283,10 @@ __mask.mops.pure.magic.shim = 'off'
 mops.pure.magic.shim = 'samethread'
 ----
 
+The section headers (`[foo]`, `[foo.bar]`, etc.) are **Python module paths**. Configuration
+under `[foo.bar]` applies to all `@pure.magic()` functions in the `foo.bar` module and its
+submodules. To target a specific function, use `[module.path.function_name]`.
+
 The above would be exactly equivalent to the following `pure.magic` usage:
 
 .`+foo/__init__.py+`
@@ -343,3 +347,19 @@ CAUTION: This function is expected to be called _inside_ other code, at runtime.
 words, it will always be applied as `pure.magic.wand(...)(func)`, and never to be used for
 module-global ``def``s as `@pure.magic.wand`, as it does not create a Magic object and
 therefore will not participate in the standard magic configuration in predictable ways.
+
+WARNING: Do NOT use `pure.magic.wand()` on functions that are already decorated with
+`@pure.magic()` - this would double-wrap them and cause unexpected behavior. If you need
+to override the shim for an already-decorated function at runtime, use the function's
+`.shim()` context manager instead:
+
+[source,python]
+----
+# WRONG - double-wrapping!
+local_func = pure.magic.wand("subprocess")(my_magic_func)
+result = local_func(args)
+
+# CORRECT - use the context manager
+with my_magic_func.shim("subprocess"):
+    result = my_magic_func(args)
+----

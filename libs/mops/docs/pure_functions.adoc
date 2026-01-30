@@ -31,7 +31,7 @@ Practically speaking, some things to avoid/remove from your functions:
   completed computation.
 
 By implementing pure functions, we can keep the **What** (the business logic of your function)
-separate from the link:./basic_usage.adoc[**How**] (the details of what environment it runs on), which not
+separate from the link:./concepts.adoc[**How**] (the details of what environment it runs on), which not
 only enables plug-and-play parallelization but also makes your code much easier to read and reason about.
 
 Ultimately, if your functions are _truly_ pure, you won't even need `mops` in the long run - you'll be
