@@ -1,6 +1,7 @@
 import io
 import itertools
 import os
+from _warnings import warn
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
@@ -9,7 +10,6 @@ from typing import Any, Collection, Dict, List, Mapping, Optional, Set, Tuple, T
 import networkx as nx
 import pkg_resources
 import yaml
-from _warnings import warn
 
 from .. import git_util
 from .constraints import AnyColumnConstraint, EnumConstraint

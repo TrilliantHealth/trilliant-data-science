@@ -1,3 +1,7 @@
+### 0.14.4
+
+Formatting changes from ruff migration.
+
 ### 0.14.3
 
 - (hopefully) fix bug where a `FileLock` could fail because its directory did not exist.

@@ -61,9 +61,9 @@ class _RefCountResource(ty.Generic[R]):
         with self._lock:
             assert self._ref_count >= 0, "Reference count should not be negative prior to incrementing"
             if self._ref_count == 0:
-                assert (
-                    self._rcm__exit__ is None
-                ), "Resource CM __exit__ should be None when ref count is zero"
+                assert self._rcm__exit__ is None, (
+                    "Resource CM __exit__ should be None when ref count is zero"
+                )
                 assert self._resource is None, "Resource should be None when ref count is zero"
                 resource_cm = self._factory()
                 resource = resource_cm.__enter__()
@@ -85,12 +85,12 @@ class _RefCountResource(ty.Generic[R]):
                 self._ref_count -= 1
                 assert self._ref_count >= 0, "Reference count should not be negative after decrementing"
                 if self._ref_count == 0:
-                    assert (
-                        self._rcm__exit__ is not None
-                    ), "Resource CM __exit__ should not be None when ref count is zero"
-                    assert (
-                        self._resource is not None
-                    ), "Resource should not be None when ref count is zero"
+                    assert self._rcm__exit__ is not None, (
+                        "Resource CM __exit__ should not be None when ref count is zero"
+                    )
+                    assert self._resource is not None, (
+                        "Resource should not be None when ref count is zero"
+                    )
                     self._rcm__exit__(None, None, None)
                     self._resource = None
                     self._rcm__exit__ = None

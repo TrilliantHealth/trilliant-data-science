@@ -46,8 +46,8 @@ def get_sql_defs_by_name(
         for row in conn.execute(
             f"""
             SELECT name, sql
-            FROM {fullname('sqlite_master', schema_name)}
-            WHERE type IN ({', '.join('?' for _ in types)})
+            FROM {fullname("sqlite_master", schema_name)}
+            WHERE type IN ({", ".join("?" for _ in types)})
             AND sql is not null
             """,
             tuple(types),
@@ -87,7 +87,7 @@ def get_virtual_tables(connectable: Connectable, *, schema_name: str = "main") -
         for row in conn.execute(
             f"""
             SELECT name, sql
-            FROM {fullname('sqlite_master', schema_name)}
+            FROM {fullname("sqlite_master", schema_name)}
             WHERE type='table' AND sql LIKE 'CREATE VIRTUAL TABLE%'
             """
         )
@@ -160,7 +160,7 @@ def get_indexes(
         for row in conn.execute(
             f"""
             SELECT name, sql
-            FROM {fullname('sqlite_master', schema_name)}
+            FROM {fullname("sqlite_master", schema_name)}
             WHERE type = 'index' AND tbl_name = '{table_name}'
             AND sql is not null
             """

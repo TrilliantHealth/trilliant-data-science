@@ -44,7 +44,6 @@ def test_memoizing_pickling_runner_init() -> None:
 
 
 def test_log_function_execution_new_file(run_directory: Path) -> None:
-
     memo_uri = "adls://env/foo/bar/pipeline-id/complex/the.module--function_id_new/ARGS"
 
     run_summary.log_function_execution(

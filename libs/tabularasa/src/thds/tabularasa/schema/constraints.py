@@ -255,7 +255,9 @@ class MatchesRegex(StrConstraint):
 
             def check_fn(s: pd.Series):
                 return s.str.fullmatch(
-                    re.compile(self.matches.pattern), case=self.case_sensitive, na=True  # type: ignore[arg-type]
+                    re.compile(self.matches.pattern),  # type: ignore[arg-type]
+                    case=self.case_sensitive,
+                    na=True,
                 )
 
         else:
@@ -301,7 +303,7 @@ class EnumConstraint(ColumnConstraint):
         return pa.Check.isin(self.enum)
 
     def sqlite_check_expr(self, colname: str) -> str:
-        return f'{colname} IN ({", ".join(map(repr, self.enum))})'
+        return f"{colname} IN ({', '.join(map(repr, self.enum))})"
 
     def applies_to(self, dtype: DType) -> bool:
         if not self.enum:

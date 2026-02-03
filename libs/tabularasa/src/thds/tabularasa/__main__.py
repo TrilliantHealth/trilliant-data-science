@@ -44,7 +44,6 @@ from thds.tabularasa.schema.util import all_predecessors, all_successors
 try:
     from bourbaki.application.cli import CommandLineInterface, cli_spec
 except ImportError:
-
     # stand-in decorators
     def noop_decorator(obj):
         return obj
@@ -84,7 +83,6 @@ else:
 try:
     from ruamel.yaml import YAML
 except ImportError:
-
     import yaml
 
     load_yaml = yaml.safe_load
@@ -578,9 +576,9 @@ class ReferenceDataManager:
                 package=self.package,
             )
         elif target == CompilationTarget.attrs_sqlite:
-            assert (
-                self.sqlite_db_path is not None
-            ), "Must specify sqlite db path in build options to generate sqlite interface"
+            assert self.sqlite_db_path is not None, (
+                "Must specify sqlite db path in build options to generate sqlite interface"
+            )
             renderer = partial(
                 render_attrs_sqlite_schema,
                 package=self.package,
@@ -595,9 +593,9 @@ class ReferenceDataManager:
     @output_handler(print_file_hashes_status)
     def check_hashes(self) -> Dict[str, DataFileHashes]:
         """Check actual hashes of on-disk built data files against those documented in the schema"""
-        assert (
-            self.package_data_dir is not None and self.transient_data_dir is not None
-        ), "Can't check hashes without package data dirs"
+        assert self.package_data_dir is not None and self.transient_data_dir is not None, (
+            "Can't check hashes without package data dirs"
+        )
         hashes = {}
         for table in self.schema.build_time_package_tables:
             name = table.name
@@ -750,9 +748,9 @@ class ReferenceDataManager:
           ensure hashes embedded in source code are up-to-date. By default, this runs when any hashes are
           updated in the config file.
         """
-        assert (
-            self.package_data_dir is not None and self.transient_data_dir is not None
-        ), "Can't update hashes without package data dirs"
+        assert self.package_data_dir is not None and self.transient_data_dir is not None, (
+            "Can't update hashes without package data dirs"
+        )
         hashes_updated = []
         tables_to_update = (
             [self.schema.tables[t] for t in tables] if tables else self.schema.build_time_package_tables

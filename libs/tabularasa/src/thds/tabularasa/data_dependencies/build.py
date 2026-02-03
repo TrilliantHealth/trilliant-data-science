@@ -181,15 +181,15 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
 
         if self.options.sqlite_data:
             # now initialize database and load reference data into database
-            assert (
-                self.options.sqlite_db_path is not None
-            ), "No sqlite_db_path specified; can't populate db"
-            assert (
-                self.options.package_data_dir is not None
-            ), "No package_data_dir specified; can't populate db"
-            assert (
-                self.options.transient_data_dir is not None
-            ), "No transient_data_dir specified; can't populate db"
+            assert self.options.sqlite_db_path is not None, (
+                "No sqlite_db_path specified; can't populate db"
+            )
+            assert self.options.package_data_dir is not None, (
+                "No package_data_dir specified; can't populate db"
+            )
+            assert self.options.transient_data_dir is not None, (
+                "No transient_data_dir specified; can't populate db"
+            )
             populate_sqlite_db(
                 self.schema,
                 db_package=self.package_name,

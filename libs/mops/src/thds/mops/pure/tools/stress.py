@@ -57,7 +57,7 @@ def stress(max_clients: int, n: int, sleep: int) -> None:
     total = default_timer() - start
     print(
         f"With max_clients {max_clients}; n {n}; sleep {sleep}, took {total:.1f} seconds,"
-        f" which is {total/n:.2f} seconds per task."
+        f" which is {total / n:.2f} seconds per task."
         " Prior experiments have found this to stabilize with increasing N in the vicinity of 0.2 seconds"
         " of overhead per task as long as the # of tasks dominates (>=20x) the length (in seconds) of the tasks."
     )

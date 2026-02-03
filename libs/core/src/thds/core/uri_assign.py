@@ -80,9 +80,9 @@ def replace_working_dirs_with_prefix(
     if not path.is_relative_to(chosen_working_dir):
         chosen_working_dir = path.parent
 
-    assert path.is_relative_to(
-        chosen_working_dir
-    ), f"Path {path} is not relative to dir {chosen_working_dir}"
+    assert path.is_relative_to(chosen_working_dir), (
+        f"Path {path} is not relative to dir {chosen_working_dir}"
+    )
 
     relative_path = fspath(path.relative_to(chosen_working_dir))
     return f"{uri_prefix.rstrip('/')}/{fspath(relative_path).lstrip('/')}"

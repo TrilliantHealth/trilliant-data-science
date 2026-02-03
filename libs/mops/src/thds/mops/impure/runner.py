@@ -26,9 +26,9 @@ _ORIGINAL_F_ARGS_KWARGS: StackContext[ty.Optional[F_Args_Kwargs]] = StackContext
 
 def _perform_original_invocation(*_args: ty.Any, **_kwargs: ty.Any) -> ty.Any:
     f_args_kwargs = _ORIGINAL_F_ARGS_KWARGS()
-    assert (
-        f_args_kwargs is not None
-    ), "_perform_original_invocation() must be called from within a runner"
+    assert f_args_kwargs is not None, (
+        "_perform_original_invocation() must be called from within a runner"
+    )
     f, args, kwargs = f_args_kwargs
     return f(*args, **kwargs)
 

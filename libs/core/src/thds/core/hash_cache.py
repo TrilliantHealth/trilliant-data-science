@@ -70,7 +70,7 @@ def hash_file(filepath: StrOrPath, hasher: Hasher) -> bytes:
     if psize > _1GB:
         log_at_lvl = logger.warning if hash_cached else logger.info
         # I want to know how often we're finding 'outdated' hashes; those should be rare.
-        log_at_lvl(f"Hashing {psize/_1GB:.2f} GB file at {resolved_path}{hash_cached}")
+        log_at_lvl(f"Hashing {psize / _1GB:.2f} GB file at {resolved_path}{hash_cached}")
 
     if hasattr(hasher, "update_mmap"):
         # a special case for the blake3 module, which has deadlocked in the past

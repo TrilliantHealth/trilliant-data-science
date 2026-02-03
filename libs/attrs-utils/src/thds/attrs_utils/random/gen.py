@@ -80,9 +80,7 @@ def gen_variadic_tuple(random_gen, type_: Type[T]) -> Gen[T]:
 
 def gen_optional(random_gen, type_: Type[T]) -> Gen[T]:
     # more specialized that the union case just below
-    return optional.random_optional_gen(
-        random_gen(type_utils.unwrap_optional(type_))
-    )  # type: ignore [return-value]
+    return optional.random_optional_gen(random_gen(type_utils.unwrap_optional(type_)))  # type: ignore [return-value]
 
 
 def gen_union(random_gen, type_: Type[T]) -> Gen[T]:

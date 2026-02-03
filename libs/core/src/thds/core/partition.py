@@ -43,9 +43,9 @@ def derive_partition_min_max(
                 '- min(n, r)  '- max(0, n - r)    `- (n < r ? (5 + 1) : 5)
                     '- q + 1       '- q
     """
-    assert (
-        partition_num < total_num_partitions
-    ), f"Cannot derive partition range for a partition_num={partition_num} > total_num_partitions={total_num_partitions}"
+    assert partition_num < total_num_partitions, (
+        f"Cannot derive partition range for a partition_num={partition_num} > total_num_partitions={total_num_partitions}"
+    )
 
     q, r = _divide_range(partitioned_range_min, partitioned_range_max, by=total_num_partitions)
     n = partition_num

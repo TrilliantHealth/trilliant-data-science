@@ -11,8 +11,8 @@ def test_populate_sqlite_db(test_case_with_sqlite_db):
 def _assert_table_correct(conn, table):
     if table.has_indexes:
         assert table_exists(conn, table), f"Expected table {table.name!r} not found in sqlite database"
-        assert table_populated(
-            conn, table
-        ), f"Columns of database table {table.name!r} not aligned with table object"
+        assert table_populated(conn, table), (
+            f"Columns of database table {table.name!r} not aligned with table object"
+        )
     else:
         assert not table_exists(conn, table), f"Unexpected table {table.name!r} found in sqlite database"

@@ -277,9 +277,9 @@ def prepare_source_result(source_: Source, existing_uris: ty.Collection[str] = t
 
     # pick a remote URI
     if not source_.uri or is_file_uri(source_.uri):
-        assert (
-            source_.cached_path
-        ), f"Source with no URI must have a local path to assign a remote URI from: {source_}"
+        assert source_.cached_path, (
+            f"Source with no URI must have a local path to assign a remote URI from: {source_}"
+        )
         logger.info(f"Assigning remote URI for Source with local path {source_.cached_path}")
         remote_uri = mops_uri_assignment(source_.cached_path)
     else:

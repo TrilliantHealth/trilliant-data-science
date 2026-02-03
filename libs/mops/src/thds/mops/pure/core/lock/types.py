@@ -26,7 +26,6 @@ class LockContents(ty.TypedDict):
 
 
 class LockAcquired(ty.Protocol):
-
     writer_id: str
 
     def maintain(self) -> None: ...  # pragma: no cover

@@ -68,7 +68,7 @@ def _error_on_first_overlapping_interval(times_tuples: ty.List[LockTimes]) -> ty
 
         gap = times_tuples[i].after_acquire - times_tuples[i - 1].before_release
         if gap < 0:
-            raise ValueError(f"Overlap between {times_tuples[i-1]} and {times_tuples[i]}")
+            raise ValueError(f"Overlap between {times_tuples[i - 1]} and {times_tuples[i]}")
         smallest_gap = min(smallest_gap, gap)
         biggest_gap = max(biggest_gap, gap)
 
@@ -85,9 +85,9 @@ def validate_lockfiles(times_dir: Path):
 
         for line in open(lock_times_file).read().splitlines():
             after_acquire, before_release = line.strip().split(",")
-            assert (
-                after_acquire < before_release
-            ), f"after_acquire {after_acquire} >= before_release {before_release}"
+            assert after_acquire < before_release, (
+                f"after_acquire {after_acquire} >= before_release {before_release}"
+            )
             times_tuples.append(LockTimes(float(after_acquire), float(before_release), idx))
 
     if times_tuples:

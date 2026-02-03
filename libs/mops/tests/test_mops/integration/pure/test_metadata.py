@@ -21,9 +21,9 @@ def extract_memo_uris(caplog_records) -> ty.Iterator[str]:
             found_at_least_one = True
             yield memo_uri
 
-    assert (
-        found_at_least_one
-    ), "Could not find memo URI in logs - are we missing 'new invocation for...'?"
+    assert found_at_least_one, (
+        "Could not find memo URI in logs - are we missing 'new invocation for...'?"
+    )
 
 
 @adls_shim

@@ -37,7 +37,6 @@ def _get_thread_stack_frames(thread: threading.Thread) -> list[str]:
     # Walk the stack
     while frame:
         if not (debug_module_path and os.path.abspath(frame.f_code.co_filename) == debug_module_path):
-
             frames.append(_format_frame(frame))
         frame = frame.f_back
     return frames

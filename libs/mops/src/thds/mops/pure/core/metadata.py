@@ -310,6 +310,6 @@ def format_end_of_run_times(start_timestamp: float, maybe_metadata_args: ty.Sequ
         meta = parse_invocation_metadata_args(maybe_metadata_args)
         wait_time = start_timestamp - meta.invoked_at.timestamp()
         total_time = time.time() - meta.invoked_at.timestamp()
-        return f" (waited {wait_time/60:.2f} minutes, total time {total_time/60:.2f} minutes) - version: {meta.invoker_code_version}"
+        return f" (waited {wait_time / 60:.2f} minutes, total time {total_time / 60:.2f} minutes) - version: {meta.invoker_code_version}"
     except Exception:
         return ""

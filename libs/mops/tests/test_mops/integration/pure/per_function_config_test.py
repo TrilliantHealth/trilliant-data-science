@@ -30,8 +30,7 @@ assert _RESULT_PATH.exists(), f"Need to create the file {_RESULT_PATH} first."
 
 def test_reuse_memoized_via_config():
     func_uri = (
-        f"{TEST_TMP_URI}mops2-mpf/test/some-pipeline-id"
-        f"/{make_unique_name_including_docstring_key(mul)}"
+        f"{TEST_TMP_URI}mops2-mpf/test/some-pipeline-id/{make_unique_name_including_docstring_key(mul)}"
     )
 
     # setting up the 'memoized' result

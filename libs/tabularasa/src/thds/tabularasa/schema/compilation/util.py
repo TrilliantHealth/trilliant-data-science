@@ -42,7 +42,7 @@ def _dict_literal(named_exprs: Iterable[Tuple[str, str]], linebreak: bool = True
     except StopIteration:
         return "{}"
     else:
-        return f"dict({start}{sep.join(map(keyval, itertools.chain((peek,), named_exprs)))}{end})" ""
+        return f"dict({start}{sep.join(map(keyval, itertools.chain((peek,), named_exprs)))}{end})"
 
 
 def _indent(expr: str, level: int = 1, first_line: bool = False) -> str:

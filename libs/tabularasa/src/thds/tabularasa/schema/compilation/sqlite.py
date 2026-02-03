@@ -31,7 +31,7 @@ def render_sql_index_schema(table: metaschema.Table) -> Optional[str]:
     if table.primary_key:
         table_constraints = (
             f"CREATE UNIQUE INDEX {index_name(table.snake_case_name, *table.primary_key)} ON "
-            f'{table.snake_case_name}({", ".join(table.primary_key)});'
+            f"{table.snake_case_name}({', '.join(table.primary_key)});"
         )
         index_defs.append(table_constraints)
 
@@ -39,7 +39,7 @@ def render_sql_index_schema(table: metaschema.Table) -> Optional[str]:
         unique = "UNIQUE " if frozenset(index) in unique_constraints else ""
         index_def = (
             f"CREATE {unique}INDEX {index_name(table.snake_case_name, *index)} "
-            f'ON {table.snake_case_name}({", ".join(index)});'
+            f"ON {table.snake_case_name}({', '.join(index)});"
         )
         index_defs.append(index_def)
 

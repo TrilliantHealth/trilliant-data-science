@@ -110,11 +110,11 @@ class DotDict(dict, MutableMapping[str, VT]):
         d: Dict[str, VT] = dict()
         for k, v in self.items():
             if isinstance(v, DotDict):
-                d[
-                    self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k
-                ] = v.to_dict(
-                    orig_keys
-                )  # type: ignore[assignment]
+                d[self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k] = (
+                    v.to_dict(  # type: ignore[assignment]
+                        orig_keys
+                    )
+                )
             else:
                 d[self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k] = v
         return d

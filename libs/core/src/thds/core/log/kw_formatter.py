@@ -16,12 +16,10 @@ _COLOR_LEVEL_MAP = {
     "low": f"{ansi_esc.fg.BLUE}{{}}{ansi_esc.fg.RESET}",
     "info": f"{ansi_esc.fg.GREEN}{{}}{ansi_esc.fg.RESET}",
     "warning": (
-        f"{ansi_esc.fg.YELLOW}{ansi_esc.style.BRIGHT}" "{}" f"{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
+        f"{ansi_esc.fg.YELLOW}{ansi_esc.style.BRIGHT}{{}}{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
     ),
     "error": (
-        f"{ansi_esc.bg.ERROR_RED}{ansi_esc.style.BRIGHT}"
-        "{}"
-        f"{ansi_esc.style.NORMAL}{ansi_esc.bg.RESET}"
+        f"{ansi_esc.bg.ERROR_RED}{ansi_esc.style.BRIGHT}{{}}{ansi_esc.style.NORMAL}{ansi_esc.bg.RESET}"
     ),
     "critical": (
         f"{ansi_esc.bg.MAGENTA}{ansi_esc.style.BRIGHT}{ansi_esc.style.BLINK}"  # 😂

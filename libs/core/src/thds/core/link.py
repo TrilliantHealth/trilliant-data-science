@@ -86,7 +86,7 @@ def link(
                 return "soft"
 
             except OSError as oserr:
-                logger.warning(f"Unable to soft-link {src} to {dest}" f" ({oserr})")
+                logger.warning(f"Unable to soft-link {src} to {dest} ({oserr})")
 
     return ""
 

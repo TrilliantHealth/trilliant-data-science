@@ -244,6 +244,8 @@ def markdown_dataframe_diff_summary(
                             )
                             col_heading = True
                         yield markdown_heading(heading_level + 3, f"{kind}:")
-                        yield counts.to_frame("count").reset_index().to_markdown(
-                            index=False, tablefmt=tablefmt
+                        yield (
+                            counts.to_frame("count")
+                            .reset_index()
+                            .to_markdown(index=False, tablefmt=tablefmt)
                         )

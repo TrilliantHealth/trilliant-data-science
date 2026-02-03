@@ -18,7 +18,7 @@ HW = Path(__file__).parent.parent / "data/hello_world.txt"
 def test_basic_upload_without_cache(caplog):
     fs = ADLSFileSystem("thdsscratch", "tmp")
 
-    remote_path = f"test/hello_world/{randint(0, 2**63-1)}.txt"
+    remote_path = f"test/hello_world/{randint(0, 2**63 - 1)}.txt"
     with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
         # synchronous file not found
         assert upload_decision_and_metadata(
@@ -54,7 +54,8 @@ def test_basic_upload_without_cache(caplog):
             assert upload_decision_and_metadata(
                 get_global_fs_client(fs.account_name, fs.file_system)  # type: ignore[arg-type]
                 # TODO - look at above type ignore
-                .get_file_client(remote_path).get_file_properties,
+                .get_file_client(remote_path)
+                .get_file_properties,
                 fb,
                 min_size_for_remote_check=0,
             ).upload_required

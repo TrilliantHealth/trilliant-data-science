@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Clean your local cache of things that no longer exist remotely."""
+
 import argparse
 import os
 import typing as ty

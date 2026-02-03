@@ -194,7 +194,6 @@ class Logfmter(logging.Formatter):
         # available under a different attribute name, then the formatter's mapping will
         # be used to lookup these attributes. e.g. 'at' from 'levelname'
         for key in self.keys:
-
             attribute = key
 
             # If there is a mapping for this key's attribute, then use it to lookup
@@ -243,15 +242,11 @@ _COLOR_LEVEL_MAP = {
     "low": f"{ansi_esc.fg.BLUE}{{}}{ansi_esc.fg.RESET}",
     "info": f"{ansi_esc.fg.GREEN}{{}}{ansi_esc.fg.RESET}",
     "warning": (
-        f"{ansi_esc.fg.YELLOW}{ansi_esc.style.BRIGHT}" "{}" f"{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
+        f"{ansi_esc.fg.YELLOW}{ansi_esc.style.BRIGHT}{{}}{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
     ),
-    "error": (
-        f"{ansi_esc.fg.RED}{ansi_esc.style.BRIGHT}" "{}" f"{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"
-    ),
+    "error": (f"{ansi_esc.fg.RED}{ansi_esc.style.BRIGHT}{{}}{ansi_esc.style.NORMAL}{ansi_esc.fg.RESET}"),
     "critical": (
-        f"{ansi_esc.fg.MAGENTA}{ansi_esc.style.BRIGHT}"
-        "{}"
-        f"{ansi_esc.fg.RESET}{ansi_esc.style.NORMAL}"
+        f"{ansi_esc.fg.MAGENTA}{ansi_esc.style.BRIGHT}{{}}{ansi_esc.fg.RESET}{ansi_esc.style.NORMAL}"
     ),
 }
 

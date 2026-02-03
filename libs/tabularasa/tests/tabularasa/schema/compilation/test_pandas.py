@@ -12,6 +12,6 @@ def test_compile_pandas(test_case_with_compiled_pandas: ReferenceDataTestCase):
 
     generated_ast = ast.parse(test_case.pandas_source)
     expected_ast = ast.parse(test_case.expected_pandas_source)
-    assert ast_eq(
-        generated_ast, expected_ast
-    ), f"sources differ:\n{line_diff(test_case.pandas_source, test_case.expected_pandas_source)}"
+    assert ast_eq(generated_ast, expected_ast), (
+        f"sources differ:\n{line_diff(test_case.pandas_source, test_case.expected_pandas_source)}"
+    )

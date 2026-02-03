@@ -61,9 +61,9 @@ def test_extract_etag_bytes_various_lengths():
     ]
     for etag_str, expected in test_cases:
         result = extract_etag_bytes(etag_str)
-        assert (
-            result == expected
-        ), f"Failed for {etag_str}: got {result.hex()}, expected {expected.hex()}"
+        assert result == expected, (
+            f"Failed for {etag_str}: got {result.hex()}, expected {expected.hex()}"
+        )
 
 
 def test_etag_cache_round_trip(tmp_path: Path):

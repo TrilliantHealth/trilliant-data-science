@@ -22,9 +22,9 @@ class LockEmitter:
     first_written_at: str = ""
 
     def __post_init__(self) -> None:
-        assert (
-            "/" not in self.writer_id
-        ), f"{self.writer_id} should not contain a slash - maybe you passed a URI instead?"
+        assert "/" not in self.writer_id, (
+            f"{self.writer_id} should not contain a slash - maybe you passed a URI instead?"
+        )
 
     def __call__(self, first_acquired_at: ty.Optional[datetime]) -> LockContents:
         self.write_count += 1

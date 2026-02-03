@@ -11,9 +11,9 @@ def test_compile_sql(test_case_with_compiled_sqlite: ReferenceDataTestCase):
         _expected = f"-- {AUTOGEN_DISCLAIMER}\n\n" + (expected or "")
         actual_normalized = " ".join(_actual.split())
         expected_normalized = " ".join(_expected.split())
-        assert (
-            actual_normalized == expected_normalized
-        ), f"sources differ:\n{line_diff(_actual, _expected)}"
+        assert actual_normalized == expected_normalized, (
+            f"sources differ:\n{line_diff(_actual, _expected)}"
+        )
 
     _assert_sql_eq(
         test_case_with_compiled_sqlite.sqlite_table_source,

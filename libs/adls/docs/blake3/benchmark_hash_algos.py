@@ -26,7 +26,7 @@ def createdummyfiles():
                 filename = f"file-{sizectr:_}.txt"
                 fullfilename = os.path.join(dir, filename)
                 with open(fullfilename, "w") as f:
-                    print(f"creating a file with {128*2**sizectr:_} bytes")
+                    print(f"creating a file with {128 * 2**sizectr:_} bytes")
                     for _ in range(2**sizectr):
                         f.write(randomstring)
                     print("File created: " + filename + f" Size: {os.path.getsize(fullfilename):_}")

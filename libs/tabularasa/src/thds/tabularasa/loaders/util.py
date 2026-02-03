@@ -44,8 +44,10 @@ from .parquet_util import (
 # used here but they're imported for backward compatibility with
 # existing generated code, which expects it to be importable from
 # here.  They were moved to sqlite_util to reduce the size of this file.
-from .sqlite_util import AttrsSQLiteDatabase  # noqa: F401
-from .sqlite_util import sqlite_constructor_for_record_type  # noqa: F401
+from .sqlite_util import (  # noqa: F401
+    AttrsSQLiteDatabase,
+    sqlite_constructor_for_record_type,
+)
 
 T = TypeVar("T")
 K = TypeVar("K", bound=PyType)
@@ -197,12 +199,12 @@ class _PackageDataOrFileInterface:
                     f"with local path {self.data_path}"
                 )
             else:
-                assert (
-                    self.md5 is not None
-                ), f"No md5 defined for {self.data_path}; can't safely sync blob"
+                assert self.md5 is not None, (
+                    f"No md5 defined for {self.data_path}; can't safely sync blob"
+                )
                 target_local_path = self.file_path(sync=False)
                 getLogger(__name__).info(
-                    f"Syncing blob with hash {self.md5}" f" to {target_local_path}" if link else ""
+                    f"Syncing blob with hash {self.md5} to {target_local_path}" if link else ""
                 )
                 remote_data_spec = self.blob_store.data_spec(self.md5)
                 local_files = sync_adls_data(remote_data_spec)

@@ -63,7 +63,7 @@ def pyarrow_field_literal(field: pa.Field) -> str:
     else:
         return (
             f'{pa.__name__}.field(\n    "{field.name}",\n'
-            f'{indent(pyarrow_type_literal(field.type), "    ")},\n    nullable={field.nullable!r},\n)'
+            f"{indent(pyarrow_type_literal(field.type), '    ')},\n    nullable={field.nullable!r},\n)"
         )
 
 

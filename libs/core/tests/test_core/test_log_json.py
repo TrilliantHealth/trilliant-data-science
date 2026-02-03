@@ -4,7 +4,6 @@ from thds.core.log.json_formatter import ThdsJsonFormatter
 
 
 def test_json_format(caplog):
-
     formatter = ThdsJsonFormatter()
 
     record = logging.LogRecord(

@@ -87,9 +87,9 @@ def sync_fastpath(
                     process.returncode,
                     f"AzCopy failed with return code {process.returncode}\n\n" + "\n".join(output_lines),
                 )
-            assert (
-                download_request.temp_path.exists()
-            ), f"AzCopy did not create the file at {download_request.temp_path}"
+            assert download_request.temp_path.exists(), (
+                f"AzCopy did not create the file at {download_request.temp_path}"
+            )
             return
 
         except (subprocess.SubprocessError, FileNotFoundError):

@@ -34,7 +34,7 @@ def _dumb_report_progress(desc: str, state: ProgressState):
     start, total, n_bytes = state
     pct = 100 * (n_bytes / total)
     elapsed = default_timer() - start
-    rate_s = f" at {n_bytes/_1MB/elapsed:,.1f} MiB/s"
+    rate_s = f" at {n_bytes / _1MB / elapsed:,.1f} MiB/s"
     logger.info(f"{desc}: {n_bytes:,} / {total:,} bytes ({pct:.1f}%){rate_s} in {elapsed:.1f}s")
 
 

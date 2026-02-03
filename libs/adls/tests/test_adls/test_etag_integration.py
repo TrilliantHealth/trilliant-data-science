@@ -203,18 +203,18 @@ async def test_integration_etag_blob_api_list_then_dfs_api_download(
         assert blob_props is not None, "File should be listable via Blob API"
         blob_etag = blob_props.etag
         # Blob API list_blobs returns unquoted etags
-        assert not blob_etag.startswith(
-            '"'
-        ), f"list_blobs should return unquoted etag, got {blob_etag!r}"
+        assert not blob_etag.startswith('"'), (
+            f"list_blobs should return unquoted etag, got {blob_etag!r}"
+        )
 
         # Step 2: Get properties via DFS API (like download does) - returns QUOTED etag
         dfs_props = file_client.get_file_properties()
         dfs_etag = dfs_props.etag
         # DFS API get_file_properties returns quoted etags
         assert dfs_etag
-        assert dfs_etag.startswith(
-            '"'
-        ), f"get_file_properties should return quoted etag, got {dfs_etag!r}"
+        assert dfs_etag.startswith('"'), (
+            f"get_file_properties should return quoted etag, got {dfs_etag!r}"
+        )
 
         # Step 3: Verify both ETags produce the SAME byte representation
         # This is the core of the regression test - before the fix, these would differ

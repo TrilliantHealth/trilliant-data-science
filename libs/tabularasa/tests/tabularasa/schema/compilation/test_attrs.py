@@ -12,6 +12,6 @@ def test_compile_attrs(test_case_with_compiled_attrs: ReferenceDataTestCase):
 
     generated_ast = ast.parse(test_case.attrs_source)
     expected_ast = ast.parse(test_case.expected_attrs_source)
-    assert ast_eq(
-        generated_ast, expected_ast
-    ), f"sources differ:\n{line_diff(test_case.attrs_source, test_case.expected_attrs_source)}"
+    assert ast_eq(generated_ast, expected_ast), (
+        f"sources differ:\n{line_diff(test_case.attrs_source, test_case.expected_attrs_source)}"
+    )

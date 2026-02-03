@@ -108,9 +108,9 @@ def test_function_registration(_base_test_db: sqlite3.Connection):
         except sqlite3.OperationalError:
             return False
 
-    assert _is_func_registered(
-        _base_test_db, "_pyhash_values"
-    ), "Function _pyhash_values is not registered"
+    assert _is_func_registered(_base_test_db, "_pyhash_values"), (
+        "Function _pyhash_values is not registered"
+    )
 
 
 @pytest.mark.parametrize(
@@ -135,9 +135,9 @@ def test_partition_read(columns, _base_test_db: sqlite3.Connection, _base_test_d
     if columns is None:
         for result in results:
             partition_size = len(result)
-            assert (
-                math.floor(row_count / n) <= partition_size <= math.ceil(row_count / n)
-            ), "Expected evenly divided partitions when not partitioning on columns"
+            assert math.floor(row_count / n) <= partition_size <= math.ceil(row_count / n), (
+                "Expected evenly divided partitions when not partitioning on columns"
+            )
 
 
 def test_get_table_schema_with_sqlite_connection(_base_test_db: sqlite3.Connection):

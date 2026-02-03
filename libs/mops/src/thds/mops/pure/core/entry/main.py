@@ -43,7 +43,7 @@ def main() -> None:
     args, unknown = parser.parse_known_args()
     run_named_entry_handler(args.runner_name, *unknown)
     logger.info(
-        f"Exiting remote process {os.getpid()} after {(default_timer() - start)/60:.2f} minutes"
+        f"Exiting remote process {os.getpid()} after {(default_timer() - start) / 60:.2f} minutes"
         + metadata.format_end_of_run_times(start_timestamp, unknown)
     )
 

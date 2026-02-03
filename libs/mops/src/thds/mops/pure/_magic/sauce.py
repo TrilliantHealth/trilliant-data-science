@@ -28,7 +28,8 @@ class _MagicConfig:
         # these ConfigTree objects apply configuration to callables wrapped with pure.magic
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
         self.shim_bld = config_tree.ConfigTree[ty.Optional[ShimBuilder]](
-            "mops.pure.magic.shim", parse=to_shim_builder  # type: ignore
+            "mops.pure.magic.shim",
+            parse=to_shim_builder,  # type: ignore
         )
         self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
             "mops.pure.magic.blob_root", parse=core.uris.to_lazy_uri
@@ -82,7 +83,8 @@ class Magic(ty.Generic[P, R]):
             # this allows the docstring pipeline id to become 'the most specific' config.
             self.config.pipeline_id.setv(p_id, self._magic_config_path)
         self._shim = stack_context.StackContext[ty.Union[None, ShimName, ShimOrBuilder]](
-            str(func) + "_SHIM", None  # none means nothing has been set stack-local
+            str(func) + "_SHIM",
+            None,  # none means nothing has been set stack-local
         )
         self.runner = MemoizingPicklingRunner(self._shimbuilder, self._get_blob_root)
         self.runner.calls(func, *calls)

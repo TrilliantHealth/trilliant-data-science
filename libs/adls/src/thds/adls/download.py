@@ -434,9 +434,7 @@ async def async_download_or_use_verified(
                 )(
                     # retry n_times(2) means _retry_ twice.
                     azcopy.download.async_fastpath
-                )(
-                    dl_file_client, co_request
-                )
+                )(dl_file_client, co_request)
                 co_request = co.send(None)
             else:
                 raise ValueError(f"Unexpected coroutine request: {co_request}")

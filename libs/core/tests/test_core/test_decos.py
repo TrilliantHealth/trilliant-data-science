@@ -32,9 +32,7 @@ def test_decos_composes_top_to_bottom(capsys):
     assert 2 == decos.compose(
         bardeco,
         bazdeco,
-    )(
-        foo
-    )(1)
+    )(foo)(1)
 
     assert (
         "in bardeco\nin bazdeco\nin foo\nout foo\nout bazdeco\nout bardeco\n" == capsys.readouterr().out

@@ -297,7 +297,7 @@ class UniqueColumnsConstraint(BaseModel, extra=Extra.forbid):
 
     @property
     def sqlite(self) -> str:
-        return f'UNIQUE ({", ".join(self.unique)})'
+        return f"UNIQUE ({', '.join(self.unique)})"
 
     @staticmethod
     def make_pandera_check_expr(unique: IdTuple) -> str:

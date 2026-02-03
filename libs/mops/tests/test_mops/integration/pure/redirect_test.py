@@ -53,7 +53,9 @@ def test_redirect_allows_pickling_of_context_without_affecting_invocation_memoiz
     # we can pass context that does not factor into the memoization at all. A real world
     # use case would be passing something that changes side effects but does not affect the real result.
     runner = MemoizingPicklingRunner(
-        samethread_shim, TEST_TMP_URI, redirect=lambda f, _a, _k: partial(foobar_redirect, 3)  # not 2
+        samethread_shim,
+        TEST_TMP_URI,
+        redirect=lambda f, _a, _k: partial(foobar_redirect, 3),  # not 2
     )
     assert runner(foobar, (1,), dict()) == 2
     # still 2 because we got a memoized result not affected by the

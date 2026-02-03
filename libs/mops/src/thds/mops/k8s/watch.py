@@ -221,8 +221,7 @@ def yield_objects_from_list(
             ex = None
         except urllib3.exceptions.ReadTimeoutError:
             logger.info(
-                f"Watch loop #{loop_count}: ReadTimeoutError after {events_yielded} events "
-                "- restarting"
+                f"Watch loop #{loop_count}: ReadTimeoutError after {events_yielded} events - restarting"
             )
             ex = None
         except Exception as e:

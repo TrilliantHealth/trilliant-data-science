@@ -28,7 +28,9 @@ class NullabilityDiff(enum.IntEnum):
         return (
             NullabilityDiff.NO_CHANGE
             if nullable_before == nullable_after
-            else NullabilityDiff.NOT_NULL if nullable_before else NullabilityDiff.NULL
+            else NullabilityDiff.NOT_NULL
+            if nullable_before
+            else NullabilityDiff.NULL
         )
 
 
@@ -47,7 +49,9 @@ class OrderedDiff(enum.IntEnum):
         return (
             OrderedDiff.NO_CHANGE
             if ordered_before == ordered_after
-            else OrderedDiff.UNORDERED if ordered_before else OrderedDiff.ORDERED
+            else OrderedDiff.UNORDERED
+            if ordered_before
+            else OrderedDiff.ORDERED
         )
 
 

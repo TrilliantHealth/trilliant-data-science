@@ -67,7 +67,7 @@ def construct_job_name(user_prefix: str, job_num: str) -> str:
 
     user_prefix = sanitize_str(user_prefix)
     if user_prefix and len(mops_name_part) < 62:
-        name = f"{user_prefix[:63 - 1 - len(mops_name_part)]}-{mops_name_part}"
+        name = f"{user_prefix[: 63 - 1 - len(mops_name_part)]}-{mops_name_part}"
     else:
         name = mops_name_part
     name = sanitize_str(name)
@@ -286,9 +286,9 @@ def shim(
     Supports an optional callable argument `disable_remote` which when evaluated to True
     causes the mops pure function to be run in a local shell.
     """
-    assert (
-        "args" not in outer_kwargs
-    ), "Passing 'args' as a keyword argument will cause conflicts with the closure."
+    assert "args" not in outer_kwargs, (
+        "Passing 'args' as a keyword argument will cause conflicts with the closure."
+    )
 
     if disable_remote():
         return samethread_shim  # type: ignore[return-value]

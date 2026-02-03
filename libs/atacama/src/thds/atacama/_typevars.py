@@ -51,9 +51,9 @@ def base_class_and_hints(class_: type) -> ty.Tuple[type, ty.Dict[str, type]]:
 
     # Create a modified hints dictionary with resolved types
     type_params = base_class.__parameters__
-    assert hasattr(
-        class_, "__args__"
-    ), f"Generic class {class_} must have type arguments, or we cannot determine types for it."
+    assert hasattr(class_, "__args__"), (
+        f"Generic class {class_} must have type arguments, or we cannot determine types for it."
+    )
     type_args = class_.__args__
     hints = {}
 

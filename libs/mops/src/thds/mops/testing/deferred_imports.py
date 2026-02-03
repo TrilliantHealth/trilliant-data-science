@@ -76,6 +76,6 @@ def assert_dev_deps_not_imported(import_statement: str, forbidden_modules: ty.Co
     with clear_and_restore_import_cache(lambda name: is_forbidden(name) or will_be_imported(name)):
         exec(import_statement, dict(__name__="", __file__=""), {})
         mistakenly_imported = [name for name in sys.modules if is_forbidden(name)]
-        assert (
-            not mistakenly_imported
-        ), f"Modules {', '.join(mistakenly_imported)} were imported on execution of {import_statement!r}"
+        assert not mistakenly_imported, (
+            f"Modules {', '.join(mistakenly_imported)} were imported on execution of {import_statement!r}"
+        )
