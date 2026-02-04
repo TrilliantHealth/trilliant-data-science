@@ -6,7 +6,6 @@ not because we don't like them, but because reducing our depedency footprint in
 our most central library is a good idea.
 """
 
-import importlib
 import os
 import re
 import typing as ty
@@ -16,7 +15,6 @@ from functools import lru_cache
 from getpass import getuser
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import Package
-from pathlib import Path
 from types import MappingProxyType
 
 from . import calgitver, git
@@ -139,46 +137,24 @@ def extract_timestamp(version: str, as_datetime: bool = False):
     )
 
 
-def _get_pkg_root_filename(pkg: Package) -> str:
-    if not isinstance(pkg, str):
-        return pkg.__file__ or ""
-    try:
-        pkg_spec = importlib.util.find_spec(pkg)  # type: ignore
-        return pkg_spec and pkg_spec.origin or ""
-    except ModuleNotFoundError:
-        return ""
-
-
 @lru_cache(None)
 def get_version(pkg: Package, orig: str = "") -> str:
-    # first try direct lookup from the pyproject.toml, if one can be found,
-    # because poetry frequently has outdated info in the venv it creates.
-    pkg_root_file = _get_pkg_root_filename(pkg)
-    if pkg_root_file:
-        version_ = find_pyproject_toml_version(Path(pkg_root_file), str(pkg))
-        if version_:
-            return version_
     try:
-        version_ = version(str(pkg))
+        return version(str(pkg))
     except PackageNotFoundError:
-        try:
-            version_ = version(str(pkg))
-        except PackageNotFoundError:
-            # 'recurse' upward, assuming that the package name is overly-specified
-            pkg_ = pkg.split(".")
-            if len(pkg_) <= 1:
-                for env_var in ("CALGITVER", "GIT_COMMIT"):
-                    env_var_version = os.getenv(env_var)
-                    lvl = LOGGER.debug if env_var == "CALGITVER" else LOGGER.info
-                    if env_var_version:
-                        lvl(f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}")
-                        return env_var_version
+        # 'recurse' upward, assuming that the package name is overly-specified
+        pkg_ = str(pkg).split(".")
+        if len(pkg_) <= 1:
+            for env_var in ("CALGITVER", "GIT_COMMIT"):
+                env_var_version = os.getenv(env_var)
+                lvl = LOGGER.debug if env_var == "CALGITVER" else LOGGER.info
+                if env_var_version:
+                    lvl(f"Using {env_var} {env_var_version} as fallback version for {orig or pkg}")
+                    return env_var_version
 
-                LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
-                return ""
-            return get_version(".".join(pkg_[:-1]), orig or pkg)
-
-    return version_
+            LOGGER.warning("Could not find a version for `%s`. Package not found.", orig or pkg)
+            return ""
+        return get_version(".".join(pkg_[:-1]), orig or pkg)
 
 
 class NoBasePackageFromMain(ValueError):
@@ -283,45 +259,6 @@ def get_user(pkg: Package = "", format: NameFormatType = "git") -> str:
         return getuser()
 
     return format_name(_get_user(pkg), format)
-
-
-def _hacky_get_pyproject_toml_version(pkg: Package, wdir: Path) -> str:
-    # it will be a good day when Python packages a toml reader by default.
-    ppt = wdir / "pyproject.toml"
-    if ppt.exists():
-        with open(ppt) as f:
-            toml = f.read()
-        # check name for sanity - we don't want to pull a version
-        # out of, say, the root project when that doesn't match our project name.
-        # TODO: extract name and version more nicely.
-        # TODO: normalize the name here more robustly.
-        if not re.search(rf"name\s*=\s*[\"']({pkg.replace('_', '-')})[\"']", toml):
-            LOGGER.warning(f"The package name in pyproject.toml does not match the package name ({pkg})")
-        for line in toml.splitlines():
-            if m := re.match(r"version\s*=\s*[\"'](?P<version>[a-zA-Z0-9.]+)[\"']", line):
-                return m.group("version")
-    return ""
-
-
-def find_pyproject_toml_version(starting_path: Path, pkg: Package) -> str:
-    """A way of looking to see if there's a pyproject.toml that defines our package's
-    version. Only really useful in a monorepo context.
-    """
-    while starting_path != starting_path.parent:
-        directory = starting_path.parent
-        ppt = directory / "pyproject.toml"
-        if ppt.exists():
-            # the first one we find is the only one we'll try.
-            # anything above that can't possibly be the appropriate
-            # pyproject.toml.
-            try:
-                return _hacky_get_pyproject_toml_version(pkg, directory)
-            except ValueError as ve:
-                LOGGER.info(str(ve))
-                return ""
-        starting_path = directory
-
-    return ""
 
 
 MiscType = ty.Mapping[str, ty.Union[str, int, float, bool]]

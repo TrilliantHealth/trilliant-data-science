@@ -304,13 +304,13 @@ def test_get_version_from_package(mock_version: MagicMock) -> None:
 
 def test_get_version_from_module(mock_version: MagicMock) -> None:
     assert meta.get_version(f"{PACKAGE_NAME}.module") == SEMVER_STRING
-    assert mock_version.call_count == 3
+    assert mock_version.call_count == 2
 
 
 def test_get_version_no_package(caplog, mock_version: MagicMock) -> None:
     with caplog.at_level(logging.WARNING):
         assert meta.get_version("unknown.package") == ""
-    assert mock_version.call_count == 4
+    assert mock_version.call_count == 2
     assert "Could not find a version" in caplog.text
 
 
