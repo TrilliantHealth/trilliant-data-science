@@ -79,7 +79,13 @@ class FastCachedAzureCliCredential(AzureCliCredential):
             raise
 
 
-def _has_workload_identity_creds() -> bool:
+def has_workload_identity_creds() -> bool:
+    """Check if workload identity environment variables are present.
+
+    Returns True when running in a Kubernetes environment with Azure
+    workload identity configured (AZURE_TENANT_ID, AZURE_CLIENT_ID,
+    and AZURE_FEDERATED_TOKEN_FILE are all set).
+    """
     workload_identity_vars = [
         EnvironmentVariables.AZURE_TENANT_ID,
         EnvironmentVariables.AZURE_CLIENT_ID,
@@ -89,7 +95,7 @@ def _has_workload_identity_creds() -> bool:
 
 
 def get_credential_kwargs() -> Dict[str, bool]:
-    if _has_workload_identity_creds():
+    if has_workload_identity_creds():
         # in K8s, we use various forms of credentials, but not the EnvironmentCredential,
         # and that one gets tried early and then warns us about something we don't care about.
         return dict(exclude_environment_credential=True)
