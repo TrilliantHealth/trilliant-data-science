@@ -2,6 +2,7 @@ __all__ = [
     "render_attrs_loaders",
     "render_attrs_module",
     "render_attrs_sqlite_schema",
+    "render_markdown_docs",
     "render_pandera_module",
     "render_pandera_loaders",
     "render_pyarrow_schema",
@@ -14,6 +15,7 @@ __all__ = [
 from .attrs import render_attrs_loaders, render_attrs_module
 from .attrs_sqlite import render_attrs_sqlite_schema
 from .io import write_if_ast_changed, write_sql
+from .markdown import render_markdown_docs
 from .pandas import render_pandera_loaders, render_pandera_module
 from .pyarrow import render_pyarrow_schema
 from .sphinx import render_sphinx_docs

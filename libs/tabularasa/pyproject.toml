@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.4"
+version = "0.14.5"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]

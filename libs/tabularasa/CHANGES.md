@@ -1,3 +1,8 @@
+### 0.14.5
+
+- Add markdown format support to `docgen` command for MkDocs documentation
+- Generated table docs now include YAML front matter for proper MkDocs navigation titles
+
 ### 0.14.4
 
 Formatting changes from ruff migration.

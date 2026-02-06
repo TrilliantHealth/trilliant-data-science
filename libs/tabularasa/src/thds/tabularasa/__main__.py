@@ -8,7 +8,20 @@ from enum import Enum
 from functools import partial
 from itertools import repeat
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple, Type, Union, cast
+from typing import (
+    Dict,
+    Final,
+    Iterable,
+    Iterator,
+    List,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import networkx as nx
 import pkg_resources
@@ -34,12 +47,13 @@ from thds.tabularasa.schema import load_schema, metaschema
 from thds.tabularasa.schema.compilation import (
     render_attrs_module,
     render_attrs_sqlite_schema,
+    render_markdown_docs,
     render_pandera_module,
     render_pyarrow_schema,
     render_sphinx_docs,
     render_sql_schema,
 )
-from thds.tabularasa.schema.util import all_predecessors, all_successors
+from thds.tabularasa.schema.util import all_predecessors, all_successors, snake_to_title
 
 try:
     from bourbaki.application.cli import CommandLineInterface, cli_spec
@@ -102,9 +116,12 @@ else:
         _yaml().dump(data, stream)
 
 
-DEFAULT_GRAPHVIZ_FORMAT = "svg"
-RED, GREEN, YELLOW, BLUE = "#FFAB99", "#99FFDE", "#EDFF99", "#b3f0ff"
-DAG_NODE_COLORS: Dict[Type, str] = {
+DEFAULT_GRAPHVIZ_FORMAT: Final = "svg"
+RED: Final = "#FFAB99"
+GREEN: Final = "#99FFDE"
+YELLOW: Final = "#EDFF99"
+BLUE: Final = "#b3f0ff"
+DAG_NODE_COLORS: Final[Dict[Type, str]] = {
     metaschema.ADLSRef: RED,
     metaschema.LocalRef: YELLOW,
     metaschema.TabularTextFileRef: YELLOW,
@@ -640,7 +657,16 @@ class ReferenceDataManager:
         """Generate all derived accessor code and save to specified files"""
         self.build_command.write_derived_source_code()
 
-    def docgen(self):
+    def docgen(self, format: str = "rst"):
+        """Generate documentation for the schema.
+
+        Args:
+            format: Output format, either "rst" (ReStructuredText) or "md" (Markdown).
+                    Defaults to "rst" for backward compatibility.
+        """
+        if format not in ("rst", "md"):
+            raise ValueError(f"Unsupported format: {format}. Use 'rst' or 'md'.")
+
         if self.table_docs_dir is None:
             raise ValueError("Can't write table docs without table_docs_dir")
         elif self.type_docs_path is None:
@@ -657,24 +683,45 @@ class ReferenceDataManager:
         self.logger.info(f"Creating table docs directory at {table_output_dir}")
         table_output_dir.mkdir(parents=True)
 
-        self.logger.info("Rendering markdown for package tables")
-        types_doc, source_doc, table_docs = render_sphinx_docs(
-            self.schema, self.repo_root, self.repo_url
-        )
-        for table_name, markdown in table_docs.items():
-            path = table_output_dir / f"{table_name}.rst"
-            self.logger.info(f"Writing markdown docs for table {table_name} to {path}")
+        # Select the appropriate renderer based on format
+        if format == "md":
+            self.logger.info("Rendering markdown for package tables")
+            render_docs = render_markdown_docs
+            file_extension = ".md"
+        else:
+            self.logger.info("Rendering RST for package tables")
+            render_docs = render_sphinx_docs
+            file_extension = ".rst"
+
+        types_doc, source_doc, table_docs = render_docs(self.schema, self.repo_root, self.repo_url)
+        for table_name, doc_content in table_docs.items():
+            path = table_output_dir / f"{table_name}{file_extension}"
+            self.logger.info(f"Writing docs for table {table_name} to {path}")
             with open(path, "w") as f:
-                f.write(markdown)
+                f.write(doc_content)
+
+        # Generate index file for tables directory (markdown only)
+        if format == "md":
+            index_path = table_output_dir / "index.md"
+            self.logger.info(f"Writing tables index to {index_path}")
+            sorted_tables = sorted(table_docs.keys())
+            index_content = (
+                "# Tables\n\nThis section contains documentation for all reference data tables.\n\n"
+            )
+            for table_name in sorted_tables:
+                display_name = snake_to_title(table_name, separator=" ")
+                index_content += f"- [{display_name}]({table_name}.md)\n"
+            with open(index_path, "w") as f:
+                f.write(index_content)
 
         type_docs_path = Path(self.type_docs_path)
-        self.logger.info(f"Writing markdown for package types to {type_docs_path}")
+        self.logger.info(f"Writing docs for package types to {type_docs_path}")
         with open(type_docs_path, "w") as f:
             f.write(types_doc)
 
         if self.source_docs_path:
             source_docs_path = Path(self.source_docs_path)
-            self.logger.info(f"Writing markdown for package source data to {source_docs_path}")
+            self.logger.info(f"Writing docs for package source data to {source_docs_path}")
             with open(source_docs_path, "w") as f:
                 f.write(source_doc)
 
