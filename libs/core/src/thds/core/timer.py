@@ -173,8 +173,8 @@ class TimeTracker:
                 indent=4,
             )
 
-    def track(self, component_name: Optional[str] = None):
-        def decorator(func):
+    def track(self, component_name: Optional[str] = None) -> Callable[[F], F]:
+        def decorator(func: F) -> F:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 start = time.perf_counter()
@@ -184,7 +184,7 @@ class TimeTracker:
                 cmpnt.calls += 1
                 return func_result
 
-            return wrapper
+            return cast(F, wrapper)
 
         return decorator
 
