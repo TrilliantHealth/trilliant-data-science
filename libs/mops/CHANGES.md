@@ -478,8 +478,9 @@ Minor features providing bootstrapping defaults for general use across the monor
   deferred to the time of use.
 - Add `std_docker_build_push_develop` helper to create a lazy-docker-image-building default approach to
   go along with the `k8s_shell` interface. This can be plugged in by applications to prevent accidentally
-  running without rebuilding. See [`mldemo`](../../apps/mldemo/src/mldemo/k8s_choose_image.py#L13) for an
-  example of this usage.
+  running without rebuilding. See
+  [`mldemo`](https://github.com/TrilliantHealth/ds-monorepo/blob/53d0bb8c33923e847a0ef4dde5632471fb44665e/apps/mldemo/src/mldemo/k8s_choose_image.py#L13)
+  for an example of this usage.
 
 ### 1.4.1
 
