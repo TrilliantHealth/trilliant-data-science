@@ -1,3 +1,7 @@
+### 0.14.6
+
+- Render AnyUrl metadata values as clickable markdown links in generated docs
+
 ### 0.14.5
 
 - Add markdown format support to `docgen` command for MkDocs documentation

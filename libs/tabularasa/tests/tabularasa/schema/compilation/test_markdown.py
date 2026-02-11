@@ -19,12 +19,14 @@ from thds.tabularasa.schema.compilation.markdown import (
     italic,
     join_blocks,
     render_column_type,
+    render_file_source,
     render_markdown_docs,
     render_table,
     render_type_entry,
     split_long_fields,
 )
 from thds.tabularasa.schema.dtypes import DType
+from thds.tabularasa.schema.files import FileSourceMixin
 
 # -----------------------------------------------------------------------------
 # Tests: Markdown Helpers
@@ -286,3 +288,37 @@ def test_render_markdown_docs_with_types(mock_schema):
     assert "## TestType" in types_doc
     assert "A test type for testing." in types_doc
     assert '<a id="test_type"></a>' in types_doc
+
+
+# -----------------------------------------------------------------------------
+# Tests: render_file_source URL linking
+# -----------------------------------------------------------------------------
+
+
+def test_render_file_source_converts_urls_to_links():
+    """AnyUrl values in file source metadata should render as clickable markdown links."""
+    meta = FileSourceMixin(
+        url="https://data.example.com/dataset.csv",
+        landing_page="https://example.com/about",
+        authority="Example Corp",
+    )
+    result = render_file_source(meta, "Test Source", repo_root=Path("/fake/repo"))
+    # URLs should be wrapped in markdown link syntax, not bare
+    assert "[https://data.example.com/dataset.csv](https://data.example.com/dataset.csv)" in result
+    assert "[https://example.com/about](https://example.com/about)" in result
+
+
+def test_render_file_source_no_urls():
+    """File sources without URLs should render normally without link conversion."""
+    meta = FileSourceMixin(authority="Internal")
+    result = render_file_source(meta, "Internal Source", repo_root=Path("/fake/repo"))
+    assert "Internal" in result
+    # No markdown link syntax expected
+    assert "](http" not in result
+
+
+def test_render_file_source_only_url_no_landing_page():
+    """Only the url field is set; landing_page is None."""
+    meta = FileSourceMixin(url="https://files.example.com/data.zip")
+    result = render_file_source(meta, None, repo_root=Path("/fake/repo"))
+    assert "[https://files.example.com/data.zip](https://files.example.com/data.zip)" in result

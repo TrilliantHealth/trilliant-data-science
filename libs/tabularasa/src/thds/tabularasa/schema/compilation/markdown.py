@@ -342,6 +342,10 @@ def render_file_source(
 ) -> str:
     """Render a metadata section for either a table or a dependency."""
     meta_dict = {name: getattr(meta, name) for name in METADATA_FIELDS if getattr(meta, name)}
+    # Convert AnyUrl values to clickable markdown links so they render properly in tables
+    for key, value in meta_dict.items():
+        if isinstance(value, AnyUrl):
+            meta_dict[key] = hyperlink(str(value), str(value))
     if repo_url and isinstance(meta, LocalFileSourceMixin):
         meta_dict.update(github_link=format_repo_url(meta, repo_root, repo_url))
     header = heading(header_title, 3) if header_title else ""
