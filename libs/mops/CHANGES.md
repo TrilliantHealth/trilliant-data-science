@@ -1,3 +1,11 @@
+### 3.14.20260206
+
+- Pins pickle protocol to 4 for all cache-key-affecting serialization. Python 3.14 changed
+  `pickle.DEFAULT_PROTOCOL` from 4 to 5, which produced different cache key hashes for identical
+  arguments, orphaning caches generated on earlier Pythons. Once Python 3.9 support is dropped, consider
+  upgrading to protocol 5 — but that will require a coordinated cache migration since all existing hashes
+  will change.
+
 ## 3.14
 
 - **Grafana log URL metadata** (TH-only): Result metadata files now include a `grafana_logs` URL that

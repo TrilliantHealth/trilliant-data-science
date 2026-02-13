@@ -1,3 +1,7 @@
+### 0.14.7
+
+- Replace `typing_inspect` with stdlib equivalents for Python 3.14 compatibility
+
 ### 0.14.6
 
 - Render AnyUrl metadata values as clickable markdown links in generated docs

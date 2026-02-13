@@ -16,6 +16,7 @@ from thds.core import hashing, log
 from ..core.content_addressed import storage_content_addressed, wordybin_content_addressed
 from ..core.serialize_paths import Downloader
 from ..core.uris import active_storage_root, lookup_blob_store
+from . import _pickle
 from .pickles import UnpicklePathFromUri, UnpickleSimplePickleFromUri
 
 logger = log.getLogger(__name__)
@@ -40,7 +41,7 @@ def _pickle_obj_and_upload_to_content_addressed_path(
     # somewhere before settling on the final destination of objects pickled.
     storage_root = active_storage_root()
     with io.BytesIO() as bio:
-        pickle.dump(obj, bio)
+        pickle.dump(obj, bio, protocol=_pickle._PICKLE_PROTOCOL)
         bio.seek(0)
         fs = lookup_blob_store(storage_root)
         bytes_uri, debug_uri = wordybin_content_addressed(

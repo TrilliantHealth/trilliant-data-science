@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.6"
+version = "0.14.7"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -34,8 +34,6 @@ cli = [
   "bourbaki.application>=0.10.12",
   "ruamel.yaml",
   "tabulate",
-  "typing-inspect",
-  # `typing-inspect` has issues with Python>=3.9 prior to these versions.
 ]
 # Support for CLI operations - code and data generation.
 viz = ["pygraphviz"]
@@ -74,7 +72,6 @@ dev = [
   "isort",
   "ruamel.yaml",
   "tabulate",
-  "typing-inspect"
 ]
 
 [build-system]

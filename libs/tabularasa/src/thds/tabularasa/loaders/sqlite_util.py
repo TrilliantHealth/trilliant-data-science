@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import types
 import typing as ty
 from functools import lru_cache, wraps
 from pathlib import Path
@@ -14,11 +15,34 @@ import attr
 import cattrs.preconf.json
 import pkg_resources
 from filelock import FileLock
-from typing_inspect import get_args, get_origin, is_literal_type, is_optional_type, is_union_type
 
 from thds.core.types import StrOrPath
 from thds.tabularasa.schema.dtypes import DType
 from thds.tabularasa.sqlite3_compat import sqlite3
+
+# typing_inspect is not compatible with Python 3.14 (relies on private typing internals).
+# Stdlib equivalents available since Python 3.8.
+get_args = ty.get_args
+get_origin = ty.get_origin
+
+
+def is_union_type(tp: type) -> bool:
+    return ty.get_origin(tp) is ty.Union or isinstance(tp, types.UnionType)
+
+
+def is_optional_type(tp: type) -> bool:
+    if tp is type(None):
+        return True
+
+    if is_union_type(tp):
+        return type(None) in ty.get_args(tp)
+
+    return False
+
+
+def is_literal_type(tp: type) -> bool:
+    return ty.get_origin(tp) is ty.Literal
+
 
 DEFAULT_ATTR_SQLITE_CACHE_SIZE = 100_000
 DEFAULT_MMAP_BYTES = int(os.environ.get("TABULA_RASA_DEFAULT_MMAP_BYTES", 8_589_934_592))  # 8 GB
@@ -39,7 +63,7 @@ if not PARAMETERIZABLE_BUILTINS:
         return None if org is None else _builtin_to_typing.get(org, org)  # type: ignore
 
 else:
-    get_generic_origin = get_origin
+    get_generic_origin = get_origin  # type: ignore[assignment]
 
 
 LITERAL_SQLITE_TYPES = {int, float, bool, str, type(None), datetime.date, datetime.datetime}

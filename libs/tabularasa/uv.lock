@@ -2922,7 +2922,7 @@ dev = [
 
 [[package]]
 name = "thds-tabularasa"
-version = "0.14.6"
+version = "0.14.7"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -2951,7 +2951,6 @@ cli = [
     { name = "bourbaki-application" },
     { name = "ruamel-yaml" },
     { name = "tabulate" },
-    { name = "typing-inspect" },
 ]
 viz = [
     { name = "pygraphviz" },
@@ -2980,7 +2979,6 @@ dev = [
     { name = "types-pyyaml" },
     { name = "types-setuptools" },
     { name = "types-tabulate" },
-    { name = "typing-inspect" },
 ]
 
 [package.metadata]
@@ -3006,7 +3004,6 @@ requires-dist = [
     { name = "thds-adls", editable = "../adls" },
     { name = "thds-core", editable = "../core" },
     { name = "typing-extensions" },
-    { name = "typing-inspect", marker = "extra == 'cli'" },
 ]
 provides-extras = ["autoformat", "cli", "viz"]
 
@@ -3031,7 +3028,6 @@ dev = [
     { name = "types-pyyaml" },
     { name = "types-setuptools" },
     { name = "types-tabulate" },
-    { name = "typing-inspect" },
 ]
 
 [[package]]

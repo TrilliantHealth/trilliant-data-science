@@ -33,8 +33,17 @@ def wrap_f(f: F) -> ty.Union[F, PicklableFunction]:
     return f
 
 
+_PICKLE_PROTOCOL = 4
+# Pin to protocol 4 (Python 3.4+) so that mops cache keys are identical
+# regardless of the Python version computing them. Python 3.8+ supports
+# to protocol 5, which is byte-for-byte identical to 4 for most objects,
+# but Python 3.14 changed DEFAULT_PROTOCOL from 4 to 5, producing
+# different hashes and orphaning caches generated on earlier Pythons.
+
+
 class _CallbackPickler(pickle.Pickler):
     def __init__(self, handlers: ty.Sequence[SerializerHandler], *args: ty.Any, **kwargs: ty.Any):
+        kwargs.setdefault("protocol", _PICKLE_PROTOCOL)
         super().__init__(*args, **kwargs)
         self.handlers = handlers
 
@@ -199,6 +208,6 @@ class NestedFunctionWithLogicKeyPickler:
 
         return UnpickleFunctionWithLogicKey(  # type: ignore
             # we must then wrap the function itself so that this does not cause infinite recursion.
-            pickle.dumps(maybe_function_with_logic_key),
+            pickle.dumps(maybe_function_with_logic_key, protocol=_PICKLE_PROTOCOL),
             function_logic_key,
         )

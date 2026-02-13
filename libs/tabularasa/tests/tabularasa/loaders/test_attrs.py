@@ -1,8 +1,12 @@
 from typing import Any, Dict, Iterable, List, Type
 
-from typing_inspect import get_args, get_origin, is_literal_type, is_union_type
-
-from thds.tabularasa.loaders.sqlite_util import resolve_newtypes
+from thds.tabularasa.loaders.sqlite_util import (
+    get_args,
+    get_origin,
+    is_literal_type,
+    is_union_type,
+    resolve_newtypes,
+)
 from thds.tabularasa.loaders.util import AttrsParquetLoader
 
 from ..conftest import ReferenceDataTestCase
