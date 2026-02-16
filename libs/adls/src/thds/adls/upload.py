@@ -79,6 +79,7 @@ def upload(
     write_through_cache: ty.Optional[Cache] = None,
     *,
     content_type: str = "",
+    cache_control: str = "",
     **upload_data_kwargs: ty.Any,
 ) -> source.Source:
     """Uploads only if the remote does not exist or does not match
@@ -90,7 +91,7 @@ def upload(
 
     Can write through a local cache, which may save you a download later.
 
-    content_type and all upload_data_kwargs will be ignored if the file
+    content_type, cache_control, and all upload_data_kwargs will be ignored if the file
     has already been uploaded and the hash matches.
     """
     dest_ = AdlsFqn.parse(dest) if isinstance(dest, str) else dest
@@ -145,6 +146,8 @@ def upload(
         upload_content_settings = ContentSettings()
         if content_type:
             upload_content_settings.content_type = content_type
+        if cache_control:
+            upload_content_settings.cache_control = cache_control
 
         # we are now using blob_client instead of file system client
         # because blob client (as of 2024-06-24) does actually do

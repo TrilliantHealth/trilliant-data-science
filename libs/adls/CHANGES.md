@@ -1,3 +1,7 @@
+### 4.5.20260211
+
+- Add optional `cache_control` keyword argument to `upload()`, forwarded to Azure `ContentSettings`.
+
 ## 4.5
 
 - Support ETag as a 'hash', even though it cannot be computed locally, by _storing_ the etag locally and
