@@ -1,4 +1,10 @@
+### 0.14.8
+
+- Bump version for CI
+
 ### 0.14.7
+
+- Makes tabularasa's yaml-printing deterministically indented.
 
 - Replace `typing_inspect` with stdlib equivalents for Python 3.14 compatibility
 

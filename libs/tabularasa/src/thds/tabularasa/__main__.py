@@ -107,6 +107,7 @@ else:
         yaml = YAML()
         yaml.preserve_quotes = True  # type: ignore[assignment]
         yaml.width = 100  # type: ignore[assignment]
+        yaml.indent(mapping=2, sequence=4, offset=2)
         return yaml
 
     def load_yaml(stream):
