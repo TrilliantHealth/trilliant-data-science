@@ -1,6 +1,12 @@
+### 0.14.9
+
+- When running `data-diff` with `--value-detail`, dropped and added rows are now rendered in their
+  entirety as markdown tables, unless `--value-detail-skip-added` or `--value-detail-skip-dropped` are
+  also passed.
+
 ### 0.14.8
 
-- Bump version for CI
+- Makes `tabularasa`'s yaml-printing deterministically indented.
 
 ### 0.14.7
 

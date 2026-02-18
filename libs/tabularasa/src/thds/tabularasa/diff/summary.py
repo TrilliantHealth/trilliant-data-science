@@ -172,6 +172,8 @@ def markdown_dataframe_diff_summary(
     verbose: bool = False,
     value_detail: bool = False,
     value_detail_min_count: int = 0,
+    value_detail_added: bool = True,
+    value_detail_dropped: bool = True,
     heading_level: int = 0,
     tablefmt: str = DEFAULT_TABLEFMT,
     floatfmt: str = DEFAULT_FLOATFMT,
@@ -249,3 +251,24 @@ def markdown_dataframe_diff_summary(
                             .reset_index()
                             .to_markdown(index=False, tablefmt=tablefmt)
                         )
+    if value_detail:
+        if value_detail_dropped and table_changes.dropped_rows:
+            yield markdown_heading(heading_level + 2, "Dropped Rows:")
+            yield ty.cast(
+                str,
+                (dropped := dataframe_diff.dropped_rows.reset_index()).to_markdown(
+                    index=False,
+                    tablefmt=tablefmt,
+                    floatfmt=_floatfmt_from_df(dropped, floatfmt),
+                ),
+            )
+        if value_detail_added and table_changes.added_rows:
+            yield markdown_heading(heading_level + 2, "Added Rows:")
+            yield ty.cast(
+                str,
+                (added := dataframe_diff.added_rows.reset_index()).to_markdown(
+                    index=False,
+                    tablefmt=tablefmt,
+                    floatfmt=_floatfmt_from_df(added, floatfmt),
+                ),
+            )

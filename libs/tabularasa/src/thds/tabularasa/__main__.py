@@ -246,6 +246,8 @@ def print_data_diff_summaries(
     verbose: bool = False,
     value_detail: bool = False,
     value_detail_min_count: int = 0,
+    value_detail_skip_added: bool = False,
+    value_detail_skip_dropped: bool = False,
     heading_level: int = 0,
     tablefmt: str = diff_summary.DEFAULT_TABLEFMT,
     floatfmt: str = diff_summary.DEFAULT_FLOATFMT,
@@ -260,6 +262,8 @@ def print_data_diff_summaries(
       types of changes as determined by the `verbose` flag
     :param value_detail_min_count: minimum number of instances of a specific value update to show value-level
       detail for. No effect when `value_detail` is False
+    :param value_detail_skip_added: when `value_detail` is True, if this is True, do not show value-level detail for added rows
+    :param value_detail_skip_dropped: when `value_detail` is True, if this is True, do not show value-level detail for dropped rows
     :param heading_level: increase this to render smaller headings on the markdown sections
     :param tablefmt: the table format to use for the markdown tables, as understood by `tabulate`
     :param floatfmt: the float format to use for the markdown tables, as understood by `tabulate`
@@ -272,6 +276,8 @@ def print_data_diff_summaries(
             verbose,
             value_detail=value_detail,
             value_detail_min_count=value_detail_min_count,
+            value_detail_added=not value_detail_skip_added,
+            value_detail_dropped=not value_detail_skip_dropped,
             heading_level=heading_level,
             tablefmt=tablefmt,
             floatfmt=floatfmt,
