@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.9"
+version = "0.14.10"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -14,9 +14,7 @@ dependencies = [
   "packaging",
   "pandas>=1.5",
   "pandera>=0.20,<0.24",  # pandera moves to pandera.pandas in 0.24
-  "pydantic>=1.10.9,<2.0",
-  # V2 introduces breaking changes, but 1.10.8 has a broken mypy plugin,
-  # see here: https://github.com/python/mypy/issues/15485.
+  "pydantic>=2.0.0",
   "pyarrow>=10.0",
   "pyyaml>=6.0.1",
   "setuptools>=66.1.1",

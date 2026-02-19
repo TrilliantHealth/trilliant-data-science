@@ -1,12 +1,13 @@
 import csv
 import datetime
 import os
+from collections import Counter
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import pkg_resources
-from pydantic import AnyUrl, BaseModel, Extra, Field
+from pydantic import AfterValidator, AnyUrl, BaseModel, ConfigDict, Field
 
 from .util import DashedIdentifier, DocumentedMixin, DottedIdentifier, HexStr, PathStr
 
@@ -46,7 +47,8 @@ def _date_tuple(date: datetime.date, freq: UpdateFrequency) -> Tuple[int, ...]:
 current_date = datetime.date.today()
 
 
-class FileSourceMixin(BaseModel, extra=Extra.forbid):
+class FileSourceMixin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     authority: Optional[str] = None
     url: Optional[AnyUrl] = None
     landing_page: Optional[AnyUrl] = None
@@ -157,7 +159,8 @@ class TabularFileSource(DocumentedMixin, LocalFileSourceMixin):
         return kw
 
 
-class VersionControlledPath(BaseModel, extra=Extra.forbid):
+class VersionControlledPath(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: PathStr
     md5: Optional[HexStr] = None
 
@@ -165,12 +168,23 @@ class VersionControlledPath(BaseModel, extra=Extra.forbid):
 class ADLSDataSpec(FileSourceMixin):
     adls_account: DashedIdentifier
     adls_filesystem: DashedIdentifier
-    paths: List[VersionControlledPath] = Field(min_items=1)
+    paths: List[VersionControlledPath] = Field(min_length=1)
     ordered: bool = False
 
 
+def _find_dups(v: list[str]) -> list[str]:
+    counts = Counter(v)
+    return [item for item, count in counts.items() if count > 1]
+
+
+def _check_unique(v: List[str]) -> List[str]:
+    if dups := _find_dups(v):
+        raise ValueError(f"Found duplicates, {dups}, in {v}.")
+    return v
+
+
 class LocalDataSpec(LocalFileSourceMixin):
-    order: List[PathStr] = Field(default_factory=list, unique_items=True)
+    order: Annotated[List[str], AfterValidator(_check_unique)] = Field(default_factory=list)
     package: Optional[DottedIdentifier] = None
 
     def list_dir(self):
@@ -201,7 +215,8 @@ class LocalDataSpec(LocalFileSourceMixin):
         return [spec_order[name] for name in self.order]
 
 
-class RemoteBlobStoreSpec(BaseModel, extra=Extra.forbid):
+class RemoteBlobStoreSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     adls_account: DashedIdentifier
     adls_filesystem: DashedIdentifier
     path: PathStr

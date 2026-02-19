@@ -26,7 +26,7 @@ import pandera as pa
 import pyarrow
 import typing_extensions
 from pandas.core.dtypes import base as pd_dtypes
-from pydantic import AnyUrl, BaseModel, Extra, Field
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field
 
 from thds.tabularasa.schema.files import FileSourceMixin
 
@@ -54,7 +54,7 @@ IdTuple = Tuple[Identifier, ...]
 
 class AnonCustomType(DocumentedMixin):
     type: DType
-    constraints: List[AnyColumnConstraint] = Field(min_items=1)
+    constraints: List[AnyColumnConstraint] = Field(min_length=1)
 
     def with_name(self, name: Identifier) -> "CustomType":
         return CustomType(
@@ -117,7 +117,8 @@ class AnonCustomType(DocumentedMixin):
         return None
 
 
-class CustomType(AnonCustomType, extra=Extra.forbid):
+class CustomType(AnonCustomType):
+    model_config = ConfigDict(extra="forbid")
     name: Identifier
 
     @property
@@ -163,7 +164,8 @@ class CustomType(AnonCustomType, extra=Extra.forbid):
         )
 
 
-class ExternalCustomType(CustomType, extra=Extra.forbid):
+class ExternalCustomType(CustomType):
+    model_config = ConfigDict(extra="forbid")
     package: DottedIdentifier
     derived_code_submodule: DottedIdentifier
     external_name: Identifier
@@ -180,7 +182,7 @@ class ExternalCustomType(CustomType, extra=Extra.forbid):
     def import_spec(self) -> Tuple[str, str]:
         old_name = self.external_class_name
         new_name = self.class_name
-        return self.module_path, old_name if old_name == new_name else f"{old_name} as {new_name}"
+        return self.module_path, (old_name if old_name == new_name else f"{old_name} as {new_name}")
 
     def attrs_required_imports(self, build_options: "BuildOptions") -> Set[str]:
         if build_options.import_external_types:
@@ -189,7 +191,8 @@ class ExternalCustomType(CustomType, extra=Extra.forbid):
             return super().attrs_required_imports(build_options)
 
 
-class _CustomTypeRef(BaseModel, extra=Extra.forbid):
+class _CustomTypeRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     custom: Identifier
 
     def __str__(self):
@@ -200,18 +203,22 @@ class _CustomTypeRef(BaseModel, extra=Extra.forbid):
         yield self.custom
 
 
-class ExternalSchemaRef(BaseModel, extra=Extra.forbid):
+class ExternalSchemaRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     schema_path: str
     package: Optional[DottedIdentifier] = None
     derived_code_submodule: Optional[DottedIdentifier] = None
 
 
-class ExternalTypeRef(BaseModel, extra=Extra.forbid):
+class ExternalTypeRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     schema_name: Identifier
     type_name: Identifier
 
 
-class _ComplexBaseType(BaseModel, extra=Extra.forbid):
+class _ComplexBaseType(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     @property
     def sqlite(self) -> str:
         return "JSON"
@@ -256,7 +263,8 @@ class ArrayType(_RawArrayType):
         return f"typing.List[{self.values.python_type_literal(build_options=build_options, builtin=builtin)}]"
 
 
-class _RawMappingType(_ComplexBaseType, extra=Extra.forbid):
+class _RawMappingType(_ComplexBaseType):
+    model_config = ConfigDict(extra="forbid")
     keys: Union[DType, _CustomTypeRef, AnonCustomType]
     values: Union[DType, _CustomTypeRef, AnonCustomType, "_RawArrayType", "_RawMappingType"]
 
@@ -266,7 +274,8 @@ class _RawMappingType(_ComplexBaseType, extra=Extra.forbid):
         yield from self.values.custom_type_refs
 
 
-class MappingType(_RawMappingType, extra=Extra.forbid):
+class MappingType(_RawMappingType):
+    model_config = ConfigDict(extra="forbid")
     keys: Union[DType, CustomType, AnonCustomType]
     values: Union[DType, CustomType, AnonCustomType, "ArrayType", "MappingType"]
 
@@ -292,7 +301,8 @@ class MappingType(_RawMappingType, extra=Extra.forbid):
         )
 
 
-class UniqueColumnsConstraint(BaseModel, extra=Extra.forbid):
+class UniqueColumnsConstraint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     unique: IdTuple
 
     @property
@@ -315,10 +325,10 @@ class UniqueColumnsConstraint(BaseModel, extra=Extra.forbid):
 
 
 # this allows the recursive types above
-_RawArrayType.update_forward_refs()
-_RawMappingType.update_forward_refs()
-ArrayType.update_forward_refs()
-MappingType.update_forward_refs()
+_RawArrayType.model_rebuild()
+_RawMappingType.model_rebuild()
+ArrayType.model_rebuild()
+MappingType.model_rebuild()
 
 
 # Remote data specifications - these are fetched at build time for preprocessing and packaging
@@ -335,7 +345,8 @@ class RawDataDependencies(DocumentedMixin):
 # references, and checking constraints
 
 
-class _RawColumn(BaseModel, extra=Extra.forbid):
+class _RawColumn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: Identifier
     type: Union[DType, _CustomTypeRef, AnonCustomType, _RawArrayType, _RawMappingType]
     nullable: bool = False
@@ -369,13 +380,14 @@ class _RawColumn(BaseModel, extra=Extra.forbid):
         yield from self.type.custom_type_refs
 
 
-class InheritanceSpec(BaseModel, extra=Extra.forbid):
+class InheritanceSpec(BaseModel):
     """Specification for columns in a table which inherits columns from other tables (usually transient
     tables which are then used in joins or filtered to a subset). The `tables` attribute is a list of
     tables to inherit columns from in order of precedence. The `columns` attribute is an optional list
     of columns to include from any of the tables. When absent, all columns from all tables are included.
     """
 
+    model_config = ConfigDict(extra="forbid")
     tables: Sequence[Identifier]
     columns: Set[Identifier] = Field(default_factory=set)
     update_docs: Mapping[Identifier, str] = Field(default_factory=dict)
@@ -383,7 +395,8 @@ class InheritanceSpec(BaseModel, extra=Extra.forbid):
     update_source_name: Mapping[Identifier, str] = Field(default_factory=dict)
 
 
-class _RawTable(BaseModel, extra=Extra.forbid):
+class _RawTable(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     columns: Sequence[_RawColumn] = Field(default_factory=list)
     doc: NonEmptyStr
     dependencies: Optional[Union[TabularFileSource, RawDataDependencies]] = None
@@ -485,7 +498,8 @@ class TransientReferenceDataRef(ReferenceDataRef):
     _name = "ReferenceData"
 
 
-class BuildOptions(BaseModel, extra=Extra.forbid):
+class BuildOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     # interface
     derived_code_submodule: DottedIdentifier
     attrs: bool
@@ -518,7 +532,8 @@ class BuildOptions(BaseModel, extra=Extra.forbid):
     curation_badge_path: Optional[str] = None
 
 
-class _RawSchema(BaseModel, extra=Extra.forbid):
+class _RawSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     tables: Mapping[Identifier, _RawTable] = Field(default_factory=dict)
     types: Mapping[Identifier, Union[AnonCustomType, ExternalTypeRef]] = Field(default_factory=dict)
     external_schemas: Mapping[Identifier, ExternalSchemaRef] = Field(default_factory=dict)

@@ -700,7 +700,9 @@ class ReferenceDataManager:
             render_docs = render_sphinx_docs
             file_extension = ".rst"
 
-        types_doc, source_doc, table_docs = render_docs(self.schema, self.repo_root, self.repo_url)
+        types_doc, source_doc, table_docs = render_docs(
+            self.schema, self.repo_root, str(self.repo_url) if self.repo_url else None
+        )
         for table_name, doc_content in table_docs.items():
             path = table_output_dir / f"{table_name}{file_extension}"
             self.logger.info(f"Writing docs for table {table_name} to {path}")

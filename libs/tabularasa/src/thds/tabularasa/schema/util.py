@@ -23,11 +23,11 @@ if not typing.TYPE_CHECKING:
     # pydantic (hilariously) uses match instead of fullmatch, so we
     # have to anchor the regexes, but only at the end, since re.match
     # requires the match to be found at the beginning of the string.
-    Identifier = constr(regex=_identifier_pattern + "$")
-    DottedIdentifier = constr(regex=_dotted_identifier_pattern + "$")
-    DashedIdentifier = constr(regex=_dashed_identifier_pattern + "$")
-    PathStr = constr(regex=_rel_path_pattern + "$")
-    HexStr = constr(regex=_md5_hex_pattern + "$")
+    Identifier = constr(pattern=_identifier_pattern + "$")
+    DottedIdentifier = constr(pattern=_dotted_identifier_pattern + "$")
+    DashedIdentifier = constr(pattern=_dashed_identifier_pattern + "$")
+    PathStr = constr(pattern=_rel_path_pattern + "$")
+    HexStr = constr(pattern=_md5_hex_pattern + "$")
     NonEmptyStr = constr(min_length=1)
 else:
     Identifier = str

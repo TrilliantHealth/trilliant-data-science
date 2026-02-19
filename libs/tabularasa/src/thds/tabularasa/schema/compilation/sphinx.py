@@ -32,7 +32,7 @@ BADGE_EXTENSION = "*.svg"
 HEADING_CHAR = "#"
 DERIVATION_TITLE = "Derivation"
 DEPENDENCIES_TITLE = "Sources"
-METADATA_FIELDS = FileSourceMixin.__fields__
+METADATA_FIELDS = FileSourceMixin.model_fields
 UNICODE_MAPPING = {
     ">=": "≥",
     "<=": "≤",
@@ -60,7 +60,8 @@ class DontSplitMe(str):
 
 def _wrap_table_field(max_width: int, text: Any) -> str:
     if isinstance(text, (AnyUrl, DontSplitMe)):
-        return text
+        return str(text)
+        # ^ NOTE: pydantic v2 doesn't sub-class str for AnyUrl and you have to cast the object to a string now.
     return "\n\n".join(textwrap.wrap(str(text), width=max_width, break_long_words=False))
 
 
@@ -411,9 +412,9 @@ def render_source_name(
 ) -> DontSplitMe:
     links = []
     if fs_data.landing_page is not None:
-        links.append(anonymous_hyperlink("homepage", fs_data.landing_page))
+        links.append(anonymous_hyperlink("homepage", str(fs_data.landing_page)))
     if fs_data.url is not None:
-        links.append(anonymous_hyperlink("url", fs_data.url))
+        links.append(anonymous_hyperlink("url", str(fs_data.url)))
     if repo_url and isinstance(fs_data, LocalFileSourceMixin):
         links.append(format_repo_url(fs_data, repo_root, repo_url, name="github"))
 
@@ -483,7 +484,7 @@ def build_source_metadata(schema: metaschema.Schema, repo_root: Path) -> Dict[st
                 dep_graph,
                 table_docs_relpath=table_docs_relpath,
                 repo_root=repo_root,
-                repo_url=schema.build_options.repo_url,
+                repo_url=(str(schema.build_options.repo_url) if schema.build_options.repo_url else None),
             )
             if fs_data.is_open_access:
                 stype = OPEN_ACCESS

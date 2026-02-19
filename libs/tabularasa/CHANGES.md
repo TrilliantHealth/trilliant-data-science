@@ -1,3 +1,7 @@
+### 0.14.10
+
+Updated to Pydantic V2.
+
 ### 0.14.9
 
 - When running `data-diff` with `--value-detail`, dropped and added rows are now rendered in their

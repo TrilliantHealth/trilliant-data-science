@@ -38,7 +38,7 @@ SOURCE_COLUMNS: Final = (
 BADGE_EXTENSION: Final = "*.svg"
 DERIVATION_TITLE: Final = "Derivation"
 DEPENDENCIES_TITLE: Final = "Sources"
-METADATA_FIELDS = FileSourceMixin.__fields__
+METADATA_FIELDS = FileSourceMixin.model_fields
 UNICODE_MAPPING: Final = {
     ">=": ">=",
     "<=": "<=",
@@ -477,9 +477,9 @@ def render_source_name(
     """Render a source name with associated links."""
     links = []
     if fs_data.landing_page is not None:
-        links.append(hyperlink("homepage", fs_data.landing_page))
+        links.append(hyperlink("homepage", str(fs_data.landing_page)))
     if fs_data.url is not None:
-        links.append(hyperlink("url", fs_data.url))
+        links.append(hyperlink("url", str(fs_data.url)))
     if repo_url and isinstance(fs_data, LocalFileSourceMixin):
         links.append(format_repo_url(fs_data, repo_root, repo_url, name="github"))
 
@@ -551,7 +551,7 @@ def build_source_metadata(schema: metaschema.Schema, repo_root: Path) -> Dict[st
                 dep_graph,
                 table_docs_relpath=table_docs_relpath,
                 repo_root=repo_root,
-                repo_url=schema.build_options.repo_url,
+                repo_url=(str(schema.build_options.repo_url) if schema.build_options.repo_url else None),
             )
             if fs_data.is_open_access:
                 stype = OPEN_ACCESS
