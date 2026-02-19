@@ -1,3 +1,7 @@
+### 4.5.20260219
+
+- Stop setting hash on existing files in ADLS without a hash by default.
+
 ### 4.5.20260211
 
 - Add optional `cache_control` keyword argument to `upload()`, forwarded to Azure `ContentSettings`.

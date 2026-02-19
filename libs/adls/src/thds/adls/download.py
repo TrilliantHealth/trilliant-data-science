@@ -350,7 +350,7 @@ def download_or_use_verified(
     *,
     expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-    set_remote_hash: bool = True,
+    set_remote_hash: bool = False,
 ) -> ty.Optional[Path]:
     """Download a file or use the existing, cached copy if one exists in the cache and is verifiable.
 
@@ -411,7 +411,7 @@ async def async_download_or_use_verified(
     *,
     expected_hash: ty.Optional[hashing.Hash] = None,
     cache: ty.Optional[Cache] = None,
-    set_remote_hash: bool = True,
+    set_remote_hash: bool = False,
 ) -> ty.Optional[Path]:
     file_properties = None
     try:

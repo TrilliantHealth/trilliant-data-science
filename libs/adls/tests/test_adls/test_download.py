@@ -180,7 +180,7 @@ async def test_integration_async(test_remote_root: AdlsRoot, test_dest: Path):
 
 
 @pytest.mark.asyncio
-async def test_file_missing_hash_gets_one_assigned_after_download(
+async def test_file_missing_hash_does_not_get_one_assigned_after_download_by_default(
     tmp_remote_root: AdlsRoot, test_dest: Path
 ):
     fs_client = _async_adls_fs_client(*tmp_remote_root)
@@ -195,11 +195,34 @@ async def test_file_missing_hash_gets_one_assigned_after_download(
 
     fp = await file_client.get_file_properties()
     assert not fp.content_settings.content_md5
+    assert not fp.metadata
+
+
+@pytest.mark.asyncio
+async def test_file_missing_hash_gets_one_assigned_after_download_when_set_remote_hash_is_true(
+    tmp_remote_root: AdlsRoot, test_dest: Path
+):
+    fs_client = _async_adls_fs_client(*tmp_remote_root)
+    key = "test/writable/missing-md5.txt"
+    file_client = fs_client.get_file_client(key)
+    await file_client.upload_data(b"hi-i-have-no-md5", overwrite=True)
+    fp = await file_client.get_file_properties()
+    assert not fp.content_settings.content_md5
+
+    cache_hit = await async_download_or_use_verified(
+        fs_client, key, test_dest / "missing-md5.txt", set_remote_hash=True
+    )
+    assert not cache_hit
+
+    fp = await file_client.get_file_properties()
+    assert not fp.content_settings.content_md5
     assert fp.metadata
     assert fp.metadata["hash_xxh3_128_b64"] == "hOfn6RuS0zmzAhyh1tid6w=="
 
     # should not error since the md5 should be correct
-    cache_hit = await async_download_or_use_verified(fs_client, key, test_dest / "missing-md5.txt")
+    cache_hit = await async_download_or_use_verified(
+        fs_client, key, test_dest / "missing-md5.txt", set_remote_hash=True
+    )
     assert cache_hit
 
 
