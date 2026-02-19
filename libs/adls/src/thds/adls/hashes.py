@@ -83,10 +83,10 @@ def extract_hashes_from_props(
     if props.content_settings and props.content_settings.content_md5:
         hashes.append(hashing.Hash("md5", bytes(props.content_settings.content_md5)))
 
-    if props.etag:
+    if props.etag and props.name:
         # this is the final fallback. it cannot be checked locally, but at least
         # it can be checked against what exists remotely the next time we want to use it.
-        if etag_bytes := extract_etag_bytes(props.etag):
+        if etag_bytes := extract_etag_bytes(props.etag, blob_path=props.name):
             hashes.append(hashing.Hash(sys.intern(ETAG_FAKE_HASH_NAME), etag_bytes))
 
     return {h.algo: h for h in hashes}

@@ -218,8 +218,8 @@ async def test_integration_etag_blob_api_list_then_dfs_api_download(
 
         # Step 3: Verify both ETags produce the SAME byte representation
         # This is the core of the regression test - before the fix, these would differ
-        blob_etag_bytes = extract_etag_bytes(blob_etag)
-        dfs_etag_bytes = extract_etag_bytes(dfs_etag)
+        blob_etag_bytes = extract_etag_bytes(blob_etag, key)
+        dfs_etag_bytes = extract_etag_bytes(dfs_etag, key)
 
         assert blob_etag_bytes == dfs_etag_bytes, (
             f"ETags from Blob API and DFS API should produce identical bytes!\n"

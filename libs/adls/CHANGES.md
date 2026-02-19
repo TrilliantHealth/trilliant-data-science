@@ -1,3 +1,8 @@
+### 4.5.20260219b
+
+- Include ADLS blob path in etag-based fake hash to prevent mops memo key collisions across files that
+  share the same Azure ETag.
+
 ### 4.5.20260219
 
 - Stop setting hash on existing files in ADLS without a hash by default.

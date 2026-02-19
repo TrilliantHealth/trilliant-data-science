@@ -11,12 +11,24 @@ ETAG_FAKE_HASH_NAME = "adls-azure-etag-fake"
 logger = log.getLogger(__name__)
 
 
-def extract_etag_bytes(etag_str: str) -> bytes:
+def _raw_etag_bytes(etag_str: str) -> bytes:
     # ADLS etags may or may not be quoted depending on the API used:
     # list_blobs returns unquoted, get_*_properties returns quoted.
     # Strip quotes first, then calculate byte length from the stripped string.
     stripped = etag_str.strip('"')
     return int(stripped, 16).to_bytes((len(stripped) - 2 + 1) // 2, byteorder="big")
+
+
+def extract_etag_bytes(etag_str: str, blob_path: str) -> bytes:
+    # We mix the full ADLS blob path into the etag hash so that files with
+    # identical etags (which Azure can assign when e.g. creation times align)
+    # produce distinct fake hashes.  Without this, mops memoization can
+    # conflate different files that happen to share an etag.
+    assert blob_path, f"We do not allow creating an {ETAG_FAKE_HASH_NAME} from an empty blob_path"
+    h = xxhash.xxh3_128()
+    h.update(blob_path.encode())
+    h.update(_raw_etag_bytes(etag_str))
+    return h.digest()
 
 
 _ETAG_CACHE = config.item("cache-path", home.HOMEDIR() / ".thds/adls/xxhash-onto-etag", parse=Path)

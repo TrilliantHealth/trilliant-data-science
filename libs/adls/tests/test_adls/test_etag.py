@@ -7,6 +7,7 @@ from attrs import define
 from thds.adls import hashes
 from thds.adls._etag import (
     ETAG_FAKE_HASH_NAME,
+    _raw_etag_bytes,
     add_to_etag_cache,
     extract_etag_bytes,
     hash_file_fake_etag,
@@ -30,26 +31,20 @@ class FakeFileProperties:
 # --- Unit tests for _etag module ---
 
 
-def test_extract_etag_bytes_standard_format():
+def test_raw_etag_bytes_standard_format():
     """ADLS etags are quoted hex strings like '"0x8DE4EC15EF69095"'"""
     etag = '"0x8DE4EC15EF69095"'
-    result = extract_etag_bytes(etag)
-    # The hex value 0x8DE4EC15EF69095 should be converted to bytes
+    result = _raw_etag_bytes(etag)
     assert isinstance(result, bytes)
     assert len(result) > 0
-    # Round-trip check: the hex representation should match
     assert result == int("0x8DE4EC15EF69095", 16).to_bytes(len(result), byteorder="big")
 
 
-def test_extract_etag_bytes_various_lengths():
-    """Test etag extraction with various lengths.
-
-    The byte length is derived from the STRIPPED string length,
+def test_raw_etag_bytes_various_lengths():
+    """The byte length is derived from the STRIPPED string length,
     so both quoted and unquoted etags produce the same byte representation.
     """
     test_cases = [
-        # (etag_str, expected_bytes) - length = (len(stripped) - 2 + 1) // 2
-        # where stripped = etag_str.strip('"')
         ('"0x1"', bytes.fromhex("01")),  # stripped='0x1', len=3, (3-2+1)//2 = 1 byte
         ("0x1", bytes.fromhex("01")),  # same value, no quotes, same result
         ('"0xFF"', bytes.fromhex("FF")),  # stripped='0xFF', len=4, (4-2+1)//2 = 1 byte
@@ -60,7 +55,7 @@ def test_extract_etag_bytes_various_lengths():
         ("0xABCDEF", bytes.fromhex("ABCDEF")),  # same value, no quotes, same result
     ]
     for etag_str, expected in test_cases:
-        result = extract_etag_bytes(etag_str)
+        result = _raw_etag_bytes(etag_str)
         assert result == expected, (
             f"Failed for {etag_str}: got {result.hex()}, expected {expected.hex()}"
         )
@@ -139,7 +134,35 @@ def test_extract_hashes_from_props_with_etag_only():
     assert ETAG_FAKE_HASH_NAME in result
     etag_hash = result[ETAG_FAKE_HASH_NAME]
     assert etag_hash.algo == ETAG_FAKE_HASH_NAME
-    assert etag_hash.bytes == extract_etag_bytes('"0x8DE4EC15EF69095"')
+    assert etag_hash.bytes == extract_etag_bytes('"0x8DE4EC15EF69095"', blob_path="a_file")
+
+
+def test_extract_etag_bytes_differs_by_path():
+    """Files with the same etag but different paths must produce different fake hashes."""
+    etag = '"0x8DE4EC15EF69095"'
+    a = extract_etag_bytes(etag, blob_path="container/dir/part-00001.parquet")
+    b = extract_etag_bytes(etag, blob_path="container/dir/part-00002.parquet")
+    assert a != b
+
+
+def test_extract_etag_bytes_same_path_same_etag_is_stable():
+    """Same path + same etag must always produce the same fake hash."""
+    etag = '"0x8DE4EC15EF69095"'
+    path = "container/dir/part-00001.parquet"
+    assert extract_etag_bytes(etag, blob_path=path) == extract_etag_bytes(etag, blob_path=path)
+
+
+def test_extract_hashes_from_props_skips_etag_without_name():
+    """When props.name is falsy, etag should not be used at all."""
+    for name in ("", None):
+        props = FakeFileProperties(
+            name,  # type: ignore[arg-type]
+            metadata=dict(),
+            content_settings=FakeContentSettings(content_md5=None),
+            etag='"0x8DE4EC15EF69095"',
+        )
+        result = hashes.extract_hashes_from_props(props)
+        assert ETAG_FAKE_HASH_NAME not in result, f"Expected no etag hash for name={name!r}"
 
 
 def test_extract_hashes_from_props_etag_is_last_resort():
