@@ -156,6 +156,11 @@ class UncertainFuturesTracker(ty.Generic[K, R_0]):
         if fut_state := self._keyed_futures_state.get(key):
             self._interpret_event(fut_state, r_0)
 
+    def has_active_futures(self) -> bool:
+        """True if any tracked key has unresolved futures."""
+        with self._lock:
+            return any(fs.futshims for fs in self._keyed_futures_state.values())
+
     def gc_stale(self) -> None:
         """Garbage collect any Futures that haven't been updated in a while.
 

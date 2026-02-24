@@ -1,3 +1,10 @@
+### 3.14.20260223
+
+- Silences k8s watch lifecycle logs (loop restarts, watchdog heartbeats, ReadTimeoutErrors) when no
+  futures are active. These logs are useful while jobs are running but become noise in long-lived
+  containers (e.g. Demand Forecast) that finish their `mops` work and then keep running. The watcher
+  thread continues operating normally — only the log level changes from `info` to `debug`.
+
 ### 3.14.20260206
 
 - Pins pickle protocol to 4 for all cache-key-affecting serialization. Python 3.14 changed
