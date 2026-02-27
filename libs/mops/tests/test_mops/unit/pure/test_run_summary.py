@@ -19,28 +19,21 @@ def set_env() -> None:
 
 @pytest.fixture
 def run_directory() -> Generator[Path, None, None]:
-    # Fixture for creating and supplying a run directory to a test
-    # and clean it up afterward
-    run_dir = run_summary.create_mops_run_directory()
+    run_dir = run_summary.resolve_run_directory_path()
 
     yield run_dir
 
-    shutil.rmtree(run_dir)
-
-
-def test_create_mops_directory(run_directory: Path) -> None:
-    assert run_directory.exists()
-    assert run_directory.is_dir()
+    shutil.rmtree(run_dir, ignore_errors=True)
+    run_summary._ensure_run_directory.clear_cache()  # type: ignore[attr-defined]
 
 
 def test_memoizing_pickling_runner_init() -> None:
     mock_shim = MagicMock()
     storage_root = "file:///mock_storage_root"
     runner = MemoizingPicklingRunner(mock_shim, blob_storage_root=storage_root)
-    assert runner._run_directory.exists()
-    assert runner._run_directory.is_dir()
-
-    shutil.rmtree(runner._run_directory)
+    # runner construction resolves the path but does NOT create it on disk
+    assert not runner._run_directory.exists()
+    assert runner._run_directory.parent.name == ".mops-test"
 
 
 def test_log_function_execution_new_file(run_directory: Path) -> None:
@@ -70,9 +63,8 @@ def test_log_function_execution_new_file(run_directory: Path) -> None:
 def test_log_function_execution_invalid_json(run_directory: Path) -> None:
     memo_uri = "adls://env/mops2-mpf/pipeline-id/some-path/foo.bar--function-id-invalid-json-test/ARGS"
 
+    run_directory.mkdir(parents=True, exist_ok=True)
     log_file = run_directory / "invalid.json"
-
-    # Create an invalid JSON file
     with log_file.open("w") as f:
         f.write("invalid json")
 

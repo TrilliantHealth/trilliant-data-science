@@ -95,7 +95,7 @@ class MemoizingPicklingRunner:
         self._by_id_registry = serialization_registry
         self._redirect = redirect
 
-        self._run_directory = run_summary.create_mops_run_directory()
+        self._run_directory = run_summary.resolve_run_directory_path()
 
         self._calls_registry: dict[ty.Callable, list[ty.Callable]] = defaultdict(list)
 

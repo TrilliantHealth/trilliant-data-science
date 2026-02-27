@@ -5,7 +5,7 @@ import pickle
 import typing as ty
 from pathlib import Path
 
-from thds.core import config, files, log, pickle_visit, source
+from thds.core import cache, config, files, log, pickle_visit, source
 from thds.mops.pure.core.memo import function_memospace
 from thds.mops.pure.core.metadata import get_invoked_by
 
@@ -45,26 +45,38 @@ class LogEntry(LogEntryV1, total=False):
     uris_in_rvalue: ty.List[str]
 
 
-def create_mops_run_directory() -> Path:
-    # Define the root directory for mops logs
-    mops_root = MOPS_SUMMARY_DIR()
-    # Use run name if set, otherwise fallback to orchestrator datetime
-    run_name = RUN_NAME()
-    # Create a subdirectory named with the orchestrator datetime and run identifier
-    run_directory = mops_root / run_name
+def resolve_run_directory_path() -> Path:
+    """Compute the run directory path without creating it on disk.
+
+    Safe to call at import time — no I/O side effects.
+    """
+    return MOPS_SUMMARY_DIR() / RUN_NAME()
+
+
+@cache.locking
+def _ensure_run_directory(run_directory: str) -> None:
+    """Create the directory on disk (called at most once per path per process).
+
+    Also propagates the run name to the environment so forked/spawned
+    children inherit the same summary directory.
+    """
+    path = Path(run_directory)
     try:
-        run_directory.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
     except Exception:
+        mops_root = MOPS_SUMMARY_DIR()
         if mops_root.exists() and not mops_root.is_dir():
-            # this is going to cause errors later on!
             logger.error(
                 f"mops summary directory must be a directory: '{mops_root}'"
                 " Please delete this file and allow mops to recreate it!"
             )
         else:
             raise
+        return
 
-    return run_directory
+    env_var = RUN_NAME.envname
+    if env_var not in os.environ:
+        os.environ[env_var] = RUN_NAME()
 
 
 def _generate_log_filename(
@@ -125,6 +137,8 @@ def log_function_execution(
     if not RUN_NAME():
         logger.debug("mops run summary is disabled.")
         return
+
+    _ensure_run_directory(str(run_directory))
 
     invoked_at = metadata.invoked_at if metadata else dt.datetime.utcnow()
 
