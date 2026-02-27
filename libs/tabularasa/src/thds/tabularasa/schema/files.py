@@ -4,7 +4,7 @@ import os
 from collections import Counter
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, Dict, List, Literal, Optional, Set, Union
 
 import pkg_resources
 from pydantic import AfterValidator, AnyUrl, BaseModel, ConfigDict, Field
@@ -21,30 +21,17 @@ class CSVQuotingConvention(Enum):
 
 UpdateFrequency = Literal["Yearly", "Quarterly", "Monthly", "Biannual"]
 
-
-def quarter(date: datetime.date) -> int:
-    return (date.month - 1) // 3 + 1
+_FREQ_MONTHS: Dict[str, int] = {"Yearly": 12, "Biannual": 6, "Quarterly": 3, "Monthly": 1}
 
 
-def half(date: datetime.date) -> int:
-    return (date.month - 1) // 6 + 1
+def _delivery_period(date: datetime.date, frequency: UpdateFrequency, first_delivery_month: int) -> int:
+    """Compute a monotonically increasing period index for a date.
 
-
-def _get_tail(freq: UpdateFrequency, date: datetime.date) -> Tuple[int, ...]:
-    if freq == "Yearly":
-        return ()
-    if freq == "Quarterly":
-        return (quarter(date),)
-    if freq == "Monthly":
-        return (date.month,)
-    return (half(date),)
-
-
-def _date_tuple(date: datetime.date, freq: UpdateFrequency) -> Tuple[int, ...]:
-    return (date.year, *_get_tail(freq, date))
-
-
-current_date = datetime.date.today()
+    Divides the timeline into periods of length determined by ``frequency``,
+    anchored so that the first period of each cycle begins in ``first_delivery_month``.
+    """
+    period_months = _FREQ_MONTHS[frequency]
+    return (date.year * 12 + date.month - first_delivery_month) // period_months
 
 
 class FileSourceMixin(BaseModel):
@@ -55,6 +42,7 @@ class FileSourceMixin(BaseModel):
     last_checked: Optional[datetime.date] = None
     last_updated: Optional[datetime.date] = None
     update_frequency: Optional[UpdateFrequency] = None
+    first_delivery_month: Optional[int] = Field(default=None, ge=1, le=12)
     is_open_access: Optional[bool] = None
     doc: Optional[str] = None
 
@@ -62,8 +50,9 @@ class FileSourceMixin(BaseModel):
         if self.update_frequency is not None:
             if self.last_updated is None:
                 return True
-            return _date_tuple(current_date, self.update_frequency) > _date_tuple(
-                self.last_updated, self.update_frequency
+            fdm = self.first_delivery_month or 1
+            return _delivery_period(current_date, self.update_frequency, fdm) > _delivery_period(
+                self.last_updated, self.update_frequency, fdm
             )
         return False
 

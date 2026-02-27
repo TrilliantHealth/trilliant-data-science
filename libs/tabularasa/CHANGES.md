@@ -1,3 +1,8 @@
+### 0.14.11
+
+- Added `first_delivery_month` field to `FileSourceMixin` and updated `needs_update` logic to use
+  delivery-period boundaries anchored to this month instead of calendar-period boundaries.
+
 ### 0.14.10
 
 Updated to Pydantic V2.
