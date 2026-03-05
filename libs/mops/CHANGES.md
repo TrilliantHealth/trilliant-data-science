@@ -1,3 +1,8 @@
+### 3.14.20260225
+
+- Drop Python 3.9 support (`requires-python>=3.10`). Remove `importlib_metadata` compat shim in favor of
+  stdlib `importlib.metadata`.
+
 ### 3.14.20260223
 
 - Silences k8s watch lifecycle logs (loop restarts, watchdog heartbeats, ReadTimeoutErrors) when no

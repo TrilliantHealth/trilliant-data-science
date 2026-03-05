@@ -1,3 +1,7 @@
+### 4.5.20260225
+
+- Drop Python 3.9 support (`requires-python>=3.10`).
+
 ### 4.5.20260219b
 
 - Include ADLS blob path in etag-based fake hash to prevent mops memo key collisions across files that

@@ -5,7 +5,7 @@ version = "1.7"
 description = "Utilities for attrs record classes."
 readme = "README.md"
 authors = [{name = "Trillianth Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "attrs>=22.2.0",
     "returns", # TODO - remove this + refactor accordingly

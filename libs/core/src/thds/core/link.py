@@ -1,5 +1,6 @@
 """Best-effort to link a destination to a source depending on file system support."""
 
+import contextlib
 import os
 import platform
 import shutil
@@ -46,8 +47,9 @@ def link(
     if not attempt_types:
         attempt_types = ("ref", "hard", "soft")
     src = Path(src).resolve()
-    if src == Path(dest).resolve():
-        return "same"
+    with contextlib.suppress(OSError):
+        if src == Path(dest).resolve():
+            return "same"
 
     assert os.path.exists(src), f"Source {src} does not exist"
 

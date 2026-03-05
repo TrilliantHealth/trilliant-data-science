@@ -2,8 +2,6 @@ from pathlib import Path
 
 from thds.core import git
 
-REPO_ROOT = Path(__file__).parents[4]
-
 
 def test_get_repo_root():
     for parent_dir in Path(__file__).resolve().parents:
@@ -15,11 +13,16 @@ def test_get_repo_root():
 
 
 def test_git_commit_datetime_and_hash():
-    """This test depends on the referenced file not being changed.
-
-    If it does change, just change the values below.
-    """
-    dt, hash = git.get_commit_datetime_and_hash(
-        "libs/core/tests/__init__.py", cwd=str(git.get_repo_root())
-    )
-    assert dt, hash == ("20221111.2001", "ac171a571f764fbd2522f254b1aa162220e7867c")
+    # no file pattern — just gets HEAD's datetime and hash, avoiding pathspec-limited
+    # git log which is extremely slow in treeless CI clones (--filter=tree:0).
+    dt, hash = git.get_commit_datetime_and_hash()
+    yyyymmdd, hhmm = dt.split(".")
+    assert len(yyyymmdd) == 8
+    assert yyyymmdd.isdigit()
+    assert yyyymmdd.startswith("20")
+    assert len(hhmm) == 4
+    assert hhmm.isdigit()
+    assert int(hhmm[:2]) < 24
+    assert int(hhmm[2:]) < 60
+    assert len(hash) == 40
+    assert all(c in "0123456789abcdef" for c in hash)

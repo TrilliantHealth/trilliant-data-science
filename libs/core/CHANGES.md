@@ -1,3 +1,7 @@
+### 1.50.20260225
+
+- Drop Python 3.9 support (`requires-python>=3.10`).
+
 ### 1.50.20260107
 
 - Fix `cpus.guarantee()` and `cpus.limit()` bug causing a boolean value to be returned instead of a

@@ -20,10 +20,10 @@ def _get_installed_packages() -> ty.List[str]:
     """Get all installed packages with versions, sorted alphabetically."""
     packages = []
     for dist in importlib.metadata.distributions():
-        name = dist.metadata.get("Name", "")
-        version = dist.version
-        if name:
-            packages.append(f"{name}=={version}")
+        if "Name" not in dist.metadata:
+            continue
+
+        packages.append(f"{dist.metadata['Name']}=={dist.version}")
 
     return sorted(packages, key=str.lower)
 

@@ -1,3 +1,7 @@
+### 1.7.20260225
+
+- Drop Python 3.9 support (`requires-python>=3.10`).
+
 ## 1.7
 
 - Adds new `params` submodule with utilities for inspecting and parameterizing generic types. These can
