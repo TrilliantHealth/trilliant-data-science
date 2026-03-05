@@ -101,3 +101,37 @@ def test_load_from_config_file():
 
     assert tree.getv("a.c") == 100  # from the mask
     assert tree.getv("a.b") == 42  # from the non-masked config.
+
+
+def test_load_config_does_not_override_more_specific_code_entry():
+    """A config-file entry at package level does NOT beat a code-level entry at a
+    more specific (e.g. function) path. This is by design — the hierarchical lookup
+    prefers the most specific match, regardless of source. Use __mask to force an
+    override of an entire subtree."""
+    tree = ConfigTree("test")  # type: ignore
+    tree.setv("from-decorator", "foo.bar.baz.my_func")
+    tree.load_config({"foo.bar.test": "from-toml"})
+
+    assert tree.getv("foo.bar.baz.my_func") == "from-decorator"
+    # but less-specific paths DO pick up the config-file entry
+    assert tree.getv("foo.bar.baz.other_func") == "from-toml"
+
+
+def test_load_config_overrides_same_path_code_entry():
+    """A config-file entry at the same path as a code-level entry overwrites it,
+    because load_config calls setv which updates the existing ConfigItem."""
+    tree = ConfigTree("test")  # type: ignore
+    tree.setv("from-decorator", "foo.bar.baz.my_func")
+    tree.load_config({"foo.bar.baz.my_func.test": "from-toml"})
+
+    assert tree.getv("foo.bar.baz.my_func") == "from-toml"
+
+
+def test_load_config_mask_overrides_more_specific_code_entry():
+    """A __mask config-file entry at package level DOES beat a code-level entry at a
+    more specific path. This is how users override an entire subtree from a TOML file."""
+    tree = ConfigTree("test")  # type: ignore
+    tree.setv("from-decorator", "foo.bar.baz.my_func")
+    tree.load_config({"__mask.foo.bar.test": "from-toml-mask"})
+
+    assert tree.getv("foo.bar.baz.my_func") == "from-toml-mask"

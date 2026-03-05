@@ -261,11 +261,6 @@ can create a `.mops.toml` file at an appropriate place in your codebase. Call
 directory of the process, and load config from the link:../src/thds/mops/config.py[first
 `.mops.toml` file that it finds].
 
-NOTE: Configuration loaded at the time of calling `pure.magic.load_config_file()` will
-override any configuration expressed statically through use of `pure.magic....` calls at
-the roots of your modules - unless those modules are imported after loading
-the config file. It is up to you to deal with the order of operations when loading config files.
-
 A `.mops.toml` can express anything that the static calls to `pure.magic....` express, using
 the syntax shown below:
 
@@ -316,6 +311,50 @@ pure.magic.shim('samethread')
 NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `samethread` shim for
 `func1` will not be used - everything under `foo.bar` would be a non-mops passthrough
 function call.
+
+=== Config file specificity and `+__mask+`
+
+Config-file entries follow the same specificity rules as code-level
+`+pure.magic.shim/blob_root/pipeline_id+` calls: a more specific path always wins over a
+less specific one, regardless of whether the entry came from code or a config file. A
+config-file entry at the same path as a code-level entry _will_ override it (since the
+config file is loaded after imports), but a package-level config-file entry will **not**
+override a function-level entry set by a decorator.
+
+For example, if your code has `+@pure.magic(k8s_shim)+` on `+foo.bar.my_func+`, and your
+`+.mops.toml+` has:
+
+.`+.mops.toml+` - this does NOT override the decorator
+[source,toml]
+----
+[foo.bar]
+mops.pure.magic.shim = 'subprocess'
+----
+
+The decorator's shim wins, because `+foo.bar.my_func+` is more specific than `+foo.bar+`.
+Functions in `+foo.bar+` that don't have their own shim set will use `+'subprocess'+`.
+
+To override `+my_func+` specifically, target it by its full path:
+
+.`+.mops.toml+` - targets the exact function
+[source,toml]
+----
+[foo.bar.my_func]
+mops.pure.magic.shim = 'subprocess'
+----
+
+To override _everything_ under `+foo.bar+` regardless of function-level config, use
+`+__mask+`:
+
+.`+.mops.toml+` - masks the entire subtree
+[source,toml]
+----
+[foo.bar]
+__mask.mops.pure.magic.shim = 'subprocess'
+----
+
+`+__mask+` is useful for development workflows where you want to force an entire module
+tree to run locally (or with a different shim) without modifying any code.
 
 == `pure.magic.wand`
 
