@@ -69,7 +69,7 @@ class _RefCountResource(ty.Generic[R]):
                 resource = resource_cm.__enter__()
                 self._rcm__exit__ = resource_cm.__exit__
                 if id(resource) == id(resource_cm):
-                    logger.info("Patching self-managing resource to avoid double exit: %s", resource)
+                    logger.debug("Patching self-managing resource to avoid double exit: %s", resource)
                     # this is one of those context managers that returns itself
                     # since we manage this resource, we need to prevent others from trying to enter or exit it.
                     resource = _ContextProxy(resource)  # type: ignore[assignment]

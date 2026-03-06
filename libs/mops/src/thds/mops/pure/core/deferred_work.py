@@ -70,7 +70,7 @@ def perform_all() -> None:
     """execute all the deferred work that has been added to the current context."""
     work_items = _DEFERRED_INVOCATION_WORK()
     if work_items:
-        logger.info("Performing %s items of deferred work", len(work_items))
+        logger.debug("Performing %s items of deferred work", len(work_items))
         with _DEFERRED_WORK_THREADPOOL.get() as thread_pool_executor:
             for key, _ in core.parallel.failfast(
                 core.parallel.yield_all(dict(work_items).items(), executor_cm=thread_pool_executor)
