@@ -22,7 +22,7 @@ T = ty.TypeVar("T")
 
 def _try_read_value(config_path: Path, parse: ty.Callable[[str], T]) -> ty.Optional[T]:
     if config_path.is_file():
-        logger.info(f"Found {config_path}; attempting to read value")
+        logger.debug(f"Found {config_path}; attempting to read value")
         with config_path.open() as f:
             contents = f.read().strip()
             try:
@@ -33,7 +33,7 @@ def _try_read_value(config_path: Path, parse: ty.Callable[[str], T]) -> ty.Optio
                 # better to fail loudly than risk silent CPU oversubscription
                 raise e
             else:
-                logger.info(f"Read value {value} from {config_path}")
+                logger.debug(f"Read value {value} from {config_path}")
                 return value
     return None
 
@@ -57,6 +57,7 @@ def _parse_cpu_quota_and_period_v2(s: str) -> ty.Tuple[int, int]:
     return quota, period
 
 
+@lru_cache
 def available_cpu_count() -> int:
     """Attempt to determine number of available CPUs, accounting for the possibility of running inside a docker
     container. Ideally, this serves as a drop-in replacement for os.cpu_count() in that context.

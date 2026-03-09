@@ -1,12 +1,11 @@
 import os
-from functools import lru_cache
 
-from thds.core import cpus, log
+from thds.core import cache, cpus, log
 
 logger = log.getLogger(__name__)
 
 
-@lru_cache
+@cache.locking
 def restrict_usage() -> dict:
     num_cpus = cpus.available_cpu_count()
 
