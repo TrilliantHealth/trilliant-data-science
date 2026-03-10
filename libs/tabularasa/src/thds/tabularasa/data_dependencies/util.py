@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import IO, Callable, Dict, List, Optional, TypeVar, Union, cast
 
 import pandas as pd
-import pkg_resources
 import pyarrow
 
 from thds.tabularasa.data_dependencies.adls import ADLSDownloadResult
 from thds.tabularasa.loaders.parquet_util import pandas_maybe, preprocessor_for_pyarrow_type
+from thds.tabularasa.pkgutil import resource_filename
 from thds.tabularasa.schema.files import LocalDataSpec
 from thds.tabularasa.schema.metaschema import Table
 from thds.tabularasa.schema.util import Identifier, import_func
@@ -33,7 +33,7 @@ F = TypeVar("F", bound=Callable)
 
 
 def package_data_file_size(package: str, path: str) -> int:
-    os_path = pkg_resources.resource_filename(package, path)
+    os_path = resource_filename(package, path)
     return os.stat(os_path).st_size
 
 

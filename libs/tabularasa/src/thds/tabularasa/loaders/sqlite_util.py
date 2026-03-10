@@ -13,10 +13,10 @@ from typing import Callable, Optional, Type
 
 import attr
 import cattrs.preconf.json
-import pkg_resources
 from filelock import FileLock
 
 from thds.core.types import StrOrPath
+from thds.tabularasa.pkgutil import resource_filename
 from thds.tabularasa.schema.dtypes import DType
 from thds.tabularasa.sqlite3_compat import sqlite3
 
@@ -174,7 +174,7 @@ def to_local_path(path: StrOrPath, package: Optional[str] = None) -> Path:
     if package is None:
         return Path(path)
     else:
-        return Path(pkg_resources.resource_filename(package, str(path)))
+        return Path(resource_filename(package, str(path)))
 
 
 def set_bulk_write_mode(con: sqlite3.Connection) -> sqlite3.Connection:

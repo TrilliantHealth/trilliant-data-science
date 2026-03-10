@@ -452,7 +452,7 @@ css = [
 
 [[package]]
 name = "bourbaki-application"
-version = "0.10.12"
+version = "0.10.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bourbaki-introspection" },
@@ -463,9 +463,9 @@ dependencies = [
     { name = "typing-inspect" },
     { name = "ujson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/42/5d43e281cb1c2bc730464a541c5f696051e6a87b5920ad663924790897e9/bourbaki.application-0.10.12.tar.gz", hash = "sha256:633974b35e55efb39b7354dfa6ed28dfabcf4fa1c428b33f01a89073a0004ee9", size = 95085, upload-time = "2021-01-26T17:23:21.145Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/f9/56dbcc7d2d014205a5e7fef9d8be9b0ccdc5b0ec66313f1bf0aba6545b95/bourbaki_application-0.10.13.tar.gz", hash = "sha256:49b6126425191ba4bf093a187ac03477c1deb7618d72f0056e94df011e777683", size = 111756, upload-time = "2026-03-04T04:54:39.554Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/b6/3da99adb01057650ada4c7dec8454ec7b9a4f3395692ccdccabd3a044f0c/bourbaki.application-0.10.12-py3-none-any.whl", hash = "sha256:1818e760fcfc72fa1e5ef93b0e42fc9159a1ba59059cba2a75024857772a4fca", size = 120339, upload-time = "2021-01-26T17:23:18.84Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/24/834b1b8948a0226aaa31a3f8d320d3c9f577e3c6ccdd9cee81d52dd7126b/bourbaki_application-0.10.13-py3-none-any.whl", hash = "sha256:147b8375744ff0812ca05ead489243067e10506cf2e71bebe777a5edf549e220", size = 118983, upload-time = "2026-03-04T04:54:38.27Z" },
 ]
 
 [[package]]
@@ -3024,7 +3024,7 @@ dev = [
 
 [[package]]
 name = "thds-tabularasa"
-version = "0.14.11"
+version = "0.14.12"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -3087,7 +3087,7 @@ dev = [
 requires-dist = [
     { name = "attrs", specifier = ">=22.2" },
     { name = "black", marker = "extra == 'autoformat'" },
-    { name = "bourbaki-application", marker = "extra == 'cli'", specifier = ">=0.10.12" },
+    { name = "bourbaki-application", marker = "extra == 'cli'", specifier = ">=0.10.13" },
     { name = "cattrs", specifier = ">=22.2" },
     { name = "filelock" },
     { name = "isort", marker = "extra == 'autoformat'" },
@@ -3112,7 +3112,7 @@ provides-extras = ["autoformat", "cli", "viz"]
 [package.metadata.requires-dev]
 dev = [
     { name = "black" },
-    { name = "bourbaki-application", specifier = ">=0.10.12" },
+    { name = "bourbaki-application", specifier = ">=0.10.13" },
     { name = "ipykernel" },
     { name = "ipython" },
     { name = "isort" },

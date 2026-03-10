@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Set, Tuple, Type, Union, cast
 
 import networkx as nx
-import pkg_resources
 import yaml
 
 from .. import git_util
+from ..pkgutil import resource_exists, resource_filename, resource_stream
 from .constraints import AnyColumnConstraint, EnumConstraint
 from .dtypes import DType
 from .files import ADLSDataSpec, LocalDataSpec, TabularFileSource
@@ -495,7 +495,7 @@ def _validate_local_data_resource(
         exists = os.path.isfile(data_path) or os.path.isdir(data_path)
     else:
         try:
-            exists = pkg_resources.resource_exists(package, data_path)
+            exists = resource_exists(package, data_path)
         except ModuleNotFoundError:
             errors.append(package_not_installed(resource_name, resource_desc, package))
             exists = True
@@ -858,14 +858,12 @@ def load_schema(
             with open(schema_path, "r") as f:
                 json: JSON = yaml.safe_load(f)
         else:
-            with pkg_resources.resource_stream(package, schema_path) as f:
+            with resource_stream(package, schema_path) as f:
                 json = yaml.safe_load(f)
 
     else:
         abspath = (
-            Path(schema_path)
-            if package is None
-            else Path(pkg_resources.resource_filename(package, str(schema_path)))
+            Path(schema_path) if package is None else Path(resource_filename(package, str(schema_path)))
         )
         contents = git_util.blob_contents(abspath, git_ref)
         json = yaml.safe_load(io.BytesIO(contents))

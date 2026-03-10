@@ -17,12 +17,12 @@ from typing import (
 
 import networkx as nx
 import pandas as pd
-import pkg_resources
 import pyarrow
 import pyarrow.parquet
 import setuptools.command.build_py
 
 from thds.tabularasa.loaders.util import PandasParquetLoader, default_parquet_package_data_path
+from thds.tabularasa.pkgutil import resource_exists, resource_filename, resource_stream
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
     render_attrs_module,
@@ -130,7 +130,7 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
             require_data_resources=self.for_setup_py_build,
         )
         self.derived_code_submodule_dir: Path = Path(
-            pkg_resources.resource_filename(
+            resource_filename(
                 self.package_name,
                 self.options.derived_code_submodule.replace(".", "/"),
             )
@@ -436,9 +436,7 @@ def _save_as_package_data(
     """NOTE: This function mutates `df` but is only ever called in one place in
     `write_package_data_tables`, just before the reference to `df` is collected."""
     file_path = Path(
-        pkg_resources.resource_filename(
-            package_name, default_parquet_package_data_path(table.name, data_dir)
-        )
+        resource_filename(package_name, default_parquet_package_data_path(table.name, data_dir))
     )
     getLogger(__name__).info("Writing table %s to %s", table.name, file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -478,11 +476,11 @@ def _computation_order_and_dependencies(
         )
 
         if check_hash:
-            if derived_pqt_md5 is not None and pkg_resources.resource_exists(
+            if derived_pqt_md5 is not None and resource_exists(
                 package,
                 pqt_package_data_path,
             ):
-                with pkg_resources.resource_stream(package, pqt_package_data_path) as f:
+                with resource_stream(package, pqt_package_data_path) as f:
                     if hash_file(f) == derived_pqt_md5:
                         precomputed_tables[table.graph_ref] = pqt_package_data_path
                     else:
@@ -502,7 +500,7 @@ def _computation_order_and_dependencies(
                     pqt_package_data_path,
                     package,
                 )
-        elif pkg_resources.resource_exists(package, pqt_package_data_path):
+        elif resource_exists(package, pqt_package_data_path):
             if derived_pqt_md5 is not None:
                 _LOGGER.warning(
                     "Ignoring MD5 hash for table %s since check_hash=False was passed; its associated "

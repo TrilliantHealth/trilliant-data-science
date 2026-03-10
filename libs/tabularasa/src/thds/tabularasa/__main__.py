@@ -24,7 +24,6 @@ from typing import (
 )
 
 import networkx as nx
-import pkg_resources
 
 from thds.core import link, parallel
 from thds.tabularasa.data_dependencies.adls import (
@@ -43,6 +42,7 @@ from thds.tabularasa.loaders.util import (
     default_parquet_package_data_path,
     hash_file,
 )
+from thds.tabularasa.pkgutil import resource_filename, resource_stream
 from thds.tabularasa.schema import load_schema, metaschema
 from thds.tabularasa.schema.compilation import (
     render_attrs_module,
@@ -443,7 +443,7 @@ class ReferenceDataManager:
     def check_editable_install(self):
         """Ensure that the package being built is installed in an editable mode; otherwise the operations
         defined in this interface may not have the intended effects."""
-        local_data_dir = Path(pkg_resources.resource_filename(self.package, ""))
+        local_data_dir = Path(resource_filename(self.package, ""))
         if not str(local_data_dir).startswith(str(self.repo_root)):
             msg = (
                 f"Package {self.package} appears not to be installed in editable mode; this could result"
@@ -458,7 +458,7 @@ class ReferenceDataManager:
         """Round-trippable load of the schema YAML file, for development operations where the file needs
         to be edited while preserving style and comments"""
         self.logger.info("Loading round-trippable raw schema")
-        with pkg_resources.resource_stream(self.package, self.schema_path) as f:
+        with resource_stream(self.package, self.schema_path) as f:
             return load_yaml(f)
 
     @property
@@ -516,7 +516,7 @@ class ReferenceDataManager:
         data_dir = self.transient_data_dir if table_.transient else self.package_data_dir
         assert data_dir is not None
         return Path(
-            pkg_resources.resource_filename(
+            resource_filename(
                 self.package,
                 default_parquet_package_data_path(table_.name, data_dir),
             )
@@ -628,7 +628,7 @@ class ReferenceDataManager:
                 package=self.package,
                 data_dir=self.transient_data_dir if table.transient else self.package_data_dir,
             )
-            if Path(pkg_resources.resource_filename(self.package, loader.data_path)).exists():
+            if Path(resource_filename(self.package, loader.data_path)).exists():
                 hashes[name] = DataFileHashes(actual=loader.file_hash(), expected=table.md5)
             else:
                 hashes[name] = DataFileHashes(actual=None, expected=table.md5)
@@ -838,7 +838,7 @@ class ReferenceDataManager:
                     f"package data file doesn't exist for table {table_name!r}; can't update md5 hash"
                 )
 
-        schema_path = pkg_resources.resource_filename(self.package, self.schema_path)
+        schema_path = resource_filename(self.package, self.schema_path)
         if hashes_updated:
             self.logger.warning(
                 f"updated hashes for tables {hashes_updated!r}; writing new schema to {schema_path}"
@@ -857,7 +857,7 @@ class ReferenceDataManager:
         assert table.md5 is not None, f"No md5 defined for table {table.name}"
         assert self.package_data_dir is not None, "No package data dir to sync"
         local_build_path = Path(
-            pkg_resources.resource_filename(
+            resource_filename(
                 self.package,
                 default_parquet_package_data_path(table.name, self.package_data_dir),
             )
@@ -1010,7 +1010,7 @@ class ReferenceDataManager:
             raise RuntimeError(f"Sync failed for tables {', '.join(table_names)}") from first_exc
 
         down_ = (
-            f"to local build directory {pkg_resources.resource_filename(self.package, self.package_data_dir)}"
+            f"to local build directory {resource_filename(self.package, self.package_data_dir)}"
             if down
             else ""
         )

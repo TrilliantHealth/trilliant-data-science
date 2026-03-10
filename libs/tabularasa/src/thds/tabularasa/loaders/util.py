@@ -22,12 +22,16 @@ import numpy as np
 import pandas as pd
 import pandas.core.dtypes.base as pd_dtypes
 import pandera as pa
-import pkg_resources
 import pyarrow
 import pyarrow.parquet as pq
 
 from thds.tabularasa.data_dependencies.adls import sync_adls_data
 from thds.tabularasa.data_dependencies.util import check_categorical_values, hash_file
+from thds.tabularasa.pkgutil import (
+    resource_exists,
+    resource_filename,
+    resource_stream,
+)
 from thds.tabularasa.schema.dtypes import PyType
 from thds.tabularasa.schema.metaschema import RemoteBlobStoreSpec, Table
 from thds.tabularasa.schema.util import snake_case
@@ -86,7 +90,7 @@ def package_data_path(filename: str, data_dir: str, as_package_data: bool = True
     """Standardized path to a file resource for inside a shared package subdirectory.
     When `as_package_data == True`, return a *package data* (Not OS) path to a resource; otherwise return
     a regular OS-compatible file path.
-    see https://setuptools.pypa.io/en/latest/pkg_resources.html#basic-resource-access"""
+    """
     return (
         f"{data_dir.rstrip('/')}/{filename}"
         if as_package_data
@@ -158,7 +162,7 @@ class _PackageDataOrFileInterface:
         if self.package is None:
             return os.path.exists(self.data_path)
         else:
-            return pkg_resources.resource_exists(self.package, self.data_path)
+            return resource_exists(self.package, self.data_path)
 
     def _resource_stream(self, sync: bool = True) -> IO[bytes]:
         if sync:
@@ -169,7 +173,7 @@ class _PackageDataOrFileInterface:
         if self.package is None:
             return open(self.data_path, "rb")
         else:
-            return pkg_resources.resource_stream(self.package, self.data_path)
+            return resource_stream(self.package, self.data_path)
 
     def file_path(self, sync: bool = True) -> Path:
         """Path on the local filesystem to the file underlying this loader. If a blob store is specified
@@ -182,7 +186,7 @@ class _PackageDataOrFileInterface:
         if self.package is None:
             return Path(self.data_path)
         else:
-            return Path(pkg_resources.resource_filename(self.package, self.data_path))
+            return Path(resource_filename(self.package, self.data_path))
 
     def sync_blob(self, link: bool = False) -> Optional[Path]:
         """Ensure that the local file underlying this loader is available.

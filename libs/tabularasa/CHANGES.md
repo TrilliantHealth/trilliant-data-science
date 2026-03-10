@@ -1,3 +1,8 @@
+### 0.14.12
+
+- Removed references to deprecated `pkg_resources` lib, allowing compatibility with `setuptools` >= 82.0
+- Bumped `bourbaki.application` minimum to 0.10.13 (drops its own `pkg_resources` namespace hack).
+
 ### 0.14.11
 
 - Added `first_delivery_month` field to `FileSourceMixin` and updated `needs_update` logic to use

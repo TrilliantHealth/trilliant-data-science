@@ -6,8 +6,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Annotated, Dict, List, Literal, Optional, Set, Union
 
-import pkg_resources
 from pydantic import AfterValidator, AnyUrl, BaseModel, ConfigDict, Field
+
+from thds.tabularasa.pkgutil import (
+    resource_filename,
+    resource_isdir,
+    resource_listdir,
+    resource_stream,
+)
 
 from .util import DashedIdentifier, DocumentedMixin, DottedIdentifier, HexStr, PathStr
 
@@ -65,9 +71,7 @@ class LocalFileSourceMixin(FileSourceMixin):
     @property
     def full_path(self) -> Path:
         return Path(
-            self.filename
-            if self.package is None
-            else pkg_resources.resource_filename(self.package, self.filename)
+            self.filename if self.package is None else resource_filename(self.package, self.filename)
         )
 
     @property
@@ -75,16 +79,16 @@ class LocalFileSourceMixin(FileSourceMixin):
         if self.package is None:
             return open(self.filename, "rb")
         else:
-            if pkg_resources.resource_isdir(self.package, self.filename):
-                raise IsADirectoryError(pkg_resources.resource_filename(self.package, self.filename))
-            return pkg_resources.resource_stream(self.package, self.filename)
+            if resource_isdir(self.package, self.filename):
+                raise IsADirectoryError(resource_filename(self.package, self.filename))
+            return resource_stream(self.package, self.filename)
 
     @property
     def is_dir(self) -> bool:
         if self.package is None:
             return os.path.isdir(self.filename)
         else:
-            return pkg_resources.resource_isdir(self.package, self.filename)
+            return resource_isdir(self.package, self.filename)
 
 
 class TabularFileSource(DocumentedMixin, LocalFileSourceMixin):
@@ -180,7 +184,7 @@ class LocalDataSpec(LocalFileSourceMixin):
         if self.package is None:
             return os.listdir(self.filename)
         else:
-            return pkg_resources.resource_listdir(self.package, self.filename)
+            return resource_listdir(self.package, self.filename)
 
     @property
     def all_data_specs(self) -> List["LocalDataSpec"]:

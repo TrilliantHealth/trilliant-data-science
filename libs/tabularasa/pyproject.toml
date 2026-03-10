@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.11"
+version = "0.14.12"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -29,7 +29,7 @@ autoformat = [
   "isort",
 ]
 cli = [
-  "bourbaki.application>=0.10.12",
+  "bourbaki.application>=0.10.13",
   "ruamel.yaml",
   "tabulate",
 ]
@@ -65,7 +65,7 @@ dev = [
   "sphinx-rtd-theme",
   # data build
   # CLI/code generation ("cli" extra)
-  "bourbaki.application>=0.10.12",
+  "bourbaki.application>=0.10.13",
   "black",
   "isort",
   "ruamel.yaml",

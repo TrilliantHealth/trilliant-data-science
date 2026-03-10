@@ -10,13 +10,13 @@ from typing import ContextManager, Dict, List, Optional, Tuple, Type
 import numpy as np
 import pandas as pd
 import pandera as pa
-import pkg_resources
 import pytest
 
 from thds.tabularasa.data_dependencies.build import write_package_data_tables
 from thds.tabularasa.data_dependencies.sqlite import populate_sqlite_db
 from thds.tabularasa.data_dependencies.tabular import PandasCSVLoader
 from thds.tabularasa.loaders.util import AttrsParquetLoader, PandasParquetLoader
+from thds.tabularasa.pkgutil import resource_filename
 from thds.tabularasa.schema import load_schema
 from thds.tabularasa.schema.compilation import (
     render_attrs_module,
@@ -107,7 +107,7 @@ class ReferenceDataTestCase:
 
     @property
     def sqlite_db_conn(self) -> sqlite3.Connection:
-        db_path = Path(pkg_resources.resource_filename(self.package, self.sqlite_db_path)).absolute()
+        db_path = Path(resource_filename(self.package, self.sqlite_db_path)).absolute()
         return sqlite3.connect(str(db_path))
 
     def _resource_path(self, filename_suffix: str) -> str:
