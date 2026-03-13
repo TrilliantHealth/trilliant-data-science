@@ -1,30 +1,16 @@
 """Bidirectional, context-sensitive translation: Source <--> (Hashref | URI).
 
-Hashrefs - passing data blobs of many kinds into remote functions by their Hash where
-possible, then using a separate lookup file per hash to tell us where the actual data is
-stored.
+Source arguments with a Hash are passed by hash into remote functions. The invocation
+file header embeds a JSON hashref map (hash → uri + size) so the remote side can
+resolve all Sources from the single invocation download — zero additional network
+round-trips.
 
 - local file source containing a Hash - can be optimized with hashref
 - remote file source containing a Hash - can be optimized with hashref
 - remote file source only having URI - cannot be optimized - passed as a raw URI.
 
-Decoupling hashref creation from potential upload is important because it lets us avoid
+Decoupling the data upload from serialization is important because it lets us avoid
 upload in cases where the Shim turns out to be a local machine shim.
-
-We create hashrefs for Sources on the local machine in a shared location. Since this
-data is immutable and content-addressed, there should be no serious concurrency objections
-to this approach.
-
-Then, if we cross a boundary into a Shim that will start execution on a different
-machine, we serialize the local Path to content-addressed storage in the current active
-storage root, and we then create a hashref in the active storage root (again, these
-should be effectively immutable on the shared store even if they will mostly likely get
-rewritten multiple times).
-
-On the remote side, we will first check the local hashref location. It may very well not
-exist at all.  If it does, we should attempt to follow it, but the referent may not
-exist (for whatever reason) and in all cases we are able to fall back to looking for a
-remote hashref and following its reference.
 
 We are keeping the core business logic completely separate from pickling.  All
 serialization methods will have to choose how to represent the information returned by
@@ -32,10 +18,9 @@ this module, but it should be able to call back into this module with that same 
 have a Source object returned to it while it performs low-level deserialization.
 """
 
-import io
-import json
 import sys
 import typing as ty
+from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -43,124 +28,67 @@ from thds import humenc
 from thds.core import hashing, log, source
 from thds.core.files import is_file_uri, to_uri
 from thds.core.source import Source
+from thds.core.stack_context import StackContext
 from thds.core.types import StrOrPath
 
 from . import deferred_work
 from .content_addressed import wordybin_content_addressed
 from .output_naming import mops_uri_assignment
-from .uris import active_storage_root, lookup_blob_store
+from .uris import lookup_blob_store
 
-_REMOTE_HASHREF_PREFIX = "mops2-hashrefs"
-_LOCAL_HASHREF_DIR = ".mops2-local-hashrefs"
 logger = log.getLogger(__name__)
+
+# Maps hash-string → {"uri": ..., "size": ...} for all Sources prepared during serialization.
+# Populated by prepare_source_argument on the orchestrator side, embedded as a JSON header
+# in the invocation file, then set on the remote side so source_from_hashref can resolve
+# without any per-hashref network calls.
+_HASHREF_MAP: StackContext[None | dict[str, dict[str, ty.Any]]] = StackContext("HASHREF_MAP", None)
+stacklocal_hashrefs = _HASHREF_MAP.__call__  # public interface that could later be intermediated
 
 
 def _hash_to_str(hash: hashing.Hash) -> str:
-    # i see no reason to not remain opinionated and "debug-friendly" with the user-visible
-    # encoding of our hashes when they are being stored on a blob store/FS of some kind.
     return f"{hash.algo}-{humenc.encode(hash.bytes)}"
 
 
-def _hashref_uri(hash: hashing.Hash, type: ty.Literal["local", "remote"]) -> str:
-    # the .txt extensions are just for user-friendliness during debugging
-    if type == "remote":
-        base_uri = active_storage_root()
-        return lookup_blob_store(base_uri).join(
-            base_uri, _REMOTE_HASHREF_PREFIX, _hash_to_str(hash) + ".txt"
-        )
-    local_hashref = Path.home() / _LOCAL_HASHREF_DIR / f"{_hash_to_str(hash)}.txt"
-    return to_uri(local_hashref)
+@contextmanager
+def hashref_context(
+    hashref_map: None | dict[str, dict[str, ty.Any]],
+) -> ty.Iterator[None]:
+    """Set an in-memory hashref map so source_from_hashref can resolve without network."""
+    with _HASHREF_MAP.set(hashref_map):
+        yield
 
 
-class _HashrefMeta(ty.NamedTuple):
-    size: int
-
-    @classmethod
-    def empty(cls) -> "_HashrefMeta":
-        return cls(size=0)
-
-    def serialize(self) -> str:
-        serialized = json.dumps(self._asdict())
-        return serialized
-
-    @classmethod
-    def deserialize(cls, serialized: ty.Union[str, ty.Sequence[str]]) -> "_HashrefMeta":
-        s = serialized if isinstance(serialized, str) else serialized[0]
-        try:
-            return cls(**json.loads(s))
-        except json.JSONDecodeError:
-            logger.warning("Failed to deserialize hashref metadata '%s'", serialized)
-            return cls.empty()
-
-
-def _read_hashref(hashref_uri: str) -> ty.Tuple[str, _HashrefMeta]:
-    """Return URI represented by this hashref. Performs IO."""
-    uri_bytes = io.BytesIO()
-    lookup_blob_store(hashref_uri).readbytesinto(hashref_uri, uri_bytes)
-    content = uri_bytes.getvalue().decode()
-    uri, *rest = content.split("\n")
-    assert uri, f"Hashref from {hashref_uri} is empty"
-    if not rest:
-        return uri, _HashrefMeta.empty()
-    return uri, _HashrefMeta.deserialize(rest)
-
-
-def _write_hashref(hashref_uri: str, uri: str, size: int) -> None:
-    """Write URI to this hashref. Performs IO."""
-    assert uri, f"Should never encode hashref ({hashref_uri}) pointing to empty URI"
-    content = "\n".join([uri, _HashrefMeta(size=size).serialize()])
-    lookup_blob_store(hashref_uri).putbytes(hashref_uri, content.encode(), type_hint="text/plain")
+def _collect_hashref_mapping(hash: hashing.Hash, uri: str, size: int) -> None:
+    """Record a hashref mapping during serialization (orchestrator side)."""
+    m = _HASHREF_MAP()
+    if m is not None:
+        m[_hash_to_str(hash)] = {"uri": uri, "size": size}
 
 
 def source_from_hashref(hash: hashing.Hash) -> Source:
-    """Re-create a Source from a Hash by looking up one of two Hashrefs and finding a
-    valid Source for the data."""
-    local_file_hashref_uri = _hashref_uri(hash, "local")
-    remote_hashref_uri = _hashref_uri(hash, "remote")
+    """Re-create a Source from a Hash using the in-memory hashref map
+    (populated from the invocation file header).
+    """
+    m = _HASHREF_MAP()
+    if m is None:
+        raise ValueError(
+            "source_from_hashref called without a hashref map context. "
+            "This indicates a mops version mismatch between orchestrator and remote, or a bug."
+        )
 
-    def remote_uri_and_meta(
-        allow_blob_not_found: bool = True,
-    ) -> ty.Tuple[str, _HashrefMeta]:
-        try:
-            return _read_hashref(remote_hashref_uri)
-        except Exception as e:
-            if not allow_blob_not_found or not lookup_blob_store(
-                remote_hashref_uri,
-            ).is_blob_not_found(e):
-                # 'remote' blob not found is sometimes fine, but anything else is weird
-                # and we should raise.
-                raise
-            return "", _HashrefMeta.empty()
+    entry = m.get(_hash_to_str(hash))
+    if not entry:
+        raise KeyError(
+            f"Hash {_hash_to_str(hash)} not found in hashref map. "
+            "This indicates the invocation was serialized without recording this hash."
+        )
 
-    try:
-        # we might be on the same machine where this was originally invoked.
-        # therefore, there may be a local path we can use directly.
-        # Then, there's no need to bother grabbing the remote_uri
-        # - but for debugging's sake, it's quite nice to actually
-        # have the full remote URI as well even if we're ultimately going to use the local copy.
-        local_uri, _ = _read_hashref(local_file_hashref_uri)
-        remote_uri, _ = remote_uri_and_meta()
-        return source.from_file(local_uri, hash=hash, uri=remote_uri)
-    except FileNotFoundError:
-        # we are not on the same machine as the local ref. assume we need the remote URI.
-        pass
-    except Exception as e:
-        if not lookup_blob_store(local_file_hashref_uri).is_blob_not_found(e):
-            # 'local' blob not found is fine, but anything else is weird and we should raise.
-            raise
-
-    # no local file, so we assume there must be a remote URI.
-    remote_uri, meta = remote_uri_and_meta(False)
-    return source.from_uri(remote_uri, hash=hash, size=meta.size)
+    return source.from_uri(entry["uri"], hash=hash, size=entry["size"])
 
 
-def _upload_and_create_remote_hashref(
-    local_path: Path, remote_uri: str, hash: hashing.Hash, size: int
-) -> None:
-    # exists only to provide a local (non-serializable) closure around local_path and remote_uri.
+def _upload_source_data(local_path: Path, remote_uri: str) -> None:
     lookup_blob_store(remote_uri).putfile(local_path, remote_uri)
-    # make sure we never overwrite a hashref until it's actually going to be valid.
-    _write_hashref(_hashref_uri(hash, "remote"), remote_uri, size)
 
 
 def _auto_remote_arg_uri(hash: hashing.Hash) -> str:
@@ -175,40 +103,24 @@ def _auto_remote_arg_uri(hash: hashing.Hash) -> str:
 def prepare_source_argument(source_: Source) -> ty.Union[str, hashing.Hash]:
     """For use on the orchestrator side, during serialization of the invocation.
 
-    You either end up with a Hashref created under the current HASHREF_ROOT, or you end up
-    with just a URI, which is not amenable to hashref optimization.
+    You either end up with a Hash (recorded in the hashref map for the remote side),
+    or you end up with just a URI, which is not amenable to hashref optimization.
     """
     if not source_.hash:
-        # we cannot optimize this one for memoization - just return the URI.
         return source_.uri
 
     local_path = source_.cached_path
     if local_path and local_path.exists():
-        # register creation of local hashref...
-        deferred_work.add(
-            __name__ + "-localhashref",
-            source_.hash,
-            partial(_write_hashref, _hashref_uri(source_.hash, "local"), str(local_path), source_.size),
-        )
-        # then also register pending upload - if the URI is a local file, we need to determine a
-        # remote URI for this thing automagically; otherwise, use whatever was already
-        # specified by the Source itself.
         remote_uri = source_.uri if not is_file_uri(source_.uri) else _auto_remote_arg_uri(source_.hash)
+        _collect_hashref_mapping(source_.hash, remote_uri, source_.size)
         deferred_work.add(
-            __name__ + "-upload-and-create-remotehashref",
+            __name__ + "-upload",
             source_.hash,
-            partial(
-                _upload_and_create_remote_hashref, local_path, remote_uri, source_.hash, source_.size
-            ),
+            partial(_upload_source_data, local_path, remote_uri),
         )
     else:
-        # prepare to (later, if necessary) create a remote hashref, because this Source
-        # represents a non-local resource.
-        deferred_work.add(
-            __name__ + "-write-hashref",
-            source_.hash,
-            partial(_write_hashref, _hashref_uri(source_.hash, "remote"), source_.uri, source_.size),
-        )
+        # non-local resource — the URI is already remote, just record the mapping
+        _collect_hashref_mapping(source_.hash, source_.uri, source_.size)
 
     return hashing.Hash(algo=sys.intern(source_.hash.algo), bytes=source_.hash.bytes)
 

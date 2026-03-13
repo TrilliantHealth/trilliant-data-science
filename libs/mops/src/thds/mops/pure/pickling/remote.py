@@ -1,5 +1,7 @@
 import contextlib
+import json
 import os
+import pickle
 import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +17,7 @@ from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
+from ..core.source import hashref_context
 from ..core.types import Args, BlobStore, Kwargs, T
 from ..core.use_runner import unwrap_use_runner
 from ..runner import strings
@@ -157,13 +160,29 @@ class _ResultExcWithMetadataChannel:
         self._write_metadata_only("exception", diagnostics)
 
 
-def _unpickle_invocation(memo_uri: str) -> ty.Tuple[ty.Callable, Args, Kwargs]:
-    _, invocation_raw = _pickle.make_read_header_and_object(strings.INVOCATION)(
-        uris.lookup_blob_store(memo_uri).join(memo_uri, strings.INVOCATION)
+def unpickle_invocation(
+    memo_uri: str,
+    unpickler: ty.Type[pickle.Unpickler] = _pickle.CallableUnpickler,
+) -> ty.Tuple[ty.Callable, Args, Kwargs]:
+    if not memo_uri.endswith(strings.INVOCATION):
+        memo_uri = uris.lookup_blob_store(memo_uri).join(memo_uri, strings.INVOCATION)
+
+    def _parse_header(header_bytes: bytes) -> dict[str, ty.Any]:
+        try:
+            return json.loads(header_bytes or "{}")
+        except (json.JSONDecodeError, AttributeError):
+            logger.warning("Failed to parse invocation header as JSON, ignoring")
+        return dict()
+
+    # there is a nested pickle inside the invocation pickle, so that the location of the pickle
+    # can be the args, kwargs hash rather than the whole Invocation object.
+    header, invocation_raw = _pickle.make_read_header_and_object(strings.INVOCATION, _parse_header)(
+        memo_uri
     )
     invocation = ty.cast(pickles.Invocation, invocation_raw)
-    args, kwargs = _pickle.unfreeze_args_kwargs(invocation.args_kwargs_pickle)
-    return invocation.func, args, kwargs
+    with hashref_context(header.get("hashrefs")):
+        args, kwargs = _pickle.unfreeze_args_kwargs(invocation.args_kwargs_pickle, unpickler)
+    return getattr(invocation, "f", None) or invocation.func, args, kwargs
 
 
 @contextlib.contextmanager
@@ -202,7 +221,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
 
     try:
-        func, args, kwargs = _unpickle_invocation(memo_uri)
+        func, args, kwargs = unpickle_invocation(memo_uri)
     except Exception:
         logger.error(f"Failed to unpickle invocation from {memo_uri} - this is a bug in mops!")
         raise

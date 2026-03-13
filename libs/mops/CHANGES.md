@@ -1,3 +1,10 @@
+## 3.15
+
+- Embed hashref map in invocation file header. When a `mops` function takes `Source` arguments, the
+  orchestrator now writes the full hash→(uri, size) map as a JSON header in the invocation file. The
+  remote side resolves all Sources from this map during unpickling — zero additional blob downloads per
+  hashref. Removes the per-hash `.txt` file infrastructure entirely.
+
 ### 3.14.20260225
 
 - Drop Python 3.9 support (`requires-python>=3.10`). Remove `importlib_metadata` compat shim in favor of

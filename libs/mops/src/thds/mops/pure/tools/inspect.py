@@ -26,12 +26,8 @@ from thds.core import log, parallel, scope, thunks, tmp
 from thds.mops.parallel import Thunk
 from thds.mops.pure.core import uris
 from thds.mops.pure.core.memo import results
-from thds.mops.pure.pickling._pickle import (
-    CallableUnpickler,
-    read_metadata_and_object,
-    unfreeze_args_kwargs,
-)
-from thds.mops.pure.pickling.pickles import Invocation
+from thds.mops.pure.pickling._pickle import CallableUnpickler, read_metadata_and_object
+from thds.mops.pure.pickling.remote import unpickle_invocation
 from thds.mops.pure.runner import strings
 
 from . import _pickle_dis
@@ -62,10 +58,8 @@ class PartialViewingUnpickler(CallableUnpickler):
 def _unpickle_object_for_debugging(uri: str) -> ty.Any:
     try:
         if uri.endswith("/" + strings.INVOCATION):
-            _no_header, invoc_raw = read_metadata_and_object(strings.INVOCATION, uri)
-            invoc = ty.cast(Invocation, invoc_raw)
-            args, kwargs = unfreeze_args_kwargs(invoc.args_kwargs_pickle, PartialViewingUnpickler)
-            return Thunk(getattr(invoc, "f", None) or invoc.func, *args, **kwargs)
+            func, args, kwargs = unpickle_invocation(uri, PartialViewingUnpickler)
+            return Thunk(func, *args, **kwargs)
 
         header, obj = read_metadata_and_object("output", uri)
         return obj, header

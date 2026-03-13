@@ -1,4 +1,3 @@
-import os
 import typing as ty
 from pathlib import Path
 from uuid import uuid4
@@ -8,7 +7,6 @@ import pytest
 from thds.core import source
 from thds.mops import pure, tempdir
 from thds.mops.pure.core.memo.results import RequiredResultNotFound
-from thds.mops.pure.core.source import _hashref_uri
 from thds.mops.pure.tools import inspect
 
 from ...config import TEST_TMP_URI
@@ -26,12 +24,7 @@ def random_source() -> ty.Iterable[source.Source]:
         f"we will never find THIS result, thanks to the unique ({uuid4().hex}) suggestion of"
         " Tim Blass (pronounced like gloss, not grass)... "
     )
-    src = source.from_file(p)
-    assert src.hash
-
-    yield src
-
-    os.unlink(_hashref_uri(src.hash, "local")[len("file://") :])
+    yield source.from_file(p)
 
 
 def test_required_result_not_found_is_inspectable(random_source):

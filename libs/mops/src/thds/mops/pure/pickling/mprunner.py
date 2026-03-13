@@ -5,6 +5,7 @@ Contains default config, core 'state' and some rarely-used customization interfa
 See runner.local.py for the core runner implementation.
 """
 
+import json
 import typing as ty
 from collections import defaultdict
 from functools import partial
@@ -18,6 +19,7 @@ from ..._utils.once import Once
 from ..core import memo, uris
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
+from ..core.source import hashref_context, stacklocal_hashrefs
 from ..core.types import Args, F, Kwargs, Serializer, T
 from ..runner import local, shim_builder
 from ..runner.types import FutureShim, Shim, ShimBuilder
@@ -151,12 +153,21 @@ class MemoizingPicklingRunner:
     def _serialize_invocation(
         self, storage_root: str, func: ty.Callable[..., T], args_kwargs: bytes
     ) -> bytes:
-        return _pickle.gimme_bytes(
-            self._get_stateful_dumper(storage_root),
-            pickles.Invocation(
-                _pickle.wrap_f(self._redirect(func, _ARGS_CONTEXT(), _KWARGS_CONTEXT())),
-                args_kwargs,
-            ),
+        # The hashref map was populated as a side effect of _serialize_args_kwargs
+        # (via SourceArgumentPickler). Embed it as a JSON header so the remote side
+        # can resolve all Source arguments from the invocation file alone.
+        hashref_map = stacklocal_hashrefs()
+        header = json.dumps({"hashrefs": hashref_map} if hashref_map else {}, indent=2)
+        return (
+            header.encode("utf-8")
+            + b"\n"
+            + _pickle.gimme_bytes(
+                self._get_stateful_dumper(storage_root),
+                pickles.Invocation(
+                    _pickle.wrap_f(self._redirect(func, _ARGS_CONTEXT(), _KWARGS_CONTEXT())),
+                    args_kwargs,
+                ),
+            )
         )
 
     def _wrap_shim_builder(self, func: F, args: Args, kwargs: Kwargs) -> ty.Union[Shim, FutureShim]:
@@ -171,7 +182,7 @@ class MemoizingPicklingRunner:
         We are trying to mimic the interface that concurrent.futures.Executors provide.
         """
         logger.debug("Preparing to run function via remote shim")
-        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs):
+        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs), hashref_context({}):
             return local.invoke_via_shim_or_return_memoized(
                 self._serialize_args_kwargs,
                 self._serialize_invocation,
