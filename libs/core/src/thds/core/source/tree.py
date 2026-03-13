@@ -109,5 +109,14 @@ class SourceTree(os.PathLike):
                 local_paths, local_logical_root, Path(dest_dir).resolve(), executor_cm=thread_pool
             )
 
+    @property
+    def higher_logical_root_uri(self) -> str:
+        """Return the uri of the higher logical root"""
+        root_uri = "/".join(logical_root.find_common_prefix(src.uri for src in self.sources))
+        assert root_uri.endswith(self.higher_logical_root), (
+            f"Expected the uri ends with the higher logical root '{self.higher_logical_root}', but got '{root_uri}' instead"
+        )
+        return root_uri
+
     def __fspath__(self) -> str:  # implement the os.PathLike protocol
         return str(self.path())
