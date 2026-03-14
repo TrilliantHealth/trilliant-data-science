@@ -21,9 +21,13 @@ def _clean_file_locks() -> int:
     deletion_threshold = time.time() - _CLEAN_UP_LOCKFILES_AFTER_TIME.total_seconds()
     try:
         for f in FILELOCKS_DIR().rglob("*"):
-            fstat = f.stat()
+            try:
+                fstat = f.stat()
+            except FileNotFoundError:
+                continue  # another process/thread already cleaned it
+
             if stat.S_ISREG(fstat.st_mode) and fstat.st_mtime < deletion_threshold:
-                f.unlink()
+                f.unlink(missing_ok=True)
                 deleted += 1
     except Exception:
         # this should be, hopefully, both very rare and completely inconsequential as to
