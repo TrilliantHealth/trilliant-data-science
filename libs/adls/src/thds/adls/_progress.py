@@ -4,6 +4,7 @@ progress bars.
 """
 
 import os
+import threading
 import typing as ty
 from functools import reduce
 from timeit import default_timer
@@ -129,26 +130,29 @@ class Tracker:
     def __init__(self, reporter: _Reporter):
         self._progresses: ty.Dict[str, ProgressState] = dict()
         self._reporter = reporter
+        self._lock = threading.Lock()
 
     def add(self, key: str, total: int) -> ty.Tuple["Tracker", str]:
-        if total < 0:
-            total = 0
-        self._progresses[key] = ProgressState(default_timer(), total, 0)
-        self._reporter(list(self._progresses.values()))
+        with self._lock:
+            if total < 0:
+                total = 0
+            self._progresses[key] = ProgressState(default_timer(), total, 0)
+            self._reporter(list(self._progresses.values()))
         return self, key
 
     def __call__(self, key: str, written: int = 0, total_written: int = 0):
         assert written >= 0, "cannot write negative bytes: {written}"
-        try:
-            start, total, n = self._progresses[key]
-            if not total_written:
-                total_written = n + written
-            self._progresses[key] = ProgressState(start, total, total_written)
-            self._reporter(list(self._progresses.values()))
-            if self._progresses[key].n >= total:
-                del self._progresses[key]
-        except KeyError:
-            self._reporter(list(self._progresses.values()))
+        with self._lock:
+            try:
+                start, total, n = self._progresses[key]
+                if not total_written:
+                    total_written = n + written
+                self._progresses[key] = ProgressState(start, total, total_written)
+                self._reporter(list(self._progresses.values()))
+                if self._progresses[key].n >= total:
+                    del self._progresses[key]
+            except KeyError:
+                self._reporter(list(self._progresses.values()))
 
 
 _GLOBAL_DN_TRACKER = Tracker(TqdmReporter("thds.adls downloading"))

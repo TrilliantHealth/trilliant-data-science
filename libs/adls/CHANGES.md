@@ -1,3 +1,7 @@
+### 4.5.20260316
+
+- Add threading lock to Tracker to fix incorrect progress sizes under concurrent downloads
+
 ### 4.5.20260225
 
 - Drop Python 3.9 support (`requires-python>=3.10`).
