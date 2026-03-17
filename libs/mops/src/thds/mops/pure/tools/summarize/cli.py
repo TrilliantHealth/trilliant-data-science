@@ -29,6 +29,7 @@ class FunctionSummary(TypedDict):
     remote_runtime_minutes: List[float]  # minutes
     uris_in_rvalue: List[str]
     uris_in_args_kwargs: List[str]
+    extras: list[dict[str, str]]
 
 
 def _empty_summary() -> FunctionSummary:
@@ -48,6 +49,7 @@ def _empty_summary() -> FunctionSummary:
         "remote_runtime_minutes": list(),
         "uris_in_rvalue": list(),
         "uris_in_args_kwargs": list(),
+        "extras": list(),
     }
 
 
@@ -103,6 +105,9 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         ):
             append_if_exists(key)
 
+        if extra := log_entry.get("extra"):
+            summary["extras"].append(extra)
+
     return partial_summary
 
 
@@ -138,7 +143,27 @@ def _combine_summaries(
         ):
             acc[function_name][key].extend(data[key])  # type: ignore
 
+        acc[function_name]["extras"].extend(data["extras"])
+
     return acc
+
+
+def _format_extras(extras: list[dict[str, str]]) -> str:
+    if not extras:
+        return ""
+
+    # Only show keys where all invocations agree on the value — divergent
+    # values (different pods, images, etc.) aren't useful in aggregate.
+    by_key: dict[str, set[str]] = {}
+    for extra in extras:
+        for k, v in extra.items():
+            by_key.setdefault(k, set()).add(v)
+
+    uniform = {k: next(iter(vs)) for k, vs in sorted(by_key.items()) if len(vs) == 1}
+    if not uniform:
+        return ""
+
+    return "  Extra metadata:\n" + "\n".join(f"    {k}: {v}" for k, v in uniform.items()) + "\n"
 
 
 def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri_limit: int = 10) -> str:
@@ -235,6 +260,8 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
         ).replace(", ", "\n     ")
         if n_uris:
             report_lines.append(f"  URIs in return value(s):\n     {n_uris}\n")
+        if extra_lines := _format_extras(data["extras"]):
+            report_lines.append(extra_lines)
     return "\n".join(report_lines)
 
 

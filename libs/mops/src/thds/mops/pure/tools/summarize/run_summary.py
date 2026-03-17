@@ -44,6 +44,8 @@ class LogEntry(LogEntryV1, total=False):
     uris_in_args_kwargs: ty.List[str]
     uris_in_rvalue: ty.List[str]
 
+    extra: dict[str, str]
+
 
 def resolve_run_directory_path() -> Path:
     """Compute the run directory path without creating it on disk.
@@ -162,6 +164,8 @@ def log_function_execution(
         log_entry["invoked_by"] = metadata.invoked_by
         log_entry["invoker_code_version"] = metadata.invoker_code_version
         log_entry["remote_code_version"] = metadata.remote_code_version
+        if metadata.extra:
+            log_entry["extra"] = metadata.extra
         # we don't bother with invoked_at or remote_started_at because they can be
         # inferred from the timestamp and the wall times
     if args_kwargs_uris:
