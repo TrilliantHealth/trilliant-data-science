@@ -36,9 +36,9 @@ def register_hashes():
     source.set_file_autohash(PREFERRED_ALGOS[0], _xxhash_hasher)
 
     try:
-        from blake3 import blake3
+        from blake3 import blake3  # type: ignore[import-not-found]
 
-        hashing.add_named_hash("blake3", lambda _: blake3())  # type: ignore
+        hashing.add_named_hash("blake3", lambda _: blake3())
     except ModuleNotFoundError:
         pass
 
