@@ -1,3 +1,11 @@
+## 3.16
+
+- **`pure.magic().shared("arg_name", ...)`**: marks named function arguments for content-addressed
+  serialization. Large objects passed to many concurrent invocations were previously re-pickled per
+  thread through the GIL. With `.shared()`, the object is pickled once, uploaded to a content-addressed
+  URI, and every invocation embeds a ~170-byte URI stub instead. Zero overhead when not configured. See
+  `docs/optimizations.adoc` for details.
+
 ### 3.15.20260317
 
 - **Serialization throttle**: limits concurrent `serialize_args_kwargs` calls via a semaphore (default 8,

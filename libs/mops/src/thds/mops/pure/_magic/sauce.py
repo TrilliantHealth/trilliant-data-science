@@ -16,6 +16,7 @@ from ..pickling.mprunner import MemoizingPicklingRunner
 from ..runner.shim_builder import make_builder
 from ..runner.simple_shims import samethread_shim
 from ..runner.types import Shim, ShimBuilder
+from .shared_args import SharedArgRegistrar
 from .shims import ShimName, ShimOrBuilder, to_shim_builder
 
 _local_root = lambda: f"file://{core.file_blob_store.MOPS_ROOT()}"  # noqa: E731
@@ -73,6 +74,7 @@ class Magic(ty.Generic[P, R]):
         config: _MagicConfig,
         magic_config_path: str,
         calls: ty.Collection[ty.Callable] = frozenset(),
+        shared_arg_names: tuple[str, ...] = (),
     ):
         functools.update_wrapper(self, func)
         self._magic_config_path = magic_config_path
@@ -88,6 +90,7 @@ class Magic(ty.Generic[P, R]):
         )
         self.runner = MemoizingPicklingRunner(self._shimbuilder, self._get_blob_root)
         self.runner.calls(func, *calls)
+        self._shared = SharedArgRegistrar(func, shared_arg_names) if shared_arg_names else None
         self._func = use_runner(self.runner, self._is_off)(func)
         self.__doc__ = f"{func.__doc__}\n\nMagic class info:\n{self.__class__.__doc__}"
         self.__wrapped__ = func
@@ -129,16 +132,23 @@ class Magic(ty.Generic[P, R]):
     def _pipeline_id(self) -> str:
         return self.config.pipeline_id.getv(self._magic_config_path)
 
+    def _register_shared(self, args: tuple, kwargs: dict) -> None:
+        # None when .shared() was not used on this function's decorator
+        if self._shared:
+            self._shared.register(self.runner, args, kwargs)
+
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> futures.PFuture[R]:
         """A futures-based interface that doesn't block on the result of the wrapped
         function call, but returns a PFuture once either a result has been found or a a
         new invocation has been started.
         """
+        self._register_shared(args, kwargs)
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self.runner.submit(self.__wrapped__, *args, **kwargs)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """This is the wrapped function - call this as though it were the function itself."""
+        self._register_shared(args, kwargs)
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self._func(*args, **kwargs)
 
@@ -157,6 +167,25 @@ class MagicReregistrationError(ValueError):
     pass
 
 
+class _MagicDecorator:
+    """Chainable decorator returned by ``pure.magic()``.
+
+    Supports ``@pure.magic(shim).shared("big_obj")`` to mark named
+    arguments for content-addressed serialization.
+    """
+
+    def __init__(self, deco: ty.Callable[..., ty.Any]):
+        self._deco = deco
+        self._shared_arg_names: tuple[str, ...] = ()
+
+    def shared(self, *arg_names: str) -> "_MagicDecorator":
+        self._shared_arg_names = arg_names
+        return self
+
+    def __call__(self, func: ty.Callable[P, R]) -> Magic[P, R]:
+        return self._deco(func, self._shared_arg_names)
+
+
 def make_magic(
     config: _MagicConfig,
     shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None],
@@ -165,7 +194,7 @@ def make_magic(
     calls: ty.Collection[ty.Callable],
     *,
     config_path: str = "",
-) -> ty.Callable[[ty.Callable[P, R]], Magic[P, R]]:
+) -> _MagicDecorator:
     """config_path is a dot-separated path that must be unique throughout your application.
 
     By default it will be set to the thds.other.module.function_name of the decorated function.
@@ -199,7 +228,7 @@ def make_magic(
     # applications separately, it won't work - these _are_ the same magic config path, so
     # they're bound together via that config.
 
-    def deco(func: ty.Callable[P, R]) -> Magic[P, R]:
+    def deco(func: ty.Callable[P, R], shared_arg_names: tuple[str, ...] = ()) -> Magic[P, R]:
         fully_qualified_name = make_magic_config_path(func)
         magic_config_path = config_path or fully_qualified_name
 
@@ -218,9 +247,9 @@ def make_magic(
 
         magic_config_path_cache.add(fully_qualified_name)
         config.all_registered_paths.add(magic_config_path)
-        return Magic(func, config, magic_config_path, calls)
+        return Magic(func, config, magic_config_path, calls, shared_arg_names)
 
-    return deco
+    return _MagicDecorator(deco)
 
 
 F = ty.TypeVar("F", bound=ty.Callable)

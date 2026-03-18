@@ -19,7 +19,6 @@ from thds.mops._utils import config_tree
 from ..core import uris
 from ..runner.types import ShimBuilder
 from . import sauce
-from .sauce import P, R
 from .shims import ShimName, ShimOrBuilder, to_shim_builder
 
 _MAGIC_CONFIG: ty.Final = sauce.new_config()
@@ -49,13 +48,15 @@ class _MagicApi:
         blob_root: uris.UriResolvable = "",
         pipeline_id: str = "",
         calls: ty.Collection[ty.Callable] = tuple(),
-    ) -> ty.Callable[[ty.Callable[P, R]], sauce.Magic[P, R]]:
+    ) -> sauce._MagicDecorator:
         """This is the main pure.magic() decorator.  It is designed to be applied directly
         at the site of function definition, i.e. on the `def`.  We dynamically capture the
         fully qualified name of the function being decorated and use that to look up the
         appropriate 'magic' configuration at the time of each call to the function. Any
         configuration passed here will be entered into the global magic config registry as
         the 'base case' for this function.
+
+        Supports chaining, e.g. ``@pure.magic(shim).shared("big_obj")``.
 
         DO NOT use this decorator multiple times on the same function, as this will overwrite
         config globally in a way that is very hard to understand.

@@ -61,3 +61,36 @@ def the_remote_df_func(x_df, y_ndarr, ...):
 
 If passed as a keyword parameter, the name serves only for debugging purposes - otherwise it is
 meaningless and there is no risk of collision.
+
+=== With `pure.magic`
+
+If you're using `pure.magic` rather than a bare `MemoizingPicklingRunner`, you can declare
+shared arguments directly on the decorator using `.shared()`:
+
+[source,python]
+----
+@pure.magic(k8s_shim).shared("lookup_table")
+def my_func(sources: tuple[Source, ...], lookup_table: MyLookup) -> Result:
+    ...
+----
+
+This applies sharing at the **parameter level** rather than the object level: any value
+passed to `lookup_table` — regardless of which object instance it is — will be uploaded
+once per unique object identity and referenced by URI stub in the invocation pickle.
+This is in contrast to the bare `runner.shared(obj)` API, which requires you to
+register specific object instances explicitly before calling the function.
+
+The argument is matched by name and can be passed positionally or as a keyword.
+Multiple arguments can be shared:
+
+[source,python]
+----
+@pure.magic(k8s_shim).shared("lookup_table", "config")
+def my_func(sources, lookup_table, config):
+    ...
+----
+
+NOTE: Adopting `.shared()` on an existing function changes how the argument is pickled,
+which changes the invocation's content address. Existing cached results for invocations
+where the shared argument is non-`None` will not be found on the first run after adding
+`.shared()`. Subsequent runs will hit the cache normally.
