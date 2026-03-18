@@ -1,3 +1,12 @@
+### 3.15.20260317
+
+- **Serialization throttle**: limits concurrent `serialize_args_kwargs` calls via a semaphore (default 8,
+  configurable via `mops.max_concurrent_serialization`). Pickling is GIL-bound, so hundreds of threads
+  pickling simultaneously just convoy — each thread's wall-clock time inflates (20s+ observed) without
+  improving total throughput. Also adds `@on_slow` instrumentation to `check_if_result_exists`,
+  `acquire_lock`, and `upload_invocation_and_deps` to surface slow network calls. `on_slow` now works as
+  both a decorator and a context manager.
+
 ## 3.15
 
 - Embed hashref map in invocation file header. When a `mops` function takes `Source` arguments, the

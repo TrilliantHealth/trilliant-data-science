@@ -42,6 +42,7 @@ def load(config_file: ty.Optional[Path], name: str = "mops") -> ty.Dict[str, ty.
 
 
 max_concurrent_network_ops = config.item("mops.max_concurrent_network_ops", 8, parse=int)
+max_concurrent_serialization = config.item("mops.max_concurrent_serialization", 8, parse=int)
 # 8 clients has been obtained experimentally via the `stress_test`
 # application running on a Mac M1 laptop running 200 parallel 5 second
 # tasks, though no significant difference was obtained between 5 and

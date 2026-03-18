@@ -10,7 +10,8 @@ from pathlib import Path
 from thds.core import futures, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
-from ...config import max_concurrent_network_ops
+from ..._utils.on_slow import LogSlow, on_slow
+from ...config import max_concurrent_network_ops, max_concurrent_serialization
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.lock.maintain import MAINTAIN_LOCKS  # noqa: F401
 from ..core.partial import unwrap_partial
@@ -23,6 +24,11 @@ from .get_results import (
     lock_maintaining_future,
     unwrap_value_or_error,
 )
+
+# Pickling is 100% GIL-bound — hundreds of threads pickling simultaneously
+# just convoy behind the GIL, inflating wall-clock time per thread without
+# improving throughput. A semaphore limits concurrency so each pickle finishes fast.
+_SERIALIZATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_serialization()))
 
 # this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
 # of progress _complete_, rather than issuing many instructions to the
@@ -85,7 +91,11 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
 
         scope.enter(deferred_work.open_context())  # optimize Source objects during serialization
 
-        args_kwargs_bytes = serialize_args_kwargs(storage_root, func, args, kwargs)
+        with (
+            _SERIALIZATION_SEMAPHORE,
+            on_slow(lambda s: LogSlow(f"serialize_args_kwargs took {s:.1f}s for {function_memospace}")),
+        ):
+            args_kwargs_bytes = serialize_args_kwargs(storage_root, func, args, kwargs)
         memo_uri = fs.join(
             function_memospace,
             *memo.calls.combine_function_logic_keys(memo.calls.resolve(calls_registry, func)),
@@ -94,6 +104,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         )
 
         # Define some important and reusable 'chunks of work'
+        @on_slow(lambda s: LogSlow(f"check_if_result_exists took {s:.1f}s for {memo_uri}"))
         def check_result_exists(
             invoc_type: run_summary.InvocationType,
         ) -> ty.Union[ResultAndInvocationType, None]:
@@ -110,14 +121,15 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             )
             return ResultAndInvocationType(result, invoc_type)
 
+        @on_slow(lambda s: LogSlow(f"acquire_lock took {s:.1f}s for {memo_uri}"))
         def acquire_lock() -> ty.Optional[lock.LockAcquired]:
             return lock.acquire(fs.join(memo_uri, "lock"), expire=timedelta(seconds=88))
 
+        @on_slow(lambda s: LogSlow(f"upload_invocation_and_deps took {s:.1f}s for {memo_uri}"))
         def upload_invocation_and_deps() -> None:
             # we're just about to transfer to a remote context,
             # so it's time to perform any deferred work
             deferred_work.perform_all()
-
             fs.putbytes(
                 fs.join(memo_uri, strings.INVOCATION),
                 serialize_invocation(storage_root, func, args_kwargs_bytes),

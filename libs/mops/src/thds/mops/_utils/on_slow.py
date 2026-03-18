@@ -11,17 +11,35 @@ _SLOW = colorized(fg="yellow", bg="black")
 LogSlow = make_colorized_out(_SLOW, out=logger.warning)
 
 
-def on_slow(callback: ty.Callable[[float], None], slow_seconds: float = 3.0) -> ty.Callable[[F], F]:
-    def deco(f: F) -> F:
+class _OnSlow:
+    """Usable as both a decorator and a context manager.
+
+    As a decorator: ``on_slow(cb)(some_func)`` — wraps the function.
+    As a context manager: ``with on_slow(cb):`` — times the block.
+    """
+
+    def __init__(self, callback: ty.Callable[[float], None], slow_seconds: float):
+        self._callback = callback
+        self._slow_seconds = slow_seconds
+        self._start = 0.0
+
+    def __call__(self, f: F) -> F:
         @wraps(f)
-        def wrapper(*args, **kwargs):  # type: ignore
-            start_time = default_timer()
-            r = f(*args, **kwargs)
-            elapsed_s = default_timer() - start_time
-            if elapsed_s > slow_seconds:
-                callback(elapsed_s)
-            return r
+        def wrapper(*args: ty.Any, **kwargs: ty.Any) -> ty.Any:
+            with _OnSlow(self._callback, self._slow_seconds):
+                return f(*args, **kwargs)
 
         return ty.cast(F, wrapper)
 
-    return deco
+    def __enter__(self) -> "_OnSlow":
+        self._start = default_timer()
+        return self
+
+    def __exit__(self, *exc: ty.Any) -> None:
+        elapsed = default_timer() - self._start
+        if elapsed > self._slow_seconds:
+            self._callback(elapsed)
+
+
+def on_slow(callback: ty.Callable[[float], None], slow_seconds: float = 3.0) -> _OnSlow:
+    return _OnSlow(callback, slow_seconds)
