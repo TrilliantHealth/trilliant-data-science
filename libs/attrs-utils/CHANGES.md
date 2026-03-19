@@ -1,3 +1,9 @@
+### 1.8.20260319
+
+- Adds `cattrs.custom_hooks` module with utilities for defining custom structuring hooks, starting with
+  `structure_hook_with_defaults` and `register_structure_hook_with_defaults` for defining structuring
+  hooks that supply default values for fields that may be missing in input data.
+
 ### 1.7.20260225
 
 - Drop Python 3.9 support (`requires-python>=3.10`).

@@ -7,7 +7,9 @@ __all__ = [
     "DisallowedConversionError",
     "default_converter",
     "format_cattrs_classval_error",
+    "register_structure_hook_with_defaults",
     "setup_converter",
+    "structure_hook_with_defaults",
 ]
 
 from .converter import (
@@ -18,6 +20,7 @@ from .converter import (
     default_converter,
     setup_converter,
 )
+from .custom_hooks import register_structure_hook_with_defaults, structure_hook_with_defaults
 from .errors import DisallowedConversionError, format_cattrs_classval_error
 
 DEFAULT_JSON_CONVERTER = setup_converter(
