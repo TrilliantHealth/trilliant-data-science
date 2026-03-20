@@ -111,6 +111,21 @@ Alternatively, you can take a look at the
 link:../src/thds/mops/k8s/warn_image_backoff.py[machinery] we have made available that may
 help you detect this.
 
+### User function exceptions
+
+When a `mops`-wrapped function raises an exception on a pod, the exception is serialized
+to blob storage and the process exits with `MOPS_EXCEPTION_EXIT_CODE` (46). A
+`podFailurePolicy` on the Job spec catches this and fires `FailJob` immediately, so the
+Job is marked as failed without consuming any of the `backoffLimit` retries. This means
+k8s (and tools like `kubectl` and `k9s`) will correctly show the Job as failed.
+
+Retrying the function is handled at the mops application level: if you call the same
+function with the same arguments again, mops will re-run it and overwrite the previous
+exception result.
+
+Infrastructure failures (OOM kills, node evictions, etc.) exit with other codes and are
+still subject to `backoffLimit` retries as normal.
+
 ## Orchestrator pods
 
 If you're running a big or long-running process with link:./remote.adoc[remote workers] in K8s, because of

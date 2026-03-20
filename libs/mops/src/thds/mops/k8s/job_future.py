@@ -7,7 +7,7 @@ from thds.core import futures, log
 from thds.termtool.colorize import colorized
 
 from . import config, counts, uncertain_future
-from .jobs import get_job, is_job_failed, is_job_succeeded, job_source
+from .jobs import get_job, is_job_failed, is_job_succeeded, is_mops_exception_failure, job_source
 
 logger = log.getLogger(__name__)
 
@@ -70,6 +70,13 @@ def _check_job_before_timeout(
                 return True
 
             if is_job_failed(fetched):
+                if is_mops_exception_failure(fetched):
+                    logger.info(
+                        f"Job {job_name} exited with mops exception code (backup fetch) "
+                        f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s)"
+                    )
+                    return True
+
                 logger.error(
                     f"Job {job_name} was not seen by watch but EXISTS and FAILED in k8s "
                     f"(JOB_SEEN={job_seen}, stale_for={time_since_last_seen:.1f}s)"
@@ -153,6 +160,13 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
 
         if is_job_failed(job):
             newly_failed = _check_newly_finished(job_name, namespace)
+            if is_mops_exception_failure(job):
+                # The user function raised — the exception is serialized in blob storage.
+                # Return True so PostShimResultGetter reads it via the normal path.
+                if newly_failed:
+                    logger.info(f"Job {job_name} exited with mops exception code {newly_failed}")
+                return True
+
             if newly_failed:
                 logger.error(FAILED(f"Job {job_name} Failed! {newly_failed}"))
             raise K8sJobFailedError(f"Job {job_name} has failed with status: {job.status}")

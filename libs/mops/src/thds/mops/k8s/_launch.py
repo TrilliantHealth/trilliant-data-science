@@ -209,11 +209,24 @@ def launch(  # noqa: C901
         )
 
         logger.debug("Creating job definition ...")
+        from thds.mops.pure.core.entry.main import MOPS_EXCEPTION_EXIT_CODE
+
         v1_job_body.spec = client.V1JobSpec(
             backoff_limit=config.k8s_job_retry_count(),
             completions=1,
             ttl_seconds_after_finished=config.k8s_job_cleanup_ttl_seconds_after_completion(),
             template=pod_template.template,
+            pod_failure_policy=client.V1PodFailurePolicy(
+                rules=[
+                    client.V1PodFailurePolicyRule(
+                        action="FailJob",
+                        on_exit_codes=client.V1PodFailurePolicyOnExitCodesRequirement(
+                            operator="In",
+                            values=[MOPS_EXCEPTION_EXIT_CODE],
+                        ),
+                    ),
+                ]
+            ),
         )
         logger.debug("Finished creating base job definition ...")
         return v1_job_body

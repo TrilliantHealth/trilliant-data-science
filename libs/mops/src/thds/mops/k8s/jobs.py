@@ -70,6 +70,21 @@ def is_job_failed(job: client.models.V1Job) -> bool:
     return False
 
 
+def is_mops_exception_failure(job: client.models.V1Job) -> bool:
+    """True when the job failed because the user function raised an exception.
+
+    The mops entry point exits with MOPS_EXCEPTION_EXIT_CODE, which triggers the
+    podFailurePolicy FailJob rule. k8s records this as reason='PodFailurePolicy'.
+    The serialized exception is already in blob storage — the caller should retrieve
+    it via the normal result-reading path rather than raising K8sJobFailedError.
+    """
+    for condition in job.status.conditions or tuple():
+        if condition.reason == "PodFailurePolicy" and condition.status == "True":
+            return True
+
+    return False
+
+
 def watch_jobs(
     namespace: str, timeout: ty.Optional[int] = None
 ) -> ty.Iterator[ty.Tuple[client.models.V1Job, EventType]]:

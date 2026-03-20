@@ -1,3 +1,14 @@
+## 3.17
+
+- **Exit sentinel on user exception**: the `mops` entrypoint now exits with `MOPS_EXCEPTION_EXIT_CODE`
+  (46) when the user function raises an exception. The exception is still written to blob storage first,
+  so the caller retrieves it normally. The k8s job spec gains a `podFailurePolicy` that fires `FailJob`
+  on exit code 46, preventing infrastructure-level retries (mops handles retries at the application
+  level). Infrastructure failures producing other exit codes can still be retried via `backoffLimit`.
+
+- **ADLS control cache default location**: moved from `~/.mops-adls-control-cache` to
+  `~/.thds/mops/adls-control-cache`. Existing caches at the old location will be ignored (harmless).
+
 ## 3.16
 
 - **`pure.magic().shared("arg_name", ...)`**: marks named function arguments for content-addressed

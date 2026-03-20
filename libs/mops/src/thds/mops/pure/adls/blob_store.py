@@ -171,7 +171,8 @@ class DangerouslyCachingStore(AdlsBlobStore):
 
 
 _DEFAULT_CONTROL_CACHE = config.item(
-    "thds.mops.pure.adls.control_cache_root", default=home.HOMEDIR() / ".mops-adls-control-cache"
+    "thds.mops.pure.adls.control_cache_root",
+    default=home.HOMEDIR() / ".thds" / "mops" / "adls-control-cache",
 )
 
 

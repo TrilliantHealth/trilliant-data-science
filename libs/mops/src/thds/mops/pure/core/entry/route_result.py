@@ -35,8 +35,13 @@ def route_return_value_or_exception(
     memo_uri: str,
     runner_prefix: str = "",  # this must be present in your memo URI
     invocation_run_id: str = "",
-) -> None:
-    """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach."""
+) -> None | Exception:
+    """The remote side of your runner implementation doesn't have to use this, but it's a reasonable approach.
+
+    Returns None on success, or the exception that was raised and transmitted. When running as a
+    subprocess entry point, callers should exit with MOPS_EXCEPTION_EXIT_CODE on non-None so that
+    the surrounding infrastructure (k8s, Databricks, etc.) can observe the failure.
+    """
     _routing_scope.enter(deferred_work.open_context())
     memo_uri_components = _routing_scope.enter(
         uri_assignment_context(memo_uri, runner_prefix, invocation_run_id)
@@ -51,6 +56,8 @@ def route_return_value_or_exception(
     except Exception as ex:
         logger.exception("Failure to run remote function. Transmitting exception...")
         channel.exception(ex)
+        return ex
     else:
         logger.debug("Success running function remotely. Transmitting return value...")
         channel.return_value(return_value)
+        return None

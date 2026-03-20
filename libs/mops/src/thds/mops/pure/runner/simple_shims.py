@@ -4,6 +4,7 @@ from typing import Sequence
 
 from thds.core import log
 
+from ..core.entry.main import MOPS_EXCEPTION_EXIT_CODE
 from ..core.entry.runner_registry import run_named_entry_handler
 
 logger = log.getLogger(__name__)
@@ -19,7 +20,13 @@ def samethread_shim(shim_args: Sequence[str]) -> None:
 
 def subprocess_shim(shim_args: Sequence[str]) -> None:
     logger.debug("Running a mops function locally in a new subprocess.")
-    subprocess.check_call(["python", "-m", "thds.mops.pure.core.entry.main", *shim_args])
+    try:
+        subprocess.check_call(["python", "-m", "thds.mops.pure.core.entry.main", *shim_args])
+    except subprocess.CalledProcessError as e:
+        if e.returncode != MOPS_EXCEPTION_EXIT_CODE:
+            raise
+        # user function raised an exception; it was serialized to blob storage before exit.
+        # return normally so the caller can retrieve it via the standard result-reading path.
 
 
 def future_subprocess_shim(shim_args: Sequence[str]) -> concurrent.futures.Future:

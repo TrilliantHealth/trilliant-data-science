@@ -7,7 +7,7 @@ import typing as ty
 
 
 class EntryHandler(ty.Protocol):
-    def __call__(self, *__args: str) -> ty.Any: ...  # pragma: nocover
+    def __call__(self, *__args: str) -> None | Exception: ...  # pragma: nocover
 
 
 ENTRY_HANDLERS: ty.Dict[str, EntryHandler] = dict()
@@ -17,5 +17,5 @@ def register_entry_handler(name: str, mh: EntryHandler) -> None:
     ENTRY_HANDLERS[name] = mh
 
 
-def run_named_entry_handler(name: str, *args: str) -> None:
-    ENTRY_HANDLERS[name](*args)
+def run_named_entry_handler(name: str, *args: str) -> None | Exception:
+    return ENTRY_HANDLERS[name](*args)

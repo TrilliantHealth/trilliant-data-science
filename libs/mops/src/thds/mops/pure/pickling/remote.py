@@ -204,7 +204,7 @@ def _manage_lock(lock_uri: str, lock_writer_id: str) -> ty.Iterator[ty.Optional[
 
 
 @scope.bound
-def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
+def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Exception:
     """The arguments are those supplied by MemoizingPicklingRunner.
 
     As of v3, we now expect a number of (required) metadata arguments with every invocation.
@@ -240,7 +240,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None:
         with unwrap_use_runner(func):
             return func(*args, **kwargs)
 
-    route_return_value_or_exception(
+    return route_return_value_or_exception(
         _ResultExcWithMetadataChannel(
             fs,
             _pickle.Dumper(

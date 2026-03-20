@@ -24,6 +24,16 @@ from .runner_registry import run_named_entry_handler
 
 logger = getLogger(__name__)
 
+# Exit code used when the remote function raised an exception. The exception itself is
+# serialized to blob storage for the caller to retrieve; this non-zero exit signals to
+# the surrounding infrastructure (k8s, Databricks, etc.) that the run was not successful,
+# so that it does not silently treat the job as having succeeded.
+#
+# Runtimes that invoke this entrypoint as a subprocess (subprocess_shim, dbxtend) should
+# catch CalledProcessError with this specific code and allow normal result retrieval to
+# proceed, since the exception is already in blob storage.
+MOPS_EXCEPTION_EXIT_CODE = 46
+
 
 def main() -> None:
     """Routes the top level remote function call in a new process."""
@@ -41,11 +51,13 @@ def main() -> None:
     )
     # TODO potentially allow things like logger context to be passed in as -- arguments
     args, unknown = parser.parse_known_args()
-    run_named_entry_handler(args.runner_name, *unknown)
+    exc = run_named_entry_handler(args.runner_name, *unknown)
     logger.info(
         f"Exiting remote process {os.getpid()} after {(default_timer() - start) / 60:.2f} minutes"
         + metadata.format_end_of_run_times(start_timestamp, unknown)
     )
+    if exc is not None:
+        sys.exit(MOPS_EXCEPTION_EXIT_CODE)
 
 
 if __name__ == "__main__":
