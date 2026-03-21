@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import stat
 import typing as ty
 from multiprocessing import Pool
 from pathlib import Path
@@ -13,18 +14,22 @@ from thds.adls.ro_cache import global_cache
 
 
 def test_and_clean(path: Path, fqn: fqn.AdlsFqn):
-    gc = get_global_fs_client(fqn.sa, fqn.container)
-    # according to
-    # https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview#move-data-based-on-last-accessed-time
-    # checking if the file exists does not count as an access for the
-    # purposes of resetting the lastAccessTime, which would then keep
-    # a file alive under certain lifecycle management policies.
-    if not gc.get_file_client(fqn.path).exists():
-        try:
+    try:
+        gc = get_global_fs_client(fqn.sa, fqn.container)
+        # according to
+        # https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview#move-data-based-on-last-accessed-time
+        # checking if the file exists does not count as an access for the
+        # purposes of resetting the lastAccessTime, which would then keep
+        # a file alive under certain lifecycle management policies.
+        if not gc.get_file_client(fqn.path).exists():
+            # Cache files are set read-only; restore write permission before unlinking.
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
             path.unlink()
             print(f"Removed {path}")
-        except Exception as e:
-            return e, path
+    except Exception as e:
+        # Return string repr; Azure SDK exceptions carry chained
+        # tracebacks that aren't picklable across multiprocessing.
+        return str(e), path
     # TODO: optionally, support md5ing locally and removing if it doesn't match.
     return None
 
