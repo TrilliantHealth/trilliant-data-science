@@ -4,8 +4,7 @@ from typing import Sequence
 
 from thds.core import log
 
-from ..core.entry.main import MOPS_EXCEPTION_EXIT_CODE
-from ..core.entry.runner_registry import run_named_entry_handler
+from ..core.entry.runner_registry import MOPS_EXCEPTION_EXIT_CODE, run_named_entry_handler
 
 logger = log.getLogger(__name__)
 

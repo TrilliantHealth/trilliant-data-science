@@ -1,5 +1,10 @@
 ### 3.17.20260324
 
+- **Fix noisy `runpy` RuntimeWarning on subprocess entry**: `MOPS_EXCEPTION_EXIT_CODE` was defined in
+  `entry.main`, causing `simple_shims` to import that module at package init time. When
+  `python -m thds.mops.pure.core.entry.main` ran, `runpy` found the module already in `sys.modules` and
+  emitted a RuntimeWarning on every invocation. Moved the constant to `entry.runner_registry`.
+
 - **Fix `InvalidStateError` race in `UncertainFuturesTracker`**: when many k8s pods complete
   simultaneously, two code paths (batch submit and k8s watch callback) could both resolve the same
   future, raising `InvalidStateError` and killing the pipeline. `interpret()` now guards against

@@ -209,7 +209,7 @@ def launch(  # noqa: C901
         )
 
         logger.debug("Creating job definition ...")
-        from thds.mops.pure.core.entry.main import MOPS_EXCEPTION_EXIT_CODE
+        from thds.mops.pure.core.entry.runner_registry import MOPS_EXCEPTION_EXIT_CODE
 
         v1_job_body.spec = client.V1JobSpec(
             backoff_limit=config.k8s_job_retry_count(),

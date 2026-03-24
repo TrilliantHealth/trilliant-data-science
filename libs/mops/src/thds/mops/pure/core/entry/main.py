@@ -20,19 +20,9 @@ from thds.core.log import getLogger
 
 from ....__about__ import __version__
 from .. import metadata
-from .runner_registry import run_named_entry_handler
+from .runner_registry import MOPS_EXCEPTION_EXIT_CODE, run_named_entry_handler
 
 logger = getLogger(__name__)
-
-# Exit code used when the remote function raised an exception. The exception itself is
-# serialized to blob storage for the caller to retrieve; this non-zero exit signals to
-# the surrounding infrastructure (k8s, Databricks, etc.) that the run was not successful,
-# so that it does not silently treat the job as having succeeded.
-#
-# Runtimes that invoke this entrypoint as a subprocess (subprocess_shim, dbxtend) should
-# catch CalledProcessError with this specific code and allow normal result retrieval to
-# proceed, since the exception is already in blob storage.
-MOPS_EXCEPTION_EXIT_CODE = 46
 
 
 def main() -> None:
