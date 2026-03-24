@@ -1,3 +1,10 @@
+### 3.17.20260324
+
+- **Fix `InvalidStateError` race in `UncertainFuturesTracker`**: when many k8s pods complete
+  simultaneously, two code paths (batch submit and k8s watch callback) could both resolve the same
+  future, raising `InvalidStateError` and killing the pipeline. `interpret()` now guards against
+  already-resolved futures.
+
 ## 3.17
 
 - **Exit sentinel on user exception**: the `mops` entrypoint now exits with `MOPS_EXCEPTION_EXIT_CODE`

@@ -5,7 +5,7 @@ import typing as ty
 
 # we use concurrent.futures.Future as an implementation detail, but it's communicated
 # as core.futures.PFuture to give us the flexibility to change the implementation later if needed.
-from concurrent.futures import Future
+from concurrent.futures import Future, InvalidStateError
 from dataclasses import dataclass
 from uuid import uuid4
 
@@ -52,12 +52,17 @@ class _FutureInterpretationShim(ty.Generic[R_0, R]):
         Return None if the Future is still in progress and should not be unregistered.
         Return self if the Future is done and should be unregistered.
         """
+        if self.future.done():
+            return self  # already resolved by another code path (e.g. batch submit vs k8s watch race)
+
         try:
             interpretation = self._interpreter(r_0, last_seen_at)
             if isinstance(interpretation, NotYetDone):
                 return None  # do nothing and do not unregister - the status is still in progress.
 
             self.future.set_result(interpretation)  # resolved successfully!
+        except InvalidStateError:
+            return self  # lost the race between check and set — future was resolved concurrently
         except Exception as e:
             self.future.set_exception(e)
 

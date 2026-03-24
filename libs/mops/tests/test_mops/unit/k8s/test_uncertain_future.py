@@ -5,7 +5,12 @@ import typing as ty
 
 import pytest
 
-from thds.mops.k8s.uncertain_future import UncertainFuturesTracker, _FuturesState, official_timer
+from thds.mops.k8s.uncertain_future import (
+    UncertainFuturesTracker,
+    _FutureInterpretationShim,
+    _FuturesState,
+    official_timer,
+)
 
 
 class SignalingODict(collections.OrderedDict):
@@ -83,3 +88,38 @@ def test_concurrent_mutation_during_active_iteration_does_not_raise():
     assert not exception_caught.is_set(), "mutation thread raised an exception"
 
     mutator_thread.join(timeout=1.0)
+
+
+def test_interpret_tolerates_already_resolved_future():
+    """If a future is resolved externally before interpret() runs, it should
+    return self (unregister) rather than raising InvalidStateError."""
+    shim: _FutureInterpretationShim[ty.Any, int] = _FutureInterpretationShim(lambda r_0, last_seen: 42)
+    shim.future.set_result(99)  # simulate external resolution (e.g. batch submit path)
+
+    result = shim.interpret("anything", official_timer())
+    assert result is shim
+    assert shim.future.result() == 99  # original result preserved
+
+
+def test_interpret_tolerates_concurrent_resolution():
+    """If the interpreter returns a result but another thread resolves the future
+    between the done() check and set_result(), interpret should not raise."""
+    resolved = threading.Event()
+
+    def _slow_interpreter(r_0: ty.Any, last_seen: float) -> int:
+        resolved.wait(timeout=2.0)  # block until the future is resolved externally
+        return 42
+
+    shim = _FutureInterpretationShim(_slow_interpreter)
+
+    def _resolve_externally():
+        shim.future.set_result(99)
+        resolved.set()
+
+    t = threading.Thread(target=_resolve_externally, daemon=True)
+    t.start()
+
+    result = shim.interpret("anything", official_timer())
+    t.join(timeout=2.0)
+    assert result is shim
+    assert shim.future.result() == 99
