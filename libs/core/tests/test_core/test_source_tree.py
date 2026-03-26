@@ -1,10 +1,11 @@
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
 
 from thds.core import scope
-from thds.core.source import tree, tree_from_directory
+from thds.core.source import Source, tree, tree_from_directory
 
 
 def test_logical_tree_replication_operations():
@@ -86,3 +87,121 @@ class Test_tree_from_directory:
 
         assert len(source_tree.sources) == 2
         assert source_tree.sources[0].hash == source_tree.sources[1].hash
+
+
+_LOGICAL_ROOT = "dir"
+_SOURCE_A = Source(uri=f"scheme://bucket/{_LOGICAL_ROOT}/a.parquet")
+_SOURCE_B = Source(uri=f"scheme://bucket/{_LOGICAL_ROOT}/b.parquet")
+
+
+# --- serde ---
+
+
+def test_serde_roundtrip_multiple_sources():
+    st = tree.SourceTree(sources=[_SOURCE_A, _SOURCE_B], higher_logical_root=_LOGICAL_ROOT)
+    restored = tree.from_json(tree.to_json(st))
+    assert len(restored.sources) == 2
+    assert restored.sources[0].uri == _SOURCE_A.uri
+    assert restored.sources[1].uri == _SOURCE_B.uri
+    assert restored.higher_logical_root == _LOGICAL_ROOT
+
+
+def test_serde_roundtrip_single_source():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root=_LOGICAL_ROOT)
+    restored = tree.from_json(tree.to_json(st))
+    assert len(restored.sources) == 1
+    assert restored.sources[0].uri == _SOURCE_A.uri
+    assert restored.higher_logical_root == _LOGICAL_ROOT
+
+
+def test_serde_roundtrip_empty_higher_logical_root():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root="")
+    restored = tree.from_json(tree.to_json(st))
+    assert restored.higher_logical_root == ""
+
+
+def test_serde_to_dict_structure():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root=_LOGICAL_ROOT)
+    d = tree.to_dict(st)
+    assert "sources" in d
+    assert "higher_logical_root" in d
+    assert len(d["sources"]) == 1
+    assert d["sources"][0]["uri"] == _SOURCE_A.uri
+
+
+def test_serde_from_mapping_missing_higher_logical_root_defaults_empty():
+    m = {"sources": [{"uri": _SOURCE_A.uri, "size": 0}]}
+    restored = tree.from_mapping(m)
+    assert restored.higher_logical_root == ""
+
+
+def test_serde_to_json_is_valid_json():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root=_LOGICAL_ROOT)
+    parsed = json.loads(tree.to_json(st))
+    assert isinstance(parsed, dict)
+
+
+def test_serde_write_to_json_file(tmp_path: Path):
+    st = tree.SourceTree(sources=[_SOURCE_A, _SOURCE_B], higher_logical_root=_LOGICAL_ROOT)
+    outfile = tmp_path / "tree.json"
+    changed = tree.write_to_json_file(st, outfile)
+    assert changed is True
+    restored = tree.from_json(outfile.read_text())
+    assert len(restored.sources) == 2
+    assert restored.higher_logical_root == _LOGICAL_ROOT
+
+
+def test_serde_write_to_json_file_no_change(tmp_path: Path):
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root=_LOGICAL_ROOT)
+    outfile = tmp_path / "tree.json"
+    tree.write_to_json_file(st, outfile)
+    changed = tree.write_to_json_file(st, outfile)
+    assert changed is False
+
+
+# --- higher_logical_root_uri ---
+
+
+def test_higher_logical_root_uri_multiple_sources():
+    st = tree.SourceTree(sources=[_SOURCE_A, _SOURCE_B], higher_logical_root=_LOGICAL_ROOT)
+    assert st.higher_logical_root_uri == f"scheme://bucket/{_LOGICAL_ROOT}"
+
+
+def test_higher_logical_root_uri_single_source():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root=_LOGICAL_ROOT)
+    assert st.higher_logical_root_uri == f"scheme://bucket/{_LOGICAL_ROOT}"
+
+
+def test_higher_logical_root_uri_single_source_nested():
+    st = tree.SourceTree(
+        sources=[Source(uri="scheme://bucket/a/b/dir/only.parquet")],
+        higher_logical_root=_LOGICAL_ROOT,
+    )
+    assert st.higher_logical_root_uri == f"scheme://bucket/a/b/{_LOGICAL_ROOT}"
+
+
+def test_higher_logical_root_uri_empty():
+    st = tree.SourceTree(sources=[_SOURCE_A], higher_logical_root="")
+    # empty string — endswith("") is always true, so no assertion error
+    assert st.higher_logical_root_uri == f"scheme://bucket/{_LOGICAL_ROOT}"
+
+
+def test_higher_logical_root_uri_single_source_mismatch():
+    st = tree.SourceTree(
+        sources=[Source(uri="scheme://bucket/other/only.parquet")],
+        higher_logical_root=_LOGICAL_ROOT,
+    )
+    with pytest.raises(AssertionError, match="Expected the uri ends with"):
+        st.higher_logical_root_uri
+
+
+def test_higher_logical_root_uri_multiple_sources_mismatch():
+    st = tree.SourceTree(
+        sources=[
+            Source(uri="scheme://bucket/other/a.parquet"),
+            Source(uri="scheme://bucket/other/b.parquet"),
+        ],
+        higher_logical_root=_LOGICAL_ROOT,
+    )
+    with pytest.raises(AssertionError, match="Expected the uri ends with"):
+        st.higher_logical_root_uri

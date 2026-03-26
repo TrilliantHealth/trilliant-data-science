@@ -94,14 +94,19 @@ def from_unknown_user_path(path: types.StrOrPath, desired_uri: str) -> Source:
             return _construct.from_file(path, uri=desired_uri)
 
 
-def write_to_json_file(source: Source, local_file: Path) -> bool:
-    """Write the canonical JSON serialization of the Source to a file."""
+def write_json_content(json_content: str, local_file: Path, log_label: str) -> bool:
+    """Atomically write JSON content to a file if it has changed."""
     local_file.parent.mkdir(parents=True, exist_ok=True)
-    previous_source = local_file.read_text() if local_file.exists() else None
-    new_source = to_json(source) + "\n"
-    if new_source != previous_source:
+    previous = local_file.read_text() if local_file.exists() else None
+    new = json_content + "\n"
+    if new != previous:
         with files.atomic_text_writer(local_file) as f:
-            logger.info(f"Writing {source} to {local_file}")
-            f.write(new_source)
+            logger.info(f"Writing {log_label} to {local_file}")
+            f.write(new)
             return True
     return False
+
+
+def write_to_json_file(source: Source, local_file: Path) -> bool:
+    """Write the canonical JSON serialization of the Source to a file."""
+    return write_json_content(to_json(source), local_file, str(source))

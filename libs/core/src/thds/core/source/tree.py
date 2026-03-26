@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import os
 import shutil
 import typing as ty
@@ -6,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import cm, link, logical_root, parallel, thunks, types
+from . import serde
 from .src import Source
 
 _MAX_PARALLELISM = 90
@@ -112,7 +114,12 @@ class SourceTree(os.PathLike):
     @property
     def higher_logical_root_uri(self) -> str:
         """Return the uri of the higher logical root"""
-        root_uri = "/".join(logical_root.find_common_prefix(src.uri for src in self.sources))
+        if len(self.sources) == 1:
+            # With a single source, common prefix is the full URI (including filename).
+            # Strip the filename to get the directory-level root.
+            root_uri = self.sources[0].uri.rsplit("/", 1)[0]
+        else:
+            root_uri = "/".join(logical_root.find_common_prefix(src.uri for src in self.sources))
         assert root_uri.endswith(self.higher_logical_root), (
             f"Expected the uri ends with the higher logical root '{self.higher_logical_root}', but got '{root_uri}' instead"
         )
@@ -120,3 +127,38 @@ class SourceTree(os.PathLike):
 
     def __fspath__(self) -> str:  # implement the os.PathLike protocol
         return str(self.path())
+
+
+# --- serde ---
+# This is basically the same structure in thds.core.source.serde, there is an opportunity to use singledispatch for
+# these serde functions, but
+#   1. deserialization doesn't benefit much, since the input is the same
+#   2. This also explicitly let you know that you are working with a SourceTree
+
+
+def to_dict(tree: SourceTree) -> dict:
+    return dict(
+        sources=list(map(serde.to_dict, tree.sources)),
+        higher_logical_root=tree.higher_logical_root,
+    )
+
+
+def to_json(tree: SourceTree) -> str:
+    return json.dumps(to_dict(tree))
+
+
+def from_mapping(m: ty.Mapping) -> SourceTree:
+    return SourceTree(
+        sources=list(map(serde.from_mapping, m["sources"])),
+        higher_logical_root=m.get("higher_logical_root", ""),
+    )
+
+
+def from_json(json_str: str) -> SourceTree:
+    return from_mapping(json.loads(json_str))
+
+
+def write_to_json_file(tree: SourceTree, local_file: Path) -> bool:
+    """Write the canonical JSON serialization of the SourceTree to a file."""
+    label = f"SourceTree({len(tree.sources)} sources, root={tree.higher_logical_root_uri})"
+    return serde.write_json_content(to_json(tree), local_file, label)
