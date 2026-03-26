@@ -23,7 +23,7 @@ _LOG_FILEPATH = os.getenv(
         # we're logging to a file by default now. Set this to empty string to turn off.
         # It's not a config item because it can't usefully be set after startup.
         home.HOMEDIR()
-        / ".thds-logs"
+        / ".thds/core/logs"
         / "-".join(
             [
                 datetime.now().isoformat(),
