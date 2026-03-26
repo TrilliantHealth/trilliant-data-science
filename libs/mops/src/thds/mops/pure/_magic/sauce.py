@@ -199,7 +199,6 @@ def make_magic(
 
     By default it will be set to the thds.other.module.function_name of the decorated function.
     """
-    error_logger = log.auto(__name__, "thds.mops.pure._magic.api").error
     err_msg = (
         "You are probably using pure.magic(.deco) from multiple places on the same function. You will need to specify a unique config_path for each usage."
         if not config_path
@@ -208,7 +207,9 @@ def make_magic(
     err_msg += " See the comment in mops.pure._magic.sauce for more details."
 
     def must_not_remagic_same_func(msg: str) -> None:
-        error_logger(f"{msg}; {err_msg}")
+        # log.auto() uses inspect.stack() which is expensive (~350ms with a large sys.modules),
+        # but this only runs on the rare re-decoration error path, so the cost is acceptable.
+        log.auto(__name__, "thds.mops.pure._magic.api").error(f"{msg}; {err_msg}")
         # if you see either of the above messages, consider whether you really need the magic
         # configurability of pure.magic, or whether it might be better to instantiate and use
         # MemoizingPicklingRunner directly without configurability. The reason overwriting

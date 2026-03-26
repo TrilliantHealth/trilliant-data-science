@@ -1,3 +1,17 @@
+### 3.17.20260326
+
+- **Fix ~28s import-time overhead from `inspect.stack()` in `pure.magic`**: `make_magic()` called
+  `log.auto()` on every `@pure.magic` decoration to create an error logger with caller attribution.
+  `log.auto()` calls `inspect.stack()` → `inspect.getmodule()`, which iterates all `sys.modules` entries
+  per stack frame. With 3400+ modules loaded and deep import stacks, each of the ~79 decorations cost
+  ~350ms. Moved the `log.auto()` call into the error handler so it only runs on the rare re-decoration
+  error path.
+
+- **Defer `calgitver` subprocess calls from import time**: `metadata.py` ran `calgitver.calgitver()` (4
+  git subprocesses, ~1s) at module scope to populate `INVOKER_CODE_VERSION`'s default. Deferred the call
+  to `get_invoker_code_version()` at runtime. The `lru_cache` on `calgitver()` still ensures the
+  subprocesses run at most once per process.
+
 ### 3.17.20260324
 
 - **Fix noisy `runpy` RuntimeWarning on subprocess entry**: `MOPS_EXCEPTION_EXIT_CODE` was defined in

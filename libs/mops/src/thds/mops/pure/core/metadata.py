@@ -18,13 +18,7 @@ from thds.core import calgitver, config, hostname
 
 _logger = logging.getLogger(__name__)
 
-try:
-    _CALGITVER = calgitver.calgitver()
-except calgitver.git.NO_GIT:
-    _CALGITVER = ""
-
-
-INVOKER_CODE_VERSION = config.item("mops.metadata.local.invoker_code_version", _CALGITVER)
+INVOKER_CODE_VERSION = config.item("mops.metadata.local.invoker_code_version", "")
 INVOKED_BY = config.item("mops.metadata.local.invoked_by", "")
 REMOTE_CODE_VERSION = config.item("mops.metadata.remote.code_version", "")
 EXTRA_METADATA_GENERATOR = config.item("mops.metadata.extra_generator", default="")
@@ -64,7 +58,13 @@ def format_extra_metadata(extra: ty.Dict[str, str]) -> str:
 
 
 def get_invoker_code_version() -> str:
-    return INVOKER_CODE_VERSION() or "unknown"
+    if v := INVOKER_CODE_VERSION():
+        return v
+
+    try:
+        return calgitver.calgitver() or "unknown"
+    except calgitver.git.NO_GIT:
+        return "unknown"
 
 
 def get_invoked_by() -> str:
