@@ -1,13 +1,12 @@
 """Joins pickle functionality and Blob Store functionality to run functions remotely."""
 
-import threading
 import time
 import typing as ty
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 
-from thds.core import futures, log, scope
+from thds.core import concurrency, futures, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
 from ..._utils.on_slow import LogSlow, on_slow
@@ -28,13 +27,17 @@ from .get_results import (
 # Pickling is 100% GIL-bound — hundreds of threads pickling simultaneously
 # just convoy behind the GIL, inflating wall-clock time per thread without
 # improving throughput. A semaphore limits concurrency so each pickle finishes fast.
-_SERIALIZATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_serialization()))
+# Reentrant because serialization (__getstate__) can trigger lazy mops calls
+# that themselves need to serialize — blocking the same thread would deadlock.
+_SERIALIZATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(int(max_concurrent_serialization()))
 
 # this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
 # of progress _complete_, rather than issuing many instructions to the
 # underlying client and allowing it to randomly order the operations
 # such that it takes longer to get a full unit of work complete.
-_BEFORE_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()))
+# Reentrant for the same reason as above — a mops call during argument
+# resolution can trigger another mops call on the same thread.
+_BEFORE_INVOCATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(int(max_concurrent_network_ops()))
 # _BEFORE prioritizes uploading a single invocation and its dependencies so the Shim can start running.
 
 _DarkBlue = colorized(fg="white", bg="#00008b")

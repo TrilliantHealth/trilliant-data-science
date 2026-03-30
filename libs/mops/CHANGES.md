@@ -1,3 +1,11 @@
+### 3.17.20260330
+
+- **Fix deadlock during serialization**: `_SERIALIZATION_SEMAPHORE` and `_BEFORE_INVOCATION_SEMAPHORE`
+  are now reentrant. When `__getstate__` triggers lazy mops calls during pickling, all semaphore slots
+  can be held by threads blocked on the same `Lazy` lock while the thread computing the lazy value can't
+  acquire a slot. Switching to `ReentrantBoundedSemaphore` lets a thread that already holds a slot
+  re-enter without blocking.
+
 ### 3.17.20260326
 
 - **Fix ~28s import-time overhead from `inspect.stack()` in `pure.magic`**: `make_magic()` called

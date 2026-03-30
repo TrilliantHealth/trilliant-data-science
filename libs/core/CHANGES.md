@@ -1,3 +1,8 @@
+## 1.51
+
+- Add `ReentrantBoundedSemaphore` to `concurrency` module. Uses `ContextVar` for depth tracking, so it
+  works correctly with both threads and async tasks.
+
 ### 1.50.20260225
 
 - Drop Python 3.9 support (`requires-python>=3.10`).

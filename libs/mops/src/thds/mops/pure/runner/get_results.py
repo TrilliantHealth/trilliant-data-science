@@ -1,10 +1,9 @@
 import concurrent.futures
-import threading
 import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
 
-from thds.core import futures, log
+from thds.core import concurrency, futures, log
 
 from ...config import max_concurrent_network_ops
 from ..core import lock, memo
@@ -48,7 +47,9 @@ def unwrap_value_or_error(
         )
 
 
-_AFTER_INVOCATION_SEMAPHORE = threading.BoundedSemaphore(int(max_concurrent_network_ops()) * 3)
+_AFTER_INVOCATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(
+    int(max_concurrent_network_ops()) * 3
+)
 # _IN prioritizes retrieving the result of a Shim that has completed.
 logger = log.getLogger(__name__)
 T = ty.TypeVar("T")

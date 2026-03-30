@@ -62,6 +62,63 @@ def contextful_threadpool_executor(
     )
 
 
+_REENTRANT_SEM_ID = 0
+_REENTRANT_SEM_ID_LOCK = Lock()
+
+
+def _next_sem_id() -> int:
+    global _REENTRANT_SEM_ID
+    with _REENTRANT_SEM_ID_LOCK:
+        _REENTRANT_SEM_ID += 1
+        return _REENTRANT_SEM_ID
+
+
+class ReentrantBoundedSemaphore:
+    """A bounded semaphore that allows the owning execution context to re-enter
+    without consuming additional slots.
+
+    Uses ContextVar for depth tracking, so it works correctly with both threads
+    and async tasks. A thread (or async task) that has already acquired the
+    semaphore can re-acquire it without blocking — the underlying semaphore slot
+    is only acquired once per context, regardless of nesting depth.
+    """
+
+    def __init__(self, value: int = 1):
+        self._sem = threading.BoundedSemaphore(value)
+        self._depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+            f"_rbs_depth_{_next_sem_id()}", default=0
+        )
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        if self._depth.get() > 0:
+            self._depth.set(self._depth.get() + 1)
+            return True
+
+        kwargs: dict[str, ty.Any] = {"blocking": blocking}
+        if blocking and timeout != -1:
+            kwargs["timeout"] = timeout
+        acquired = self._sem.acquire(**kwargs)
+        if acquired:
+            self._depth.set(1)
+        return acquired
+
+    def release(self) -> None:
+        depth = self._depth.get()
+        if depth <= 0:
+            raise RuntimeError("cannot release a semaphore that has not been acquired")
+
+        self._depth.set(depth - 1)
+        if depth == 1:
+            self._sem.release()
+
+    def __enter__(self) -> "ReentrantBoundedSemaphore":
+        self.acquire()
+        return self
+
+    def __exit__(self, *args: ty.Any) -> None:
+        self.release()
+
+
 H = ty.TypeVar("H", bound=ty.Hashable)
 L = ty.TypeVar("L", bound=Lock)
 
