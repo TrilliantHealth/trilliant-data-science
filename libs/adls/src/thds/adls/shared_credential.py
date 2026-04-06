@@ -103,7 +103,35 @@ def get_credential_kwargs() -> Dict[str, bool]:
     return dict(exclude_shared_token_cache_credential=True)
 
 
+_PREFETCHED_TOKEN_PATH = "/run/secrets/thds_adls_token"
+
+
+class _PrefetchedTokenCredential:
+    """Uses a pre-fetched token from a file on disk.
+
+    Designed for Docker builds, where the host generates a short-lived
+    token via `az account get-access-token` and mounts it as a BuildKit
+    secret. The token file is only present during the RUN step and never
+    persists in any image layer.
+    """
+
+    def __init__(self, path: Path):
+        token_data = json.loads(path.read_text())
+        self._token = AccessToken(token=token_data["accessToken"], expires_on=token_data["expires_on"])
+
+    def get_token(self, *args, **kwargs) -> AccessToken:
+        return self._token
+
+    def close(self) -> None:
+        pass
+
+
 def _SharedCredential() -> TokenCredential:
+    prefetched = Path(_PREFETCHED_TOKEN_PATH)
+    if prefetched.exists():
+        logger.info("Using prefetched Azure token from %s", prefetched)
+        return _PrefetchedTokenCredential(prefetched)
+
     if platform.system() == "Darwin" and not DISABLE_FAST_CACHED_CREDENTIAL():
         # only try this crazy optimization on our local laptops
         return FastCachedAzureCliCredential()  # type: ignore
