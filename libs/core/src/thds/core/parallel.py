@@ -148,6 +148,17 @@ def failfast(results: ty.Iterable[ty.Tuple[H, ty.Union[R, Error]]]) -> ty.Iterat
         yield key, res
 
 
+def failfast_results(thunks: ty.Iterable[ty.Callable[[], R]], *, named: str = "") -> ty.Iterator[R]:
+    """Run thunks concurrently, yield results in completion order, abort on first error."""
+    for _, result in failfast(yield_all(create_keys(thunks), named=named)):
+        yield result
+
+
+def failfast_with_len(thunks: ty.Sequence[ty.Callable[[], R]], *, named: str = "") -> IteratorWithLen[R]:
+    """Like failfast_results, but takes a Sequence and returns an IteratorWithLen."""
+    return IteratorWithLen(len(thunks), failfast_results(thunks, named=named))
+
+
 def xf_mapping(
     thunks: ty.Mapping[H, ty.Callable[[], R]], named: str = ""
 ) -> ty.Iterator[ty.Tuple[H, R]]:
