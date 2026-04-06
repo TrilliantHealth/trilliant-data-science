@@ -32,7 +32,12 @@ def is_dir(blob_meta: BlobMeta) -> bool:
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.containerclient?view=azure-python#azure-storage-blob-containerclient-list-blobs
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobproperties?view=azure-python
 # https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.contentsettings?view=azure-python
-def yield_blob_meta(container_client: ContainerClient, root_dir: str) -> ty.Iterator[BlobMeta]:
+def yield_blob_props(container_client: ContainerClient, root_dir: str) -> ty.Iterator[BlobProperties]:
     for blob_props in container_client.list_blobs(name_starts_with=root_dir, include=["metadata"]):
         # `list_blobs` does not include metadata by default, so we need to explicitly specify including it
+        yield blob_props
+
+
+def yield_blob_meta(container_client: ContainerClient, root_dir: str) -> ty.Iterator[BlobMeta]:
+    for blob_props in yield_blob_props(container_client, root_dir):
         yield to_blob_meta(blob_props)

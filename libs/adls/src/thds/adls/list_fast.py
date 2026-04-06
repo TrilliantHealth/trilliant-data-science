@@ -6,6 +6,8 @@ client instead of the file system client.
 
 import typing as ty
 
+from azure.storage.blob import BlobProperties
+
 from thds.core import log, parallel, source, thunks
 
 from . import blob_meta, global_client
@@ -28,7 +30,7 @@ def _failfast_parallel(thunks: ty.Iterable[ty.Callable[[], R]]) -> ty.Iterator[R
     )
 
 
-def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[blob_meta.BlobMeta]:
+def multilayer_yield_blob_properties(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[BlobProperties]:
     """A fast way to find all blobs in a directory tree; we do this in parallel on
     subdirs, with as much nesting as necessary (though 1 level should be enough for most cases).
 
@@ -38,7 +40,7 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[blo
     """
     if layers <= 0:
         # directly yield the blobs
-        yield from blob_meta.yield_blob_meta(
+        yield from blob_meta.yield_blob_props(
             global_client.get_global_blob_container_client(fqn.sa, fqn.container),
             fqn.path.rstrip("/") + "/",
         )
@@ -78,28 +80,31 @@ def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[blo
 
     blob_container_client = global_client.get_global_blob_container_client(fqn.sa, fqn.container)
 
-    def _get_blob_meta(blob_name: str) -> blob_meta.BlobMeta:
-        return blob_meta.to_blob_meta(
-            blob_container_client.get_blob_client(blob_name).get_blob_properties()
-        )
+    def _get_blob_props(blob_name: str) -> BlobProperties:
+        return blob_container_client.get_blob_client(blob_name).get_blob_properties()
 
-    for blob_meta_iter in (
-        _failfast_parallel((thunks.thunking(_get_blob_meta)(file) for file in files)),
+    for blob_props_iter in (
+        _failfast_parallel(thunks.thunking(_get_blob_props)(name) for name in (*files, *subdirs)),
         *(
             _failfast_parallel(
                 # we use list_blobs (defined below) rather than yield here because returning
                 # an iterator across a thread boundary doesn't work
-                thunks.thunking(_list_blob_meta)(AdlsFqn(fqn.sa, fqn.container, subdir), layers - 1)
+                thunks.thunking(_list_blob_props)(AdlsFqn(fqn.sa, fqn.container, subdir), layers - 1)
                 for subdir in subdirs
             )
         ),
     ):
-        yield from blob_meta_iter
+        yield from blob_props_iter
 
 
-def _list_blob_meta(fqn: AdlsFqn, layers: int = 1) -> list[blob_meta.BlobMeta]:
-    """Only for use within multi_layer_yield_blobs."""
-    return list(multilayer_yield_blob_meta(fqn, layers))
+def multilayer_yield_blob_meta(fqn: AdlsFqn, layers: int = 1) -> ty.Iterator[blob_meta.BlobMeta]:
+    for blob_props in multilayer_yield_blob_properties(fqn, layers):
+        yield blob_meta.to_blob_meta(blob_props)
+
+
+def _list_blob_props(fqn: AdlsFqn, layers: int = 1) -> list[BlobProperties]:
+    """Only for use within multilayer_yield_blob_properties."""
+    return list(multilayer_yield_blob_properties(fqn, layers))
 
 
 def multilayer_yield_sources(
