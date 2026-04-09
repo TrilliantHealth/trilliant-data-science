@@ -1,0 +1,72 @@
+[project]
+name = "thds.mllegos"
+# Patch version is a datetime determined upon release
+version = "1.0"
+description = "Composable components for basic ML tasks"
+readme = "README.md"
+authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "thds-core",
+]
+
+[project.optional-dependencies]
+sklearn = ["scikit-learn"]
+pyecharts = ["pyecharts~=2.0"]
+
+[project.urls]
+Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+
+[dependency-groups]
+dev = [
+    "ipykernel",
+    "ipython",
+    "matplotlib",
+    "mypy~=1.11",
+    "mypy-extensions~=1.0",
+    "pytest~=7.2",
+    "pytest-cov~=4.0",
+    "pytest-mock~=3.10",
+    "pandas-stubs",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+thds-core = { path = "../../libs/core", editable = true }
+
+# TOOLING CONFIG
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["thds.mllegos"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+exclude = '''(?x)(
+    build/
+    | dist/
+    | \S+\.egg-info/
+)'''
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["azure", "joblib", "pyarrow.*", "pyecharts.*", "ruamel.*", "scipy.*", "sklearn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# do not run integration test by default, but CI will pick it up
+addopts = "-m 'not integration'"
+markers = ["integration"]
+testpaths = ["tests"]
