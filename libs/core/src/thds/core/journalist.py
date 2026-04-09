@@ -1,14 +1,16 @@
-"""Process-tree resource watchdog: samples RSS and CPU across the full process tree.
+"""Journalist: sits alongside your process tree, watches everything, and reports on it.
 
-Uses psutil when available; graceful no-op otherwise.  On Linux containers,
-also reads cgroup memory for accurate container-level RSS (avoids psutil
-overcounting from COW-shared pages in forked processes).
+Samples RSS, CPU, and network IO across the full process tree at configurable
+intervals.  Uses psutil when available; graceful no-op otherwise.  On Linux
+containers, reads cgroup memory for accurate container-level RSS (avoids
+psutil overcounting from COW-shared pages in forked processes).
 """
 
 import os
 import threading
 import time
 import typing as ty
+from dataclasses import dataclass
 from pathlib import Path
 
 from thds.core import log
@@ -92,11 +94,35 @@ def _tree_cpu_times(proc: "psutil.Process") -> tuple[float, float]:
     return user, sys_
 
 
-class ProcessTreeWatchdog:
-    """Context manager that samples RSS and CPU across the full process tree.
+def _read_net_bytes() -> tuple[int, int] | None:
+    """Return (bytes_sent, bytes_recv) across all interfaces, or None."""
+    if psutil is None:
+        return None
 
-    Logs tree_rss, peak_rss, instantaneous CPU cores, peak CPU cores, and
-    avg CPU cores each interval. No-op if psutil is unavailable.
+    try:
+        counters = psutil.net_io_counters()
+        return counters.bytes_sent, counters.bytes_recv
+    except Exception:
+        return None
+
+
+@dataclass(frozen=True)
+class JournalistMetrics:
+    """Snapshot of resource usage collected by a Journalist."""
+
+    peak_rss_gb: float
+    avg_rss_gb: float
+    peak_cpu_cores: float
+    avg_cpu_cores: float
+    peak_recv_mbps: float
+    total_recv_gb: float
+
+
+class Journalist:
+    """Context manager that samples RSS, CPU, and network IO across the process tree.
+
+    Logs memory, CPU cores, and network bandwidth at each interval.
+    No-op if psutil is unavailable.
     """
 
     def __init__(self, label: str, interval: float = 10.0, sample_interval: float = 1.0) -> None:
@@ -120,6 +146,11 @@ class ProcessTreeWatchdog:
         self._start_cpu = 0.0
         self._last_wall = 0.0
         self._last_cpu = 0.0
+        # Network IO tracking.
+        self._net_available = _read_net_bytes() is not None
+        self._start_net_recv = 0
+        self._start_net_sent = 0
+        self._peak_recv_mbps = 0.0
 
     def _read_cpu_seconds(self, proc: "psutil.Process") -> float:
         """Read CPU seconds from cgroup (preferred) or process tree (fallback)."""
@@ -143,8 +174,15 @@ class ProcessTreeWatchdog:
         last_cgroup_mb = 0.0
         last_rss_mb = 0.0
 
+        prev_net = _read_net_bytes()
+        if prev_net is not None:
+            self._start_net_sent, self._start_net_recv = prev_net
+        prev_net_recv = self._start_net_recv
+        last_recv_mbps = 0.0
+
         _BLUE = "\033[34m"
         _GREEN = "\033[32m"
+        _YELLOW = "\033[33m"
         _RESET = "\033[0m"
 
         while not self._stop.wait(self._sample_interval):
@@ -172,6 +210,14 @@ class ProcessTreeWatchdog:
             self._peak_cpu_cores = max(self._peak_cpu_cores, cores)
             last_cores = cores
 
+            if self._net_available:
+                cur_net = _read_net_bytes()
+                if cur_net is not None:
+                    recv_delta = max(0, cur_net[1] - prev_net_recv)
+                    last_recv_mbps = (recv_delta / max(dt, 0.01)) / (1024 * 1024)
+                    self._peak_recv_mbps = max(self._peak_recv_mbps, last_recv_mbps)
+                    prev_net_recv = cur_net[1]
+
             prev_wall, prev_cpu = now_wall, cur_cpu
             self._last_wall, self._last_cpu = now_wall, cur_cpu
 
@@ -191,8 +237,19 @@ class ProcessTreeWatchdog:
                     avg_mem_gb = (self._rss_sum_mb / self._sample_count) / 1024
 
                 elapsed_min = total_wall / 60
+
+                total_recv_gb = (prev_net_recv - self._start_net_recv) / (1024**3)
+
+                net_part = ""
+                if self._net_available:
+                    net_part = (
+                        f" | {_YELLOW}net {last_recv_mbps:.0f} MB/s recv, "
+                        f"{total_recv_gb:.1f} GB total{_RESET}"
+                    )
+
                 _logger.info(
-                    "%s [%.1fm]: %smem %.1f / %.1f GB (avg %.1f)%s | %scpu %.1f / %.1f cores (avg %.1f)%s",
+                    "%s [%.1fm]: %smem %.1f / %.1f GB (avg %.1f)%s"
+                    " | %scpu %.1f / %.1f cores (avg %.1f)%s%s",
                     self._label,
                     elapsed_min,
                     _BLUE,
@@ -205,6 +262,7 @@ class ProcessTreeWatchdog:
                     self._peak_cpu_cores,
                     avg_cores,
                     _RESET,
+                    net_part,
                 )
 
     @property
@@ -233,7 +291,32 @@ class ProcessTreeWatchdog:
         total_cpu = max(0.0, self._last_cpu - self._start_cpu)
         return total_cpu / max(total_wall, 0.01)
 
-    def __enter__(self) -> "ProcessTreeWatchdog":
+    @property
+    def peak_recv_mbps(self) -> float:
+        return self._peak_recv_mbps
+
+    @property
+    def total_recv_gb(self) -> float:
+        net = _read_net_bytes()
+        if net is None:
+            return 0.0
+
+        return max(0, net[1] - self._start_net_recv) / (1024**3)
+
+    @property
+    def metrics(self) -> JournalistMetrics:
+        peak_mem_mb = max(self._peak_cgroup_mb, self._peak_rss_mb)
+        avg_mem_mb = self.avg_cgroup_mb if self._cgroup_available else self.avg_rss_mb
+        return JournalistMetrics(
+            peak_rss_gb=peak_mem_mb / 1024,
+            avg_rss_gb=avg_mem_mb / 1024,
+            peak_cpu_cores=self.peak_cpu_cores,
+            avg_cpu_cores=self.avg_cpu_cores,
+            peak_recv_mbps=self.peak_recv_mbps,
+            total_recv_gb=self.total_recv_gb,
+        )
+
+    def __enter__(self) -> "Journalist":
         if self._enabled:
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
