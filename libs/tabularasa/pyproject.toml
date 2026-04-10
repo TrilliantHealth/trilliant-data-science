@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.12"
+version = "0.14.13"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -30,6 +30,10 @@ autoformat = [
 ]
 cli = [
   "bourbaki.application>=0.10.13",
+  "bourbaki.introspection>=0.5.12",
+  # both bourbaki packages ship a `bourbaki/__init__.py` with a
+  # `pkg_resources.declare_namespace` call in older versions; these minimums
+  # ensure both use implicit namespace packages instead (see PR #4090).
   "ruamel.yaml",
   "tabulate",
 ]
@@ -66,6 +70,7 @@ dev = [
   # data build
   # CLI/code generation ("cli" extra)
   "bourbaki.application>=0.10.13",
+  "bourbaki.introspection>=0.5.12",
   "black",
   "isort",
   "ruamel.yaml",

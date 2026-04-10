@@ -1,3 +1,8 @@
+### 0.14.13
+
+- Pinned `bourbaki.introspection>=0.5.12` to fully fix `pkg_resources` warning — PR #4090 only pinned
+  `bourbaki.application`, but `bourbaki.introspection` also ships the namespace `__init__.py`.
+
 ### 0.14.12
 
 - Removed references to deprecated `pkg_resources` lib, allowing compatibility with `setuptools` >= 82.0

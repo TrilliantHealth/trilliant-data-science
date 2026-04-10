@@ -402,15 +402,15 @@ wheels = [
 
 [[package]]
 name = "bourbaki-introspection"
-version = "0.5.11"
+version = "0.5.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "multipledispatch" },
     { name = "typing-inspect" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/ce/4708f8ef35c912b24f0df5121e1a81fd67890b9d9b9eeea55ac19cdd84fe/bourbaki.introspection-0.5.11.tar.gz", hash = "sha256:edae2ddba7585c77ac4e59e4762706ab77037d89a417d996e9f898827c8f9490", size = 43003, upload-time = "2023-05-16T17:37:00.122Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/81/b486beaed1cef4029f018b53e86eab3acd3412c435a0803dbe5cbd7c1e5f/bourbaki_introspection-0.5.13.tar.gz", hash = "sha256:2a97bf0f21125c6a07a9d24d59739b15eb1b6f97538e0d14855f04e3aedaad68", size = 58846, upload-time = "2026-03-05T03:06:57.581Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/dd/f1dd7501391c8e72ad96945184aa2b8f9a45e89b3adf9776b70a0b1cff12/bourbaki.introspection-0.5.11-py3-none-any.whl", hash = "sha256:c586339af11c2b8d58f315d67085fbedb69a5726cfcc1bd1bbf943415e4f402e", size = 58585, upload-time = "2023-05-16T17:36:55.531Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/aa/fd2dd6b205b29a55883822e12628e672a717e531c142be0f70b654204e5e/bourbaki_introspection-0.5.13-py3-none-any.whl", hash = "sha256:b4532d53485f8b63dba06bce08d93bdada7b1fceabe6b69b728411635597e022", size = 57489, upload-time = "2026-03-05T03:06:56.707Z" },
 ]
 
 [[package]]
@@ -2954,7 +2954,7 @@ dev = [
 
 [[package]]
 name = "thds-tabularasa"
-version = "0.14.12"
+version = "0.14.13"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -2981,6 +2981,7 @@ autoformat = [
 ]
 cli = [
     { name = "bourbaki-application" },
+    { name = "bourbaki-introspection" },
     { name = "ruamel-yaml" },
     { name = "tabulate" },
 ]
@@ -2992,6 +2993,7 @@ viz = [
 dev = [
     { name = "black" },
     { name = "bourbaki-application" },
+    { name = "bourbaki-introspection" },
     { name = "ipykernel" },
     { name = "ipython" },
     { name = "isort" },
@@ -3018,6 +3020,7 @@ requires-dist = [
     { name = "attrs", specifier = ">=22.2" },
     { name = "black", marker = "extra == 'autoformat'" },
     { name = "bourbaki-application", marker = "extra == 'cli'", specifier = ">=0.10.13" },
+    { name = "bourbaki-introspection", marker = "extra == 'cli'", specifier = ">=0.5.12" },
     { name = "cattrs", specifier = ">=22.2" },
     { name = "filelock" },
     { name = "isort", marker = "extra == 'autoformat'" },
@@ -3043,6 +3046,7 @@ provides-extras = ["autoformat", "cli", "viz"]
 dev = [
     { name = "black" },
     { name = "bourbaki-application", specifier = ">=0.10.13" },
+    { name = "bourbaki-introspection", specifier = ">=0.5.12" },
     { name = "ipykernel" },
     { name = "ipython" },
     { name = "isort" },
