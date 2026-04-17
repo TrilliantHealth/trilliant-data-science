@@ -1,3 +1,10 @@
+### 1.51.20260417
+
+- `Journalist` self-guards against re-entry within the same process: if one is already active, a second
+  `__enter__` logs a debug note and becomes a no-op. Avoids double-counted samples and duplicate log
+  lines when a process opportunistically wraps its work in a Journalist (e.g. from an env-var-driven
+  activation point) and recursively invokes something that does the same.
+
 ## 1.51
 
 - Add `ReentrantBoundedSemaphore` to `concurrency` module. Uses `ContextVar` for depth tracking, so it

@@ -20,6 +20,7 @@ from thds.core.log import getLogger
 
 from ....__about__ import __version__
 from .. import metadata
+from .journalist import maybe_journalist
 from .runner_registry import MOPS_EXCEPTION_EXIT_CODE, run_named_entry_handler
 
 logger = getLogger(__name__)
@@ -41,7 +42,8 @@ def main() -> None:
     )
     # TODO potentially allow things like logger context to be passed in as -- arguments
     args, unknown = parser.parse_known_args()
-    exc = run_named_entry_handler(args.runner_name, *unknown)
+    with maybe_journalist(args.runner_name, unknown):
+        exc = run_named_entry_handler(args.runner_name, *unknown)
     logger.info(
         f"Exiting remote process {os.getpid()} after {(default_timer() - start) / 60:.2f} minutes"
         + metadata.format_end_of_run_times(start_timestamp, unknown)

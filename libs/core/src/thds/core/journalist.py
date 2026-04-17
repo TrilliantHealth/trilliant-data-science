@@ -23,6 +23,10 @@ except ImportError:
     psutil = None  # type: ignore[assignment]
 
 
+_ACTIVE: "Journalist | None" = None
+_ACTIVE_LOCK = threading.Lock()
+
+
 # cgroup v2: /sys/fs/cgroup/memory.current
 # cgroup v1: /sys/fs/cgroup/memory/memory.usage_in_bytes
 _CGROUP_V2 = Path("/sys/fs/cgroup/memory.current")
@@ -116,6 +120,8 @@ class JournalistMetrics:
     avg_cpu_cores: float
     peak_recv_mbps: float
     total_recv_gb: float
+    peak_sent_mbps: float
+    total_sent_gb: float
 
 
 class Journalist:
@@ -151,6 +157,7 @@ class Journalist:
         self._start_net_recv = 0
         self._start_net_sent = 0
         self._peak_recv_mbps = 0.0
+        self._peak_sent_mbps = 0.0
 
     def _read_cpu_seconds(self, proc: "psutil.Process") -> float:
         """Read CPU seconds from cgroup (preferred) or process tree (fallback)."""
@@ -169,16 +176,22 @@ class Journalist:
 
         self._start_wall = prev_wall
         self._start_cpu = prev_cpu
-        last_log_wall = prev_wall
-        last_cores = 0.0
-        last_cgroup_mb = 0.0
-        last_rss_mb = 0.0
+
+        # "Log window" baselines - reset at each log emission so "current" values
+        # report the average rate (or window peak for mem) over the window
+        # instead of the last sample.
+        window_start_wall = prev_wall
+        window_start_cpu = prev_cpu
+        window_peak_rss_mb = 0.0
+        window_peak_cgroup_mb = 0.0
 
         prev_net = _read_net_bytes()
         if prev_net is not None:
             self._start_net_sent, self._start_net_recv = prev_net
         prev_net_recv = self._start_net_recv
-        last_recv_mbps = 0.0
+        prev_net_sent = self._start_net_sent
+        window_start_net_recv = self._start_net_recv
+        window_start_net_sent = self._start_net_sent
 
         _BLUE = "\033[34m"
         _GREEN = "\033[32m"
@@ -190,80 +203,96 @@ class Journalist:
             self._peak_rss_mb = max(self._peak_rss_mb, rss_mb)
             self._rss_sum_mb += rss_mb
             self._sample_count += 1
-            last_rss_mb = rss_mb
+            window_peak_rss_mb = max(window_peak_rss_mb, rss_mb)
 
-            cgroup_mb = 0.0
             if self._cgroup_available:
                 cg_bytes = _read_cgroup_mem_bytes()
                 if cg_bytes is not None:
                     cgroup_mb = cg_bytes / (1024 * 1024)
                     self._peak_cgroup_mb = max(self._peak_cgroup_mb, cgroup_mb)
                     self._cgroup_sum_mb += cgroup_mb
-                    last_cgroup_mb = cgroup_mb
+                    window_peak_cgroup_mb = max(window_peak_cgroup_mb, cgroup_mb)
 
             now_wall = time.monotonic()
             cur_cpu = self._read_cpu_seconds(proc)
 
             dt = now_wall - prev_wall
             cpu_delta = max(0.0, cur_cpu - prev_cpu)
-            cores = cpu_delta / max(dt, 0.01)
-            self._peak_cpu_cores = max(self._peak_cpu_cores, cores)
-            last_cores = cores
+            sample_cores = cpu_delta / max(dt, 0.01)
+            self._peak_cpu_cores = max(self._peak_cpu_cores, sample_cores)
 
             if self._net_available:
                 cur_net = _read_net_bytes()
                 if cur_net is not None:
+                    sent_delta = max(0, cur_net[0] - prev_net_sent)
                     recv_delta = max(0, cur_net[1] - prev_net_recv)
-                    last_recv_mbps = (recv_delta / max(dt, 0.01)) / (1024 * 1024)
-                    self._peak_recv_mbps = max(self._peak_recv_mbps, last_recv_mbps)
+                    sample_sent_mbps = (sent_delta / max(dt, 0.01)) / (1024 * 1024)
+                    sample_recv_mbps = (recv_delta / max(dt, 0.01)) / (1024 * 1024)
+                    self._peak_sent_mbps = max(self._peak_sent_mbps, sample_sent_mbps)
+                    self._peak_recv_mbps = max(self._peak_recv_mbps, sample_recv_mbps)
+                    prev_net_sent = cur_net[0]
                     prev_net_recv = cur_net[1]
 
             prev_wall, prev_cpu = now_wall, cur_cpu
             self._last_wall, self._last_cpu = now_wall, cur_cpu
 
-            if now_wall - last_log_wall >= self._log_interval:
-                last_log_wall = now_wall
+            if now_wall - window_start_wall >= self._log_interval:
                 total_wall = now_wall - self._start_wall
                 total_cpu = max(0.0, cur_cpu - self._start_cpu)
                 avg_cores = total_cpu / max(total_wall, 0.01)
 
+                window_seconds = max(now_wall - window_start_wall, 0.01)
+                window_cores = max(0.0, cur_cpu - window_start_cpu) / window_seconds
+
                 if self._cgroup_available:
-                    mem_gb = last_cgroup_mb / 1024
+                    window_peak_mem_gb = window_peak_cgroup_mb / 1024
                     peak_mem_gb = self._peak_cgroup_mb / 1024
-                    avg_mem_gb = (self._cgroup_sum_mb / self._sample_count) / 1024
                 else:
-                    mem_gb = last_rss_mb / 1024
+                    window_peak_mem_gb = window_peak_rss_mb / 1024
                     peak_mem_gb = self._peak_rss_mb / 1024
-                    avg_mem_gb = (self._rss_sum_mb / self._sample_count) / 1024
 
                 elapsed_min = total_wall / 60
 
                 total_recv_gb = (prev_net_recv - self._start_net_recv) / (1024**3)
+                total_sent_gb = (prev_net_sent - self._start_net_sent) / (1024**3)
 
                 net_part = ""
                 if self._net_available:
+                    window_recv_mbps = (
+                        (prev_net_recv - window_start_net_recv) / window_seconds / (1024 * 1024)
+                    )
+                    window_sent_mbps = (
+                        (prev_net_sent - window_start_net_sent) / window_seconds / (1024 * 1024)
+                    )
                     net_part = (
-                        f" | {_YELLOW}net {last_recv_mbps:.0f} MB/s recv, "
-                        f"{total_recv_gb:.1f} GB total{_RESET}"
+                        f" | {_YELLOW}NET {window_recv_mbps:.0f}/{self._peak_recv_mbps:.0f}\u2193"
+                        f" {window_sent_mbps:.0f}/{self._peak_sent_mbps:.0f}\u2191 cur/peak MBps;"
+                        f" total GB {total_recv_gb:.1f}\u2193 {total_sent_gb:.1f}\u2191{_RESET}"
                     )
 
                 _logger.info(
-                    "%s [%.1fm]: %smem %.1f / %.1f GB (avg %.1f)%s"
-                    " | %scpu %.1f / %.1f cores (avg %.1f)%s%s",
+                    "%s [%.1fm]: %sMEM cur %.1f / %.1f peak GB%s"
+                    " | %sCPU cur %.1f, avg %.1f / %.1f peak%s%s",
                     self._label,
                     elapsed_min,
                     _BLUE,
-                    mem_gb,
+                    window_peak_mem_gb,
                     peak_mem_gb,
-                    avg_mem_gb,
                     _RESET,
                     _GREEN,
-                    last_cores,
-                    self._peak_cpu_cores,
+                    window_cores,
                     avg_cores,
+                    self._peak_cpu_cores,
                     _RESET,
                     net_part,
                 )
+
+                window_start_wall = now_wall
+                window_start_cpu = cur_cpu
+                window_start_net_recv = prev_net_recv
+                window_start_net_sent = prev_net_sent
+                window_peak_rss_mb = 0.0
+                window_peak_cgroup_mb = 0.0
 
     @property
     def peak_rss_mb(self) -> float:
@@ -296,12 +325,24 @@ class Journalist:
         return self._peak_recv_mbps
 
     @property
+    def peak_sent_mbps(self) -> float:
+        return self._peak_sent_mbps
+
+    @property
     def total_recv_gb(self) -> float:
         net = _read_net_bytes()
         if net is None:
             return 0.0
 
         return max(0, net[1] - self._start_net_recv) / (1024**3)
+
+    @property
+    def total_sent_gb(self) -> float:
+        net = _read_net_bytes()
+        if net is None:
+            return 0.0
+
+        return max(0, net[0] - self._start_net_sent) / (1024**3)
 
     @property
     def metrics(self) -> JournalistMetrics:
@@ -314,15 +355,69 @@ class Journalist:
             avg_cpu_cores=self.avg_cpu_cores,
             peak_recv_mbps=self.peak_recv_mbps,
             total_recv_gb=self.total_recv_gb,
+            peak_sent_mbps=self.peak_sent_mbps,
+            total_sent_gb=self.total_sent_gb,
         )
 
     def __enter__(self) -> "Journalist":
-        if self._enabled:
-            self._thread = threading.Thread(target=self._run, daemon=True)
-            self._thread.start()
+        global _ACTIVE
+        if not self._enabled:
+            return self
+
+        with _ACTIVE_LOCK:
+            if _ACTIVE is not None:
+                _logger.debug(
+                    "Journalist already active in this process; %r will be a no-op.", self._label
+                )
+                self._enabled = False
+                return self
+
+            _ACTIVE = self
+
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
         return self
 
+    def _log_final_summary(self) -> None:
+        # Parens format matches the periodic line's "avg/peak" grammar; "cur"
+        # is dropped because it is meaningless at exit. For NET we lead with
+        # peak (sustained throughput is captured in total GB, so a recap avg
+        # rate adds nothing).
+        m = self.metrics
+        elapsed_min = (self._last_wall - self._start_wall) / 60
+        _BLUE = "\033[34m"
+        _GREEN = "\033[32m"
+        _YELLOW = "\033[33m"
+        _RESET = "\033[0m"
+        net_part = ""
+        if self._net_available:
+            net_part = (
+                f" | {_YELLOW}NET {m.peak_recv_mbps:.0f}\u2193 {m.peak_sent_mbps:.0f}\u2191 peak MBps;"
+                f" total GB {m.total_recv_gb:.1f}\u2193 {m.total_sent_gb:.1f}\u2191{_RESET}"
+            )
+        _logger.info(
+            "%s [%.1fm]: %sMEM avg %.1f / %.1f peak GB%s | %sCPU avg %.1f / %.1f peak%s%s",
+            self._label,
+            elapsed_min,
+            _BLUE,
+            m.avg_rss_gb,
+            m.peak_rss_gb,
+            _RESET,
+            _GREEN,
+            m.avg_cpu_cores,
+            m.peak_cpu_cores,
+            _RESET,
+            net_part,
+        )
+
     def __exit__(self, *exc: ty.Any) -> None:
+        global _ACTIVE
         if self._thread is not None:
             self._stop.set()
             self._thread.join(timeout=2.0)
+            if self._sample_count > 0:
+                self._log_final_summary()
+
+        with _ACTIVE_LOCK:
+            if _ACTIVE is self:
+                _ACTIVE = None

@@ -1,3 +1,14 @@
+### 3.18
+
+- **Add optional resource-usage monitoring for remote entry processes.** New config item
+  `mops.journalist.log_interval` (env var `MOPS_JOURNALIST_LOG_INTERVAL`): when set to a positive float
+  (seconds), the remote entry wraps the runner invocation in a `thds.core.journalist.Journalist` that
+  samples RSS, CPU, and network IO across the process tree and logs at the configured interval. Set via a
+  k8s shim builder or the project's Dockerfile. Defaults to `0.0` (off). On activation both the env var
+  and the in-process config value are cleared so recursively-invoked mops functions do not re-activate.
+  Note: `thds.core.journalist` requires `psutil` to actually sample the process tree - projects that
+  enable this feature must declare `psutil` as an explicit runtime dependency themselves.
+
 ### 3.17.20260330
 
 - **Fix deadlock during serialization**: `_SERIALIZATION_SEMAPHORE` and `_BEFORE_INVOCATION_SEMAPHORE`
