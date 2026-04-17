@@ -1,3 +1,11 @@
+### 1.51.20260417b
+
+- Fix `JournalistMetrics.peak_rss_gb` when both cgroup and psutil are available: previously took
+  `max(cgroup, psutil_tree_sum)`, which picked the psutil value whenever the proc-tree RSS double-counted
+  COW-shared pages across forked children (observed: `417 GB` peak on a 256 GB node). Now consistently
+  prefers cgroup (the kernel's authoritative container view) when available, matching how the periodic
+  log line and `avg_rss_gb` already behaved.
+
 ### 1.51.20260417
 
 - `Journalist` self-guards against re-entry within the same process: if one is already active, a second

@@ -346,7 +346,10 @@ class Journalist:
 
     @property
     def metrics(self) -> JournalistMetrics:
-        peak_mem_mb = max(self._peak_cgroup_mb, self._peak_rss_mb)
+        # Prefer cgroup when available; psutil's proc-tree RSS double-counts
+        # COW-shared pages across forked children (observed: 417 GB peak on a
+        # 256 GB node). Cgroup is the kernel's authoritative container view.
+        peak_mem_mb = self._peak_cgroup_mb if self._cgroup_available else self._peak_rss_mb
         avg_mem_mb = self.avg_cgroup_mb if self._cgroup_available else self.avg_rss_mb
         return JournalistMetrics(
             peak_rss_gb=peak_mem_mb / 1024,
