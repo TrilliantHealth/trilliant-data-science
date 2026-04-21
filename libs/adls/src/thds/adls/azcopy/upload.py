@@ -96,5 +96,6 @@ def run(
     if process.returncode != 0:
         raise subprocess.CalledProcessError(
             process.returncode,
-            f"AzCopy failed with return code {process.returncode}\n\n" + "\n".join(output_lines),
+            cmd,
+            output="\n".join(output_lines),
         )

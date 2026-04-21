@@ -1,3 +1,11 @@
+### 4.5.20260417
+
+- Delete blob after azcopy failure and before upload retries to prevent InvalidBlobOrBlock errors and
+  silent data corruption.
+- Re-check upload decision before deleting a blob on InvalidBlobOrBlock to avoid removing a valid
+  concurrent upload.
+- Capture azcopy JSON error output in CalledProcessError.
+
 ### 4.5.20260316
 
 - Add threading lock to Tracker to fix incorrect progress sizes under concurrent downloads

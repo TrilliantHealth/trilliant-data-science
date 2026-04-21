@@ -5,8 +5,9 @@ import random
 import time
 import typing as ty
 from functools import wraps
-from logging import getLogger
 from timeit import default_timer
+
+from .log import getLogger
 
 F = ty.TypeVar("F", bound=ty.Callable)
 
@@ -78,7 +79,13 @@ def sleep(
     return sleep_
 
 
-def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
+BeforeRetry = ty.Callable[[Exception], ty.Any]
+
+
+def retry(
+    retry_strategy_factory: RetryStrategyFactory,
+    before_retry: ty.Optional[BeforeRetry] = None,
+) -> ty.Callable[[F], F]:
     """Uses your retry strategy every time an exception is raised.
     Your iterable can therefore provide different handling for each
     incrementing error, as well as configurable delays between errors,
@@ -86,6 +93,10 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
 
     If the retry_strategy iterator itself ends (or is empty to begin
     with), the function will be called one final time.
+
+    before_retry, if provided, is called with the caught exception after
+    determining the exception is retryable but before sleeping/retrying.
+    Use it for cleanup (e.g. deleting a partially-written resource).
     """
 
     def _retry_decorator(func: F) -> F:
@@ -97,6 +108,8 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
                 except Exception as ex:
                     if not is_retryable(ex):
                         raise ex
+                    if before_retry:
+                        before_retry(ex)
                     getLogger(__name__).info("Retry #%d for %s due to exception %s", i, func, ex)
             # one final retry that, if it fails, will not get caught and retried.
             return func(*args, **kwargs)
@@ -109,16 +122,18 @@ def retry(retry_strategy_factory: RetryStrategyFactory) -> ty.Callable[[F], F]:
 def retry_regular(
     is_retryable: IsRetryable,
     intervals_factory: ty.Callable[[], ty.Iterable[ty.Any]],
+    before_retry: ty.Optional[BeforeRetry] = None,
 ) -> ty.Callable[[F], F]:
-    return retry(lambda: (is_retryable for _ in intervals_factory()))
+    return retry(lambda: (is_retryable for _ in intervals_factory()), before_retry=before_retry)
 
 
 def retry_sleep(
     is_retryable: IsRetryable,
     seconds_iter: ty.Callable[[], ty.Iterable[float]],
+    before_retry: ty.Optional[BeforeRetry] = None,
 ) -> ty.Callable[[F], F]:
     """E.g. retry_sleep(expo(retries=5)) to get max 6 calls to the function."""
-    return retry_regular(is_retryable, sleep(seconds_iter))
+    return retry_regular(is_retryable, sleep(seconds_iter), before_retry=before_retry)
 
 
 def is_exc(*exc_types: ty.Type[Exception]) -> IsRetryable:

@@ -1,3 +1,13 @@
+### 1.51.20260420
+
+- `from_uri` with a `file://` URI no longer raises `FileNotFoundError` at construction time. Consistent
+  with ADLS and other URI schemes — validation happens at access time.
+
+### 1.51.20260417c
+
+- Add `before_retry` callback to `fretry.retry_sleep` and friends.
+- Fix `fretry` retry logs being silently dropped (was using stdlib getLogger).
+
 ### 1.51.20260417b
 
 - Fix `JournalistMetrics.peak_rss_gb` when both cgroup and psutil are available: previously took

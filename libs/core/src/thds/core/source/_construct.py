@@ -100,7 +100,11 @@ def register_from_uri_handler(key: str, handler: FromUriHandler):
 
 def _from_local_uri(uri: str, hash: ty.Optional[Hash], size: int = 0) -> Source:
     """fulfill the FromUri interface"""
-    return from_file(path_from_uri(uri), hash)
+    path = path_from_uri(uri)
+    if path.exists():
+        return from_file(path, hash)
+
+    return Source(uri=uri, hash=hash, size=size)
 
 
 def _local_file_uri_handler(uri: str) -> ty.Optional[FromUri]:
@@ -112,9 +116,8 @@ register_from_uri_handler("local_file", _local_file_uri_handler)
 
 
 def from_uri(uri: str, hash: ty.Optional[Hash] = None, size: int = 0) -> Source:
-    """Create a read-only Source from a URI. The data should already exist at this remote
-    URI, although Source itself can make no guarantee that it always represents real data
-    - only that any data it does represent is read-only.
+    """Create a read-only Source descriptor from a URI. The data need not exist
+    at the URI yet — the Source is just a pointer. Validation happens at access time.
 
     It may be advantageous for a URI-handling library to register a more specific
     implementation of this function, if it is capable of determining a Hash for the blob
