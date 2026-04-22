@@ -31,6 +31,9 @@ mops-human-sha256b64 = "thds.mops.pure.tools.sha256_b64_addressed:main"
 mops-inspect = "thds.mops.pure.tools.inspect:main"
 mops-summarize = "thds.mops.pure.tools.summarize.cli:main"
 
+[project.entry-points.pytest11]
+pytest-mops = "thds.mops.testing.plugin"
+
 [project.urls]
 Repository = "https://github.com/TrilliantHealth/ds-monorepo"
 
@@ -105,5 +108,5 @@ disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v -s"
+addopts = "-v -s -p no:pytest-mops"
 markers = ["integration"]
