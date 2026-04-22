@@ -200,10 +200,12 @@ def launch(  # noqa: C901
 
         container = client.V1Container(**v1_container_args)
         logger.debug("Creating podspec definition ...")
+        node_affinity = node_narrowing.get("node_affinity")
         pod_template.template.spec = client.V1PodSpec(
             containers=[container],
             restart_policy="Never",
             node_selector=node_narrowing.get("node_selector", dict()),
+            affinity=client.V1Affinity(node_affinity=node_affinity) if node_affinity else None,
             tolerations=node_narrowing.get("tolerations", list()),
             service_account_name=service_account_name,
         )

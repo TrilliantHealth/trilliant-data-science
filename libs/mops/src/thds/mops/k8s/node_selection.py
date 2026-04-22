@@ -28,6 +28,11 @@ class NodeNarrowing(TypedDict, total=False):
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     node_selector: ty.Mapping[str, str]
     # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+    node_affinity: client.V1NodeAffinity
+    # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
+    # Use when node_selector's single-value equality isn't enough - e.g. when a pod
+    # should be eligible for any of several node pools. node_affinity and node_selector
+    # compose: the scheduler ANDs them, so setting both is fine.
     tolerations: ty.Sequence[client.V1Toleration]
     # https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 
@@ -56,3 +61,28 @@ def tolerates_64cpu() -> client.V1Toleration:
 def require_gpu() -> NodeNarrowing:
     """Merge this with any additional NodeNarrowing (e.g. resource_requests) to run on GPUs."""
     return dict(node_selector={"instance-type": "gpu"}, tolerations=[tolerates_gpu()])
+
+
+def require_node_labels(labels: ty.Mapping[str, ty.Sequence[str]]) -> client.V1NodeAffinity:
+    """Hard requirement that each node label's value is in the given set.
+
+    AND across keys, OR within each key (standard `In` operator semantics). Use this
+    when a pod should be eligible for any of several node pools - e.g.
+    ``{"initiative": ["pool-a", "pool-b"]}``. For single-value equality,
+    ``node_selector`` is simpler.
+
+    For unusual cases (preferred affinity, NotIn, key-exists-only), build a
+    ``V1NodeAffinity`` directly and pass it to ``NodeNarrowing["node_affinity"]``.
+    """
+    return client.V1NodeAffinity(
+        required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+            node_selector_terms=[
+                client.V1NodeSelectorTerm(
+                    match_expressions=[
+                        client.V1NodeSelectorRequirement(key=k, operator="In", values=list(v))
+                        for k, v in labels.items()
+                    ],
+                ),
+            ],
+        ),
+    )

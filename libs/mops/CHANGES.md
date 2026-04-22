@@ -1,3 +1,12 @@
+### 3.19
+
+- **Support multi-value node-label requirements in `NodeNarrowing`.** Added a new optional
+  `node_affinity: V1NodeAffinity` field on `NodeNarrowing` and a `node_selection.require_node_labels`
+  helper for the common "any of these node pools" case. `node_selector` and `node_affinity` compose via
+  kubernetes' standard AND semantics. Previously, "any of several pools" could only be approximated with
+  tolerations, which are permissive rather than restrictive - pods could drift onto any pool whose
+  resources fit.
+
 ### 3.18
 
 - **Add optional resource-usage monitoring for remote entry processes.** New config item
