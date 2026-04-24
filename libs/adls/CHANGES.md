@@ -1,3 +1,8 @@
+### 4.5.20260423
+
+- Drop `InvalidBlobOrBlock` retry and blob-delete logic from `upload()` — suspected cause of silent
+  upload failures under fork-based multiprocessing. Restore simple `ResourceModifiedError`-only retries.
+
 ### 4.5.20260417
 
 - Delete blob after azcopy failure and before upload retries to prevent InvalidBlobOrBlock errors and
