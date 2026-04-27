@@ -1,3 +1,4 @@
+import os
 import typing as ty
 from threading import RLock
 
@@ -23,12 +24,24 @@ empty_config_retry = fretry.retry_sleep(_retry_config, fretry.expo(retries=3, de
 _AUTH_RLOCK = RLock()
 
 
+def _load_kube_config() -> None:
+    # In-pod, kubernetes.config.load_config tries ~/.kube/config first, fails,
+    # then falls back to in-cluster - emitting a root-logger WARNING on every
+    # call ("kube_config_path not provided ... Using inCluster Config"). The
+    # TTL cache keeps it bounded but it still recurs on token refresh. Skip
+    # the kube_config probe when KUBERNETES_SERVICE_HOST is set.
+    if "KUBERNETES_SERVICE_HOST" in os.environ:
+        config.load_incluster_config()
+    else:
+        config.load_config()
+
+
 # load_config gets called all over the place and way too often.
 @locked_cached(TTLCache(1, ttl=120), lock=_AUTH_RLOCK)
 def load_config() -> None:
     logger.debug("Loading Kubernetes config...")
     try:
-        empty_config_retry(config.load_config)()
+        empty_config_retry(_load_kube_config)()
     except config.ConfigException:
         logger.error("Failed to load kube-config")
 

@@ -1,4 +1,10 @@
-### 3.19
+### 3.19.20260427
+
+- When calling into `mops.k8s` within Kubernetes, don't issue
+  `kube_config_path not provided and default location (~/.kube/config) does not exist. Using inCluster Config. This might not work.`
+  warnings.
+
+## 3.19
 
 - **Support multi-value node-label requirements in `NodeNarrowing`.** Added a new optional
   `node_affinity: V1NodeAffinity` field on `NodeNarrowing` and a `node_selection.require_node_labels`
@@ -7,7 +13,7 @@
   tolerations, which are permissive rather than restrictive - pods could drift onto any pool whose
   resources fit.
 
-### 3.18
+## 3.18
 
 - **Add optional resource-usage monitoring for remote entry processes.** New config item
   `mops.journalist.log_interval` (env var `MOPS_JOURNALIST_LOG_INTERVAL`): when set to a positive float
