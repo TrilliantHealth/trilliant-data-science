@@ -86,7 +86,6 @@ def _start_watchdog(
     last_event_time: ty.List[float],  # mutable container for sharing between threads
     timeout_seconds: int,
     object_type_hint: str,
-    has_waiters: ty.Callable[[], bool] = lambda: True,
 ) -> ty.Callable[[], None]:
     """Start a watchdog thread that stops the watch if no events received within timeout.
 
@@ -98,11 +97,8 @@ def _start_watchdog(
     """
     stop_event = threading.Event()
 
-    def _log_lifecycle(msg: str) -> None:
-        (logger.info if has_waiters() else logger.debug)(msg)
-
     def watchdog() -> None:
-        _log_lifecycle(f"Watchdog started for {object_type_hint} (timeout={timeout_seconds}s)")
+        logger.debug(f"Watchdog started for {object_type_hint} (timeout={timeout_seconds}s)")
         try:
             while not stop_event.is_set():
                 stop_event.wait(timeout_seconds / 2)  # check twice per timeout period
@@ -111,7 +107,7 @@ def _start_watchdog(
                     return
 
                 elapsed = _watch_timer() - last_event_time[0]
-                _log_lifecycle(
+                logger.debug(
                     f"Watchdog {object_type_hint}: elapsed={elapsed:.1f}s (threshold={timeout_seconds}s)"
                 )
                 if elapsed > timeout_seconds:
@@ -127,7 +123,7 @@ def _start_watchdog(
                         try:
                             watch_obj.resp.close()
                             watch_obj.resp.release_conn()
-                            _log_lifecycle(f"Watchdog {object_type_hint}: closed response connection")
+                            logger.debug(f"Watchdog {object_type_hint}: closed response connection")
                         except Exception as close_err:
                             logger.debug(
                                 f"Watchdog {object_type_hint}: error closing response: {close_err}"
@@ -152,15 +148,11 @@ def yield_objects_from_list(
     # quickly if we don't hear anything for a while, and the config defaults are.
     object_type_hint: str = "items",
     init: ty.Optional[ty.Callable[[], None]] = None,
-    has_waiters: ty.Callable[[], bool] = lambda: True,
     **kwargs: ty.Any,
 ) -> ty.Iterator[ty.Tuple[str, T, EventType]]:
     ex = None
     if init:
         init()
-
-    def _log_lifecycle(msg: str) -> None:
-        (logger.info if has_waiters() else logger.debug)(msg)
 
     loop_count = 0
     events_yielded = 0
@@ -176,7 +168,7 @@ def yield_objects_from_list(
                 return
 
             initial_list = list_method(namespace=namespace)
-            _log_lifecycle(
+            logger.debug(
                 f"Watch loop #{loop_count}: Listed {len(initial_list.items)} {object_type_hint} "
                 f"in {namespace} (resource_version={initial_list.metadata.resource_version})"
             )
@@ -185,9 +177,7 @@ def yield_objects_from_list(
             # This ensures the watchdog protects both FETCH and stream phases
             watch = k8s_watch.Watch()
             last_event_time = [_watch_timer()]  # mutable container for watchdog thread
-            watchdog_stop = _start_watchdog(
-                watch, last_event_time, watchdog_timeout, object_type_hint, has_waiters
-            )
+            watchdog_stop = _start_watchdog(watch, last_event_time, watchdog_timeout, object_type_hint)
 
             try:
                 # Yield FETCH events, updating watchdog timestamp for each
@@ -220,7 +210,7 @@ def yield_objects_from_list(
                 watchdog_stop()  # stop the watchdog thread
 
             # If we get here, the stream ended normally (server timeout or watch.stop())
-            _log_lifecycle(
+            logger.debug(
                 f"Watch loop #{loop_count}: Stream ended after {events_yielded} events - restarting"
             )
 
@@ -231,7 +221,7 @@ def yield_objects_from_list(
             )
             ex = None
         except urllib3.exceptions.ReadTimeoutError:
-            _log_lifecycle(
+            logger.debug(
                 f"Watch loop #{loop_count}: ReadTimeoutError after {events_yielded} events - restarting"
             )
             ex = None
@@ -339,7 +329,6 @@ def create_watch_thread(
     namespace: str,
     *,
     typename: str = "object",
-    has_waiters: ty.Callable[[], bool] = lambda: True,
 ) -> threading.Thread:
     return threading.Thread(
         target=callback_events,
@@ -351,7 +340,6 @@ def create_watch_thread(
                 # arguably this wrapper could be composed externally, but i see no use cases so far where we'd want that.
                 object_type_hint=typename + "s",
                 init=lambda: logger.info(STARTING(f"Watching {typename}s in {namespace}")),
-                has_waiters=has_waiters,
             ),
         ),
         daemon=True,
@@ -504,18 +492,11 @@ class WatchingObjectSource(ty.Generic[T]):
             self._last_gc_time = now
 
     def _start_namespace_watcher_thread(self, namespace: str) -> None:
-        # The watch thread runs indefinitely, but its lifecycle logs (loop restarts,
-        # watchdog heartbeats, etc.) are only useful when someone is actively waiting
-        # for results. create_future() callers are blocked on UncertainFutures and need
-        # the watch to be delivering events — that's when INFO logging matters. .get()
-        # callers just read cached state and aren't dependent on watch liveness. So
-        # has_active_futures is the right signal: when it's False, we downgrade to DEBUG.
         create_watch_thread(
             self.get_list_method,
             self._add_object,
             namespace,
             typename=self.typename,
-            has_waiters=self._uncertain_futures.has_active_futures,
         ).start()
 
     @scope.bound

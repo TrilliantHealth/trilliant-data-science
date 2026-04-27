@@ -3,6 +3,12 @@
 - When calling into `mops.k8s` within Kubernetes, don't issue
   `kube_config_path not provided and default location (~/.kube/config) does not exist. Using inCluster Config. This might not work.`
   warnings.
+- Demote `mops.k8s.watch` lifecycle messages to `DEBUG`. Watchdog start/heartbeat, watch-loop restarts on
+  server-timeout/`ReadTimeoutError`, and "Listed N items" reconnect lines no longer appear at `INFO`.
+  Real signals (`Watchdog: No events for ...`, `ProtocolError`, swallowed listing exceptions, the startup
+  banner) stay. The `has_waiters` plumbing on `_start_watchdog`, `yield_objects_from_list`, and
+  `create_watch_thread` is removed; `UncertainFuturesTracker.has_active_futures` is retained as an
+  accessor.
 
 ## 3.19
 
