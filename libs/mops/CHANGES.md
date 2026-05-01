@@ -1,9 +1,3 @@
-### 3.19.20260429
-
-- Add `protostellar` namespace to `mops.k8s.azure.namespaces_supporting_workload_identity` (the
-  east-cluster default in `east_config.toml`). Alphabetizes the existing list to match the upstream
-  Terraform source-of-truth at `engineering-stable/datascience/identities.tf`.
-
 ### 3.19.20260427
 
 - When calling into `mops.k8s` within Kubernetes, don't issue
