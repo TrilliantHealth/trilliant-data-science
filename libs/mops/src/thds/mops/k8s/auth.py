@@ -8,6 +8,7 @@ from kubernetes import client, config
 from thds.core import fretry, log, scope
 
 from .._utils.locked_cache import locked_cached
+from .config import kubeconfig_context
 
 logger = log.getLogger(__name__)
 
@@ -32,8 +33,21 @@ def _load_kube_config() -> None:
     # the kube_config probe when KUBERNETES_SERVICE_HOST is set.
     if "KUBERNETES_SERVICE_HOST" in os.environ:
         config.load_incluster_config()
-    else:
+        return
+
+    ctx = kubeconfig_context()
+    if not ctx:
         config.load_config()
+        return
+
+    try:
+        config.load_kube_config(context=ctx)
+    except config.ConfigException as e:
+        raise config.ConfigException(
+            f"`mops` is configured to use the kubeconfig context {ctx!r} but it was not"
+            f" found in your kubeconfig. Use your cloud provider's CLI to add credentials"
+            f" for that cluster, then retry. (original error: {e})"
+        ) from e
 
 
 # load_config gets called all over the place and way too often.

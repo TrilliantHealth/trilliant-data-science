@@ -60,3 +60,9 @@ aad_pod_managed_identity = config.item("mops.k8s.azure.aad_pod_managed_identity"
 namespaces_supporting_workload_identity = config.item(
     "mops.k8s.azure.namespaces_supporting_workload_identity", ["default"]
 )
+
+# Pin which kubeconfig context this mops config targets. When set, mops loads that
+# context regardless of the user's current-context, so the same config can't
+# accidentally route pods to a different cluster the user happens to have selected.
+# Empty string means "use whatever kubernetes.config.load_config picks by default".
+kubeconfig_context = config.item("mops.k8s.kubeconfig_context", "")
