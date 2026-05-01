@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.13"
+version = "0.14.14"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -45,7 +45,7 @@ viz = ["pygraphviz"]
 tabularasa = "thds.tabularasa.__main__:main"
 
 [project.urls]
-Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [

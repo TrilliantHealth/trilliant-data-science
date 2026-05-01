@@ -1,3 +1,7 @@
+### 0.14.14
+
+- Updated repository URL to point to the new open-source location.
+
 ### 0.14.13
 
 - Pinned `bourbaki.introspection>=0.5.12` to fully fix `pkg_resources` warning — PR #4090 only pinned

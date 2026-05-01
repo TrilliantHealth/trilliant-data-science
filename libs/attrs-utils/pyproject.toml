@@ -19,7 +19,7 @@ docstrings = ["docstring-parser"]
 jsonschema = ["fastjsonschema"]
 
 [project.urls]
-Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [

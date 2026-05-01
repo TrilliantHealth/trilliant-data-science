@@ -35,7 +35,7 @@ mops-summarize = "thds.mops.pure.tools.summarize.cli:main"
 pytest-mops = "thds.mops.testing.plugin"
 
 [project.urls]
-Repository = "https://github.com/TrilliantHealth/ds-monorepo"
+Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [

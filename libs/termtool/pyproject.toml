@@ -20,7 +20,7 @@ dependencies = [
 
 
 [project.urls]
-repository = "https://github.com/TrilliantHealth/ds-monorepo"
+Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [
