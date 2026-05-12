@@ -1,16 +1,15 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # Invocation Locks/Leases
 
-This feature is currently experimental and may be removed or tweaked as we observe its use.
-
-NOTE: To the extent possible, it's best not to _rely_ on these locks - instead, you
-should wrap `mops` functions which may be called concurrently with separate wrapper
-functions that themselves have a `core.cache.locking` or `core.lazy.lazy` or other
-process-local coordination mechanism.
-
 No configuration or code changes are necessary to use this feature. It is baked directly into the
-`MemoizingPicklingRunner`.
+`MemoizingPicklingRunner` and has been in production use for years.
+
+NOTE: These locks coordinate work _across_ orchestrators — they prevent two separate
+processes from racing to compute the same invocation. If you have process-local
+concurrent calls to the same `mops` function (multiple threads within one
+orchestrator, etc.), the simplest correct pattern is still to wrap the call site with
+`core.cache.locking`, `core.lazy.lazy`, or another in-process coordination mechanism.
 
 Throughout this documentation, we will refer to these as "locks" even though they're more properly
 leases, since they have built-in expiration dates and therefore do not ever require human intervention to

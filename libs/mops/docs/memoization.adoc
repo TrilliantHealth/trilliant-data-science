@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 = Memoization/caching
 
@@ -81,14 +81,36 @@ root to point to a shared blob store.
 
 The other bits and pieces and their purposes are documented below.
 
+== Sharing across processes and machines
+
+A shared blob root turns mops into a shared, write-once cache that converges
+remote-execution and memoization use cases into a single useful property: any caller
+producing a result publishes it to a deterministic location, and any caller (now or later,
+local or remote) consuming the same arguments reads it back.
+
+* **Write-once semantics**: same args produce the same `memo_uri`; the first caller
+  computes and writes, all later callers read.
+* **Cross-machine, cross-process, cross-user sharing**: anyone with access to the blob
+  store sees results computed by anyone else. Precomputed results flow downstream by
+  being _called for_, not by being explicitly distributed — calling code doesn't need to
+  know whether a result was computed two seconds or two months ago, or by which process.
+* **Concurrent callers**: when two orchestrators call the same function with the same
+  arguments at the same time, mops's link:./invocation_locks.adoc[lock/lease mechanism]
+  ensures one computes and the other waits, rather than both racing to recompute.
+* **Provenance is free**: the `memo_uri` _is_ the provenance — module + function + args +
+  pipeline id, deterministic.
+
+This is the property that no standalone Python cache library provides: the cache is the
+namespace where results live, not just a local optimization on top of a function call.
+
 == Configurability
 
 At the time of function call, a fully-qualified `memo_uri` is derived from the following
-components which are either chosen explicitly by the user, determined by names in code ,
-or which arise from `@pure.magic` defaults`.
+components which are either chosen explicitly by the user, determined by names in code,
+or which arise from `@pure.magic` defaults.
 
 1. A blob root (non-optional, user-controlled, has `pure.magic` default).
-   `pure.magic` sets the default blob root as `$HOME/.mops-root`.
+   `pure.magic` sets the default blob root as `file://$HOME/.mops`.
 +
 1. [[pipeline-id]] The `pipeline_id` (non-optional, user-controlled, defaults provided
 either by `pure.magic` or by local system state)

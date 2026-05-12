@@ -3,7 +3,7 @@ name = "thds.mops"
 version = "3.19"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
-readme = "docs/pypi_readme.md"
+readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
 requires-python = ">=3.10"
 dependencies = [

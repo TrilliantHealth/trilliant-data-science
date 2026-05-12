@@ -1,3 +1,19 @@
+### 3.19.20260512
+
+- Fix runner re-entry so recursive `@pure.magic` functions memoize each call. Previously the named-set
+  bypass in `use_runner` matched calls by `full_name` but never popped the token on consume, so every
+  same-named call below an `unwrap_use_runner` context inherited the bypass and ran inline - for a
+  recursive function, that meant every recursive sub-call bypassed mops and only the outermost call
+  produced a memo URI. The bypass is now a named _stack_ with one-shot semantics: a wrapped call bypasses
+  only when its own `full_name` matches the top of the stack, and marks the top consumed on match, so
+  recursive sub-calls re-enter the runner normally. The keying preserves the property that calls to other
+  wrapped functions from inside an outer mops function's body dispatch through the runner so each gets
+  its own memo (the shape exercised by the `unified-asset` integration tests: outer wrapped via
+  `pure.magic.wand` at the call site, inner `@pure.magic`-decorated). Also fixes
+  `PicklableFunction.__init__` for `__main__` modules to stash whatever `__main__` currently binds under
+  the function's name (the wrapper) rather than the raw function, matching how non-`__main__` resolution
+  already works.
+
 ### 3.19.20260427
 
 - When calling into `mops.k8s` within Kubernetes, don't issue

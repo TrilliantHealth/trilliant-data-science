@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 ## What do we mean by remote?
 

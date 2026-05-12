@@ -7,6 +7,7 @@ to maintain backward-compatibility more easily.
 import importlib
 import io
 import pickle
+import sys
 import typing as ty
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,7 +50,11 @@ class PicklableFunction:
 
     def __init__(self, f: ty.Callable) -> None:
         if f.__module__ == "__main__":
-            add_main_module_function(f.__name__, f)
+            # Stash whatever __main__ currently binds to this name — for a
+            # @pure.magic-decorated function that's the wrapper, not the raw function.
+            # Matching the wrapper here keeps recursive calls re-entering mops, the
+            # same way PicklableFunction._resolve() does for non-__main__ modules.
+            add_main_module_function(f.__name__, getattr(sys.modules.get("__main__"), f.__name__, f))
         self.fmod = f.__module__
         self.fname = f.__name__
         self.f = None

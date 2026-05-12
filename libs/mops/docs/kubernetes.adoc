@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # Kubernetes
 
@@ -27,9 +27,14 @@ providing resource requests or limitations. For example, you might create a modu
 ----
 from thds import mops
 
+def my_image_ref() -> str:
+    # In production, you'll usually have a callable that builds (or
+    # confirms) the image and returns its tag. The callable is invoked
+    # only when an image is actually needed.
+    return "myregistry.example.com/myproject:latest"
+
 df_k8s_spot_11g_shim = mops.k8s.shim(
-    mops.k8s.autocr('ds/demand-forecast:latest'),
-    # gotta specify which container this runs on
+    my_image_ref,
     node_narrowing=dict(
         resource_requests={"cpu": "3.6", "memory": "11G"},
         tolerations=[mops.k8s.tolerates_spot()],
@@ -38,9 +43,12 @@ df_k8s_spot_11g_shim = mops.k8s.shim(
 ----
 
 ****
-`mops` does _not_ distribute your code for you, and neither does the provided k8s shim. You must
-perform your own code distribution by building and pushing a Docker image to an accessible container
-registry, and configuring the K8s runtime shim so that it knows what pre-published image to use.
+`mops` does not distribute your code for you. The k8s shim takes an image reference — either
+a string, or (much more commonly) a callable that returns one — and invokes that callable when
+an image is needed. The standard pattern is for the callable to be an image-_production_
+routine that internally builds-if-needed and pushes to your registry. Python is well-suited
+for wrapping whatever your Docker build looks like, and making the callable responsible for
+"the image exists and is up-to-date" keeps the function-call ergonomics clean.
 ****
 
 This will require your Docker image to exist and to be accessible to Kubernetes via the configured
@@ -48,9 +56,26 @@ Container Registry. Additionally, that image must somehow be provided with read 
 since all data will be transferred back and forth from your local environment via your blob store.
 
 Once you have constructed an appropriate runtime shim, you need only pass it to the
-`pure.magic()` decorator factory, and apply that decorator to any pure function to the
-remote K8s environment, and inject its result right back into the local/orchestrator
-context.
+`pure.magic()` decorator factory, and apply that decorator to any pure function. mops
+will run that function on the remote K8s environment and inject its result right back
+into the local/orchestrator context.
+
+## You also get memoization
+
+When you run on Kubernetes, you also get link:./memoization.adoc[memoization] for free.
+This does three jobs at once:
+
+- A crashed pipeline restarts without redoing work — already-completed function calls are
+  read from the blob store rather than recomputed.
+- Anyone with access to the same blob store sees results computed by anyone else.
+  Downstream code can simply call upstream functions to consume precomputed results.
+- Concurrent callers don't race to compute the same invocation — see
+  link:./invocation_locks.adoc[invocation locks].
+
+When you genuinely want a fresh result, the dominant pattern is to pass a different
+output URI as an explicit function argument; mops's cache key is derived from the
+function arguments, so changing the URI forces a fresh computation.
+`link:./pipeline-ids.adoc[pipeline_id]` is for higher-level grouping that rarely changes.
 
 ## Imperative usage
 
@@ -65,12 +90,10 @@ The basic container specification will be the same regardless of which approach 
 For Kubernetes only, `mops` will automatically try to scrape and print the logs from each launched pod.
 ANSI terminal Colors will be automatically chosen for each separate pod being scraped.
 
-If you are running many pods in parallel, it may be desirable to turn off logging, as it has been
-observed to leak memory over the course of long runs, and a separate OS thread is used for each pod being
-scraped.
-
-Either set the `MOPS_NO_K8S_LOGS` environment variable, or programmatically pass `suppress_logs=True` to
-either `k8s.shim` (declarative API) or `launch` (imperative API).
+For very high-parallelism workloads, you may wish to disable log scraping (a separate
+OS thread is used for each pod being scraped). Either set the `MOPS_NO_K8S_LOGS`
+environment variable, or programmatically pass `suppress_logs=True` to either
+`k8s.shim` (declarative API) or `launch` (imperative API).
 
 ## Common failure modes
 
@@ -125,14 +148,6 @@ exception result.
 
 Infrastructure failures (OOM kills, node evictions, etc.) exit with other codes and are
 still subject to `backoffLimit` retries as normal.
-
-## Orchestrator pods
-
-If you're running a big or long-running process with link:./remote.adoc[remote workers] in K8s, because of
-common network link:./limitations.adoc[limitations], you may wish to run from an orchestrator pod also hosted
-in Kubernetes.
-
-See link:../src/thds/mops/k8s/orchestrator/README.md[here].
 
 ## Further reading
 

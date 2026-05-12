@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # pure.magic
 
@@ -10,10 +10,9 @@ running your functions locally with mops xref:#off[completely out of the loop]. 
 these approaches is the right choice for specific situations, and setting things up for
 this to work should be as easy as we can make it.
 
-WARNING: The `pure.magic` decorator and its corresponding configuration APIs are designed
+NOTE: The `pure.magic` decorator and its corresponding configuration APIs are designed
 to be used only at the module level, during import, as they modify the global 'magic'
-state of your `mops` configuration. For runtime (stack-local) function-wrapping, see
-xref:pure-magic-wand[pure.magic.wand].
+state of your `mops` configuration.
 
 == `@pure.magic` - the easy button
 
@@ -272,7 +271,6 @@ mops.pure.magic.blob_root = "adls://secret/harmonies"
 
 [foo.bar]
 mops.pure.magic.blob_root = "adls://secret/bar"
-__mask.mops.pure.magic.shim = 'off'
 
 [foo.bar.baz.func1]
 mops.pure.magic.shim = 'samethread'
@@ -294,23 +292,15 @@ pure.magic.blob_root('adls://secret/harmonies')
 [source,python]
 ----
 pure.magic.blob_root('adls://secret/bar')
-pure.magic.shim('off', mask=True)
 ----
 
 .`foo/bar/baz.py`
 [source,python]
 ----
-
-@pure.magic()
+@pure.magic('samethread')
 def func1(...):
     ...
-
-pure.magic.shim('samethread')
 ----
-
-NOTE: because of the `foo.bar` shim _mask_ at `foo.bar`, the `samethread` shim for
-`func1` will not be used - everything under `foo.bar` would be a non-mops passthrough
-function call.
 
 === Config file specificity and `+__mask+`
 

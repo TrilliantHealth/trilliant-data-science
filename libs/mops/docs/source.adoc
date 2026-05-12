@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # Source: File-based Inputs and Outputs
 

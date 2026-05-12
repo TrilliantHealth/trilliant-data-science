@@ -1,4 +1,4 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # Quickstart
 
@@ -78,6 +78,11 @@ IRE(
 ## Take a victory lap!
 
 You've successfully installed and used `mops`. Although it's a toy example, everything you need for local-only memoization is already working.
+
+Want a fresh run? Pass a different `pipeline_id` to `@pure.magic()` (e.g.
+`@pure.magic(pipeline_id='try-again')`) and run again — you'll see the green
+`+Invoking+` logs come back. The previous results are still on disk under their old
+`pipeline_id`, untouched.
 
 If you want to do very expensive computations inside automagically-launched subprocesses,
 rather than in the same thread as `@pure.magic()` does by default, you could call it as

@@ -1,54 +1,101 @@
-link:../README.adoc[↑]
+link:../README.md[↑]
 
 # `mops` and Pure functions
 
-The overarching approach of `mops` is to realize the potential for _parallelizing_
-link:https://en.wikipedia.org/wiki/Pure_function[**_functions_**] using simple and scalable architectural
-primitives. A function which depends on nothing but its input parameter(s) and produces no meaningful
-result other than a returned value may be easily transposed into a different runtime context, and is
-therefore easily parallelized. This is the principle behind `multiprocess.Pool`, behind the `MapReduce`
-paradigm, and many other implementations of the same idea.
+Your function is pure-enough for `mops` if calling it twice with the same
+arguments returns the same value, and any side effects it performs (logging,
+network calls, writing temp files, reading shared inputs) don't interfere with
+other calls.
 
-What this means for the user of this system is that you're going to have an easy time if your computation
-is already encapsulated in a pure function, and a progressively harder time (more work to be done) the
-less link:https://en.wikipedia.org/wiki/Pure_function[pure] your existing computation is. You will almost
-certainly need to refactor out any existing instances of impurity.
+This is sometimes called _logical_ purity, in contrast to the stricter
+link:https://en.wikipedia.org/wiki/Pure_function[theoretical/mathematical
+definition] of a pure function which permits no side effects at all. `mops`
+cares about the logical definition: side effects are fine as long as the
+return value is deterministic from the caller's point of view, and any side
+effect that produces a result other code depends on (writing a file, updating
+a database row) is _idempotent_ — repeated calls with the same arguments
+produce the same content at the same location. Diagnostic side effects (logging,
+metrics) aren't idempotent in the strict sense and don't need to be; they're
+not load-bearing for the result.
 
-Practically speaking, some things to avoid/remove from your functions:
+## A concrete example
 
-- Global mutable variables.
-- Global constants (prefer passing the value of the constant as a function argument).
-- Direct use of environment variables (again, pass values instead).
-- Code that modifies input arguments, e.g. a dict or list.
-- Any kind of randomness, including `datetime.now()` and friends.
-- Non-random things that present to link:serialization.adoc[`pickle`] as random, including the built-in `set`.footnote:[We expect to eventually support `set` transparently with a serialization shim, but this has not yet made it to the top of the backlog]
-- References to files or other state external to the function (with exceptions for explicit passing
-  of filesystem primitives via link:./source.adoc[`core.Source`])
-- References to large amounts of static reference data. If possible, select only the data you need before
-  passing it to the function. If not, see the docs on
-  link:./optimizations.adoc#large-shared-objects[large shared objects]
-- Returning a result that does not contain _everything you might possibly want to know_ about the
-  completed computation.
+The function below is _not_ pure — its result depends on `os.environ` and the
+wall clock, neither of which appear in its signature:
 
-By implementing pure functions, we can keep the **What** (the business logic of your function)
-separate from the link:./concepts.adoc[**How**] (the details of what environment it runs on), which not
-only enables plug-and-play parallelization but also makes your code much easier to read and reason about.
+[source,python]
+----
+import os
+import datetime
 
-Ultimately, if your functions are _truly_ pure, you won't even need `mops` in the long run - you'll be
-able to find other off-the-shelf libraries and frameworks that will let you parallelize your computation.
-`mops` itself strives to be an implementation detail that doesn't tie your code to itself, which is in
-itself a valuable 'feature'.
+def fetch_report(account_id: int):
+    region = os.environ["DEFAULT_REGION"]
+    asof = datetime.datetime.now()
+    return _query_for_account(account_id, region, asof)
+----
 
-## Logical (as opposed to theoretical) purity
+The same function, refactored to be pure:
 
-A function that is theoretically/truly pure is one that performs absolutely no side effects. In a
-distributed system, this may be difficult to achieve for various reasons.
+[source,python]
+----
+import datetime
 
-A function that is _logically_ pure may perform side effects such as logging, uploading or downloading
-data, writing to temporary files, performing arbitrary network communication, etc., _as long as_ the
-results of those side effects are reasonably believed to be deterministic from the point of view of the
-caller of the function.
+def fetch_report(account_id: int, region: str, asof: datetime.datetime):
+    return _query_for_account(account_id, region, asof)
+----
 
-In other words, if the calling your 'logically pure' function will result in the same return value each
-time, and the side effects used to produce that result will not interfere with the operation of other
-functions, then you may consider your function to be pure and it should work fine with `mops`.
+Two callers that pass the same `account_id`, `region`, and `asof` will get the
+same result. The caller decides what "now" means — and `mops` can memoize the
+result against those explicit inputs.
+
+## Why `mops` cares
+
+`mops` realizes the potential for _parallelizing_ pure functions using simple
+and scalable architectural primitives. A function which depends on nothing
+but its input parameters and produces no meaningful result other than its
+return value may be easily transposed into a different runtime context, and
+is therefore easily parallelized. This is the principle behind
+`multiprocess.Pool`, behind the `MapReduce` paradigm, and many other
+implementations of the same idea.
+
+By implementing pure functions, you keep the **What** (the business logic)
+separate from the link:./concepts.adoc[**How**] (where it runs), which both
+enables plug-and-play parallelization and makes your code easier to read.
+
+Ultimately, if your functions are _truly_ pure, you won't need `mops` in the
+long run — you'll be able to find other off-the-shelf libraries and
+frameworks that will let you parallelize your computation. `mops` itself
+strives to be an implementation detail that doesn't tie your code to itself,
+which is a valuable feature in itself.
+
+## Refactoring checklist
+
+If your function isn't pure-enough yet, these are the common things to
+address:
+
+- **Global mutable variables.** Pass values in instead.
+- **Direct use of environment variables.** Read them in the caller and pass
+  the value as an argument.
+- **Wall-clock or random sources.** Including `datetime.now()` and `random`.
+  Take a seed or a timestamp as an argument so the caller decides.
+- **Code that modifies its input arguments** (mutating a passed-in dict or
+  list).
+- **Non-random things that present to link:serialization.adoc[`pickle`] as
+  random**, including the built-in `set`.footnote:[We expect to eventually
+  support `set` transparently with a serialization shim, but this has not
+  yet made it to the top of the backlog]
+- **References to files or other state external to the function**, with
+  exceptions for explicit passing of filesystem primitives via
+  link:./source.adoc[`core.Source`].
+- **References to large amounts of static reference data.** If possible,
+  select only the data you need before passing it to the function. If not,
+  see the docs on
+  link:./optimizations.adoc#large-shared-objects[large shared objects].
+- **Returning a partial result.** This isn't strictly a purity issue, but
+  it matters for memoization: if your return value doesn't contain
+  _everything you might possibly want to know_ about the completed
+  computation, you can't recover that information from the cache later.
+
+Global module-level constants (e.g. `PI = 3.14159`, an enum, a string
+literal) are fine — they're effectively part of the code, not runtime state.
+What you're avoiding is values that *vary* across environments or runs.
