@@ -1,3 +1,10 @@
+### 4.5.NEXT
+
+- Add optional `content_disposition` kwarg to `gen_blob_sas_token`. When set, it is baked into the SAS as
+  `rscd=...`, so requests using the token receive the given `Content-Disposition` response header. Lets
+  callers force a browser download with a custom filename (e.g.
+  `attachment; filename="treatments_2024.csv"`) without re-uploading the blob.
+
 ### 4.5.20260423
 
 - Drop `InvalidBlobOrBlock` retry and blob-delete logic from `upload()` — suspected cause of silent

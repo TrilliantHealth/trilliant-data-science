@@ -35,6 +35,7 @@ def gen_blob_sas_token(
     account_key: ty.Union[str, UserDelegationKey],
     permissions: BlobSasPermissions,
     expiry: ty.Union[int, ty.Callable[[], int]] = BLOB_SAS_EXPIRY,
+    content_disposition: ty.Optional[str] = None,
 ) -> str:
     """Generates a SAS token for the blob present at the `fqn`.
 
@@ -42,6 +43,11 @@ def gen_blob_sas_token(
     as when that key expires, the SAS tokens it signs will also expire.
 
     `expiry` is in seconds.
+
+    `content_disposition`, when set, is baked into the SAS as `rscd=...` so
+    requests using the token receive the given `Content-Disposition`
+    response header. Use this to force a browser download with a custom
+    filename, e.g. `attachment; filename="treatments_2024.csv"`.
     """
     expiry_datetime: ty.Union[ty.Optional[str], datetime.datetime]
 
@@ -60,4 +66,5 @@ def gen_blob_sas_token(
         # the Azure SDK has too restrictive a type here
         permission=permissions,
         expiry=expiry_datetime,
+        content_disposition=content_disposition,
     )
