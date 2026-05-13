@@ -1,5 +1,6 @@
 """Utilities for working with concurrency in Python."""
 
+import asyncio
 import contextlib
 import contextvars
 import threading
@@ -120,7 +121,7 @@ class ReentrantBoundedSemaphore:
 
 
 H = ty.TypeVar("H", bound=ty.Hashable)
-L = ty.TypeVar("L", bound=Lock)
+L = ty.TypeVar("L", threading.Lock, asyncio.Lock)
 
 
 class LockSet(ty.Generic[H, L]):
@@ -133,11 +134,11 @@ class LockSet(ty.Generic[H, L]):
     """
 
     def __init__(self, lockclass: ty.Type[L]):
-        self._lockclass = lockclass
+        self._lockclass: ty.Type[L] = lockclass
         self._master_lock = Lock()
         self._hashed_locks: ty.Dict[H, L] = dict()
 
-    def get(self, hashable: H) -> Lock:
+    def get(self, hashable: H) -> L:
         if hashable not in self._hashed_locks:
             with self._master_lock:
                 if hashable not in self._hashed_locks:
@@ -145,7 +146,7 @@ class LockSet(ty.Generic[H, L]):
         assert hashable in self._hashed_locks, hashable
         return self._hashed_locks[hashable]
 
-    def __getitem__(self, hashable: H) -> Lock:
+    def __getitem__(self, hashable: H) -> L:
         return self.get(hashable)
 
     def delete(self, hashable: H) -> None:
