@@ -55,3 +55,17 @@ def test_join_idempotent():
     uri = "adls://foo/bar"
     assert uri == join(uri, "", "/", "")
     assert f"{uri}/baz/box" == join(uri, "/", "", "///baz", "", "box", "", "")
+
+
+def test_join_onto_empty_prefix_has_no_leading_slash():
+    # joining onto an empty prefix (what AdlsRoot.join / an empty-path AdlsFqn do)
+    # must not produce a leading slash -- "/name" renders as a double slash in a blob URL.
+    assert join("", "name") == "name"
+    assert join("", "/name/") == "name"
+
+
+def test_root_div_preserves_single_slash():
+    # AdlsRoot (and an empty-path AdlsFqn) joined with a child dir must yield a path
+    # with no leading slash, so downstream blob URLs are single-slashed.
+    assert (AdlsRoot("foo", "bar") / "baz").path == "baz"
+    assert (AdlsFqn("foo", "bar", "") / "baz").path == "baz"

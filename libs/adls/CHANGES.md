@@ -1,4 +1,25 @@
-### 4.5.NEXT
+### 4.5.20260602
+
+- Fix `join` (and thus `AdlsRoot / x`, `AdlsFqn(path="") / x`) producing a leading slash when joining
+  onto an empty prefix: `join("", "name")` returned `"/name"`, which `to_blob_windows_url` rendered as a
+  double slash (`container//name`). Joining a child onto a container root now yields a clean single-slash
+  path. Only the empty-prefix case changes; non-empty paths and `adls://` idempotency are unaffected.
+- Fix `list_fast` thrashing (and pinning all CPU) when listing a tree with very many files (e.g. the UA
+  treatments source, ~160k parquet fragments). The parallel fan-out is nested and recursive and several
+  listings share ONE cached connection pool per (account, container) of `default_connection_pool_size`
+  (100), so live threads vastly exceeded pool connections; the pool then churned and `urllib3` logged a
+  "pool is full" WARNING per discarded connection -- thousands per second, which was itself the CPU spin.
+  Capping each executor individually did nothing (unboundedly many executors). Bound total in-flight
+  listing _requests_ with a single shared semaphore (`adls_max_inflight_listing_requests`, default 80) so
+  concurrency can never oversubscribe the pool regardless of thread/executor count or nesting depth.
+- Also stop fetching per-blob properties for subdirectory entries (the recursive listing already
+  enumerates their contents) -- a wasted request per subdir, hundreds on a partitioned tree.
+- Retry transient connection failures (`ServiceResponseError`/`ServiceRequestError`, wrapping
+  `BrokenPipe` and similar drops) on the materializing listing operations -- the same resilience
+  downloads already had -- so a single dropped connection no longer reaches `failfast` and aborts the
+  whole listing.
+
+### 4.5.20260513
 
 - Add optional `content_disposition` kwarg to `gen_blob_sas_token`. When set, it is baked into the SAS as
   `rscd=...`, so requests using the token receive the given `Content-Disposition` response header. Lets

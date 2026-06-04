@@ -12,6 +12,12 @@ def join(*parts: str) -> str:
     def join_(prefix: str, suffix: str) -> str:
         prefix = prefix.rstrip("/")
         suffix = suffix.lstrip("/")
+        if not prefix:
+            # joining onto an empty prefix (e.g. AdlsRoot.join does join("", *path))
+            # must not yield a leading slash -- "/name" renders as a double slash
+            # ("container//name") in a blob URL.
+            return suffix.rstrip("/")
+
         return f"{prefix}/{suffix}".rstrip("/")
 
     return reduce(join_, parts)
