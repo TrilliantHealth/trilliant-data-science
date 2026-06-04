@@ -1,3 +1,8 @@
+### 1.51.20260529
+
+- `JournalistMetrics` gains an optional `elapsed_seconds` field (wall-clock duration of the
+  Journalist-watched block). Optional + None default so previously-pickled instances deserialize cleanly.
+
 ### 1.51.20260420
 
 - `from_uri` with a `file://` URI no longer raises `FileNotFoundError` at construction time. Consistent

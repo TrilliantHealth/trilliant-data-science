@@ -122,6 +122,9 @@ class JournalistMetrics:
     total_recv_gb: float
     peak_sent_mbps: float
     total_sent_gb: float
+    # Optional with a None default so previously-pickled instances
+    # deserialize without error.
+    elapsed_seconds: ty.Optional[float] = None
 
 
 class Journalist:
@@ -351,6 +354,13 @@ class Journalist:
         # 256 GB node). Cgroup is the kernel's authoritative container view.
         peak_mem_mb = self._peak_cgroup_mb if self._cgroup_available else self._peak_rss_mb
         avg_mem_mb = self.avg_cgroup_mb if self._cgroup_available else self.avg_rss_mb
+        # When the sampler never ran (psutil unavailable, or context exited
+        # before the first sample), both walls are still 0.0; reporting None
+        # in that case is more honest than reporting 0.
+        if self._last_wall == 0.0 and self._start_wall == 0.0:
+            elapsed_seconds: ty.Optional[float] = None
+        else:
+            elapsed_seconds = max(self._last_wall - self._start_wall, 0.0)
         return JournalistMetrics(
             peak_rss_gb=peak_mem_mb / 1024,
             avg_rss_gb=avg_mem_mb / 1024,
@@ -360,6 +370,7 @@ class Journalist:
             total_recv_gb=self.total_recv_gb,
             peak_sent_mbps=self.peak_sent_mbps,
             total_sent_gb=self.total_sent_gb,
+            elapsed_seconds=elapsed_seconds,
         )
 
     def __enter__(self) -> "Journalist":
