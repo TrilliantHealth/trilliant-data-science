@@ -12,6 +12,8 @@ ShimBuilder.  If you don't supply one, it will default to the same-thread shim.
 import typing as ty
 from pathlib import Path
 
+from typing_extensions import ParamSpec
+
 from thds import core
 from thds.mops import config
 from thds.mops._utils import config_tree
@@ -23,6 +25,8 @@ from .shims import ShimName, ShimOrBuilder, to_shim_builder
 
 _MAGIC_CONFIG: ty.Final = sauce.new_config()
 F = ty.TypeVar("F", bound=ty.Callable)
+P = ParamSpec("P")
+R = ty.TypeVar("R")
 
 
 def _get_config() -> sauce._MagicConfig:  # for testing
@@ -100,13 +104,33 @@ class _MagicApi:
         )
 
     @staticmethod
+    @ty.overload
+    def wand(
+        shim_or_builder: ty.Union[ty.Literal["samethread", "subprocess"], ShimOrBuilder],
+        *,
+        blob_root: uris.UriResolvable = ...,
+        pipeline_id: str = ...,
+        calls: ty.Collection[ty.Callable] = ...,
+    ) -> ty.Callable[[ty.Callable[P, R]], sauce.Wand[P, R]]: ...
+
+    @staticmethod
+    @ty.overload
+    def wand(
+        shim_or_builder: ty.Union[ty.Literal["off"], None] = ...,
+        *,
+        blob_root: uris.UriResolvable = ...,
+        pipeline_id: str = ...,
+        calls: ty.Collection[ty.Callable] = ...,
+    ) -> ty.Callable[[ty.Callable[P, R]], ty.Union[sauce.Wand[P, R], ty.Callable[P, R]]]: ...
+
+    @staticmethod
     def wand(
         shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
         *,
         blob_root: uris.UriResolvable = "",
         pipeline_id: str = "",
         calls: ty.Collection[ty.Callable] = tuple(),
-    ) -> ty.Callable[[F], F]:
+    ) -> ty.Callable[[ty.Callable[P, R]], ty.Union[sauce.Wand[P, R], ty.Callable[P, R]]]:
         """Meant for truly dynamic (i.e. runtime-controlled) use cases. This picks up
         _current_ magic configuration at the time of wrapping the function, but does not allow
         further magic configuration at the time of function call, and does not enter any
@@ -114,6 +138,9 @@ class _MagicApi:
 
         Suitable for cases where you want to fall back to existing module and config-file
         configuration at the time of wrapping the function for anything that you don't supply explicitly.
+
+        Pass a shim builder to guarantee a `Wand` (with `.submit()`); with no shim the result
+        depends on config at wrap time and is typed `Wand | Callable` accordingly.
         """
         return sauce.wand(
             _get_config(), shim_or_builder, blob_root=blob_root, pipeline_id=pipeline_id, calls=calls

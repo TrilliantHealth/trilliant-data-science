@@ -1,3 +1,12 @@
+## 3.20
+
+- `pure.magic.wand` now returns a callable `Wand` object exposing `.submit()` (returns a `PFuture`) in
+  addition to the existing blocking call. `Wand` is now exported from `thds.mops.pure` as public API.
+  Backward compatible for all callers that use the result purely as a callable. Overloaded so the return
+  type is honest: a runner-building shim (`"samethread"`, `"subprocess"`, or a shim/builder object)
+  yields a `Wand` with `.submit()`; `"off"`/`None` yields `Wand | Callable` (the 'off' path returns the
+  bare function, which has no `.submit()`).
+
 ### 3.19.20260512
 
 - Fix runner re-entry so recursive `@pure.magic` functions memoize each call. Previously the named-set

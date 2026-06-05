@@ -6,6 +6,7 @@
 
 from . import adls  # noqa
 from ._magic.api import magic  # noqa
+from ._magic.sauce import Wand  # noqa
 from .core.entry import register_entry_handler
 from .core.lock.maintain import no_maintain as no_maintain_locks  # noqa: F401
 from .core.memo import results  # noqa

@@ -256,6 +256,73 @@ def make_magic(
 F = ty.TypeVar("F", bound=ty.Callable)
 
 
+class Wand(ty.Generic[P, R]):
+    """Callable result of `pure.magic.wand`. Calling it runs the wrapped function blocking;
+    `.submit()` returns a `PFuture` without blocking. Config is resolved at wrap time and
+    does not enter the global magic registry.
+
+    No `use_runner` wrapper: `MemoizingPicklingRunner.__call__(func, args, kwargs)` is
+    itself `submit(...).result()`, and the remote-execution bypass lives in
+    `pickling/remote.py` (it wraps the bare deserialized func by name, independent of any
+    orchestrator-side wrapper). So both paths call the runner directly with the bare func,
+    exactly as `Magic.submit` does.
+    """
+
+    def __init__(
+        self,
+        func: ty.Callable[P, R],
+        runner: MemoizingPicklingRunner,
+        pipeline_id: str,
+    ) -> None:
+        self._runner = runner
+        self._pipeline_id = pipeline_id
+        self.__wrapped__ = func
+        functools.update_wrapper(self, func)
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+            return self._runner(self.__wrapped__, args, kwargs)
+
+    def submit(self, *args: P.args, **kwargs: P.kwargs) -> futures.PFuture[R]:
+        """Non-blocking: returns a PFuture once a result is found or a new invocation has
+        been started. Mirrors `Magic.submit`."""
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+            return self._runner.submit(self.__wrapped__, *args, **kwargs)
+
+
+# The shim names that actually build a runner. `"off"` is a `ShimName` too but produces no
+# runner (like `None`), so it does NOT belong in the `Wand`-guaranteeing overload below.
+_RunnerShimName = ty.Literal["samethread", "subprocess"]
+
+
+@ty.overload
+def wand(
+    config: _MagicConfig,
+    shim_or_builder: ty.Union[_RunnerShimName, ShimOrBuilder],
+    *,
+    blob_root: core.uris.UriResolvable = ...,
+    pipeline_id: str = ...,
+    calls: ty.Collection[ty.Callable] = ...,
+) -> ty.Callable[[ty.Callable[P, R]], Wand[P, R]]:
+    # A runner-building shim means the result is always a `Wand`, so `.submit()` is real.
+    ...
+
+
+@ty.overload
+def wand(
+    config: _MagicConfig,
+    shim_or_builder: ty.Union[ty.Literal["off"], None] = ...,
+    *,
+    blob_root: core.uris.UriResolvable = ...,
+    pipeline_id: str = ...,
+    calls: ty.Collection[ty.Callable] = ...,
+) -> ty.Callable[[ty.Callable[P, R]], ty.Union[Wand[P, R], ty.Callable[P, R]]]:
+    # `None` resolves 'on'/'off' from config at wrap time; `"off"` is explicitly off. Either
+    # may yield the bare function (no runner), so the honest return is the union - a caller
+    # needing `.submit()` passes a runner-building shim (overload above) or narrows.
+    ...
+
+
 def wand(
     config: _MagicConfig,
     shim_or_builder: ty.Union[ShimName, ShimOrBuilder, None] = None,
@@ -264,16 +331,23 @@ def wand(
     blob_root: core.uris.UriResolvable = "",
     pipeline_id: str = "",
     calls: ty.Collection[ty.Callable] = tuple(),
-) -> ty.Callable[[F], F]:
+) -> ty.Callable[[ty.Callable[P, R]], ty.Union[Wand[P, R], ty.Callable[P, R]]]:
     """A higher-order function factory that prefers your arguments but falls back to magic
     config at the time of wrapping the function.
 
     You are creating a magic wand, not doing magic. In fact, the wand doesn't actually use
     Magic at all - it resolves things from config as soon as the function is _wrapped_,
     not at the time of function call.
+
+    With a shim builder, returns a callable `Wand`: call it to run blocking, or use
+    `.submit()` for a `PFuture`. On the 'off' path (no shim builder, in arg or config) the
+    bare function is returned unchanged - there is no runner, so `.submit()` is genuinely
+    unavailable, and the return type says so rather than casting a lie.
     """
 
-    def deco_that_resolves_and_locks_in_config(func: F) -> F:
+    def deco_that_resolves_and_locks_in_config(
+        func: ty.Callable[P, R],
+    ) -> ty.Union[Wand[P, R], ty.Callable[P, R]]:
         magic_config_path = make_magic_config_path(func)
         shim_builder = (
             to_shim_builder(shim_or_builder)
@@ -281,14 +355,18 @@ def wand(
             else config.shim_bld.getv(magic_config_path)
         )
         if not shim_builder:  # this means 'off'
-            return func  # just run the function normally
+            # 'off' returns the bare callable unchanged: no runner, so no `.submit()`. The
+            # union return type carries this truth to callers (no cast).
+            return func
 
         blob_root_uri = (
             core.uris.to_lazy_uri(blob_root) if blob_root else config.blob_root.getv(magic_config_path)()
         )
-
-        return core.pipeline_id.set_pipeline_id_for_stack(
-            pipeline_id or config.pipeline_id.getv(magic_config_path)
-        )(use_runner(MemoizingPicklingRunner(shim_builder, blob_root_uri).calls(func, *calls))(func))
+        resolved_pipeline_id = pipeline_id or config.pipeline_id.getv(magic_config_path)
+        return Wand(
+            func,
+            MemoizingPicklingRunner(shim_builder, blob_root_uri).calls(func, *calls),
+            resolved_pipeline_id,
+        )
 
     return deco_that_resolves_and_locks_in_config
