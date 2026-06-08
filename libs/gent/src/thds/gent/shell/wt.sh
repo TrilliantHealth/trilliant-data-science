@@ -48,6 +48,19 @@ wt() {
 
     case "$cmd" in
         root|cd|co)
+            # `wt cd -` / `wt co -`: jump back to the previous worktree (like `cd -`).
+            # Handled entirely in the shell so the dash never reaches the Python CLI.
+            if { [ "$cmd" = "cd" ] || [ "$cmd" = "co" ]; } && [ "$1" = "-" ]; then
+                if [ -n "$_GENT_PREV_WT" ] && [ -d "$_GENT_PREV_WT" ]; then
+                    local previous="$_GENT_PREV_WT"
+                    export _GENT_PREV_WT="$PWD"
+                    cd "$previous" || return 1
+                    return 0
+                fi
+                echo "wt: no previous worktree to switch to" >&2
+                return 1
+            fi
+
             # Navigation commands - capture path from last line while streaming output
             local target
             # Use tee to stream output if TTY available, otherwise just capture
@@ -69,6 +82,8 @@ wt() {
             fi
 
             if [ $exit_code -eq 0 ] && [ -d "$target" ]; then
+                # Remember where we came from so `wt cd -` can return here.
+                [ "$target" != "$PWD" ] && export _GENT_PREV_WT="$PWD"
                 cd "$target" || return 1
             else
                 return $exit_code

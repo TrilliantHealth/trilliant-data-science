@@ -140,11 +140,11 @@ def set_upstream_tracking(
         output.warning(f"Failed to set upstream branch: {extract_subprocess_error(e)}")
 
 
-@argh.arg("branch", help="Branch name to checkout or create")
+@argh.arg("branch", help="Branch name to checkout or create ('-' switches to the previous worktree)")
 @argh.arg(
     "base_branch",
     nargs="?",
-    default="-",
+    default=None,
     help="Base branch for creating new branches (default: current worktree or main)",
 )
 def main(branch: str, base_branch: str | None) -> None:
@@ -159,6 +159,7 @@ def main(branch: str, base_branch: str | None) -> None:
       wt co feature/existing        # Checkout existing (local or remote)
       wt co feature/new             # Create new from HEAD (current worktree or main)
       wt co feature/new main        # Create new from main explicitly
+      wt co -                       # Switch back to the previous worktree
 
     Base branch behavior (when creating new):
       - No base specified: Uses current worktree branch, or 'main' if not in worktree
@@ -166,6 +167,13 @@ def main(branch: str, base_branch: str | None) -> None:
 
     Note: Always fetches from remote first to check for remote branches.
     """
+    if branch == "-":
+        # The shell wrapper intercepts `-` to jump to the previous worktree. If we
+        # reach Python with it, the wrapper isn't active and there's nothing to do.
+        error_exit(
+            "'wt co -' (previous worktree) requires the wt shell integration; run 'wt setup-shell'"
+        )
+
     root = get_worktree_root_or_exit()
     worktree_path = root / branch
 

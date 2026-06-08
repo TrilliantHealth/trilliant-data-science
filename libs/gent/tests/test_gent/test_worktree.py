@@ -55,6 +55,24 @@ def test_gent_cd(worktree_git_repo, run_wt):
     assert "main" in result.stdout
 
 
+def test_gent_cd_dash_without_shell_wrapper_errors(worktree_git_repo, run_wt):
+    """`wt cd -` is handled by the shell wrapper; reaching Python means no wrapper."""
+    main_path = worktree_git_repo / "main"
+    result = run_wt("cd", ["-"], cwd=main_path)
+
+    assert result.returncode != 0
+    assert "shell integration" in result.stderr
+
+
+def test_gent_co_dash_without_shell_wrapper_errors(worktree_git_repo, run_wt):
+    """`wt co -` is handled by the shell wrapper; reaching Python means no wrapper."""
+    main_path = worktree_git_repo / "main"
+    result = run_wt("co", ["-"], cwd=main_path)
+
+    assert result.returncode != 0
+    assert "shell integration" in result.stderr
+
+
 def test_gent_path_with_branch_arg(worktree_git_repo, run_wt):
     """Test wt path prints full path when branch name provided."""
     main_path = worktree_git_repo / "main"

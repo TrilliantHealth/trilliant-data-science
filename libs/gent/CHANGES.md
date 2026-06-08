@@ -1,3 +1,11 @@
+## 1.4
+
+- `wt cd -` and `wt co -` now switch back to the previous worktree (like `cd -` / `git switch -`). The
+  previous worktree is tracked per-terminal by the shell integration, so this requires re-running
+  `wt setup-shell` (shell integration bumped to v5).
+- Cleaned up the redundant `"-"` sentinel default for `wt co`'s `base_branch` argument (now `None`); no
+  behavior change for base-branch selection.
+
 ## 1.3
 
 - First public release on PyPI as `thds.gent`.

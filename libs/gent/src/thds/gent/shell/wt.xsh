@@ -87,6 +87,17 @@ def _wt(args):
     os.environ['_WT_SHELL_WRAPPER'] = '1'
 
     if cmd in ('root', 'cd', 'co'):
+        # `wt cd -` / `wt co -`: jump back to the previous worktree (like `cd -`).
+        # Handled here so the dash never reaches the Python CLI.
+        if cmd in ('cd', 'co') and rest and rest[0] == '-':
+            previous = os.environ.get('_GENT_PREV_WT', '')
+            if previous and os.path.isdir(previous):
+                os.environ['_GENT_PREV_WT'] = os.getcwd()
+                os.chdir(previous)
+                return 0
+            print("wt: no previous worktree to switch to", file=sys.stderr)
+            return 1
+
         # Navigation commands - capture path from last line while streaming output
         try:
             result = subprocess.run(
@@ -113,6 +124,10 @@ def _wt(args):
             if result.returncode == 0 and stdout_lines:
                 target = stdout_lines[-1]
                 if os.path.isdir(target):
+                    # Remember where we came from so `wt cd -` can return here.
+                    cwd = os.getcwd()
+                    if os.path.abspath(target) != cwd:
+                        os.environ['_GENT_PREV_WT'] = cwd
                     os.chdir(target)
                     return 0
                 else:

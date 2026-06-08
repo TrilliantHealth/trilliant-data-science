@@ -16,4 +16,4 @@ except ImportError:
 # This is separate from __version__ because shell scripts are copied to ~/.gent/
 # during install, so Python code updates don't require re-running install.sh.
 # When this doesn't match ~/.gent/version, users see a warning to reinstall.
-SHELL_INTEGRATION_VERSION = "4"
+SHELL_INTEGRATION_VERSION = "5"

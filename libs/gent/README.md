@@ -97,7 +97,7 @@ my-project/
 wt clone <url> [dir]   # Clone a repository with worktree structure
 wt list                # List all worktrees
 wt co <branch> [base]  # Checkout existing or create new branch as worktree
-wt cd <branch>         # Navigate to a worktree
+wt cd <branch>         # Navigate to a worktree (use `-` for the previous one)
 wt init [branch]       # Initialize worktree environment (.gent/init script)
 wt start [branch]      # Run start hook (e.g. open editor)
 wt rm <branch>         # Remove worktree and optionally delete branch
@@ -137,7 +137,11 @@ editor or other "ready to work" actions.
 ```bash
 wt cd main              # Jump to main
 wt cd feature/testing   # Jump to feature
+wt cd -                 # Jump back to the previous worktree (like `cd -`)
 ```
+
+`wt co -` does the same thing. The previous worktree is remembered per terminal, so `wt cd -` toggles
+between your two most recent worktrees.
 
 **Clean up:**
 
