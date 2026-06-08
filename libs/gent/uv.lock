@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-25T16:10:18.869444Z"
+exclude-newer = "2026-06-01T19:12:48.064753Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -417,7 +417,7 @@ wheels = [
 
 [[package]]
 name = "thds-gent"
-version = "1.4"
+version = "1.5"
 source = { editable = "." }
 dependencies = [
     { name = "argh" },

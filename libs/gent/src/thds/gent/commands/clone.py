@@ -12,7 +12,7 @@ import argh
 
 from thds.gent import output
 from thds.gent.readme import ensure_readme
-from thds.gent.utils import error_exit, run_git, run_git_streaming
+from thds.gent.utils import FETCH_REFSPEC, error_exit, run_git, run_git_streaming
 
 
 def determine_default_branch(bare_dir: Path) -> str:
@@ -103,7 +103,7 @@ def main(url: str, *, directory: str | None = None, branch: str | None = None) -
             "--git-dir=.bare",
             "config",
             "remote.origin.fetch",
-            "'+refs/heads/*:refs/remotes/origin/*'",
+            FETCH_REFSPEC,
             cwd=target_dir,
         )  # Enable fetching remote branches
         output.success(f"Cloned bare repository to {bare_dir}")

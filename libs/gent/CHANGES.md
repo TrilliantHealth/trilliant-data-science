@@ -1,3 +1,12 @@
+## 1.5
+
+- Fixed `wt clone` writing the `remote.origin.fetch` refspec with literal surrounding quotes
+  (`'+refs/heads/*:...'`). Because git is invoked via an argv list (no shell), the quotes became part of
+  the value, the refspec matched nothing, and no `refs/remotes/origin/*` refs were ever created — so
+  `wt co <remote-branch>` couldn't find remote branches and created a new local branch from base instead.
+- `wt co` now repairs that exact known-bad refspec in-place before fetching, healing bare repos already
+  cloned with the bug. A deliberately quoted refspec is left untouched.
+
 ## 1.4
 
 - `wt cd -` and `wt co -` now switch back to the previous worktree (like `cd -` / `git switch -`). The

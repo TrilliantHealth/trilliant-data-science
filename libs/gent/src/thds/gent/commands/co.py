@@ -27,6 +27,7 @@ from thds.gent.utils import (
     git_checkout,
     git_current_branch,
     ignore_git_errors,
+    repair_fetch_refspec,
     run_git,
     run_git_streaming,
     set_git_config,
@@ -186,6 +187,9 @@ def main(branch: str, base_branch: str | None) -> None:
     # Fetch from remote to ensure we have latest branch info (if remote exists)
     output.info("Fetching latest branch info from remote...")
     bare_path = get_bare_path(root)
+    # Repair a quote-wrapped refspec left by older `wt clone` versions, so the fetch
+    # below actually populates refs/remotes/origin/* and remote branches are found.
+    repair_fetch_refspec(bare_path)
     # Ignore fetch errors - no remote or fetch failure is okay
     ignore_git_errors(run_git, "fetch", "origin", cwd=bare_path, capture=False)
 

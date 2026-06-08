@@ -3,12 +3,28 @@ Tests for utility functions, especially error detection.
 """
 
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from thds.gent._repo import GENT_REPO_PATH
-from thds.gent.utils import find_worktree_root, get_worktree_root_or_exit
+from thds.gent.utils import (
+    FETCH_REFSPEC,
+    find_worktree_root,
+    get_git_config,
+    get_worktree_root_or_exit,
+    repair_fetch_refspec,
+    set_git_config,
+)
+
+
+def _git_repo_with_fetch_refspec(path: Path, value: str | None) -> Path:
+    """Init a git repo at `path`, optionally seeding remote.origin.fetch with `value`."""
+    subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
+    if value is not None:
+        set_git_config("remote.origin.fetch", value, path)
+    return path
 
 
 def test_find_worktree_root_in_worktree(worktree_git_repo):
@@ -145,3 +161,29 @@ def test_get_worktree_root_or_exit_from_subdirectory(worktree_git_repo):
         assert root == worktree_git_repo.resolve()
     finally:
         os.chdir(original_cwd)
+
+
+def test_repair_fetch_refspec_repairs_known_bad_value(tmp_path):
+    repo = _git_repo_with_fetch_refspec(tmp_path, f"'{FETCH_REFSPEC}'")
+
+    repaired = repair_fetch_refspec(repo)
+
+    assert repaired is True
+    assert get_git_config("remote.origin.fetch", repo) == FETCH_REFSPEC
+
+
+@pytest.mark.parametrize(
+    "existing_value",
+    [
+        pytest.param(FETCH_REFSPEC, id="already-correct"),
+        pytest.param(None, id="unset"),
+        pytest.param("'+refs/heads/main:refs/remotes/origin/main'", id="deliberately-quoted-other"),
+    ],
+)
+def test_repair_fetch_refspec_leaves_other_values_untouched(tmp_path, existing_value):
+    repo = _git_repo_with_fetch_refspec(tmp_path, existing_value)
+
+    repaired = repair_fetch_refspec(repo)
+
+    assert repaired is False
+    assert get_git_config("remote.origin.fetch", repo) == existing_value

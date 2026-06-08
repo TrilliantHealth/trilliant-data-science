@@ -15,6 +15,11 @@ from thds.gent._repo import GENT_BARE_SETUP, GENT_REPO_PATH, github_tree_url
 
 BARE_SETUP_URL = github_tree_url(path=f"{GENT_REPO_PATH}/{GENT_BARE_SETUP}")
 
+# The refspec that lets a bare clone fetch all remote branches into refs/remotes/origin/*.
+# Without it, `git fetch origin` updates no remote-tracking refs and `wt co` can't find
+# remote branches (it falls through to creating a new local branch from base).
+FETCH_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
+
 
 @dataclass(frozen=True)
 class WorktreeInfo:
@@ -438,6 +443,29 @@ def set_git_config(key: str, value: str, cwd: Path) -> None:
         capture_output=True,
         text=True,
     )
+
+
+def repair_fetch_refspec(bare_path: Path) -> bool:
+    """Repair the known-bad quote-wrapped `remote.origin.fetch` refspec in the bare repo.
+
+    Older `wt clone` versions wrote the refspec with literal surrounding quotes
+    (`f"'{FETCH_REFSPEC}'"`). git invoked via an argv list never strips those, so the
+    quotes became part of the value, the refspec matched nothing, and no
+    refs/remotes/origin/* refs were ever created — leaving `wt co` unable to find
+    remote branches. This rewrites only that exact known-bad value, so a refspec
+    someone deliberately quoted is left untouched.
+
+    Returns True if a repair was made.
+    """
+    if get_git_config("remote.origin.fetch", bare_path) != f"'{FETCH_REFSPEC}'":
+        return False
+
+    output.warning(
+        f"Repairing malformed remote.origin.fetch refspec in {bare_path} "
+        f"(quote-wrapped by an older `wt clone`); setting it to {FETCH_REFSPEC!r}"
+    )
+    set_git_config("remote.origin.fetch", FETCH_REFSPEC, bare_path)
+    return True
 
 
 def get_branch_list(cwd: Path, remote: bool = False, strip_remote_prefix: bool = True) -> list[str]:

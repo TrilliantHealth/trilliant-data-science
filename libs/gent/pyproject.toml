@@ -1,6 +1,6 @@
 [project]
 name = "thds.gent"
-version = "1.4"
+version = "1.5"
 # Patch version is a datetime determined upon release.
 description = "Git worktree management utilities - tree shepherds for your working trees"
 readme = "README.md"
