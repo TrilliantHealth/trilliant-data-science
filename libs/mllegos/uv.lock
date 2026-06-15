@@ -7,6 +7,10 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[options]
+exclude-newer = "2026-06-05T15:06:06.464449Z"
+exclude-newer-span = "P7D"
+
 [[package]]
 name = "appnope"
 version = "0.1.4"

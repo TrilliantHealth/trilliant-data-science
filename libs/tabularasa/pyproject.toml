@@ -81,6 +81,9 @@ dev = [
 requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.sources]
 thds-adls = { path = "../../libs/adls", editable = true }
 thds-core = { path = "../../libs/core", editable = true }

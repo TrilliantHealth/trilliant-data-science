@@ -64,3 +64,6 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--durations=20"
+
+[tool.uv]
+exclude-newer = "7 days"
