@@ -55,3 +55,12 @@ def test_exit_logs_final_summary(caplog):
     assert len(lines) == 1
     assert "MEM" in lines[0]
     assert "CPU" in lines[0]
+
+
+def test_metrics_construct_with_no_args():
+    # Adding a metric field must stay additive: downstream code that builds a
+    # baseline/zero instance shouldn't have to enumerate every field.
+    metrics = journalist.JournalistMetrics()
+    assert metrics.peak_disk_read_mbps == 0.0
+    assert metrics.total_disk_write_gb == 0.0
+    assert metrics.elapsed_seconds is None

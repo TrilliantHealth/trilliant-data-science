@@ -128,20 +128,25 @@ def _read_disk_bytes() -> tuple[int, int] | None:
 
 @dataclass(frozen=True)
 class JournalistMetrics:
-    """Snapshot of resource usage collected by a Journalist."""
+    """Snapshot of resource usage collected by a Journalist.
 
-    peak_rss_gb: float
-    avg_rss_gb: float
-    peak_cpu_cores: float
-    avg_cpu_cores: float
-    peak_recv_mbps: float
-    total_recv_gb: float
-    peak_sent_mbps: float
-    total_sent_gb: float
-    peak_disk_read_mbps: float
-    total_disk_read_gb: float
-    peak_disk_write_mbps: float
-    total_disk_write_gb: float
+    Every field defaults, so `JournalistMetrics()` is a valid zero instance and
+    adding a new metric never breaks downstream code that constructs one (e.g. a
+    baseline/zero fixture). The Journalist itself always fills every field.
+    """
+
+    peak_rss_gb: float = 0.0
+    avg_rss_gb: float = 0.0
+    peak_cpu_cores: float = 0.0
+    avg_cpu_cores: float = 0.0
+    peak_recv_mbps: float = 0.0
+    total_recv_gb: float = 0.0
+    peak_sent_mbps: float = 0.0
+    total_sent_gb: float = 0.0
+    peak_disk_read_mbps: float = 0.0
+    total_disk_read_gb: float = 0.0
+    peak_disk_write_mbps: float = 0.0
+    total_disk_write_gb: float = 0.0
     # Optional with a None default so previously-pickled instances
     # deserialize without error.
     elapsed_seconds: ty.Optional[float] = None

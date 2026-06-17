@@ -1,3 +1,10 @@
+### 1.52.20260617
+
+- All `JournalistMetrics` fields now default (bugfix). The disk fields shipped in 1.52 as required
+  positional fields, which broke downstream code constructing a metrics instance with only the older
+  fields. `JournalistMetrics()` is now a valid zero instance, so adding a metric stays additive for
+  constructors.
+
 ### 1.52
 
 - `Journalist` now samples disk IO (read/write MBps cur/peak + total GB) alongside memory, CPU, and
