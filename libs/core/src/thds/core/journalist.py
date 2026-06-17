@@ -110,6 +110,22 @@ def _read_net_bytes() -> tuple[int, int] | None:
         return None
 
 
+def _read_disk_bytes() -> tuple[int, int] | None:
+    """Return (bytes_read, bytes_written) across all disks, or None.
+
+    System-wide (like net counters), not per-process — captures DuckDB spill
+    and partitioned-write IO to local pod disk that network counters miss.
+    """
+    if psutil is None:
+        return None
+
+    try:
+        counters = psutil.disk_io_counters()
+        return counters.read_bytes, counters.write_bytes
+    except Exception:
+        return None
+
+
 @dataclass(frozen=True)
 class JournalistMetrics:
     """Snapshot of resource usage collected by a Journalist."""
@@ -122,6 +138,10 @@ class JournalistMetrics:
     total_recv_gb: float
     peak_sent_mbps: float
     total_sent_gb: float
+    peak_disk_read_mbps: float
+    total_disk_read_gb: float
+    peak_disk_write_mbps: float
+    total_disk_write_gb: float
     # Optional with a None default so previously-pickled instances
     # deserialize without error.
     elapsed_seconds: ty.Optional[float] = None
@@ -161,6 +181,14 @@ class Journalist:
         self._start_net_sent = 0
         self._peak_recv_mbps = 0.0
         self._peak_sent_mbps = 0.0
+        # Disk IO tracking (local pod disk: DuckDB spill + partitioned writes).
+        self._disk_available = _read_disk_bytes() is not None
+        self._start_disk_read = 0
+        self._start_disk_write = 0
+        self._prev_disk_read = 0
+        self._prev_disk_write = 0
+        self._peak_disk_read_mbps = 0.0
+        self._peak_disk_write_mbps = 0.0
 
     def _read_cpu_seconds(self, proc: "psutil.Process") -> float:
         """Read CPU seconds from cgroup (preferred) or process tree (fallback)."""
@@ -196,9 +224,18 @@ class Journalist:
         window_start_net_recv = self._start_net_recv
         window_start_net_sent = self._start_net_sent
 
+        prev_disk = _read_disk_bytes()
+        if prev_disk is not None:
+            self._start_disk_read, self._start_disk_write = prev_disk
+        self._prev_disk_read = self._start_disk_read
+        self._prev_disk_write = self._start_disk_write
+        window_start_disk_read = self._start_disk_read
+        window_start_disk_write = self._start_disk_write
+
         _BLUE = "\033[34m"
         _GREEN = "\033[32m"
         _YELLOW = "\033[33m"
+        _MAGENTA = "\033[35m"
         _RESET = "\033[0m"
 
         while not self._stop.wait(self._sample_interval):
@@ -235,6 +272,18 @@ class Journalist:
                     self._peak_recv_mbps = max(self._peak_recv_mbps, sample_recv_mbps)
                     prev_net_sent = cur_net[0]
                     prev_net_recv = cur_net[1]
+
+            if self._disk_available:
+                cur_disk = _read_disk_bytes()
+                if cur_disk is not None:
+                    read_delta = max(0, cur_disk[0] - self._prev_disk_read)
+                    write_delta = max(0, cur_disk[1] - self._prev_disk_write)
+                    sample_read_mbps = (read_delta / max(dt, 0.01)) / (1024 * 1024)
+                    sample_write_mbps = (write_delta / max(dt, 0.01)) / (1024 * 1024)
+                    self._peak_disk_read_mbps = max(self._peak_disk_read_mbps, sample_read_mbps)
+                    self._peak_disk_write_mbps = max(self._peak_disk_write_mbps, sample_write_mbps)
+                    self._prev_disk_read = cur_disk[0]
+                    self._prev_disk_write = cur_disk[1]
 
             prev_wall, prev_cpu = now_wall, cur_cpu
             self._last_wall, self._last_cpu = now_wall, cur_cpu
@@ -273,9 +322,26 @@ class Journalist:
                         f" total GB {total_recv_gb:.1f}\u2193 {total_sent_gb:.1f}\u2191{_RESET}"
                     )
 
+                disk_part = ""
+                if self._disk_available:
+                    window_read_mbps = (
+                        (self._prev_disk_read - window_start_disk_read) / window_seconds / (1024 * 1024)
+                    )
+                    window_write_mbps = (
+                        (self._prev_disk_write - window_start_disk_write)
+                        / window_seconds
+                        / (1024 * 1024)
+                    )
+                    disk_part = (
+                        f" | {_MAGENTA}DISK {window_read_mbps:.0f}/{self._peak_disk_read_mbps:.0f}r"
+                        f" {window_write_mbps:.0f}/{self._peak_disk_write_mbps:.0f}w cur/peak MBps;"
+                        f" total GB {(self._prev_disk_read - self._start_disk_read) / (1024**3):.1f}r"
+                        f" {(self._prev_disk_write - self._start_disk_write) / (1024**3):.1f}w{_RESET}"
+                    )
+
                 _logger.info(
                     "%s [%.1fm]: %sMEM cur %.1f / %.1f peak GB%s"
-                    " | %sCPU cur %.1f, avg %.1f / %.1f peak%s%s",
+                    " | %sCPU cur %.1f, avg %.1f / %.1f peak%s%s%s",
                     self._label,
                     elapsed_min,
                     _BLUE,
@@ -288,12 +354,15 @@ class Journalist:
                     self._peak_cpu_cores,
                     _RESET,
                     net_part,
+                    disk_part,
                 )
 
                 window_start_wall = now_wall
                 window_start_cpu = cur_cpu
                 window_start_net_recv = prev_net_recv
                 window_start_net_sent = prev_net_sent
+                window_start_disk_read = self._prev_disk_read
+                window_start_disk_write = self._prev_disk_write
                 window_peak_rss_mb = 0.0
                 window_peak_cgroup_mb = 0.0
 
@@ -348,6 +417,22 @@ class Journalist:
         return max(0, net[0] - self._start_net_sent) / (1024**3)
 
     @property
+    def peak_disk_read_mbps(self) -> float:
+        return self._peak_disk_read_mbps
+
+    @property
+    def peak_disk_write_mbps(self) -> float:
+        return self._peak_disk_write_mbps
+
+    @property
+    def total_disk_read_gb(self) -> float:
+        return max(0, self._prev_disk_read - self._start_disk_read) / (1024**3)
+
+    @property
+    def total_disk_write_gb(self) -> float:
+        return max(0, self._prev_disk_write - self._start_disk_write) / (1024**3)
+
+    @property
     def metrics(self) -> JournalistMetrics:
         # Prefer cgroup when available; psutil's proc-tree RSS double-counts
         # COW-shared pages across forked children (observed: 417 GB peak on a
@@ -370,6 +455,10 @@ class Journalist:
             total_recv_gb=self.total_recv_gb,
             peak_sent_mbps=self.peak_sent_mbps,
             total_sent_gb=self.total_sent_gb,
+            peak_disk_read_mbps=self.peak_disk_read_mbps,
+            total_disk_read_gb=self.total_disk_read_gb,
+            peak_disk_write_mbps=self.peak_disk_write_mbps,
+            total_disk_write_gb=self.total_disk_write_gb,
             elapsed_seconds=elapsed_seconds,
         )
 
@@ -402,6 +491,7 @@ class Journalist:
         _BLUE = "\033[34m"
         _GREEN = "\033[32m"
         _YELLOW = "\033[33m"
+        _MAGENTA = "\033[35m"
         _RESET = "\033[0m"
         net_part = ""
         if self._net_available:
@@ -409,8 +499,14 @@ class Journalist:
                 f" | {_YELLOW}NET {m.peak_recv_mbps:.0f}\u2193 {m.peak_sent_mbps:.0f}\u2191 peak MBps;"
                 f" total GB {m.total_recv_gb:.1f}\u2193 {m.total_sent_gb:.1f}\u2191{_RESET}"
             )
+        disk_part = ""
+        if self._disk_available:
+            disk_part = (
+                f" | {_MAGENTA}DISK {m.peak_disk_read_mbps:.0f}r {m.peak_disk_write_mbps:.0f}w peak MBps;"
+                f" total GB {m.total_disk_read_gb:.1f}r {m.total_disk_write_gb:.1f}w{_RESET}"
+            )
         _logger.info(
-            "%s [%.1fm]: %sMEM avg %.1f / %.1f peak GB%s | %sCPU avg %.1f / %.1f peak%s%s",
+            "%s [%.1fm]: %sMEM avg %.1f / %.1f peak GB%s | %sCPU avg %.1f / %.1f peak%s%s%s",
             self._label,
             elapsed_min,
             _BLUE,
@@ -422,6 +518,7 @@ class Journalist:
             m.peak_cpu_cores,
             _RESET,
             net_part,
+            disk_part,
         )
 
     def __exit__(self, *exc: ty.Any) -> None:

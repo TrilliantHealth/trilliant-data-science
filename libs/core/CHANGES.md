@@ -1,3 +1,11 @@
+### 1.52
+
+- `Journalist` now samples disk IO (read/write MBps cur/peak + total GB) alongside memory, CPU, and
+  network, logged in its own color. System-wide via `psutil.disk_io_counters` (like the network
+  counters); no-ops where psutil or disk counters are unavailable. Surfaces local-disk bottlenecks
+  (parquet writer flushes, DuckDB spill) that the network metric misses. New `JournalistMetrics` fields:
+  `peak_disk_read_mbps`, `total_disk_read_gb`, `peak_disk_write_mbps`, `total_disk_write_gb`.
+
 ### 1.51.20260529
 
 - `JournalistMetrics` gains an optional `elapsed_seconds` field (wall-clock duration of the
