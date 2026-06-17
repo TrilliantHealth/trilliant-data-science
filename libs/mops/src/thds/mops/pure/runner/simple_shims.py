@@ -29,6 +29,11 @@ def subprocess_shim(shim_args: Sequence[str]) -> None:
 
 
 def future_subprocess_shim(shim_args: Sequence[str]) -> concurrent.futures.Future:
-    """Use this if you really want a Future rather than just running the process"""
+    """Use this if you really want a Future rather than just running the process."""
     logger.debug("Running a mops function in a new subprocess, returning a Future.")
-    return concurrent.futures.ProcessPoolExecutor().submit(samethread_shim, shim_args)
+    pool = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="mops-subprocess-shim"
+    )
+    future = pool.submit(subprocess_shim, shim_args)
+    future.add_done_callback(lambda _: pool.shutdown(wait=False))
+    return future

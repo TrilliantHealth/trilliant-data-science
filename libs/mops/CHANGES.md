@@ -1,3 +1,14 @@
+### 3.20.20260617
+
+- Fix a race in `future_subprocess_shim` that intermittently produced `NoResultAfterShimSuccess` on
+  `main` CI. The shim created a fresh `ProcessPoolExecutor` per call and retained no reference to it,
+  leaving the pool's teardown to nondeterministic GC/atexit timing - which could reclaim a worker process
+  while it was still flushing its result blob, so the shim exited cleanly but no result was written. The
+  shim now runs `subprocess_shim` (a real `python -m thds.mops.pure.core.entry.main` child process) on a
+  single-worker `ThreadPoolExecutor` whose lifetime is bounded by the call and shut down
+  deterministically once the work completes. Because `subprocess.check_call` returns only after the child
+  exits, the result is durable before the future resolves.
+
 ## 3.20
 
 - `pure.magic.wand` now returns a callable `Wand` object exposing `.submit()` (returns a `PFuture`) in
