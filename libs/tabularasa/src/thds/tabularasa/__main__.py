@@ -34,9 +34,9 @@ from thds.tabularasa.data_dependencies.adls import (
 )
 from thds.tabularasa.data_dependencies.build import ReferenceDataBuildCommand, populate_sqlite_db
 from thds.tabularasa.diff import data as data_diff
+from thds.tabularasa.diff import pks
 from thds.tabularasa.diff import schema as schema_diff
 from thds.tabularasa.diff import summary as diff_summary
-from thds.tabularasa.loaders import parquet_util
 from thds.tabularasa.loaders.util import (
     PandasParquetLoader,
     default_parquet_package_data_path,
@@ -1120,6 +1120,7 @@ class ReferenceDataManager:
         after_blob_store = s_diff.after.remote_blob_store
         if before_blob_store is None or after_blob_store is None:
             raise ValueError("Can't diff data without remote blob stores defined in both schemas")
+
         for table_name, table_diff in sorted(s_diff.table_diffs.items(), key=lambda t: t[0]):
             if tables and table_name not in tables:
                 continue
@@ -1130,38 +1131,15 @@ class ReferenceDataManager:
             if table_diff.before.md5 == table_diff.after.md5:
                 self.logger.info(f"{table_name}: Matching md5 hashes; no data diff detected")
                 continue
-
-            if not (pkb := table_diff.before.primary_key) or not (pka := table_diff.after.primary_key):
-                self.logger.warning(f"{table_name}: Can't diff without primary keys")
-                continue
-            if len(pka) != len(pkb):
-                self.logger.warning(
-                    f"{table_name}: Can't diff with different primary key lengths ({len(pkb)} vs {len(pka)})"
+            if (table_diff_ := pks.data_diffable(table_diff, self.logger)) is not None:
+                # ^ not None vs simple falsy check here because table diffs define __bool__ which might be false if
+                # there's no schema change - but in those cases, the data is surely diffable!
+                d_diff = data_diff.DataFrameDiff.from_tables(
+                    table_diff_.before, table_diff_.after, before_blob_store, after_blob_store
                 )
-                continue
-
-            before_pk_cols = [next(c for c in table_diff.before.columns if c.name == k) for k in pkb]
-            after_pk_cols = [next(c for c in table_diff.after.columns if c.name == k) for k in pka]
-            incomparable = [
-                (c1.name, c2.name)
-                for c1, c2 in zip(before_pk_cols, after_pk_cols)
-                if not parquet_util.pyarrow_type_compatible(
-                    c1.type.parquet, c2.type.parquet, parquet_util.TypeCheckLevel.compatible
-                )
-            ]
-            if incomparable:
-                _incomparable = ", ".join(f"{a} <-> {b}" for a, b in incomparable)
-                self.logger.warning(
-                    f"{table_name}: Can't diff with incompatibly typed primary key columns {_incomparable}"
-                )
-                continue
-
-            d_diff = data_diff.DataFrameDiff.from_tables(
-                table_diff.before, table_diff.after, before_blob_store, after_blob_store
-            )
-            if debug and d_diff:
-                breakpoint()
-            yield table_name, d_diff
+                if debug and d_diff:
+                    breakpoint()
+                yield table_name, d_diff
 
 
 def main():

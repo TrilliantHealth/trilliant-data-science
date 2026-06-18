@@ -1,3 +1,9 @@
+### 0.14.15
+
+- Added new module `diff.pks` to localize logic for determining an appropriate primary key for computing
+  data diffs given before/after table schema objects. This module now contains logic that used to be
+  in-lined in the `data_diff` command in `__main__.py`, documented in the `data_diffable` function.
+
 ### 0.14.14
 
 - Updated repository URL to point to the new open-source location.
