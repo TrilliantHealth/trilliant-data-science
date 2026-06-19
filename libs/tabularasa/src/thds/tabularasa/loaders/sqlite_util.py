@@ -204,9 +204,16 @@ def bulk_write_connection(
     database file on entry and release it on exit. Other processes attempting to perform bulk writes to the same file
     will block until the lock is released. In the case of tabularasa init-sqlite, the semantics then imply that those
     workers will perform no writes at all, since metadata will indicate that the data in the file is up-to-date.
+
+    The lock file is intentionally never deleted. `filelock` uses OS-level locking (flock/fcntl), so the
+    file's mere presence on disk locks nothing - it is created once and reused. Deleting it introduces a
+    TOCTOU race: `filelock._acquire` only sets O_CREAT when the file is absent, so if one worker removes
+    the file between another worker's existence check and its `os.open`, that `os.open` fails with
+    FileNotFoundError. `filelock` itself never removes the file for this reason (see py-filelock #31).
+    The lock file is 0 bytes and named after the db (e.g. `foo.db.lock`, `foo.sqlite.lock`).
     """
     db_path_ = to_local_path(db_path, db_package).absolute()
-    lock_path = db_path_.with_suffix(".lock")
+    lock_path = db_path_.with_name(db_path_.name + ".lock")
     lock = FileLock(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(__name__)
@@ -221,9 +228,6 @@ def bulk_write_connection(
 
             if close:
                 con.close()
-
-            if lock_path.exists():
-                os.remove(lock_path)
 
 
 def sqlite_connection(

@@ -1,3 +1,10 @@
+### 0.14.16
+
+- Stopped deleting the lock file in `bulk_write_connection`. The deletion raced with `filelock`'s
+  `_acquire` (which only sets `O_CREAT` when the file is absent), causing intermittent
+  `FileNotFoundError` when concurrent workers wrote to the same sqlite db. The lock file now persists,
+  matching `filelock`'s own design, and is named after the db (e.g. `foo.db.lock`, `foo.sqlite.lock`).
+
 ### 0.14.15
 
 - Added new module `diff.pks` to localize logic for determining an appropriate primary key for computing
