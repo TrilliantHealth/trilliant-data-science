@@ -1,3 +1,10 @@
+### 1.53
+
+- Add `core.iterutils` module with generic utilities for working with iterables that aren't available
+  e.g. in the standard library `itertools` module.
+- Add an `Ord` protocol and `T_Ord` type variable to `core.types` for representing generic orderable
+  types.
+
 ### 1.52.20260617
 
 - All `JournalistMetrics` fields now default (bugfix). The disk fields shipped in 1.52 as required
