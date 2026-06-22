@@ -1,3 +1,11 @@
+### 3.21
+
+- `Magic.submit` / `MemoizingPicklingRunner.submit` now return a `MopsFuture` (a `PFuture` that
+  additionally carries `.memo_uri` and `.result_metadata`). Existing callers treating the result as a
+  `PFuture` are unaffected. `.result_metadata` is populated when the future resolves, parsed from the
+  result-blob header in the same read that produces the value (no extra fetch), and surfaces on memo hits
+  too.
+
 ### 3.20.20260617
 
 - Fix a race in `future_subprocess_shim` that intermittently produced `NoResultAfterShimSuccess` on

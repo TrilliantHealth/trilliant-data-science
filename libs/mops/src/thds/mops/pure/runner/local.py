@@ -11,6 +11,7 @@ from thds.termtool.colorize import colorized, make_colorized_out
 
 from ..._utils.on_slow import LogSlow, on_slow
 from ...config import max_concurrent_network_ops, max_concurrent_serialization
+from .._futures import MopsFuture
 from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
 from ..core.lock.maintain import MAINTAIN_LOCKS  # noqa: F401
 from ..core.partial import unwrap_partial
@@ -58,7 +59,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
     get_meta_and_result: types.GetMetaAndResult,
     run_directory: ty.Optional[Path] = None,
     calls_registry: ty.Mapping[ty.Callable, ty.Collection[ty.Callable]] = dict(),  # noqa: B006
-) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], futures.PFuture[T]]:
+) -> ty.Callable[[bool, str, ty.Callable[..., T], Args, Kwargs], MopsFuture[T]]:
     @scope.bound
     def create_invocation_and_result_future(
         rerun_exceptions: bool,
@@ -68,7 +69,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         func: ty.Callable[..., T],
         args_: Args,
         kwargs_: Kwargs,
-    ) -> futures.PFuture[T]:
+    ) -> MopsFuture[T]:
         """This is the generic local runner. Its core abstractions are:
 
         - serializers of some sort (for the function and its arguments)
@@ -169,7 +170,10 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             # we can short-circuit the entire process by looking for that result and returning it immediately.
             result = check_result_exists("memoized")
             if result:
-                return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                value, md = p_unwrap_value_or_error(memo_uri, result)
+                f: MopsFuture[T] = MopsFuture(futures.resolved(value), memo_uri)
+                f.set_result_metadata(md)
+                return f
 
             lock_owned = acquire_lock()
             # if no result exists, the vastly most common outcome here will be acquiring
@@ -196,7 +200,10 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     _LogAwaitedResult(
                         f"{val_or_res} for {memo_uri} was found after waiting for the lock."
                     )
-                    return futures.resolved(p_unwrap_value_or_error(memo_uri, result))
+                    value, md = p_unwrap_value_or_error(memo_uri, result)
+                    f = MopsFuture(futures.resolved(value), memo_uri)
+                    f.set_result_metadata(md)
+                    return f
 
                 lock_owned = acquire_lock()  # still inside the semaphore, as it's a network op
                 if lock_owned:
@@ -230,13 +237,23 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             if hasattr(future_or_shim_result, "add_done_callback"):
                 # if the shim returns a Future, we wrap it.
                 logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
-                return futures.make_lazy(lock_maintaining_future)(
-                    lock_owned, future_result_getter, future_or_shim_result
+                # PostShimResultGetter.__call__ returns (value, metadata), so the lazy future
+                # yields that tuple type; we cast to make the type match from_tuple_future's sig.
+                lazy: futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]] = ty.cast(
+                    "futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]]",
+                    futures.make_lazy(lock_maintaining_future)(
+                        lock_owned, future_result_getter, future_or_shim_result
+                    ),
                 )
+                # lazy yields (value, metadata) since PostShimResultGetter now returns a tuple.
+                return MopsFuture.from_tuple_future(lazy, memo_uri)
 
             else:  # it's a synchronous shim - just process the result directly.
                 future_result_getter.release_lock = release_lock_in_current_process
-                return futures.resolved(future_result_getter(future_or_shim_result))
+                value, md = future_result_getter(future_or_shim_result)
+                f = MopsFuture(futures.resolved(value), memo_uri)
+                f.set_result_metadata(md)
+                return f
 
         except Exception:
             try:

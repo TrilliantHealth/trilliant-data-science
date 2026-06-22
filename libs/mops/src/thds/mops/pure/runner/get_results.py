@@ -7,6 +7,7 @@ from thds.core import concurrency, futures, log
 
 from ...config import max_concurrent_network_ops
 from ..core import lock, memo
+from ..core import metadata as metadata_mod
 from ..core.types import NoResultAfterShimSuccess
 from ..tools.summarize import run_summary
 from . import types
@@ -24,14 +25,14 @@ def unwrap_value_or_error(
     args_kwargs_uris: ty.Collection[str],
     memo_uri: str,
     result_and_itype: ResultAndInvocationType,
-) -> ty.Any:  # the result value
+) -> tuple[ty.Any, ty.Optional[metadata_mod.ResultMetadata]]:  # (value, metadata)
     result = result_and_itype.value_or_error
     metadata = None
     value_t = None
     try:
         if isinstance(result, memo.results.Success):
             metadata, value_t = get_meta_and_result("value", result.value_uri)
-            return value_t
+            return value_t, metadata
         else:
             assert isinstance(result, memo.results.Error), "Must be Error or Success"
             metadata, exc = get_meta_and_result("EXCEPTION", result.exception_uri)
@@ -65,10 +66,13 @@ class PostShimResultGetter(ty.Generic[T]):
     """
 
     memo_uri: str
-    partially_applied_unwrap_value_or_error: ty.Callable[[str, ResultAndInvocationType], T]
+    partially_applied_unwrap_value_or_error: ty.Callable[
+        [str, ResultAndInvocationType],
+        tuple[T, ty.Optional[metadata_mod.ResultMetadata]],
+    ]
     release_lock: ty.Optional[ty.Callable[[], None]] = None
 
-    def __call__(self, _shim_result: ty.Any) -> T:
+    def __call__(self, _shim_result: ty.Any) -> tuple[T, ty.Optional[metadata_mod.ResultMetadata]]:
         """Check if the result exists, and return it if it does.
 
         This is the future 'translator' that allows us to chain a shim future to be a result future.

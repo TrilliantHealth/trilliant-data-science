@@ -12,10 +12,11 @@ from functools import partial
 
 from typing_extensions import Self
 
-from thds.core import cache, futures, log
+from thds.core import cache, log
 from thds.core.stack_context import StackContext
 
 from ..._utils.once import Once
+from .._futures import MopsFuture
 from ..core import memo, uris
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
@@ -174,9 +175,7 @@ class MemoizingPicklingRunner:
         base_shim = self._shim_builder(func, args, kwargs)
         return partial(mp_shim, base_shim)
 
-    def submit(
-        self, func: ty.Callable[..., T], /, *args: ty.Any, **kwargs: ty.Any
-    ) -> futures.PFuture[T]:
+    def submit(self, func: ty.Callable[..., T], /, *args: ty.Any, **kwargs: ty.Any) -> MopsFuture[T]:
         """Now that mops supports Futures, we can have an 'inner' API that returns a PFuture.
 
         We are trying to mimic the interface that concurrent.futures.Executors provide.

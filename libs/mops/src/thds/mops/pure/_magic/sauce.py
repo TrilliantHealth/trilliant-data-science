@@ -6,10 +6,11 @@ import typing as ty
 
 from typing_extensions import ParamSpec
 
-from thds.core import futures, log, stack_context
+from thds.core import log, stack_context
 from thds.mops._utils import config_tree
 
 from .. import core
+from .._futures import MopsFuture
 from ..core.memo.unique_name_for_function import full_name_and_callable
 from ..core.use_runner import use_runner
 from ..pickling.mprunner import MemoizingPicklingRunner
@@ -137,7 +138,7 @@ class Magic(ty.Generic[P, R]):
         if self._shared:
             self._shared.register(self.runner, args, kwargs)
 
-    def submit(self, *args: P.args, **kwargs: P.kwargs) -> futures.PFuture[R]:
+    def submit(self, *args: P.args, **kwargs: P.kwargs) -> MopsFuture[R]:
         """A futures-based interface that doesn't block on the result of the wrapped
         function call, but returns a PFuture once either a result has been found or a a
         new invocation has been started.
@@ -283,7 +284,7 @@ class Wand(ty.Generic[P, R]):
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self._runner(self.__wrapped__, args, kwargs)
 
-    def submit(self, *args: P.args, **kwargs: P.kwargs) -> futures.PFuture[R]:
+    def submit(self, *args: P.args, **kwargs: P.kwargs) -> MopsFuture[R]:
         """Non-blocking: returns a PFuture once a result is found or a new invocation has
         been started. Mirrors `Magic.submit`."""
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
