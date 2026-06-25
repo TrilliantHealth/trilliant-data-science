@@ -20,8 +20,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-k8s = ["kubernetes>=18.20,!=32.0.0"]
+k8s = ["kubernetes>=18.20,!=32.0.0,!=36.0.0"]
 # 32.0.0 has this bug https://github.com/kubernetes-client/python/issues/2356
+# 36.0.0 has an auth bug https://github.com/kubernetes-client/python/issues/2591
 
 [project.scripts]
 krsync = "thds.mops.k8s.tools.krsync:main"
@@ -39,7 +40,7 @@ Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [
-    "kubernetes>=18.20",
+    "kubernetes>=18.20,!=32.0.0,!=36.0.0",
     "mypy>=1.16",
     "mypy-extensions~=1.0",
     "pytest~=7.2",

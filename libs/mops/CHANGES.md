@@ -1,3 +1,10 @@
+### 3.21.20260625
+
+- Fix pod log streaming against `kubernetes-client` 36.x, which reformatted the `read_namespaced_pod_log`
+  docstring such that `watch.Watch` stopped detecting `follow` and passed `watch` instead (rejected with
+  `ApiTypeError`). A `_PodLogWatch` shim matches either docstring form. Also exclude the broken
+  `kubernetes==36.0.0` (auth regression) from the `k8s` extra and dev deps.
+
 ### 3.21
 
 - `Magic.submit` / `MemoizingPicklingRunner.submit` now return a `MopsFuture` (a `PFuture` that

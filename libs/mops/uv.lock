@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [options]
-exclude-newer = "2026-06-15T20:41:20.481305Z"
+exclude-newer = "2026-06-17T17:59:31.199284Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -1255,7 +1255,7 @@ requires-dist = [
     { name = "azure-identity" },
     { name = "azure-storage-file-datalake" },
     { name = "cachetools" },
-    { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=18.20,!=32.0.0" },
+    { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=18.20,!=32.0.0,!=36.0.0" },
     { name = "tblib", specifier = "~=2.0" },
     { name = "thds-adls", editable = "../adls" },
     { name = "thds-core", editable = "../core" },
@@ -1267,7 +1267,7 @@ provides-extras = ["k8s"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "kubernetes", specifier = ">=18.20" },
+    { name = "kubernetes", specifier = ">=18.20,!=32.0.0,!=36.0.0" },
     { name = "mypy", specifier = ">=1.16" },
     { name = "mypy-extensions", specifier = "~=1.0" },
     { name = "pytest", specifier = "~=7.2" },

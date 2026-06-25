@@ -1,6 +1,7 @@
 """Handles things having to do with getting logs out of the Pods of a Job."""
 
 import enum
+import pydoc
 import random
 import threading
 import time
@@ -30,6 +31,28 @@ BOINK = colorized(fg="white", bg="magenta")
 # this module has tons of logs. occasionally you want to find a needle
 # in that haystack when you're debugging something. Wrap the logged
 # string in this and it'll stand out.
+
+
+class _PodLogWatch(watch.Watch):
+    """`watch.Watch` chooses the `watch` vs `follow` kwarg by scanning the API method's
+    docstring for the literal `:param bool follow:` (`get_watch_argument_name`).
+    kubernetes-client 36.x reformatted that to `:param follow:` + `:type follow: bool`, so
+    the stock heuristic misses it and injects `watch`, which `read_namespaced_pod_log`
+    rejects (`ApiTypeError`). Scan for either modern form so a `follow`-supporting method
+    (i.e. pod logs) is detected across client versions; the legacy form still matches via
+    the base class.
+
+    GH issue: https://github.com/kubernetes-client/python/issues/2615
+
+    TODO: remove this shim (and use `watch.Watch()` directly) once kubernetes-client fixes
+    `get_watch_argument_name` to match its own reformatted docstrings - it's an upstream
+    regression, not ours."""
+
+    def get_watch_argument_name(self, func: ty.Any) -> str:
+        doc = pydoc.getdoc(func)
+        if ":param follow:" in doc or ":type follow:" in doc:
+            return "follow"
+        return super().get_watch_argument_name(func)
 
 
 def should_log(job_name: str) -> bool:
@@ -226,7 +249,7 @@ def _scrape_pod_logs(
         )
         logger.debug("Watching pod log stream...")
         while True:
-            for e in watch.Watch().stream(
+            for e in _PodLogWatch().stream(
                 client.CoreV1Api().read_namespaced_pod_log,
                 **kwargs,
             ):
