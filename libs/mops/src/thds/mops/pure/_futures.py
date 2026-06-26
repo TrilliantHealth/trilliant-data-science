@@ -79,6 +79,15 @@ class MopsFuture(ty.Generic[R]):
     def running(self) -> bool:
         return self._inner.running()
 
+    def cancel(self) -> bool | None:
+        """Cancel the underlying invocation, delegating down the future chain
+        (`_ChainedFuture` -> `LazyFuture` -> the runtime shim's future, which
+        for k8s deletes the Job). Tri-state: True (cancelled), False (couldn't -
+        already done/raced), None (the inner doesn't support cancellation, e.g.
+        a memo hit or a synchronous shim). The public home for cancellation
+        because a caller already holds the concrete `MopsFuture`."""
+        return futures.try_cancel(self._inner)
+
     def done(self) -> bool:
         return self._inner.done()
 

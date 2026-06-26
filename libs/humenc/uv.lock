@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [options]
-exclude-newer = "2026-06-12T15:07:27.359111Z"
+exclude-newer = "2026-06-17T18:39:26.619054Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -206,7 +206,7 @@ wheels = [
 
 [[package]]
 name = "thds-core"
-version = "1.53"
+version = "1.54"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },

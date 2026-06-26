@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [options]
-exclude-newer = "2026-06-17T17:59:31.199284Z"
+exclude-newer = "2026-06-19T03:13:51.393348Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -1167,7 +1167,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.53"
+version = "1.54"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },
@@ -1216,7 +1216,7 @@ dev = [
 
 [[package]]
 name = "thds-mops"
-version = "3.21"
+version = "3.22"
 source = { editable = "." }
 dependencies = [
     { name = "azure-core" },

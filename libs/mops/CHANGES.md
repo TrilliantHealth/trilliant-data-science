@@ -1,3 +1,16 @@
+### 3.22
+
+- `MopsFuture.cancel()` cancels the underlying invocation, delegating down the future chain. Tri-state:
+  `True` (cancelled), `False` (supported but couldn't), `None` (the inner doesn't support cancellation,
+  e.g. a memo hit or a synchronous shim). For a k8s invocation this deletes the Job (cascading to its pod
+  via `propagation_policy="Foreground"`) - the new `k8s.jobs.delete_job` plus a `_CancellableJobFuture`
+  that closes over the Job name + namespace, so the name never escapes the k8s layer. A shim without a
+  real `cancel()` (samethread, dbxtend today) returns `None`. Like `concurrent.futures.Future.cancel()`,
+  cancel never raises: `k8s.jobs.delete_job` returns `False` for ANY delete failure (already-gone,
+  forbidden, API error, ...) rather than classifying shim errors, logging a full stack trace (a quiet
+  info for the expected already-gone 404) so a failure - e.g. an orchestrator SA lacking `delete` on
+  `jobs.batch` - is diagnosable without corrupting the return contract.
+
 ### 3.21.20260625
 
 - Fix pod log streaming against `kubernetes-client` 36.x, which reformatted the `read_namespaced_pod_log`

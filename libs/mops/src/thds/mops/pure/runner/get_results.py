@@ -111,4 +111,4 @@ def lock_maintaining_future(
     maintain the lock while it is being retrieved.
     """
     post_shim_result_getter.release_lock = lock.maintain_to_release(lock_acquired)
-    return futures.chain_futures(inner_future, concurrent.futures.Future(), post_shim_result_getter)
+    return futures.chain_futures(inner_future, post_shim_result_getter)

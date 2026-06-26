@@ -33,6 +33,38 @@ def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1J
     return _JOB_SOURCE.get(job_name, namespace=namespace)
 
 
+@k8s_sdk_retry()
+def delete_job(job_name: str, namespace: str) -> bool:
+    """Delete a Job, cascading to its pod(s). Returns True if the Job was
+    deleted, False if it couldn't be - for ANY reason. `propagation_policy=
+    "Foreground"` deletes the Job's dependents (the pod) too - deleting just the
+    pod is wrong, the Job controller would recreate it.
+
+    Never raises: this backs a future's `cancel()`, and like
+    `concurrent.futures.Future.cancel()` (pure local state, bool-only) cancel
+    must be infallible from the caller's view. mops does not try to classify the
+    many ways the shim's delete can fail (forbidden, throttled, API-server down,
+    admission webhook, ...) into a raise-vs-return taxonomy - any failure to
+    effect the delete collapses to False. The distinction the caller never gets
+    here is instead preserved in the logs: a 404 (Job already gone) is the one
+    expected non-success and logs quietly; everything else logs with a full
+    stack trace so nothing is swallowed silently (e.g. a 403 = the orchestrator
+    SA lacks `delete` on jobs.batch, an RBAC gap worth fixing)."""
+    try:
+        client.BatchV1Api().delete_namespaced_job(
+            name=job_name, namespace=namespace, propagation_policy="Foreground"
+        )
+        logger.info(f"Deleted job {namespace}/{job_name}")
+        return True
+    except client.exceptions.ApiException as e:
+        if e.status == 404:
+            logger.info(f"Job {namespace}/{job_name} already gone; nothing to delete")
+            return False
+
+        logger.exception(f"Failed to delete job {namespace}/{job_name}; the pod will run to completion")
+        return False
+
+
 # https://github.com/kubernetes/kubernetes/issues/68712#issuecomment-514008330
 # https://kubernetes.io/docs/concepts/workloads/controllers/job/#terminal-job-conditions
 

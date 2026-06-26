@@ -7,7 +7,14 @@ from thds.core import futures, log
 from thds.termtool.colorize import colorized
 
 from . import config, counts, uncertain_future
-from .jobs import get_job, is_job_failed, is_job_succeeded, is_mops_exception_failure, job_source
+from .jobs import (
+    delete_job,
+    get_job,
+    is_job_failed,
+    is_job_succeeded,
+    is_mops_exception_failure,
+    job_source,
+)
 
 logger = log.getLogger(__name__)
 
@@ -109,6 +116,50 @@ def _check_job_before_timeout(
     return None  # proceed with timeout
 
 
+class _CancellableJobFuture(futures.PFuture[bool]):
+    """Wraps the watch-driven completion future so it can also cancel the Job.
+
+    The watch loop still resolves the inner future (every PFuture method here
+    delegates to it, including `add_done_callback`, so the result-delivery path
+    is unchanged). What this adds is `cancel()` -> delete the k8s Job, which is
+    what lets cancellation travel down the future chain
+    (`MopsFuture.cancel()` -> `_ChainedFuture` -> `LazyFuture` -> here). The Job
+    name + namespace stay closed over in this layer; nothing above ever sees
+    them."""
+
+    def __init__(self, inner: futures.PFuture[bool], job_name: str, namespace: str) -> None:
+        self._inner = inner
+        self._job_name = job_name
+        self._namespace = namespace
+
+    def cancel(self) -> bool:
+        """Delete the Job (cascading to its pod). True if deleted, False if it
+        was already gone - matching the chain's tri-state where this layer can
+        always give a definite bool (a k8s Job is always deletable-or-absent)."""
+        return delete_job(self._job_name, self._namespace)
+
+    def running(self) -> bool:
+        return self._inner.running()
+
+    def done(self) -> bool:
+        return self._inner.done()
+
+    def result(self, timeout: ty.Optional[float] = None) -> bool:
+        return self._inner.result(timeout)
+
+    def exception(self, timeout: ty.Optional[float] = None) -> ty.Optional[BaseException]:
+        return self._inner.exception(timeout)
+
+    def add_done_callback(self, fn: ty.Callable[["futures.PFuture[bool]"], None]) -> None:
+        self._inner.add_done_callback(fn)
+
+    def set_result(self, result: bool) -> None:
+        self._inner.set_result(result)
+
+    def set_exception(self, exception: BaseException) -> None:
+        self._inner.set_exception(exception)
+
+
 def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures.PFuture[bool]:
     """This is a natural boundary for a serializable lazy future - something that represents
     work being done across process boundaries (since Kubernetes jobs will be listed via an API.
@@ -173,10 +224,11 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
 
         return uncertain_future.NotYetDone()  # job is still in progress
 
-    return job_source().create_future(
-        job_completion_interpreter,
-        job_name,
-        namespace=namespace or config.k8s_namespace(),
+    ns = namespace or config.k8s_namespace()
+    return _CancellableJobFuture(
+        job_source().create_future(job_completion_interpreter, job_name, namespace=ns),
+        job_name=job_name,
+        namespace=ns,
     )
 
 

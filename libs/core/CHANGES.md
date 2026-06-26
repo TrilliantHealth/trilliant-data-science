@@ -1,3 +1,20 @@
+### 1.54
+
+- **BREAKING (bugfix):** `futures.chain_futures` no longer takes an `outer_future` argument - it now
+  constructs and returns a `_ChainedFuture` (a `concurrent.futures.Future` subclass) that retains its
+  inner future and delegates `running()` to it. The old form let the caller pass a bare `Future` as the
+  outer, which was only `set_result`-ed when the inner finished, so `running()` reported `False` even
+  while the inner work was mid-flight (and there was no way to reach the inner to cancel it). The
+  signature change is part of fixing that. The return value is still a real `concurrent.futures.Future`,
+  so `as_completed` and `reify_future` are unaffected, and the one in-repo external caller is migrated.
+- `futures` gains optional cancellation: a `Cancellable` protocol and `try_cancel(future)` helper with a
+  tri-state contract - `True` (cancelled), `False` (supported but couldn't), `None` (not cancellable -
+  the future's result already exists). `cancel()` is added to `LazyFuture` (delegates to the realized
+  inner), `ResolvedFuture` (always `None`), and `_ChainedFuture` (cancels the inner and reconciles its
+  own state so `as_completed`/`.result()` don't hang; returns strict `bool`, translating the inner's
+  `None` to `False` to honor the stdlib `Future.cancel()` contract). `PFuture` is deliberately left
+  unchanged - it stays the common subset of `concurrent.futures.Future` and does NOT gain `cancel()`.
+
 ### 1.53
 
 - Add `core.iterutils` module with generic utilities for working with iterables that aren't available
