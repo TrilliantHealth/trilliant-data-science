@@ -1,4 +1,3 @@
-import dataclasses
 import typing
 from functools import partial
 from typing import List, Optional, Tuple, Type, TypeVar
@@ -98,7 +97,7 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
                 (type_utils.is_literal_type, literal),
                 (type_utils.is_enum_type, enum),
                 (attr.has, attrs),
-                (dataclasses.is_dataclass, dataclass),
+                (type_utils.is_dataclass_type, dataclass),
                 (type_utils.is_optional_type, optional),
                 (is_union_type, union),
                 (type_utils.is_set_type, set),

@@ -44,5 +44,6 @@ def _value_error(
 
 def value_error(msg: str, exc_type: Type[Exception] = ValueError) -> RecF[T, Params, U]:
     """Helper to be passed as the `fallback` of a `StructuredRecursion` in case there is no natural
-    fallback/default implementation and an input fails to satisfy any of the predicates"""
+    fallback/default implementation and an input fails to satisfy any of the predicates. `msg` must contain a single
+    formatting param substring (`{}`) so that `msg.format(obj)` may be called using the passed `obj`."""
     return partial(_value_error, msg, exc_type)

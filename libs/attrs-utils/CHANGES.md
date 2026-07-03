@@ -1,3 +1,13 @@
+## 1.8.20260702
+
+- Implements `empty.empty_gen` for `dataclassets`-defined record types, and fixes it to handle
+  parameterized generic `attrs`-defined records.
+- Fixes a minor bug wherein `recursion.value_error` wasn't being called correctly by `empty_gen`, and
+  improved the docstring there to make it clearer how to use that helper.
+- Adds new `type_utils.is_dataclass_type` function which detects dataclasses even when they're
+  parameterized generics, and improves detection of `dataclasses`-defined record types in
+  `type_recursion` by using it.
+
 ### 1.8.20260319
 
 - Adds `cattrs.custom_hooks` module with utilities for defining custom structuring hooks, starting with

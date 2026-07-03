@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 import enum
 import inspect
 import typing
@@ -137,6 +138,12 @@ def is_set_type(type_: Type) -> TypeIs[Type[typing.AbstractSet]]:
 
 def is_namedtuple_type(type_: Type) -> TypeIs[Type[typing.NamedTuple]]:
     return getattr(type_, "__bases__", None) == (tuple,) and hasattr(type_, "_fields")
+
+
+def is_dataclass_type(type_: Type) -> bool:
+    # dataclasses.is_dataclass returns False for a subscripted generic alias (Foo[Bar]), whose runtime type is
+    # _GenericAlias, so - like the collection predicates above - we test the origin. (attr.has already handles aliases.)
+    return dataclasses.is_dataclass(get_origin(type_) or type_)
 
 
 def is_variadic_tuple_type(type_: Type) -> TypeIs[Type[typing.Tuple[typing.Any, ...]]]:
