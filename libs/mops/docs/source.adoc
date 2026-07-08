@@ -133,6 +133,33 @@ def make_a_file() -> Source:
 
 This works, but your code won't produce local output without `mops`. Prefer `.out/` when possible.
 
+## A Source is identified by content, not URI
+
+[WARNING]
+====
+`mops` passes `Source` arguments *by content hash*. During serialization it
+records each source in a hash-keyed map (`hash -> {uri, size}`) and the remote
+side resolves every `Source` from that map. This means:
+
+**A `Source` cannot encode information that is derivable only from its URI.**
+
+Two `Source` objects with identical file content but different URIs have the
+same hash and are therefore indistinguishable to `mops` — passed together (e.g.
+in a `list[Source]`), one silently shadows the other, and both resolve to a
+single surviving URI. The classic trap is hive-partitioned parquet where the
+partition value (e.g. `data_source=Komodo` vs `data_source=Komodo_Voldemort`)
+lives only in the directory path: two rows identical in every in-file column
+produce byte-identical files that collide, and one partition's file is dropped.
+
+If a file's identity depends on URI-only information, do one of:
+
+- **encode that information as data inside the file** (preferred — the file is
+  then self-describing and can't "lose" the value when downloaded or moved), or
+- **pass it explicitly as a separate argument** alongside the `Source`, or
+- **pass a raw URI string** instead of a `Source` (opting out of the
+  content-hash optimization).
+====
+
 ## Technical Notes
 
 - `source.uri` for a locally-created file will be a `file://` URI (or a hook-assigned remote URI within a mops invocation context)
