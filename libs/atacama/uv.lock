@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [options]
-exclude-newer = "2026-06-17T18:39:11.440291Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -293,7 +293,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.54"
+version = "1.55"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },

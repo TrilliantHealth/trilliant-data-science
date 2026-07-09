@@ -1,13 +1,11 @@
 import os
 
-from thds.core import journalist as core_journalist
 from thds.mops.pure.core.entry import journalist
 
 
 def _reset(monkeypatch):
     monkeypatch.delenv(journalist.JOURNALIST_INTERVAL_ENV, raising=False)
     journalist.LOG_INTERVAL.set_global(0.0)
-    core_journalist._ACTIVE = None
 
 
 def test_disabled_by_default(monkeypatch):

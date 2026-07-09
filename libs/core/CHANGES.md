@@ -1,3 +1,13 @@
+### 1.55
+
+- `journalist.Journalist` now nests. Entering a second `Journalist` while one is already active no longer
+  becomes a no-op; both report independently, each with its own label, aggregate statistics, and log
+  line. A single process-global sampler thread does the underlying reads once per tick and folds each
+  sample into every active journalist, so nesting adds no thread or sampling overhead. A nested
+  journalist's totals scope to its own enter->exit window. Concurrently-active label collisions are
+  auto-suffixed (`query`, `query#2`) with a warning; a label freed by a prior journalist's exit is reused
+  clean. Public API is unchanged.
+
 ### 1.54
 
 - **BREAKING (bugfix):** `futures.chain_futures` no longer takes an `outer_future` argument - it now

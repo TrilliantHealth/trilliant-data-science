@@ -7,10 +7,12 @@ the project's Dockerfile - the remote entry wraps `run_named_entry_handler` in a
 process tree and logs at the configured interval.
 
 The env var is popped on activation so subprocess-shim children - which inherit env -
-do not re-activate the journalist in their own process. In-process re-entry is
-prevented by `Journalist` itself. K8s child pods receive their env from the shim builder
-or Dockerfile rather than inheriting from this process, so the pop does not prevent
-them from running their own journalist.
+do not re-activate the journalist in their own process. (Journalists now nest: a
+user journalist opened in-process under this one reports its own labeled line rather
+than being suppressed, so the pop is about not spawning a redundant harness-level
+journalist in children, not about preventing all re-entry.) K8s child pods receive
+their env from the shim builder or Dockerfile rather than inheriting from this
+process, so the pop does not prevent them from running their own journalist.
 """
 
 import contextlib
