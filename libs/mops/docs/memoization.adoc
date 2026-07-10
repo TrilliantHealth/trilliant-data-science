@@ -197,3 +197,9 @@ runtime. So the information above is mostly about 'understanding what they do.'
 However, if you want to call a function and get a result that you know already exists (was
 run previously and therefore memoized by `MemoizingPicklingRunner`), and you don't wish to
 change your current code, you have several options, which are link:advanced_memoization.adoc[documented separately here].
+
+== Related
+
+* link:storage_tiers.adoc[Storage tiers] - routing memos, intermediates, and final
+  outputs to storage with lifecycles that match their roles, and the rules that keep
+  memoization correct when intermediate bytes expire.

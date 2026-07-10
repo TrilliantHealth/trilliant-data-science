@@ -1,0 +1,110 @@
+link:../README.md[↑]
+
+= Storage tiers: multi-pass pipelines over TTL'd scratch
+
+Intermediates that exist only to feed the next pass don't deserve durable
+storage - keeping them alongside the final output doubles storage forever
+for bytes nobody will ever read again. The pattern here routes each artifact
+class to a storage tier whose lifecycle matches its role, and states the
+rules that keep memoization *correct* after the scratch bytes expire.
+
+This works because a completed memo chain outlives its data: once every
+downstream memo exists, a rerun traverses memo-hits end to end and never
+touches the intermediate bytes at all. The data is scaffolding; the memo
+chain is the durable structure. The rules below exist to make sure a chain
+can never *half*-survive - serving stale metadata where real bytes are
+required.
+
+== The tiers
+
+[cols="1,1,2"]
+|===
+| artifact class | storage tier | lifetime driver
+
+| memo / invocation / result files (the blob root)
+| long-TTL scratch (e.g. ~100 days)
+| must cover crash recovery within a run, and replay across runs
+
+| intermediate pass outputs
+| short-TTL scratch (e.g. a few days)
+| consumed by the next pass within the same run
+
+| final outputs
+| caller-owned durable location
+| the product; the caller owns its lifecycle
+|===
+
+== Where the bytes actually go
+
+Which knob controls an output's tier depends on how the function
+communicates its output:
+
+* **Source-returning functions**: `mops` uploads returned-`Source` bytes
+  under the invocation's memo namespace, so the *blob root* places the
+  data. Scratch-tier these by setting `blob_root` to the short-TTL root -
+  and note that the memo then dies with its data, which is exactly what
+  you want (a memo must never outlive bytes it hands out).
+* **Explicit-URI side-effect writers** (functions that take an output URI
+  argument and write there): the *arguments* place the data; `blob_root`
+  moves only the small memo files. Scratch-tier these by pointing the
+  output-URI argument at the short-TTL root. The memo files can stay on
+  the long-TTL root - see the rules below for why that is safe.
+
+== The rules
+
+. **Fresh scratch namespace per run.** Derive the intermediate output
+  namespace from a run tag, never reuse one. Because the namespace is a
+  function argument, it is part of every unit's memo key: a new run
+  re-keys everything, so no unit can memo-hit against bytes an earlier
+  run's TTL already deleted.
+
+. **On last-access-tracked lifecycle policies, pin the mops control files
+  to creation-time expiry.** A policy that expires blobs N days after last
+  access refreshes a memo's clock on every memo *read*, while the data it
+  references - possibly never read again - keeps aging. Frequently-consulted
+  memos then outlive their data even on the same blob root. Give the
+  `mops2-mpf/` prefix a creation-time rule no longer than the data's TTL,
+  so a memo always dies before (or with) the bytes it references.
+
+. **Consumers take producer return values as arguments - never re-list a
+  scratch directory.** A listing of an expired directory does not fail; it
+  is silently empty, which is the worst failure shape. Producer functions
+  should return their output manifests (URIs, counts), and the consumer
+  should take those as arguments. Then replay rides memos with identical
+  args, and the broken case (consumer memo missing, bytes expired) fails
+  loudly on read instead of quietly producing nothing.
+
+. **Complete the chain within the scratch window.** Run the consuming pass
+  immediately after the producing pass, in the same orchestration. Once
+  the consumer's memos exist, the intermediate bytes are never needed
+  again - a rerun memo-hits straight through to the final result even
+  though the intermediates are long gone.
+
+. **Cross-run identity lives at the final output, not in the middle of the
+  chain.** Gate reruns on a completion receipt (or the final memoized
+  result) at the durable output, keyed on the *content* of the inputs that
+  shaped it - check the end first, and skip whole units of work whose
+  receipt already matches. Never decide "is this done?" by inspecting
+  intermediate state.
+
+. **Never resume a stale scratch namespace.** A half-finished run older
+  than the scratch TTL will memo-hit its producers (metadata intact, bytes
+  gone) and starve its consumers. If the receipt is absent and the run
+  tag's scratch window has lapsed, mint a fresh run tag and let the
+  producers recompute.
+
+== Failure modes when the rules are broken
+
+* *Memo outlives Source-returned bytes* (blob root on longer TTL than the
+  data it references): memo-hits hand out dangling `Source`s and every
+  consumer fails with storms of blob-not-found errors - possibly weeks
+  later, from an unrelated process.
+* *Consumer re-lists an expired directory*: no error at all - an empty
+  input set flows downstream and "succeeds," producing empty or partial
+  output.
+* *Stale namespace resumed*: producers fast-forward as memo-hits, the run
+  looks healthy until the first consumer actually needs bytes.
+
+Each of these is a chain that half-survived. The rules above make the two
+legitimate states - fully replayable, or fully recomputed - the only
+reachable ones.

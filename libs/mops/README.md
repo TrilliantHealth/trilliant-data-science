@@ -90,6 +90,10 @@ Jump to [Quickstart](docs/quickstart.adoc) if you ~~are impatient~~ prefer examp
 `mops` is used by [decorating or wrapping your pure function and then calling it](docs/magic.adoc) like a
 normal function.
 
+Building a multi-pass pipeline whose intermediates live on TTL'd scratch storage? The
+[storage tiers](docs/storage_tiers.adoc) doc states the rules that keep memoization correct after the
+scratch bytes expire.
+
 ## Requirements
 
 - Python >= 3.10

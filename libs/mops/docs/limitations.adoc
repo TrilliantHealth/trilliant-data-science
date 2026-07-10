@@ -28,3 +28,11 @@ However, if you're in a situation where you absolutely can't live without some k
 won't provide that for you. Happily, it _will_ stay out of your way and allow you to wrap any
 sufficiently capable DAG runner around it, while allowing you to reap the benefits of
 link:./memoization.adoc[memoization] and efficient transfer of control to the remote runtime.
+
+### No tracking of referenced-data lifecycles
+
+`mops` never verifies that the blobs referenced by a memoized result (e.g. its returned `Source`s,
+or side-effect outputs named in its return value) still exist - a memo-hit trusts its pickle. If
+memos or the data they reference live on TTL'd storage, follow the rules in
+link:./storage_tiers.adoc[storage tiers], which exist to make "memo alive, data expired"
+unreachable.

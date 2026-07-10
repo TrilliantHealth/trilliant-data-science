@@ -170,3 +170,10 @@ If a file's identity depends on URI-only information, do one of:
 
 - link:./paths.adoc[Non-optimized Path handling (deprecated)]
 - link:./optimizations.adoc[Other optimizations (large shared objects)]
+
+## Sources and TTL'd storage
+
+A `Source` handed out by a memo-hit is a *reference* to remote bytes; `mops` does not check that
+the bytes still exist. When Sources point into TTL'd scratch storage, see
+link:./storage_tiers.adoc[storage tiers] for the rules that keep memos from outliving the data
+they reference.

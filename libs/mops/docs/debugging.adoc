@@ -234,3 +234,10 @@ This can cascade through your pipeline, effectively "undoing" memoization for ev
 * Strip volatile metadata (timestamps, random IDs, etc.)
 * Use deterministic seeds for any randomness
 * Ensure serialization is stable (e.g., `sort_keys=True` for JSON)
+
+## Blob-not-found on a memo-hit
+
+If a fast memo-hit hands back `Source`s (or output paths) whose downloads then fail with
+blob-not-found, the memo has outlived its referenced data - the classic symptom of TTL'd storage
+expiring data underneath a live memo. See link:./storage_tiers.adoc[storage tiers] for the rules
+that prevent this, and re-run with a fresh output namespace to force recomputation.
