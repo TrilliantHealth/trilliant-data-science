@@ -1,3 +1,14 @@
+### 3.23
+
+- `pure.inject`: inject precomputed results into the memoization store. `inject.shim_builder(make_value)`
+  is a `ShimBuilder` whose shim writes the value produced by `make_value(func, args, kwargs)` at the
+  call's memo URI exactly as the remote entry would have written a computed result - so this and all
+  future identical calls memo-hit. Injection only happens where real computation would have (after the
+  memo check misses, under the invocation lock, with the invocation pickle uploaded), and injected
+  results carry a `precomputed_result=true` marker in their result metadata. Also `inject.capturing_shim`
+  / `MemoUriCapture` for imperative use, and `inject.write_result` as the underlying primitive. See the
+  new section in `docs/advanced_memoization.adoc`.
+
 ### 3.22
 
 - `MopsFuture.cancel()` cancels the underlying invocation, delegating down the future chain. Tri-state:

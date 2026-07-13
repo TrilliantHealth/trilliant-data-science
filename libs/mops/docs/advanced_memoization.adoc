@@ -117,6 +117,71 @@ In other words, this configuration is cumulative and explicit - if you want to p
 various different historical runs, you'll need to specify the configuration for each previous run.
 ====
 
+[[inject]]
+== Injecting precomputed results: `pure.inject`
+
+[sidebar]
+Scope: write a value at a call's memo URI exactly as if the function had computed it,
+so that this and all future identical calls memo-hit.
+
+Sometimes the result of a function call already exists - computed outside `mops`, or
+reconstructible from durable output the function previously wrote - and what you want is
+for the memoization store to _know_ that, rather than paying to recompute.
+
+The memo URI for a call is only honestly derivable by running the orchestrator path
+(argument serialization has content-addressing side effects; pipeline-id masks and
+`calls=` logic keys all participate), so the injection tools are *shims*: the
+orchestrator hands the memo URI to a shim only after the memo check has missed, the
+invocation lock is held, and the invocation pickle has been uploaded. Injection
+therefore happens exactly where real computation would have, with full provenance, and
+only for calls that would actually have run.
+
+The functional form is a `ShimBuilder`. Your `make_value` callable receives the
+original in-process `(func, args, kwargs)` and returns a thunk producing the value to
+inject:
+
+[source,python]
+----
+from thds.mops import pure
+
+def make_value(func, args, kwargs):
+    return lambda: reconstruct_result_from_durable_output(args[0])
+
+with my_magic_func.shim(pure.inject.shim_builder(make_value)):
+    my_magic_func(some_arg)  # memo miss -> injected; the value is read back
+                             # through the normal path (round-trip verified)
+----
+
+Because the real orchestration manufactures every argument, you never have to
+reconstruct arguments yourself - you only supply the values.
+
+For imperative control, `pure.inject.capturing_shim` raises `MemoUriCapture` instead of
+executing, surfacing the memo URI so you can call `pure.inject.write_result(memo_uri,
+value, *metadata_args)` yourself and then re-invoke the function to consume (and
+verify) the injected result.
+
+Injected results carry a `precomputed_result=true` marker in their result metadata but
+are otherwise indistinguishable from computed ones - permanently. Your `make_value`
+bears full responsibility for constructing _exactly_ what the function would have
+returned, including types and any embedded ``Source``s or ``Path``s.
+
+[WARNING]
+====
+The memo key hashes the pickled argument BYTES, and pickle bytes depend on object
+_identity_, not just value: equal strings that are the same object serialize as memo
+backreferences, while distinct-but-equal objects serialize fresh. Two ways of
+assembling the same argument values can therefore produce different memo keys.
+
+Consequence for injection: call the function under the injecting shim from the REAL
+orchestration code path (which mints the same keys as future production calls), not
+from a side script that re-derives the arguments. A re-derived object graph that
+shares (or fails to share) string objects differently than the production caller
+will write results at keys production never computes - silently unreachable. This
+is observed behavior, not theory: a full-pipeline injection whose nested-dict
+argument was assembled from a shared list of keys missed production's keys built
+from per-result fresh strings, while injections for flat arguments hit every time.
+====
+
 [[keyed-local-runner]]
 == `KeyedLocalRunner`
 

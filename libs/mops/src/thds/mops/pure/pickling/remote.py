@@ -1,4 +1,5 @@
 import contextlib
+import dataclasses
 import json
 import os
 import pickle
@@ -33,7 +34,7 @@ _RESULT_DIAGNOSTICS_THRESHOLD_SECONDS = config.item(
 # result-metadata file. Set to 0 to always include, or -1 to disable.
 
 
-def _generate_run_id(started_at: datetime) -> str:
+def generate_run_id(started_at: datetime) -> str:
     """Generate a unique run ID for this execution.
 
     Format: YYMMDDHHmm-TwoWords (e.g., 2601271523-SkirtBus)
@@ -50,13 +51,16 @@ def _generate_run_id(started_at: datetime) -> str:
 
 
 @dataclass  # needed for cached_property
-class _ResultExcWithMetadataChannel:
+class ResultExcWithMetadataChannel:
     fs: BlobStore
     dumper: _pickle.Dumper
     call_id: str
     invocation_metadata: metadata.InvocationMetadata
     started_at: datetime
     run_id: str
+    extra_metadata: ty.Mapping[str, str] = dataclasses.field(default_factory=dict)
+    # static extra metadata provided by the caller, merged with (and overridden by)
+    # anything the configured extra-metadata generator produces.
 
     @cached_property
     def _result_metadata(self) -> metadata.ResultMetadata:
@@ -77,17 +81,18 @@ class _ResultExcWithMetadataChannel:
 
     @cached_property
     def _extra_metadata_content(self) -> bytes:
-        """Generate extra metadata using the configured generator, if any."""
+        """Caller-provided extra metadata plus the configured generator's, if any."""
+        extra = dict(self.extra_metadata)
         generator = metadata.load_metadata_generator()
-        if generator is None:
+        if generator is not None:
+            try:
+                extra.update(generator(self._result_metadata))
+            except Exception as e:
+                logger.warning(f"Extra metadata generator failed: {e}")
+        if not extra:
             return b""
 
-        try:
-            extra = generator(self._result_metadata)
-            return metadata.format_extra_metadata(extra).encode("utf-8")
-        except Exception as e:
-            logger.warning(f"Extra metadata generator failed: {e}")
-            return b""
+        return metadata.format_extra_metadata(extra).encode("utf-8")
 
     def _write_metadata_only(self, prefix: str, extra_content: bytes = b"") -> None:
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.
@@ -160,6 +165,15 @@ class _ResultExcWithMetadataChannel:
         self._write_metadata_only("exception", diagnostics)
 
 
+def result_dumper() -> _pickle.Dumper:
+    """The Dumper used to serialize return values (and exceptions) for transmission."""
+    return _pickle.Dumper(
+        ByIdSerializer(ByIdRegistry()),
+        CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once()),
+        _pickle.SourceResultPickler(),
+    )
+
+
 def unpickle_invocation(
     memo_uri: str,
     unpickler: ty.Type[pickle.Unpickler] = _pickle.CallableUnpickler,
@@ -210,7 +224,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
     As of v3, we now expect a number of (required) metadata arguments with every invocation.
     """
     started_at = datetime.now(tz=timezone.utc)  # capture this timestamp right at the outset.
-    run_id = _generate_run_id(started_at)
+    run_id = generate_run_id(started_at)
     invocation_metadata = metadata.parse_invocation_metadata_args(metadata_args)
     metadata.INVOKED_BY.set_global(invocation_metadata.invoked_by)
     pipeline_id.set_pipeline_id(invocation_metadata.pipeline_id)
@@ -241,13 +255,9 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
             return func(*args, **kwargs)
 
     return route_return_value_or_exception(
-        _ResultExcWithMetadataChannel(
+        ResultExcWithMetadataChannel(
             fs,
-            _pickle.Dumper(
-                ByIdSerializer(ByIdRegistry()),
-                CoordinatingPathSerializer(sha256_b64.Sha256B64PathStream(), Once()),
-                _pickle.SourceResultPickler(),
-            ),
+            result_dumper(),
             memo_uri,
             invocation_metadata,
             started_at,
