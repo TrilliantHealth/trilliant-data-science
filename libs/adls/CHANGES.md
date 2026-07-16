@@ -1,3 +1,10 @@
+### 4.5.20260623
+
+- Remove a stray `print(remote_hashes, hash_meta)` from the upload-decision path. It only fired when a
+  remote blob already existed but its hash did not match (the re-upload-required branch), dumping two
+  hash dicts to stdout per such file -- noise that surfaces in volume when overwriting existing output
+  with new content (e.g. re-running a pipeline into a dir that holds a prior run's files).
+
 ### 4.5.20260602
 
 - Fix `join` (and thus `AdlsRoot / x`, `AdlsFqn(path="") / x`) producing a leading slash when joining

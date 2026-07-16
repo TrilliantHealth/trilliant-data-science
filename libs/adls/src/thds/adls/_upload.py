@@ -90,7 +90,6 @@ def _co_upload_decision_unless_file_present_with_matching_checksum(
             logger.info(f"Remote file {remote_properties.name} already exists and has matching checksum")
             return UploadDecision(False, metadata)
 
-    print(remote_hashes, hash_meta)
     logger.debug("Remote file exists but hash does not match - upload required.")
     return UploadDecision(True, metadata)
 
