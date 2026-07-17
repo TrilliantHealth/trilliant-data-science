@@ -1,3 +1,4 @@
+import datetime
 import logging
 import shutil
 import subprocess
@@ -832,6 +833,13 @@ class ReferenceDataManager:
 
                 table.md5 = md5
                 raw_schema["tables"][table_name]["md5"] = md5
+                if isinstance(table.dependencies, metaschema.FileSourceMixin):
+                    # only the raw_schema (yaml) write matters for these dates; unlike md5,
+                    # they aren't embedded in the codegen'd accessor code, so the live object
+                    # (which codegen reads) doesn't need updating.
+                    today = datetime.date.today()
+                    raw_schema["tables"][table_name]["dependencies"]["last_checked"] = today
+                    raw_schema["tables"][table_name]["dependencies"]["last_updated"] = today
                 hashes_updated.append(table_name)
             else:
                 self.logger.warning(

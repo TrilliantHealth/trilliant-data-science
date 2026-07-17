@@ -1,3 +1,7 @@
+### 0.14.17
+
+- Fixed a bug in Markdown docgen that caused the Source table to render incorrectly
+
 ### 0.14.16
 
 - Stopped deleting the lock file in `bulk_write_connection`. The deletion raced with `filelock`'s

@@ -867,6 +867,8 @@ class FileSourceMeta(NamedTuple):
     schema_path: List[str]
     name: str
     source: FileSourceMixin
+    table_doc: Optional[str] = None
+    table_title: Optional[str] = None
 
 
 class Schema(_RawSchema):
@@ -943,7 +945,11 @@ class Schema(_RawSchema):
         for table_name, table in self.tables.items():
             if isinstance(table.dependencies, FileSourceMixin):
                 yield FileSourceMeta(
-                    ["tables", table_name, "dependencies"], table_name, table.dependencies
+                    ["tables", table_name, "dependencies"],
+                    table_name,
+                    table.dependencies,
+                    table_doc=table.doc,
+                    table_title=table.title,
                 )
         sources: Mapping[str, FileSourceMixin]
         for type_name, sources in [("local_data", self.local_data), ("remote_data", self.remote_data)]:

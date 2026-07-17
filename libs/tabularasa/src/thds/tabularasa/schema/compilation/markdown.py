@@ -39,6 +39,8 @@ BADGE_EXTENSION: Final = "*.svg"
 DERIVATION_TITLE: Final = "Derivation"
 DEPENDENCIES_TITLE: Final = "Sources"
 METADATA_FIELDS = FileSourceMixin.model_fields
+MAX_HEADING_LEVEL: Final = 6
+MD_HEADING_RE: Final = re.compile(r"^(#{1,6})\s+")
 UNICODE_MAPPING: Final = {
     ">=": ">=",
     "<=": "<=",
@@ -48,12 +50,6 @@ UNICODE_MAPPING: Final = {
 MISSING_BADGE_MSG: Final = (
     "Curation badges could not be rendered. Make sure that curation_badge_path "
     "and source_docs_path are both supplied in schema.build_options."
-)
-
-# For detecting RST heading underlines to convert
-RST_HEADING_UNDERLINE_CHARS = '=-^"'
-RST_HEADING_UNDERLINE_RE = re.compile(
-    "|".join(f"({re.escape(c)})+" for c in RST_HEADING_UNDERLINE_CHARS)
 )
 
 
@@ -183,40 +179,33 @@ def render_image(img_path: Path) -> str:
     return f"![{img_path.name}]({img_path})"
 
 
-def convert_rst_headings_to_markdown(markup_text: str, base_level: int = 3) -> str:
-    """Convert RST headings to markdown headings.
+def demote_heading_levels(markup_text: str, table_name: str, levels: int = 1) -> str:
+    """Demotes each heading in the markdown document by `levels` levels.
 
-    RST heading levels are determined by underline characters:
-    = is level 1, - is level 2, ^ is level 3, " is level 4
+    For example, if the text contains
 
-    Args:
-        markup_text: Text that may contain RST headings
-        base_level: The markdown heading level to start at for converted headings
+        ## Foo
 
-    Returns:
-        Text with RST headings converted to markdown
+    then `levels=2` will result in
+
+        #### Foo
+
+    Warns if demotion would exceed the maximum heading level (h6).
     """
+    exceeded_limit = False
     output = []
-    lines = markup_text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        # Check if next line is an underline
-        if i + 1 < len(lines):
-            next_line = lines[i + 1]
-            if (
-                len(line) > 0
-                and len(next_line) == len(line)
-                and RST_HEADING_UNDERLINE_RE.fullmatch(next_line)
-            ):
-                # Determine RST level from underline character
-                rst_level = RST_HEADING_UNDERLINE_CHARS.index(next_line[0]) + 1
-                md_level = base_level + rst_level - 1
-                output.append(heading(line, md_level))
-                i += 2  # Skip both the title and underline
-                continue
-        output.append(line)
-        i += 1
+    for line in markup_text.splitlines():
+        if match := MD_HEADING_RE.match(line):
+            current_level = len(match.group(1))
+            new_level = current_level + levels
+            exceeded_limit |= new_level > MAX_HEADING_LEVEL
+            new_level = min(new_level, MAX_HEADING_LEVEL)
+            output.append("#" * new_level + line[len(match.group(1)) :])
+        else:
+            output.append(line)
+
+    if exceeded_limit:
+        warn(f"Demoting heading levels for table {table_name} will exceed max heading level.")
 
     return "\n".join(output)
 
@@ -283,11 +272,10 @@ def render_derivation_doc(tbl: metaschema.Table) -> str:
     """Render derivation documentation for a table."""
     derivation_docs = tbl.dependencies.docstring if tbl.dependencies else None
     if derivation_docs:
-        converted_docs = convert_rst_headings_to_markdown(derivation_docs)
         return join_blocks(
             [
                 heading(DERIVATION_TITLE, 2),
-                converted_docs,
+                demote_heading_levels(derivation_docs, tbl.name, 2),
             ],
             "\n\n",
         )
@@ -483,7 +471,7 @@ def render_source_name(
     if repo_url and isinstance(fs_data, LocalFileSourceMixin):
         links.append(format_repo_url(fs_data, repo_root, repo_url, name="github"))
 
-    return DontSplitMe(f"{fs_name} ({' | '.join(links)})" if links else fs_name)
+    return DontSplitMe(f"{fs_name} ({'; '.join(links)})" if links else fs_name)
 
 
 def render_package_table_links(

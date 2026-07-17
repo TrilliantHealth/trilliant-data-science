@@ -10,8 +10,8 @@ from thds.tabularasa.schema.compilation.markdown import (
     DontSplitMe,
     anchor,
     bold,
-    convert_rst_headings_to_markdown,
     crossref,
+    demote_heading_levels,
     docref,
     escape_for_display,
     heading,
@@ -125,51 +125,43 @@ def test_split_long_fields():
 
 
 # -----------------------------------------------------------------------------
-# Tests: RST to Markdown Conversion
+# Tests: demote_heading_levels
 # -----------------------------------------------------------------------------
 
 
-def test_convert_level_1_heading():
-    rst_text = "Title\n====="
-    result = convert_rst_headings_to_markdown(rst_text)
-    assert "### Title" in result
-    assert "=====" not in result
+def test_demote_heading_by_one_level():
+    result = demote_heading_levels("## Foo", "test_table")
+    assert result == "### Foo"
 
 
-def test_convert_level_2_heading():
-    rst_text = "Subtitle\n--------"
-    result = convert_rst_headings_to_markdown(rst_text)
-    assert "#### Subtitle" in result
-    assert "--------" not in result
+def test_demote_heading_by_two_levels():
+    result = demote_heading_levels("## Foo", "test_table", levels=2)
+    assert result == "#### Foo"
 
 
-def test_convert_multiple_headings():
-    rst_text = """Title
-=====
-
-Some content here.
-
-Subtitle
---------
-
-More content."""
-    result = convert_rst_headings_to_markdown(rst_text)
+def test_demote_multiple_headings():
+    text = "# Title\n\nSome content.\n\n## Subtitle\n\nMore content."
+    result = demote_heading_levels(text, "test_table", levels=2)
     assert "### Title" in result
     assert "#### Subtitle" in result
-    assert "Some content here." in result
+    assert "Some content." in result
     assert "More content." in result
 
 
-def test_preserves_non_heading_text():
-    rst_text = "This is regular text.\nNo headings here."
-    result = convert_rst_headings_to_markdown(rst_text)
-    assert result == rst_text
+def test_demote_preserves_non_heading_text():
+    text = "This is regular text.\nNo headings here."
+    result = demote_heading_levels(text, "test_table")
+    assert result == text
 
 
-def test_custom_base_level():
-    rst_text = "Title\n====="
-    result = convert_rst_headings_to_markdown(rst_text, base_level=2)
-    assert "## Title" in result
+def test_demote_clamps_at_h6():
+    result = demote_heading_levels("##### Deep heading", "test_table", levels=3)
+    assert result == "###### Deep heading"
+
+
+def test_demote_warns_when_exceeding_max_level():
+    with pytest.warns(UserWarning, match="exceed max heading level"):
+        demote_heading_levels("##### Deep heading", "test_table", levels=3)
 
 
 # -----------------------------------------------------------------------------
