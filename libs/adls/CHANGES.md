@@ -1,3 +1,10 @@
+### 4.5.20260722
+
+- `AdlsFqn.parse` accepts a scheme'd container root without a trailing slash: `adls://sa/container` now
+  parses to an FQN with an empty path instead of raising `NotAdlsUri`, matching the normalization
+  `AdlsRoot.parse` already performed. The scheme-less legacy form is unchanged (a two-word string still
+  raises), so parse failure remains a reliable non-ADLS-string detector.
+
 ### 4.5.20260623
 
 - Remove a stray `print(remote_hashes, hash_meta)` from the upload-decision path. It only fired when a

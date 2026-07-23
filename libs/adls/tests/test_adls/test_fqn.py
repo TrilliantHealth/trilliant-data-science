@@ -1,4 +1,6 @@
-from thds.adls.fqn import AdlsFqn, AdlsRoot, format_fqn, join, parent, parse_fqn
+import pytest
+
+from thds.adls.fqn import AdlsFqn, AdlsRoot, NotAdlsUri, format_fqn, join, parent, parse_fqn
 
 
 def test_adls_fqn_basics():
@@ -42,6 +44,25 @@ def test_adls_root_parent():
     root = AdlsRoot("foo", "bar")
     assert root.parent is root
     assert parent(root) is root
+
+
+def test_parse_fqn_container_root_without_trailing_slash():
+    fqn = parse_fqn("adls://foo/bar")
+    assert fqn == AdlsFqn("foo", "bar", "")
+    assert fqn == parse_fqn("adls://foo/bar/")
+
+
+def test_parse_fqn_rejects_scheme_less_container_root():
+    # the leniency is scoped to scheme'd URIs: a two-word string must not
+    # silently parse as an FQN, since parse failure is how callers detect
+    # non-ADLS strings.
+    with pytest.raises(NotAdlsUri):
+        parse_fqn("foo bar")
+
+
+def test_parse_fqn_rejects_sa_only():
+    with pytest.raises(NotAdlsUri):
+        parse_fqn("adls://foo")
 
 
 def test_adls_root_parse():

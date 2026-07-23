@@ -36,8 +36,6 @@ class AdlsRoot(NamedTuple):
 
     @staticmethod
     def parse(root_uri: str) -> "AdlsRoot":
-        if not root_uri.endswith("/"):
-            root_uri = root_uri + "/"
         fqn = AdlsFqn.parse(root_uri)
         assert not fqn.path, f"URI '{root_uri}' does not represent an ADLS root!"
         return AdlsRoot(fqn.sa, fqn.container)
@@ -143,16 +141,17 @@ def parse_fqn(fully_qualified_uri: str) -> AdlsFqn:
     We accept formatted strings with or without the leading forward
     slash in front of the path even though the formatter below
     guarantees the leading forward slash, but we do require there to
-    be two spaces. If you wish to represent a Storage Account and
-    Container with no path, simply append a forward slash to the end
-    of your string, which represents the root of that SA and
-    container, because a single forward slash is not valid as a path
-    name for a blob in ADLS.
+    be two spaces. A scheme'd URI with no path (`adls://sa/container`)
+    is unambiguously the root of that SA and container, and is
+    accepted with or without a trailing slash.
     """
     # an older, scheme-less version of format_fqn used spaces to separate sa and container.
     if fully_qualified_uri.startswith(ADLS_SCHEME):
         fully_qualified_uri = fully_qualified_uri[len(ADLS_SCHEME) :]
         sep = "/"
+        if fully_qualified_uri.count("/") == 1:
+            # a container root with no trailing slash - normalize to an empty path.
+            fully_qualified_uri += "/"
     else:
         sep = None
     try:
