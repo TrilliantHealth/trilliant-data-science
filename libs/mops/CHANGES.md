@@ -1,3 +1,13 @@
+### 3.23.20260727
+
+- `MopsFuture.add_done_callback`: fire the registered callback even when the invocation failed or was
+  cancelled. Previously the metadata-capturing wrapper read the result tuple first, which re-raises for a
+  non-successful invocation - and since `concurrent.futures` only logs a raising callback before moving
+  on, the user's callback was silently dropped. Callers awaiting completion through the callback (rather
+  than a blocking `.result()`) waited forever for an invocation that had already finished; that also left
+  `reify_future`'s outer future pending forever. Metadata capture is now best-effort and the callback
+  always runs, with the outcome still reaching the caller via the `MopsFuture` it is handed.
+
 ### 3.23
 
 - `pure.inject`: inject precomputed results into the memoization store. `inject.shim_builder(make_value)`

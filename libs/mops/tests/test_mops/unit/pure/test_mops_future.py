@@ -1,6 +1,8 @@
 import concurrent.futures
 import pickle
 
+import pytest
+
 from thds.core import futures
 from thds.mops import pure
 from thds.mops.pure._futures import MopsFuture
@@ -101,6 +103,60 @@ def test_result_metadata_populated_via_done_callback():
 
     pending.set_result(("v", "MD"))
     assert mf.result_metadata == "MD"
+
+
+def test_done_callback_fires_when_the_invocation_failed():
+    """A FAILED tuple-future must still fire the user's done-callback.
+
+    There is no metadata tuple to unpack on a failure, so the capture step raises -
+    and because concurrent.futures logs a raising callback and moves on to the next,
+    that used to eat the user's callback entirely. Anyone awaiting completion via
+    add_done_callback (rather than a blocking .result()) then waited forever for a
+    query that had already failed."""
+    pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+
+    seen: list[MopsFuture[int]] = []
+    mf.add_done_callback(seen.append)  # type: ignore[arg-type]
+
+    pending.set_exception(ValueError("the pod OOMed"))
+
+    assert len(seen) == 1, "the done-callback was dropped for a failed invocation"
+    # The failure is not swallowed - it reaches the caller through the future it's handed.
+    with pytest.raises(ValueError, match="the pod OOMed"):
+        seen[0].result()
+    assert mf.result_metadata is None
+
+
+def test_done_callback_fires_when_the_invocation_was_cancelled():
+    """Same contract for a CANCELLED tuple-future, which raises CancelledError rather
+    than the invocation's own exception when its result is read."""
+    pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+
+    seen: list[MopsFuture[int]] = []
+    mf.add_done_callback(seen.append)  # type: ignore[arg-type]
+
+    assert pending.cancel()
+
+    assert len(seen) == 1, "the done-callback was dropped for a cancelled invocation"
+    with pytest.raises(concurrent.futures.CancelledError):
+        seen[0].result()
+
+
+def test_failed_invocation_settles_a_reified_future():
+    """The consequence that matters for async callers: `reify_future` chains onto
+    add_done_callback, so a dropped callback left the reified future PENDING forever.
+    A failed invocation must settle it (with the exception), never hang it."""
+    pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+    reified = futures.reify_future(mf)
+
+    pending.set_exception(ValueError("evicted"))
+
+    assert reified.done(), "a failed invocation left its reified future unresolved"
+    with pytest.raises(ValueError, match="evicted"):
+        reified.result(timeout=0)
 
 
 def test_from_tuple_future_picklable():

@@ -6,9 +6,11 @@ across process-pool boundaries, so the whole object is pickled."""
 import typing as ty
 from dataclasses import dataclass
 
-from thds.core import futures
+from thds.core import futures, log
 
 from .core.metadata import ResultMetadata
+
+logger = log.getLogger(__name__)
 
 R = ty.TypeVar("R")
 
@@ -24,7 +26,22 @@ class _MetadataCapturingCallback(ty.Generic[R]):
     user_fn: ty.Callable[["futures.PFuture[R]"], None]
 
     def __call__(self, _tuple_future: "futures.PFuture[tuple[R, ty.Optional[ResultMetadata]]]") -> None:
-        self.mops_future._capture_metadata_from(_tuple_future)
+        # Only a SUCCESSFUL invocation carries a metadata tuple. Reading one from a
+        # failed invocation re-raises its exception, and from a cancelled one raises
+        # CancelledError (`PFuture` documents both as possible and deliberately omits
+        # `cancelled()`, so there is nothing cheaper to test than the read itself).
+        # Either would propagate out of this callback into the inner future's dispatch
+        # loop, which logs the raising callback and moves on to the next - so
+        # `user_fn` would never run, and whoever registered it would wait forever for
+        # a completion that had in fact already happened. Metadata is therefore
+        # best-effort and `user_fn` always runs; the outcome (value or exception)
+        # still reaches the caller through the MopsFuture it receives.
+        try:
+            self.mops_future._capture_metadata_from(_tuple_future)
+        except Exception as exc:
+            logger.debug("no result metadata for %s: %s", self.mops_future.memo_uri, exc)
+        except BaseException as exc:  # noqa: B036 - CancelledError; delivered via user_fn below
+            logger.debug("invocation %s was cancelled: %s", self.mops_future.memo_uri, exc)
         self.user_fn(self.mops_future)
 
 
