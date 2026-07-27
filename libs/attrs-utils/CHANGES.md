@@ -1,3 +1,9 @@
+## 1.9
+
+- Adds new `pickling` submodule with utilities for controlling `pickle` behavior for `attrs` and
+  `dataclasses`-defined record types, with a `PickleOnlyAttrs` mixin that can be used to ensure that
+  extraneous non-attribute data (as might come for example from use of `cached_property`)
+
 ## 1.8.20260702
 
 - Implements `empty.empty_gen` for `dataclassets`-defined record types, and fixes it to handle
