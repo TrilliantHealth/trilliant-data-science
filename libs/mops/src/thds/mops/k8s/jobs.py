@@ -3,22 +3,28 @@ from datetime import datetime, timezone
 
 from kubernetes import client
 
+from . import auth
 from ._shared import logger
 from .retry import k8s_sdk_retry
+from .target import K8sTarget, resolve_target
 from .watch import EventType, WatchingObjectSource, watch_forever
 
 
+def _batch_api(target: K8sTarget) -> client.BatchV1Api:
+    return client.BatchV1Api(api_client=auth.api_client(target.kubeconfig_context))
+
+
 @k8s_sdk_retry()
-def _get_job(namespace: str, job_name: str) -> ty.Optional[client.models.V1Job]:
+def _get_job(target: K8sTarget, job_name: str) -> ty.Optional[client.models.V1Job]:
     logger.debug(f"Reading job {job_name}")
-    return client.BatchV1Api().read_namespaced_job(
-        namespace=namespace,
+    return _batch_api(target).read_namespaced_job(
+        namespace=target.namespace,
         name=job_name,
     )
 
 
 _JOB_SOURCE = WatchingObjectSource(
-    lambda _, __: client.BatchV1Api().list_namespaced_job,
+    lambda target, _: _batch_api(target).list_namespaced_job,
     lambda job: job.metadata.name,  # type: ignore
     _get_job,
     typename="Job",
@@ -29,12 +35,12 @@ def job_source() -> WatchingObjectSource[client.models.V1Job]:
     return _JOB_SOURCE
 
 
-def get_job(job_name: str, namespace: str = "") -> ty.Optional[client.models.V1Job]:
-    return _JOB_SOURCE.get(job_name, namespace=namespace)
+def get_job(job_name: str, target: ty.Optional[K8sTarget] = None) -> ty.Optional[client.models.V1Job]:
+    return _JOB_SOURCE.get(job_name, target=target)
 
 
 @k8s_sdk_retry()
-def delete_job(job_name: str, namespace: str) -> bool:
+def delete_job(job_name: str, target: ty.Optional[K8sTarget] = None) -> bool:
     """Delete a Job, cascading to its pod(s). Returns True if the Job was
     deleted, False if it couldn't be - for ANY reason. `propagation_policy=
     "Foreground"` deletes the Job's dependents (the pod) too - deleting just the
@@ -50,18 +56,19 @@ def delete_job(job_name: str, namespace: str) -> bool:
     expected non-success and logs quietly; everything else logs with a full
     stack trace so nothing is swallowed silently (e.g. a 403 = the orchestrator
     SA lacks `delete` on jobs.batch, an RBAC gap worth fixing)."""
+    target = target or resolve_target()
     try:
-        client.BatchV1Api().delete_namespaced_job(
-            name=job_name, namespace=namespace, propagation_policy="Foreground"
+        _batch_api(target).delete_namespaced_job(
+            name=job_name, namespace=target.namespace, propagation_policy="Foreground"
         )
-        logger.info(f"Deleted job {namespace}/{job_name}")
+        logger.info(f"Deleted job {target}/{job_name}")
         return True
     except client.exceptions.ApiException as e:
         if e.status == 404:
-            logger.info(f"Job {namespace}/{job_name} already gone; nothing to delete")
+            logger.info(f"Job {target}/{job_name} already gone; nothing to delete")
             return False
 
-        logger.exception(f"Failed to delete job {namespace}/{job_name}; the pod will run to completion")
+        logger.exception(f"Failed to delete job {target}/{job_name}; the pod will run to completion")
         return False
 
 
@@ -121,8 +128,8 @@ def watch_jobs(
     namespace: str, timeout: ty.Optional[int] = None
 ) -> ty.Iterator[ty.Tuple[client.models.V1Job, EventType]]:
     yield from watch_forever(
-        lambda _, __: client.BatchV1Api().list_namespaced_job,
-        namespace,
+        lambda target, _: _batch_api(target).list_namespaced_job,
+        resolve_target(namespace=namespace or None),
         typename="Job",
         timeout=timeout,
     )

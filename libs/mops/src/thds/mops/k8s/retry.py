@@ -60,7 +60,11 @@ def k8s_sdk_retry(
                         #
                         # https://github.com/kubernetes-client/python/blob/release-18.0/kubernetes/client/exceptions.py?ts=4#L84
                         logger.info(f"{ex} - retrying after auth failure")
-                        auth.load_config()
+                        auth.cache_clear()
+                        # ^ Retried callables build their API objects via auth.api_client(ctx), so
+                        # clearing forces fresh credentials on the next attempt. (Bare-client code
+                        # that calls auth.load_config() per attempt self-heals the same way - the
+                        # clear makes its next load_config() a real reload instead of a cached no-op.)
                     elif not should_retry(ex):
                         raise
 

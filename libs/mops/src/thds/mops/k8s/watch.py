@@ -48,7 +48,7 @@ from thds.core.log import getLogger, logger_context
 from thds.termtool.colorize import colorized
 
 from . import config
-from .auth import load_config
+from .target import K8sTarget, resolve_target
 from .too_old_resource_version import parse_too_old_resource_version
 from .uncertain_future import FutureInterpreter, UncertainFuturesTracker
 
@@ -70,11 +70,15 @@ class K8sList(ty.Protocol[T]):
     def __call__(self, *args: ty.Any, namespace: str, **kwargs: ty.Any) -> V1List[T]: ...
 
 
-# If this does not return a K8sList API method, the loop will exit
-GetListMethod = ty.Callable[[str, ty.Optional[Exception]], ty.Optional[K8sList[T]]]
+# If this does not return a K8sList API method, the loop will exit.
+# Called fresh on every watch-loop iteration, so implementations should construct their API
+# object from `auth.api_client(target.kubeconfig_context)` each time - that (TTL-cached)
+# client is what keeps credentials fresh AND pins the watch to the cluster it was started
+# for, regardless of any process-global kubernetes configuration.
+GetListMethod = ty.Callable[[K8sTarget, ty.Optional[Exception]], ty.Optional[K8sList[T]]]
 # if this returns True, the loop will exit.
 EventType = ty.Literal["FETCH", "ADDED", "MODIFIED", "DELETED"]
-OnEvent = ty.Callable[[str, T, EventType], ty.Optional[bool]]
+OnEvent = ty.Callable[[K8sTarget, T, EventType], ty.Optional[bool]]
 
 
 class WatchdogTimeout(Exception):
@@ -138,7 +142,7 @@ def _start_watchdog(
 
 
 def yield_objects_from_list(
-    namespace: str,
+    target: K8sTarget,
     get_list_method: GetListMethod[T],
     *,
     server_timeout: int = config.k8s_watch_server_timeout_seconds(),
@@ -149,7 +153,7 @@ def yield_objects_from_list(
     object_type_hint: str = "items",
     init: ty.Optional[ty.Callable[[], None]] = None,
     **kwargs: ty.Any,
-) -> ty.Iterator[ty.Tuple[str, T, EventType]]:
+) -> ty.Iterator[ty.Tuple[K8sTarget, T, EventType]]:
     ex = None
     if init:
         init()
@@ -161,16 +165,18 @@ def yield_objects_from_list(
     while True:
         loop_count += 1
         try:
-            load_config()
-            list_method = get_list_method(namespace, ex)
+            list_method = get_list_method(target, ex)
+            # ^ constructs its API object per iteration (see GetListMethod) - this is where
+            # credentials get refreshed, replacing the process-global load_config() we
+            # previously called here.
             if not list_method:
-                logger.debug(f"Stopped watching {object_type_hint} events in namespace: {namespace}")
+                logger.debug(f"Stopped watching {object_type_hint} events in {target}")
                 return
 
-            initial_list = list_method(namespace=namespace)
+            initial_list = list_method(namespace=target.namespace)
             logger.debug(
                 f"Watch loop #{loop_count}: Listed {len(initial_list.items)} {object_type_hint} "
-                f"in {namespace} (resource_version={initial_list.metadata.resource_version})"
+                f"in {target} (resource_version={initial_list.metadata.resource_version})"
             )
 
             # Create watch with watchdog monitoring BEFORE FETCH phase
@@ -184,7 +190,7 @@ def yield_objects_from_list(
                 for object in initial_list.items:
                     last_event_time[0] = _watch_timer()  # update for watchdog during FETCH
                     events_yielded += 1
-                    yield namespace, object, "FETCH"
+                    yield target, object, "FETCH"
 
                 if initial_list.metadata._continue:
                     logger.warning(
@@ -193,7 +199,7 @@ def yield_objects_from_list(
 
                 for evt in watch.stream(
                     list_method,
-                    namespace=namespace,
+                    namespace=target.namespace,
                     resource_version=initial_list.metadata.resource_version,
                     **kwargs,
                     timeout_seconds=server_timeout,
@@ -203,7 +209,7 @@ def yield_objects_from_list(
                     object = evt.get("object")
                     if object:
                         events_yielded += 1
-                        yield namespace, object, evt["type"]
+                        yield target, object, evt["type"]
                     # once we've received events, let the resource version
                     # be managed automatically if possible.
             finally:
@@ -235,12 +241,12 @@ def yield_objects_from_list(
 
 
 def callback_events(
-    on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[str, T, EventType]]
+    on_event: OnEvent[T], event_yielder: ty.Iterable[ty.Tuple[K8sTarget, T, EventType]]
 ) -> None:
     """Suitable for use with a daemon thread."""
-    for namespace, obj, event in event_yielder:
+    for target, obj, event in event_yielder:
         try:
-            should_exit = on_event(namespace, obj, event)
+            should_exit = on_event(target, obj, event)
             if should_exit:
                 break
         except Exception:
@@ -272,9 +278,9 @@ class OneShotLimiter:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._names: ty.Set[str] = set()
+        self._names: ty.Set[ty.Hashable] = set()
 
-    def __call__(self, name: str, shoot: ty.Callable[[str], ty.Any]) -> None:
+    def __call__(self, name: ty.Hashable, shoot: ty.Callable[[ty.Any], ty.Any]) -> None:
         """Shoot if the name has not already been shot."""
         if name in self._names:
             return
@@ -309,7 +315,9 @@ def _wrap_get_list_method_with_too_old_check(
     typename: str,
     get_list_method: GetListMethod[T],
 ) -> GetListMethod[T]:
-    def wrapped_get_list_method(namespace: str, exc: ty.Optional[Exception]) -> ty.Optional[K8sList[T]]:
+    def wrapped_get_list_method(
+        target: K8sTarget, exc: ty.Optional[Exception]
+    ) -> ty.Optional[K8sList[T]]:
         suffix = ""
         if exc:
             too_old = parse_too_old_resource_version(exc)
@@ -317,16 +325,16 @@ def _wrap_get_list_method_with_too_old_check(
                 logger.exception(f"Not fatal, but sleeping before we retry {typename} scraping...")
                 time.sleep(config.k8s_monitor_delay())
                 suffix = f" after {type(exc).__name__}: {exc}"
-                logger.info(f"Watching {typename}s in namespace: {namespace}{suffix}")
-        return get_list_method(namespace, exc)
+                logger.info(f"Watching {typename}s in {target}{suffix}")
+        return get_list_method(target, exc)
 
     return wrapped_get_list_method
 
 
 def create_watch_thread(
     get_list_method: GetListMethod[T],
-    callback: ty.Callable[[str, T, EventType], None],
-    namespace: str,
+    callback: ty.Callable[[K8sTarget, T, EventType], None],
+    target: K8sTarget,
     *,
     typename: str = "object",
 ) -> threading.Thread:
@@ -335,11 +343,11 @@ def create_watch_thread(
         args=(
             callback,
             yield_objects_from_list(
-                namespace,
+                target,
                 _wrap_get_list_method_with_too_old_check(typename, get_list_method),
                 # arguably this wrapper could be composed externally, but i see no use cases so far where we'd want that.
                 object_type_hint=typename + "s",
-                init=lambda: logger.info(STARTING(f"Watching {typename}s in {namespace}")),
+                init=lambda: logger.info(STARTING(f"Watching {typename}s in {target}")),
             ),
         ),
         daemon=True,
@@ -348,17 +356,17 @@ def create_watch_thread(
 
 def watch_forever(
     get_list_method: GetListMethod[T],
-    namespace: str,
+    target: K8sTarget,
     *,
     typename: str = "object",
     timeout: ty.Optional[int] = None,
 ) -> ty.Iterator[ty.Tuple[T, EventType]]:
     q: queue.Queue[ty.Tuple[T, EventType]] = queue.Queue()
 
-    def put_queue(namespace: str, obj: T, event_type: EventType) -> None:
+    def put_queue(target: K8sTarget, obj: T, event_type: EventType) -> None:
         q.put((obj, event_type))
 
-    create_watch_thread(get_list_method, put_queue, namespace, typename=typename).start()
+    create_watch_thread(get_list_method, put_queue, target, typename=typename).start()
     while True:
         try:
             yield q.get(timeout=timeout)
@@ -453,28 +461,28 @@ class WatchingObjectSource(ty.Generic[T]):
         get_name: ty.Callable[[T], str] = ty.cast(  # noqa: B008
             ty.Callable[[T], str], _default_get_name
         ),
-        backup_fetch: ty.Optional[ty.Callable[[str, str], ty.Optional[T]]] = None,
+        backup_fetch: ty.Optional[ty.Callable[[K8sTarget, str], ty.Optional[T]]] = None,
         typename: str = "object",
     ) -> None:
         self.get_list_method = get_list_method
         self.get_name = get_name
         self.typename = typename
         self._limiter = OneShotLimiter()
-        self._uncertain_futures = UncertainFuturesTracker[tuple[str, str], T](
+        self._uncertain_futures = UncertainFuturesTracker[tuple[K8sTarget, str], T](
             config.k8s_watch_object_stale_seconds()
         )
-        self._seen_objects = _SeenObjectContainer[tuple[str, str], T](
-            lambda namespace_and_name: backup_fetch(*namespace_and_name) if backup_fetch else None
+        self._seen_objects = _SeenObjectContainer[tuple[K8sTarget, str], T](
+            lambda target_and_name: backup_fetch(*target_and_name) if backup_fetch else None
         )
         self._last_gc_time = 0.0  # for rate-limiting staleness GC
 
-    def _add_object(self, namespace: str, obj: T, event_type: EventType) -> None:
+    def _add_object(self, target: K8sTarget, obj: T, event_type: EventType) -> None:
         """This is where we receive updates from the k8s API."""
         if not obj:
             logger.warning(f"Received null/empty {self.typename}")
             return
 
-        key = (namespace, self.get_name(obj))
+        key = (target, self.get_name(obj))
         self._seen_objects.set_object(key, obj)
         self._uncertain_futures.update(key, obj)
         logger.debug("%s %s updated", self.typename, key)
@@ -491,28 +499,28 @@ class WatchingObjectSource(ty.Generic[T]):
             self._uncertain_futures.gc_stale()
             self._last_gc_time = now
 
-    def _start_namespace_watcher_thread(self, namespace: str) -> None:
+    def _start_watcher_thread(self, target: K8sTarget) -> None:
         create_watch_thread(
             self.get_list_method,
             self._add_object,
-            namespace,
+            target,
             typename=self.typename,
         ).start()
 
     @scope.bound
-    def get(self, obj_name: str, namespace: str = "") -> ty.Optional[T]:
+    def get(self, obj_name: str, target: ty.Optional[K8sTarget] = None) -> ty.Optional[T]:
         """May block for a little while if a manual fetch is required."""
-        namespace = namespace or config.k8s_namespace()
-        scope.enter(logger_context(name=obj_name, namespace=namespace))
-        self._limiter(namespace, self._start_namespace_watcher_thread)
-        return self._seen_objects.get((namespace, obj_name))
+        target = target or resolve_target()
+        scope.enter(logger_context(name=obj_name, target=str(target)))
+        self._limiter(target, self._start_watcher_thread)
+        return self._seen_objects.get((target, obj_name))
 
     def create_future(
         self,
         interpreter: FutureInterpreter[T, R],
         obj_name: str,
         *,
-        namespace: str = "",
+        target: ty.Optional[K8sTarget] = None,
     ) -> futures.PFuture[R]:
         """Create a future that will be resolved when the object is available according to
         the interpreter.
@@ -522,9 +530,9 @@ class WatchingObjectSource(ty.Generic[T]):
          - return a Done with the result if it wishes the future to resolve successfully.
           -return None if the status is still in progress.
         """
-        namespace = namespace or config.k8s_namespace()
-        self._limiter(namespace, self._start_namespace_watcher_thread)
-        key = (namespace, obj_name)
+        target = target or resolve_target()
+        self._limiter(target, self._start_watcher_thread)
+        key = (target, obj_name)
         fut = self._uncertain_futures.create(key, interpreter)
         # If we already have a cached object for this key, immediately update the future
         # with it. This handles the race condition where the watch saw the object before

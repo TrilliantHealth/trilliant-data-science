@@ -32,7 +32,7 @@ F = ty.TypeVar("F", bound=ty.Callable)
 def _clear_config_cache(f: F) -> F:
     @wraps(f)
     def _wrapped(*args, **kwargs):  # type: ignore
-        auth.load_config.cache_clear()  # type: ignore
+        auth.cache_clear()
         return f(*args, **kwargs)
 
     return ty.cast(F, _wrapped)

@@ -16,9 +16,10 @@ from thds.termtool.colorize import colorized
 
 from . import config, counts, job_future, logging
 from ._shared import logger
-from .auth import load_config, upsert_namespace
+from .auth import api_client, upsert_namespace
 from .node_selection import NodeNarrowing, ResourceDefinition
 from .retry import k8s_sdk_retry
+from .target import K8sTarget, Resolvable, resolve_target
 
 JobTransform = ty.Callable[["client.models.V1Job"], "client.models.V1Job"]
 
@@ -97,6 +98,11 @@ def launch(  # noqa: C901
     # If None, loads from config (mops.k8s.job_transform). TH users get embed_thds_auth via
     # east_config.toml. OSS users can configure their own or leave empty for no transform.
     service_account_name: str = "",
+    namespace: Resolvable = None,
+    kubeconfig_context: Resolvable = None,
+    # ^ per-launch targeting: a value, a zero-arg callable (e.g. a config item), or None to
+    # read the mops config items. Resolved exactly once, below - the job creation, watch,
+    # and log threads all inherit the resolved target rather than re-reading ambient config.
 ) -> core.futures.LazyFuture[bool]:
     """Launch a Kubernetes job.
 
@@ -111,6 +117,8 @@ def launch(  # noqa: C901
     """
     if not container_image:
         raise ValueError("container_image (the fully qualified Docker tag) must not be empty.")
+
+    target = resolve_target(kubeconfig_context, namespace)
 
     full_name = full_name or JOB_NAME()
     # in certain cases, it may be necessary to set the job name
@@ -133,12 +141,10 @@ def launch(  # noqa: C901
     @k8s_sdk_retry()
     def assemble_base_job() -> client.models.V1Job:
         logger.debug(f"Assembling job named `{name}` on image `{container_image}`")
-        logger.debug("Loading kube configs ...")
-        load_config()
         logger.debug("Populating job object ...")
         v1_job_body = client.V1Job(api_version="batch/v1", kind="Job")
         logger.debug("Setting object meta ...")
-        v1_job_body.metadata = client.V1ObjectMeta(namespace=config.k8s_namespace(), name=name)
+        v1_job_body.metadata = client.V1ObjectMeta(namespace=target.namespace, name=name)
 
         v1_job_body.status = client.V1JobStatus()
         logger.debug("Creating pod template ...")
@@ -160,7 +166,7 @@ def launch(  # noqa: C901
             for env_name, env_value in env_vars.items():
                 add_env_var(env_name, env_value)
 
-        add_env_var(config.k8s_namespace_env_var_key(), config.k8s_namespace())
+        add_env_var(config.k8s_namespace_env_var_key(), target.namespace)
         add_env_var("MOPS_K8S_JOB_NAME", name)
         # Pass the extra_metadata_generator config to the remote side via env var.
         # This is needed because east_config.toml is only loaded on the local side
@@ -245,42 +251,56 @@ def launch(  # noqa: C901
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:
         with _SIMULTANEOUS_LAUNCHES:
-            # This ensures the config is loaded before the the batch API client is created.
-            load_config()
-            upsert_namespace(config.k8s_namespace())
+            upsert_namespace(target.namespace, target.kubeconfig_context)
             # we do the job transform after actually upserting the namespace so that
             # the transform can use the namespace if necessary.
-            return client.BatchV1Api().create_namespaced_job(
-                namespace=config.k8s_namespace(), body=job_with_all_transforms()
-            )
+            return client.BatchV1Api(
+                api_client=api_client(target.kubeconfig_context)
+            ).create_namespaced_job(namespace=target.namespace, body=job_with_all_transforms())
 
     job = launch_job()
     logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
     return core.futures.make_lazy(_launch_logs_and_create_future)(  # see below for implementation
         job.metadata.name,
         num_pods_expected=len(job.spec.template.spec.containers),
-        namespace=config.k8s_namespace(),
+        namespace=target.namespace,
+        kubeconfig_context=target.kubeconfig_context,
+        # ^ the resolved target rides along as args (captured now, eagerly) because this
+        # future realizes later, on threads where ambient config must not be consulted.
         suppress_logs=suppress_logs,
     )
 
 
 # this function has to be a top level def because it will sometimes be transferred across process boundaries,
 # and Python/pickle in its infinite wisdom does not allow nested functions to be pickled.
+# (its params stay pickle-friendly primitives for the same reason.)
 def _launch_logs_and_create_future(
-    job_name: str, *, num_pods_expected: int, namespace: str, suppress_logs: bool
+    job_name: str,
+    *,
+    num_pods_expected: int,
+    namespace: str,
+    kubeconfig_context: str = "",
+    suppress_logs: bool,
 ) -> core.futures.PFuture[bool]:
     if not suppress_logs:
-        logging.maybe_start_job_thread(job_name, num_pods_expected)
-    return job_future.make_job_completion_future(job_name, namespace=namespace)
+        logging.maybe_start_job_thread(
+            job_name, K8sTarget(kubeconfig_context, namespace), num_pods_expected
+        )
+    return job_future.make_job_completion_future(
+        job_name, namespace=namespace, kubeconfig_context=kubeconfig_context
+    )
 
 
 def create_lazy_job_logging_future(
-    job_name: str, *, namespace: str = "", num_pods_expected: int = 1
+    job_name: str, *, namespace: str = "", kubeconfig_context: str = "", num_pods_expected: int = 1
 ) -> core.futures.LazyFuture[bool]:
+    target = resolve_target(kubeconfig_context or None, namespace or None)
+    # ^ resolved eagerly - the LazyFuture realizes later.
     return core.futures.make_lazy(_launch_logs_and_create_future)(
         job_name,
         num_pods_expected=num_pods_expected,
-        namespace=namespace or config.k8s_namespace(),
+        namespace=target.namespace,
+        kubeconfig_context=target.kubeconfig_context,
         suppress_logs=False,
     )
 

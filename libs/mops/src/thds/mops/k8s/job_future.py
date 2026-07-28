@@ -15,6 +15,7 @@ from .jobs import (
     is_mops_exception_failure,
     job_source,
 )
+from .target import K8sTarget, resolve_target
 
 logger = log.getLogger(__name__)
 
@@ -27,10 +28,9 @@ _FINISHED_JOBS = set[str]()
 _FINISHED_JOBS_LOCK = threading.Lock()
 
 
-def _check_newly_finished(job_name: str, namespace: str = "") -> str:
+def _check_newly_finished(job_name: str, target: K8sTarget) -> str:
     # I don't believe it's possible to ever have a Job that both succeeds and fails.
-    namespace = namespace or config.k8s_namespace()
-    job_full = f"{namespace}/{job_name}"
+    job_full = f"{target}/{job_name}"
     if job_full in _FINISHED_JOBS:
         return ""
 
@@ -49,7 +49,7 @@ class K8sJobFailedError(Exception):
 
 
 def _check_job_before_timeout(
-    job_name: str, namespace: str, job_seen: bool, time_since_last_seen: float
+    job_name: str, target: K8sTarget, job_seen: bool, time_since_last_seen: float
 ) -> ty.Union[bool, uncertain_future.NotYetDone, None]:
     """Check actual job state before timing out.
 
@@ -65,7 +65,7 @@ def _check_job_before_timeout(
     """
     try:
         # get_job uses the existing cache + backup fetch abstraction
-        fetched = get_job(job_name, namespace)
+        fetched = get_job(job_name, target)
         if fetched:
             if is_job_succeeded(fetched):
                 logger.warning(
@@ -124,19 +124,19 @@ class _CancellableJobFuture(futures.PFuture[bool]):
     is unchanged). What this adds is `cancel()` -> delete the k8s Job, which is
     what lets cancellation travel down the future chain
     (`MopsFuture.cancel()` -> `_ChainedFuture` -> `LazyFuture` -> here). The Job
-    name + namespace stay closed over in this layer; nothing above ever sees
+    name + target stay closed over in this layer; nothing above ever sees
     them."""
 
-    def __init__(self, inner: futures.PFuture[bool], job_name: str, namespace: str) -> None:
+    def __init__(self, inner: futures.PFuture[bool], job_name: str, target: K8sTarget) -> None:
         self._inner = inner
         self._job_name = job_name
-        self._namespace = namespace
+        self._target = target
 
     def cancel(self) -> bool:
         """Delete the Job (cascading to its pod). True if deleted, False if it
         was already gone - matching the chain's tri-state where this layer can
         always give a definite bool (a k8s Job is always deletable-or-absent)."""
-        return delete_job(self._job_name, self._namespace)
+        return delete_job(self._job_name, self._target)
 
     def running(self) -> bool:
         return self._inner.running()
@@ -160,7 +160,9 @@ class _CancellableJobFuture(futures.PFuture[bool]):
         self._inner.set_exception(exception)
 
 
-def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures.PFuture[bool]:
+def make_job_completion_future(
+    job_name: str, *, namespace: str = "", kubeconfig_context: str = ""
+) -> futures.PFuture[bool]:
     """This is a natural boundary for a serializable lazy future - something that represents
     work being done across process boundaries (since Kubernetes jobs will be listed via an API.
 
@@ -170,6 +172,9 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
 
     If the Job definitely failed, an Exception will be raised.
     """
+    target = resolve_target(kubeconfig_context or None, namespace or None)
+    # ^ resolved once, here: the interpreter below runs later, on watcher threads, where
+    # ambient config must not be consulted.
 
     JOB_SEEN = False
 
@@ -189,8 +194,9 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
             if time_since_last_seen > config.k8s_watch_object_stale_seconds():
                 # this is 5 minutes by default as of 2025-07-15.
                 # Before timing out, check the actual job state - we might be able to recover
-                ns = namespace or config.k8s_namespace()
-                recovery_result = _check_job_before_timeout(job_name, ns, JOB_SEEN, time_since_last_seen)
+                recovery_result = _check_job_before_timeout(
+                    job_name, target, JOB_SEEN, time_since_last_seen
+                )
                 if recovery_result is not None:
                     return recovery_result
 
@@ -204,13 +210,13 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
         JOB_SEEN = True
 
         if is_job_succeeded(job):
-            newly_succeeded = _check_newly_finished(job_name, namespace)
+            newly_succeeded = _check_newly_finished(job_name, target)
             if newly_succeeded:
                 logger.info(SUCCEEDED(f"Job {job_name} Succeeded! {newly_succeeded}"))
             return True
 
         if is_job_failed(job):
-            newly_failed = _check_newly_finished(job_name, namespace)
+            newly_failed = _check_newly_finished(job_name, target)
             if is_mops_exception_failure(job):
                 # The user function raised — the exception is serialized in blob storage.
                 # Return True so PostShimResultGetter reads it via the normal path.
@@ -224,19 +230,24 @@ def make_job_completion_future(job_name: str, *, namespace: str = "") -> futures
 
         return uncertain_future.NotYetDone()  # job is still in progress
 
-    ns = namespace or config.k8s_namespace()
     return _CancellableJobFuture(
-        job_source().create_future(job_completion_interpreter, job_name, namespace=ns),
+        job_source().create_future(job_completion_interpreter, job_name, target=target),
         job_name=job_name,
-        namespace=ns,
+        target=target,
     )
 
 
-def make_lazy_completion_future(job_name: str, *, namespace: str = "") -> futures.LazyFuture[bool]:
+def make_lazy_completion_future(
+    job_name: str, *, namespace: str = "", kubeconfig_context: str = ""
+) -> futures.LazyFuture[bool]:
     """This is a convenience function that will create a job completion future and then
     immediately process it, returning the result. See docs on function above.
     """
+    target = resolve_target(kubeconfig_context or None, namespace or None)
+    # ^ resolve eagerly - the LazyFuture realizes later, possibly on a thread where ambient
+    # config must not be consulted.
     return futures.make_lazy(make_job_completion_future)(
         job_name,
-        namespace=namespace or config.k8s_namespace(),
+        namespace=target.namespace,
+        kubeconfig_context=target.kubeconfig_context,
     )

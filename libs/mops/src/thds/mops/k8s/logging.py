@@ -17,10 +17,11 @@ from thds.core.log import logger_context
 from thds.termtool.colorize import colorized, make_colorized_out, next_color
 
 from .._utils.locked_cache import locked_cached
-from . import config
+from . import auth, config
 from ._shared import logger
 from .jobs import get_job
 from .retry import k8s_sdk_retry
+from .target import K8sTarget
 
 NO_K8S_LOGS = core.config.item("mops.no_k8s_logs", parse=core.config.tobool, default=False)
 # non-empty if you want to completely disable k8s pod logs.
@@ -82,8 +83,9 @@ class JobLogWatcher:
     some spurious logging messages.
     """
 
-    def __init__(self, job_name: str, num_pods_expected: int = 1) -> None:
+    def __init__(self, job_name: str, target: K8sTarget, num_pods_expected: int = 1) -> None:
         self.job_name = job_name
+        self.target = target
         self.num_pods_expected = num_pods_expected
         self.pods_being_scraped: ty.Set[str] = set()
         self.pod_colors: ty.Dict[str, ty.Callable[[str], ty.Any]] = dict()
@@ -110,6 +112,7 @@ class JobLogWatcher:
             # this one can be retried if it's still out there.
         time.sleep(config.k8s_monitor_delay())
         for pod in _yield_running_pods_for_job(
+            self.target,
             self.job_name,
             self.num_pods_expected if not self.pods_being_scraped else 1,
         ):
@@ -125,6 +128,7 @@ class JobLogWatcher:
                     target=_scrape_pod_logs,
                     args=(
                         self.pod_colors[pod_name],
+                        self.target,
                         pod_name,
                         self.start,
                     ),
@@ -133,10 +137,14 @@ class JobLogWatcher:
                 log_thread.start()
 
 
+def _core_api(target: K8sTarget) -> client.CoreV1Api:
+    return client.CoreV1Api(api_client=auth.api_client(target.kubeconfig_context))
+
+
 # we really don't want many threads calling the K8S API a billion times all at once
-@locked_cached(cachetools.TTLCache(maxsize=1, ttl=2))
-def _list_pods_in_our_namespace() -> ty.List[client.models.V1Pod]:
-    return client.CoreV1Api().list_namespaced_pod(namespace=config.k8s_namespace()).items
+@locked_cached(cachetools.TTLCache(maxsize=8, ttl=2))
+def _list_pods(target: K8sTarget) -> ty.List[client.models.V1Pod]:
+    return _core_api(target).list_namespaced_pod(namespace=target.namespace).items
 
 
 class K8sPodStatus(enum.Enum):
@@ -148,14 +156,14 @@ class K8sPodStatus(enum.Enum):
 
 
 def _yield_running_pods_for_job(
-    job_name: str, expected_number_of_pods: int = 1
+    target: K8sTarget, job_name: str, expected_number_of_pods: int = 1
 ) -> ty.Iterator[client.models.V1Pod]:
     """TODO: stop polling if the Job cannot be found at all."""
     attempt = 0
     yielded = 0
     logger.debug("Polling for pods created by job: %s", job_name)
     while attempt < config.k8s_monitor_max_attempts():
-        for pod in _list_pods_in_our_namespace():
+        for pod in _list_pods(target):
             owner_refs = pod.metadata.owner_references
             if not owner_refs:
                 # this is a rare and undocumented case where a pod
@@ -177,7 +185,7 @@ def _yield_running_pods_for_job(
         if yielded >= expected_number_of_pods:
             logger.debug("Found all expected running pods.")
             return
-        if not get_job(job_name):
+        if not get_job(job_name, target):
             logger.warning("Job not found; not a good sign for pod logs")
             attempt += 50
         logger.debug("Didn't find enough pods yet, sleeping for a moment...")
@@ -185,11 +193,11 @@ def _yield_running_pods_for_job(
         attempt += 1
 
 
-def _get_pod_phase(pod_name: str) -> str:
+def _get_pod_phase(target: K8sTarget, pod_name: str) -> str:
     return (
-        client.CoreV1Api()
+        _core_api(target)
         .read_namespaced_pod(
-            namespace=config.k8s_namespace(),
+            namespace=target.namespace,
             name=pod_name,
             _request_timeout=(
                 config.k8s_watch_connection_timeout_seconds(),
@@ -200,9 +208,9 @@ def _get_pod_phase(pod_name: str) -> str:
     )
 
 
-def _await_pod_phases(phases: ty.Set[K8sPodStatus], pod_name: str) -> str:
+def _await_pod_phases(phases: ty.Set[K8sPodStatus], target: K8sTarget, pod_name: str) -> str:
     while True:
-        phase = _get_pod_phase(pod_name)
+        phase = _get_pod_phase(target, pod_name)
         if phase in {phase.value for phase in phases}:
             return phase
         time.sleep(config.k8s_monitor_delay())
@@ -211,6 +219,7 @@ def _await_pod_phases(phases: ty.Set[K8sPodStatus], pod_name: str) -> str:
 @core.scope.bound
 def _scrape_pod_logs(
     out: ty.Callable[[str], ty.Any],
+    target: K8sTarget,
     pod_name: str,
     failure_callback: ty.Callable[[str], ty.Any],
 ) -> None:
@@ -220,7 +229,7 @@ def _scrape_pod_logs(
     last_scraped_at = default_timer()
     base_kwargs = dict(
         name=pod_name,
-        namespace=config.k8s_namespace(),
+        namespace=target.namespace,
         _request_timeout=(
             config.k8s_logs_watch_connection_timeout_seconds(),
             config.k8s_logs_watch_read_timeout_seconds(),
@@ -245,18 +254,19 @@ def _scrape_pod_logs(
         nonlocal last_scraped_at
         _await_pod_phases(
             {K8sPodStatus.RUNNING, K8sPodStatus.SUCCEEDED, K8sPodStatus.FAILED},
+            target,
             pod_name,
         )
         logger.debug("Watching pod log stream...")
         while True:
             for e in _PodLogWatch().stream(
-                client.CoreV1Api().read_namespaced_pod_log,
+                _core_api(target).read_namespaced_pod_log,
                 **kwargs,
             ):
                 out(e)
                 last_scraped_at = default_timer()
             time.sleep(config.k8s_monitor_delay())
-            pod_phase = _get_pod_phase(pod_name)
+            pod_phase = _get_pod_phase(target, pod_name)
             if pod_phase == K8sPodStatus.SUCCEEDED.value:
                 logger.debug("Done scraping pod logs")
                 return
@@ -282,7 +292,7 @@ _JOB_LOG_THREAD_COUNT: int = 0
 _JOB_LOG_THREADS_LOCK = threading.Lock()
 
 
-def maybe_start_job_thread(job_name: str, num_pods_expected: int = 1) -> bool:
+def maybe_start_job_thread(job_name: str, target: K8sTarget, num_pods_expected: int = 1) -> bool:
     """Starts a thread to watch the logs of a job. Makes sure we only start one thread per
     job even if there are multiple calls to this function.
     """
@@ -296,7 +306,7 @@ def maybe_start_job_thread(job_name: str, num_pods_expected: int = 1) -> bool:
                     _JOB_LOG_THREAD_COUNT += 1
                     logger.info(f"Starting log watcher {_JOB_LOG_THREAD_COUNT} for job {job_name}")
                     threading.Thread(
-                        target=JobLogWatcher(job_name, num_pods_expected).start, daemon=True
+                        target=JobLogWatcher(job_name, target, num_pods_expected).start, daemon=True
                     ).start()
                     return True
     return False

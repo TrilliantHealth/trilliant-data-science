@@ -25,58 +25,83 @@ empty_config_retry = fretry.retry_sleep(_retry_config, fretry.expo(retries=3, de
 _AUTH_RLOCK = RLock()
 
 
-def _load_kube_config() -> None:
-    # In-pod, kubernetes.config.load_config tries ~/.kube/config first, fails,
-    # then falls back to in-cluster - emitting a root-logger WARNING on every
-    # call ("kube_config_path not provided ... Using inCluster Config"). The
-    # TTL cache keeps it bounded but it still recurs on token refresh. Skip
-    # the kube_config probe when KUBERNETES_SERVICE_HOST is set.
+def _new_api_client(kubeconfig_context: str) -> client.ApiClient:
     if "KUBERNETES_SERVICE_HOST" in os.environ:
+        # in-pod there is exactly one cluster; the context is irrelevant. (Skipping the
+        # kube-config probe also avoids the kubernetes library's root-logger WARNING about
+        # falling back to inCluster config, which otherwise recurs on every token refresh.)
         config.load_incluster_config()
-        return
+        return client.ApiClient()
 
-    ctx = kubeconfig_context()
-    if not ctx:
-        config.load_config()
-        return
+    if not kubeconfig_context:
+        return config.new_client_from_config()
 
     try:
-        config.load_kube_config(context=ctx)
+        return config.new_client_from_config(context=kubeconfig_context)
     except config.ConfigException as e:
         raise config.ConfigException(
-            f"`mops` is configured to use the kubeconfig context {ctx!r} but it was not"
-            f" found in your kubeconfig. Use your cloud provider's CLI to add credentials"
+            f"`mops` was asked to use the kubeconfig context {kubeconfig_context!r} but it was"
+            f" not found in your kubeconfig. Use your cloud provider's CLI to add credentials"
             f" for that cluster, then retry. (original error: {e})"
         ) from e
 
 
-# load_config gets called all over the place and way too often.
+# TTL'd because exec-plugin credentials (kubelogin) expire, and rebuilding the client
+# re-resolves them. Keyed per context, so launches targeting different clusters each get a
+# client bound to their own cluster, independent of the process-global default configuration.
+@locked_cached(TTLCache(8, ttl=120), lock=_AUTH_RLOCK)
+def api_client(kubeconfig_context: str = "") -> client.ApiClient:
+    logger.debug("Building Kubernetes ApiClient for context %r...", kubeconfig_context)
+    return empty_config_retry(_new_api_client)(kubeconfig_context)
+
+
 @locked_cached(TTLCache(1, ttl=120), lock=_AUTH_RLOCK)
 def load_config() -> None:
+    """__Here for backwards-compatibility.__
+
+    Set the kubernetes library's process-global default Configuration - what bare
+    `client.FooApi()` constructors read - to the configured context's configuration.
+
+    This exists for code outside the mops launch->watch->logs pipeline (`apply_yaml`, external
+    bare-client callers); mops's own machinery passes `api_client(context)` explicitly. It is
+    just a promotion of `api_client`'s configuration, so both views share one loader, one
+    retry policy, and one credential-refresh cadence."""
     logger.debug("Loading Kubernetes config...")
     try:
-        empty_config_retry(_load_kube_config)()
+        client.Configuration.set_default(api_client(kubeconfig_context()).configuration)
     except config.ConfigException:
         logger.error("Failed to load kube-config")
 
 
+def cache_clear() -> None:
+    """Manually clearing the cache is hacky, but we found a bug that necessitated it."""
+    load_config.cache_clear()  # type: ignore[attr-defined]
+    api_client.cache_clear()  # type: ignore[attr-defined]
+
+
 @scope.bound
-def upsert_namespace(namespace: str, created_cache: ty.Set[str] = set()) -> None:  # noqa: B006
+def upsert_namespace(
+    namespace: str,
+    kubeconfig_context: str = "",
+    created_cache: ty.Set[ty.Tuple[str, str]] = set(),  # noqa: B006
+) -> None:
     scope.enter(_AUTH_RLOCK)
-    if namespace in created_cache:
+    key = (kubeconfig_context, namespace)
+    if key in created_cache:
         return
     logger.debug("Creating namespace if not exists: %s" % namespace)
-    load_config()
-    kubeapi = client.CoreV1Api()
+    kubeapi = client.CoreV1Api(api_client=api_client(kubeconfig_context))
     ns_obj = client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace))
     namespaces = set([item.metadata.name for item in kubeapi.list_namespace().items])
     if namespace not in namespaces:
         logger.info(f"Creating namespace {namespace}")
         kubeapi.create_namespace(ns_obj)
-    created_cache.add(namespace)
+    created_cache.add(key)
 
 
 def core_client() -> client.CoreV1Api:
-    """Returns a CoreV1Api client, ensuring that the Kubernetes config is loaded."""
-    load_config()
-    return client.CoreV1Api()
+    """Returns a CoreV1Api client bound to the configured kubeconfig context."""
+    return client.CoreV1Api(api_client=api_client(kubeconfig_context()))
+    # Passing the config item's value (rather than "") preserves load_config's behavior of
+    # honoring `mops.k8s.kubeconfig_context` - api_client("") means kubernetes-default loading,
+    # which deliberately does NOT consult the config item.

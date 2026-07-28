@@ -1,3 +1,14 @@
+### 3.24
+
+- Per-launch cluster + namespace targeting: `k8s.shim`/`k8s.launch` accept `kubeconfig_context=` and
+  `namespace=` (a value or a zero-arg callable, defaulting to the existing config items). The target is
+  resolved once at launch and threaded through everything downstream, so launches targeting different
+  clusters/namespaces coexist in one process, even concurrently - background watcher/log threads no
+  longer re-read process-global config.
+- API clients are built and TTL-cached per kubeconfig context (`auth.api_client`); watchers are keyed by
+  `(cluster, namespace)`. `auth.load_config` remains for external bare-client code.
+- Internal `k8s` signatures now take a `K8sTarget`; no known external callers.
+
 ### 3.23.20260727
 
 - `MopsFuture.add_done_callback`: fire the registered callback even when the invocation failed or was
