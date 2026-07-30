@@ -1,3 +1,12 @@
+### 1.56
+
+- `cache.locking` accepts `make_cache`, a factory for the backing store (one per decorated function), so
+  callers can bound it - e.g. `make_cache=lambda: cachetools.LRUCache(maxsize=2)` when cache keys are
+  unbounded over a process's life but only the newest few are ever read. Defaults to an unbounded `dict`,
+  so existing behavior is unchanged, and `cachetools` remains deliberately absent from `thds.core`'s
+  dependencies - the caller supplies it. `cache_info().maxsize` now reports the backing store's own
+  `maxsize` when it has one instead of always `None`.
+
 ### 1.55
 
 - `journalist.Journalist` now nests. Entering a second `Journalist` while one is already active no longer

@@ -86,9 +86,10 @@ _R = ty.TypeVar("_R")
 def _locking_factory(
     cache_lock: proto.ContextManager,
     make_func_lock: ty.Callable[[HashedTuple], proto.ContextManager],
+    make_cache: ty.Callable[[], ty.MutableMapping[HashedTuple, ty.Any]],
 ) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]:
     def decorator(func: ty.Callable[_P, _R]) -> ty.Callable[_P, _R]:
-        cache: ty.Dict[HashedTuple, _R] = {}
+        cache: ty.MutableMapping[HashedTuple, _R] = make_cache()
         keys_to_func_locks: ty.Dict[HashedTuple, proto.ContextManager] = {}
         hits = misses = 0
         bound_hashkey = make_bound_hashkey(func)
@@ -127,7 +128,9 @@ def _locking_factory(
             # concurrent usage of cached function may result in incorrect hit and miss counts
             # incrementing them is not threadsafe
             with cache_lock:
-                return _CacheInfo(hits, misses, None, len(cache))
+                # A caller-supplied bounded mapping (e.g. `cachetools.LRUCache`) reports its own
+                # `maxsize`; a plain dict has none.
+                return _CacheInfo(hits, misses, getattr(cache, "maxsize", None), len(cache))
 
         def clear_cache() -> None:
             nonlocal hits, misses
@@ -154,6 +157,7 @@ def locking(
     *,
     cache_lock: ty.Optional[proto.ContextManager] = ...,
     make_func_lock: ty.Optional[ty.Callable[[HashedTuple], proto.ContextManager]] = ...,
+    make_cache: ty.Optional[ty.Callable[[], ty.MutableMapping[HashedTuple, ty.Any]]] = ...,
 ) -> ty.Callable[[ty.Callable[_P, _R]], ty.Callable[_P, _R]]: ...  # pragma: no cover
 
 
@@ -166,8 +170,9 @@ def locking(
     *,
     cache_lock: ty.Optional[proto.ContextManager] = None,
     make_func_lock: ty.Optional[ty.Callable[[HashedTuple], proto.ContextManager]] = None,
+    make_cache: ty.Optional[ty.Callable[[], ty.MutableMapping[HashedTuple, ty.Any]]] = None,
 ):
-    """A threadsafe, simple, unbounded cache.
+    """A threadsafe, simple, unbounded-by-default cache.
 
     Unlike common cache implementations, such as `functools.cache` or `cachetools.cached({})`,
     `locking` makes sure only one invocation of the wrapped function will occur per key across concurrent
@@ -182,6 +187,14 @@ def locking(
     returns a context manager supporting lock based on the cache key. By default, the `cache_lock` is a `Lock` and
     each unique cache key gets a unique `Lock`.
 
+    `make_cache` builds the backing store (a fresh one per decorated function), defaulting to an
+    unbounded `dict`. Pass a factory returning a bounded mapping - e.g.
+    `make_cache=lambda: cachetools.LRUCache(maxsize=2)` - when keys are unbounded over a process's
+    life and only the newest few are ever read. `cachetools` is deliberately NOT a `thds.core`
+    dependency; the caller supplies it. Note that eviction alone does not make the cache
+    threadsafe - single-flight still comes from the locks above, which is why this is a parameter
+    here rather than a reason to reach for `cachetools.cached`.
+
     Please also note that `hits` and `misses` in `cache_info` may not be accurate as they are not incremented in
     a threadsafe matter. Doing that incrementation in a threadsafe manner would incur a performance penalty on threaded
     usage that is not worth the cost.
@@ -191,7 +204,9 @@ def locking(
         return threading.Lock()
 
     decorator = _locking_factory(
-        cache_lock or threading.Lock(), make_func_lock or default_make_func_lock
+        cache_lock or threading.Lock(),
+        make_func_lock or default_make_func_lock,
+        make_cache or dict,
     )
 
     if func:

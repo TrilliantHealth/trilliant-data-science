@@ -2933,7 +2933,7 @@ dev = [
 
 [[package]]
 name = "thds-core"
-version = "1.55"
+version = "1.56"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },

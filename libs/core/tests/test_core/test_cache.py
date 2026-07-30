@@ -103,3 +103,64 @@ def deadlocker(deco) -> int:
 
 def test_locking_supports_recursive_calls_w_rlock() -> None:
     assert deadlocker(cache.locking(make_func_lock=lambda _key: RLock()))
+
+
+class _Bounded(dict):
+    """A minimal newest-N mapping, standing in for `cachetools.LRUCache` so
+    these tests don't need `cachetools` (which `thds.core` deliberately
+    doesn't depend on)."""
+
+    maxsize = 2
+
+    def __setitem__(self, key, value) -> None:
+        super().__setitem__(key, value)
+        while len(self) > self.maxsize:
+            super().pop(next(iter(self)))
+
+
+def test_locking_accepts_a_bounded_cache() -> None:
+    calls = []
+
+    @cache.locking(make_cache=_Bounded)
+    def square(n: int) -> int:
+        calls.append(n)
+        return n * n
+
+    assert [square(n) for n in (1, 2, 3)] == [1, 4, 9]
+    assert square.cache_info().currsize == 2  # type: ignore[attr-defined]
+    assert square.cache_info().maxsize == 2  # type: ignore[attr-defined]
+
+    assert square(3) == 9  # still cached
+    assert calls == [1, 2, 3]
+
+    assert square(1) == 1  # evicted, so recomputed
+    assert calls == [1, 2, 3, 1]
+
+
+def test_locking_defaults_to_unbounded_dict() -> None:
+    @cache.locking
+    def double(n: int) -> int:
+        return n * 2
+
+    for n in range(50):
+        double(n)
+    assert double.cache_info().currsize == 50  # type: ignore[attr-defined]
+    assert double.cache_info().maxsize is None  # type: ignore[attr-defined]
+
+
+def test_locking_bounded_cache_is_still_single_flight() -> None:
+    """Eviction must not cost the single-flight property - the whole reason
+    this decorator exists rather than `cachetools.cached`."""
+    invocations = 0
+
+    @cache.locking(make_cache=_Bounded)
+    def slow(_n: int) -> int:
+        nonlocal invocations
+        invocations += 1
+        time.sleep(0.2)
+        return 1
+
+    with ThreadPoolExecutor() as exc:
+        list(exc.map(slow, [7] * 8))
+
+    assert invocations == 1
