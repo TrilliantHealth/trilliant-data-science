@@ -1,3 +1,11 @@
+### 1.56.20260729
+
+- `progress.report_still_alive` no longer deadlocks when the wrapped block raises. The sentinel that
+  stops the reporter thread was only resolved on the success path, so any exception left the executor's
+  `__exit__` joining a reporter that never exits - the caller hung forever while "Still working..." lines
+  kept logging for work that had already failed. The sentinel now resolves in a `finally`, and the
+  exception propagates promptly.
+
 ### 1.56
 
 - `cache.locking` accepts `make_cache`, a factory for the backing store (one per decorated function), so

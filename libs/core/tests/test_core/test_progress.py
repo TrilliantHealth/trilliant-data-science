@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import threading
 import time
 from datetime import timedelta
 
@@ -64,6 +65,26 @@ def test_report_still_alive(caplog):
     result = report_still_alive(roughly_every_s=timedelta(seconds=0.2))(_takes_a_long_time)(1)
     assert result == 2
     assert re.search(r"Still working after \d+\.\d+ seconds", caplog.text)
+
+
+def test_report_still_alive_propagates_exceptions_promptly():
+    """Regression: an exception inside the block used to skip resolving the reporter's sentinel,
+    deadlocking in the executor join while the reporter logged 'still working' forever."""
+    outcome: dict = {}
+
+    def _raise_inside_the_block() -> None:
+        try:
+            with report_still_alive(roughly_every_s=timedelta(seconds=0.1)):
+                raise ValueError("boom")
+        except ValueError as e:
+            outcome["raised"] = e
+
+    thread = threading.Thread(target=_raise_inside_the_block, daemon=True)
+    thread.start()
+    thread.join(timeout=5)
+
+    assert not thread.is_alive(), "deadlocked joining the reporter instead of propagating"
+    assert isinstance(outcome.get("raised"), ValueError)
 
 
 @scope.bound

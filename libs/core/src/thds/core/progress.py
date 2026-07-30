@@ -141,6 +141,11 @@ def report_still_alive(
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.submit(_report_still_alive)
 
-        yield
-
-        sentinel.set_result(True)
+        try:
+            yield
+        finally:
+            sentinel.set_result(True)
+            # ^ must run on the exception path too: the executor's __exit__ joins the reporter,
+            # which only exits once the sentinel resolves - anything raised out of this block
+            # would otherwise deadlock in that join, while the reporter logs 'still working'
+            # forever about work that is no longer happening.
