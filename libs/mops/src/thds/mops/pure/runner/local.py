@@ -1,6 +1,6 @@
 """Joins pickle functionality and Blob Store functionality to run functions remotely."""
 
-import time
+import concurrent.futures
 import typing as ty
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -12,16 +12,16 @@ from thds.termtool.colorize import colorized, make_colorized_out
 from ..._utils.on_slow import LogSlow, on_slow
 from ...config import max_concurrent_network_ops, max_concurrent_serialization
 from .._futures import MopsFuture
-from ..core import deferred_work, lock, memo, metadata, pipeline_id_mask, uris
-from ..core.lock.maintain import MAINTAIN_LOCKS  # noqa: F401
+from ..core import deferred_work, lease, memo, metadata, pipeline_id_mask, uris
+from ..core.lease.maintain import MAINTAIN_LEASES  # noqa: F401
 from ..core.partial import unwrap_partial
 from ..core.types import Args, Kwargs, T
 from ..tools.summarize import run_summary
-from . import strings, types
+from . import lease_waiter, same_process_in_flight, strings, types
 from .get_results import (
     PostShimResultGetter,
     ResultAndInvocationType,
-    lock_maintaining_future,
+    lease_maintaining_future,
     unwrap_value_or_error,
 )
 
@@ -43,13 +43,11 @@ _BEFORE_INVOCATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(int(max_con
 
 _DarkBlue = colorized(fg="white", bg="#00008b")
 _GreenYellow = colorized(fg="black", bg="#adff2f")
-_Purple = colorized(fg="white", bg="#800080")
 _Pink = colorized(fg="black", bg="#ff1493")
 logger = log.getLogger(__name__)
 _LogKnownResult = make_colorized_out(_DarkBlue, out=logger.info, fmt_str=" {} ")
 _LogNewInvocation = make_colorized_out(_GreenYellow, out=logger.info, fmt_str=" {} ")
-_LogInvocationAfterSteal = make_colorized_out(_Pink, out=logger.info, fmt_str=" {} ")
-_LogAwaitedResult = make_colorized_out(_Purple, out=logger.info, fmt_str=" {} ")
+_LogInvocationAfterTakeover = make_colorized_out(_Pink, out=logger.info, fmt_str=" {} ")
 
 
 def invoke_via_shim_or_return_memoized(  # noqa: C901
@@ -77,7 +75,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         - a result and metadata deserializer
         - URIs that are supported by a registered BlobStore implementation.
 
-        It uses a mops-internal locking mechanism to prevent concurrent invocations for the same function+args.
+        It uses a mops-internal lease mechanism to prevent concurrent invocations for the same function+args.
         """
         invoked_at = datetime.now(tz=timezone.utc)
         # capture immediately, because many things may delay actual start.
@@ -125,9 +123,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             )
             return ResultAndInvocationType(result, invoc_type)
 
-        @on_slow(lambda s: LogSlow(f"acquire_lock took {s:.1f}s for {memo_uri}"))
-        def acquire_lock() -> ty.Optional[lock.LockAcquired]:
-            return lock.acquire(fs.join(memo_uri, "lock"), expire=timedelta(seconds=88))
+        @on_slow(lambda s: LogSlow(f"acquire_lease took {s:.1f}s for {memo_uri}"))
+        def acquire_lease() -> ty.Optional[lease.LeaseAcquired]:
+            return lease.acquire(fs.join(memo_uri, lease.LEASE_DIRNAME), expire=timedelta(seconds=88))
 
         @on_slow(lambda s: LogSlow(f"upload_invocation_and_deps took {s:.1f}s for {memo_uri}"))
         def upload_invocation_and_deps() -> None:
@@ -158,14 +156,91 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             run_summary.extract_source_uris((args, kwargs)),
         )
 
-        log_invocation = _LogNewInvocation  # this is what we use unless we steal the lock.
+        deferred_uploads = deferred_work.capture_context()
+
+        def invoke_with_lease(
+            lease_owned: lease.LeaseAcquired,
+            log_invocation: ty.Callable[[str], ty.Any] = _LogNewInvocation,
+        ) -> MopsFuture[T]:
+            """The 'we own this invocation' path: upload the invocation, hand off to the
+            runtime shim, and wrap the shim's answer in a future.
+
+            Usually runs on the submitting thread (lease acquired on the first try), but
+            a lease_waiter takeover runs it on a fresh thread - so it re-enters the
+            stack-local context that argument serialization established at submit time.
+            """
+            # once we own the lease, we are in 'run this ourselves' mode forever. If our
+            # invocation fails, we fail, without any attempt to go 'back' to waiting for
+            # someone else to compute the result.
+            release_lease_in_current_process = lease.maintain_to_release(lease_owned)
+
+            completion_signal: "concurrent.futures.Future[None]" = concurrent.futures.Future()
+            same_process_in_flight.register(memo_uri, completion_signal)
+
+            try:
+                with (
+                    uris.ACTIVE_STORAGE_ROOT.set(storage_root),
+                    deferred_work.resume_context(deferred_uploads),
+                ):
+                    with _BEFORE_INVOCATION_SEMAPHORE:
+                        log_invocation(f"Invoking {memo_uri}")
+                        upload_invocation_and_deps()
+
+                    # can't hold the semaphore while we block on the shim, though.
+                    shim = shim_builder(func, args_, kwargs_)
+                    future_or_shim_result = (
+                        shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
+                            (
+                                memo_uri,
+                                *metadata.format_invocation_cli_args(
+                                    metadata.InvocationMetadata.new(
+                                        pipeline_id, invoked_at, lease_owned.writer_id
+                                    )
+                                ),
+                            )
+                        )
+                    )
+
+                future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
+                if hasattr(future_or_shim_result, "add_done_callback"):
+                    # if the shim returns a Future, we wrap it.
+                    logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
+                    # PostShimResultGetter.__call__ returns (value, metadata), so the lazy future
+                    # yields that tuple type; we cast to make the type match from_tuple_future's sig.
+                    lazy: futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]] = ty.cast(
+                        "futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]]",
+                        futures.make_lazy(lease_maintaining_future)(
+                            lease_owned, future_result_getter, future_or_shim_result
+                        ),
+                    )
+                    # lazy yields (value, metadata) since PostShimResultGetter now returns a tuple.
+                    mops_future = MopsFuture.from_tuple_future(lazy, memo_uri)
+                    same_process_in_flight.register(memo_uri, mops_future)  # replaces the placeholder
+                    return mops_future
+
+                else:  # it's a synchronous shim - just process the result directly.
+                    future_result_getter.release_lease = release_lease_in_current_process
+                    value, md = future_result_getter(future_or_shim_result)
+                    f = MopsFuture(futures.resolved(value), memo_uri)
+                    f.set_result_metadata(md)
+                    return f
+
+            except Exception:
+                try:
+                    release_lease_in_current_process()
+                except Exception:
+                    logger.exception(
+                        f"Failed to release lease {lease_owned.writer_id} after failed invocation."
+                    )
+                raise
+            finally:
+                if not completion_signal.done():
+                    completion_signal.set_result(None)  # wake subscribers
 
         # the network ops being grouped by _BEFORE_INVOCATION include one or more
         # download attempts (consider possible Paths) plus
         # one or more uploads (embedded Paths & Sources/refs, and then invocation).
         with _BEFORE_INVOCATION_SEMAPHORE:
-            # now actually execute the chunks of work that are required...
-
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
             result = check_result_exists("memoized")
@@ -175,93 +250,34 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                 f.set_result_metadata(md)
                 return f
 
-            lock_owned = acquire_lock()
+            lease_owned = acquire_lease()
             # if no result exists, the vastly most common outcome here will be acquiring
-            # the lock on the first try.  this will lead to breaking out of
-            # the LOCK LOOP directly below and going on to the shim invocation.
-            # still, we release the semaphore b/c we can't sleep while holding a lock.
+            # the lease on the first try.
 
-        # LOCK LOOP: entering this loop (where we attempt to acquire the lock) is the common non-memoized case
-        while not result:
-            if lock_owned:
-                break  # we own the invocation - invoke the shim ourselves (below)
+        if lease_owned:
+            return invoke_with_lease(lease_owned)
 
-            # getting to this point ONLY happens if we failed to acquire the lock, which
-            # is not expected to be the usual situation. We log a differently-colored
-            # message here to make that clear to users.
-            _LogAwaitedResult(
-                f"{val_or_res} for {memo_uri} does not exist, but the lock is owned by another process."
-            )
-            time.sleep(22)
+        # another caller holds the lease. Hand the wait to the shared waiter daemon and
+        # return a pending future immediately, rather than parking this thread in a
+        # sleep/check loop for however long the other caller takes.
+        def check_awaited_result() -> ResultAndInvocationType | None:
+            with _BEFORE_INVOCATION_SEMAPHORE, uris.ACTIVE_STORAGE_ROOT.set(storage_root):
+                return check_result_exists("awaited")
 
+        def acquire_lease_for_takeover() -> lease.LeaseAcquired | None:
             with _BEFORE_INVOCATION_SEMAPHORE:
-                result = check_result_exists("awaited")
-                if result:
-                    _LogAwaitedResult(
-                        f"{val_or_res} for {memo_uri} was found after waiting for the lock."
-                    )
-                    value, md = p_unwrap_value_or_error(memo_uri, result)
-                    f = MopsFuture(futures.resolved(value), memo_uri)
-                    f.set_result_metadata(md)
-                    return f
+                return acquire_lease()
 
-                lock_owned = acquire_lock()  # still inside the semaphore, as it's a network op
-                if lock_owned:
-                    log_invocation = _LogInvocationAfterSteal
-                    logger.info(f"Stole expired lock for {memo_uri} - invoking ourselves.")
-
-        assert lock_owned is not None
-        # if/when we acquire the lock, we move forever into 'run this ourselves mode'.
-        # If something about our invocation fails,
-        # we fail just as we would have previously, without any attempt to go
-        # 'back' to waiting for someone else to compute the result.
-        release_lock_in_current_process = lock.maintain_to_release(lock_owned)
-
-        try:
-            with _BEFORE_INVOCATION_SEMAPHORE:
-                log_invocation(f"Invoking {memo_uri}")
-                upload_invocation_and_deps()
-
-            # can't hold the semaphore while we block on the shim, though.
-            shim = shim_builder(func, args_, kwargs_)
-            future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
-                (
-                    memo_uri,
-                    *metadata.format_invocation_cli_args(
-                        metadata.InvocationMetadata.new(pipeline_id, invoked_at, lock_owned.writer_id)
-                    ),
-                )
-            )
-
-            future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
-            if hasattr(future_or_shim_result, "add_done_callback"):
-                # if the shim returns a Future, we wrap it.
-                logger.debug("Shim returned a Future; wrapping it for post-shim result retrieval.")
-                # PostShimResultGetter.__call__ returns (value, metadata), so the lazy future
-                # yields that tuple type; we cast to make the type match from_tuple_future's sig.
-                lazy: futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]] = ty.cast(
-                    "futures.PFuture[tuple[T, ty.Optional[metadata.ResultMetadata]]]",
-                    futures.make_lazy(lock_maintaining_future)(
-                        lock_owned, future_result_getter, future_or_shim_result
-                    ),
-                )
-                # lazy yields (value, metadata) since PostShimResultGetter now returns a tuple.
-                return MopsFuture.from_tuple_future(lazy, memo_uri)
-
-            else:  # it's a synchronous shim - just process the result directly.
-                future_result_getter.release_lock = release_lock_in_current_process
-                value, md = future_result_getter(future_or_shim_result)
-                f = MopsFuture(futures.resolved(value), memo_uri)
-                f.set_result_metadata(md)
-                return f
-
-        except Exception:
-            try:
-                release_lock_in_current_process()
-            except Exception:
-                logger.exception(
-                    f"Failed to release lock {lock_owned.writer_id} after failed invocation."
-                )
-            raise
+        return MopsFuture.from_tuple_future(
+            lease_waiter.future_awaiting_lease(
+                memo_uri,
+                what=val_or_res,
+                check_result=check_awaited_result,
+                unwrap=partial(p_unwrap_value_or_error, memo_uri),
+                acquire_lease=acquire_lease_for_takeover,
+                invoke_with_lease=partial(invoke_with_lease, log_invocation=_LogInvocationAfterTakeover),
+            ),
+            memo_uri,
+        )
 
     return create_invocation_and_result_future

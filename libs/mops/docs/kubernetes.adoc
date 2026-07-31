@@ -70,7 +70,7 @@ This does three jobs at once:
 - Anyone with access to the same blob store sees results computed by anyone else.
   Downstream code can simply call upstream functions to consume precomputed results.
 - Concurrent callers don't race to compute the same invocation — see
-  link:./invocation_locks.adoc[invocation locks].
+  link:./invocation_leases.adoc[invocation leases].
 
 When you genuinely want a fresh result, the dominant pattern is to pass a different
 output URI as an explicit function argument; mops's cache key is derived from the

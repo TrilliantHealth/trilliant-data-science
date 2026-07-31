@@ -1,3 +1,38 @@
+### 3.25
+
+- A lease-blocked `submit()` no longer parks its thread until the lease holder finishes: it returns a
+  pending `MopsFuture` immediately, and a single shared daemon thread (`runner/lease_waiter.py`) polls
+  every lease-blocked invocation in the process. The future resolves with the other process's result,
+  with our own invocation's result after taking over an expired lease (dispatched on a fresh thread), or
+  with an exception - including any error encountered while waiting, which previously raised out of
+  `submit()` itself. Futures cross process boundaries via pickle in process-pool orchestration patterns,
+  and a pending lease-blocked future cannot cross as-is (its waiter daemon dies with the sending
+  process), so pickling one: after a lease takeover, delegates to our own invocation's future, which is
+  picklable and lazily resumable in the receiving process; while still waiting on another process's live
+  lease, blocks until it resolves, exactly as the pre-3.25 `submit()` did.
+- Waiting on another process's lease now backs off exponentially (sleeps of 1, 2, 4, 8, 16, then 22s
+  repeating) instead of a flat 22s. For a waiter that arrives just as the owner starts, result checks
+  therefore land at ~1s, 3s, 7s, 15s, 31s, 53s, and every 22s thereafter (previously 22s, 44s, ...): a
+  result the owner produced in 2s is picked up at the 3s check instead of the 22s one, a 10s result at
+  15s, and once a wait is long the added latency stays bounded by the 22s cap. (Network time for the
+  checks themselves is extra.) The 'still waiting' log line is emitted on the first wait and then at most
+  every ~2 minutes, instead of on every poll.
+- Rename the invocation "lock" to what it always was: a lease. This is a clean break for the Python API
+  and config surface - no deprecated aliases:
+  - `thds.mops.pure.core.lock` is now `thds.mops.pure.core.lease`; `LockAcquired` -> `LeaseAcquired`,
+    `CannotMaintainLock` -> `CannotMaintainLease`, `LockWasStolenError` -> `LeaseLostError`,
+    `make_remote_lock_writer` -> `make_remote_lease_writer`, `add_lock_to_maintenance_daemon` ->
+    `add_lease_to_maintenance_daemon`.
+  - `pure.no_maintain_locks` -> `pure.no_maintain_leases`; `MAINTAIN_LOCKS` -> `MAINTAIN_LEASES`.
+  - config `thds.mops.pure.local.maintain_locks` -> `thds.mops.pure.local.maintain_leases` (env var
+    `THDS_MOPS_PURE_LOCAL_MAINTAIN_LEASES`).
+  - The on-storage paths are deliberately unchanged (the `lock/` directory under each memo URI, and
+    `lock.json` within it): they are a wire format shared with every other mops process that may
+    coordinate on the same memo URI, and will only be renamed at a major version.
+- When the lease holder is a thread in this same process, the waiter now wakes on the holder's completion
+  (via a weakly-held registry, `runner/same_process_in_flight.py`) instead of waiting out the polling
+  backoff. Timed polling remains the backstop. Memoization semantics and result identity are unchanged.
+
 ### 3.24
 
 - Per-launch cluster + namespace targeting: `k8s.shim`/`k8s.launch` accept `kubeconfig_context=` and

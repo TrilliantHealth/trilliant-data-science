@@ -81,7 +81,7 @@ class InvocationMetadata:
     invoker_code_version: str
     # ^ Collectively: the 'ABC's of the invocation metadata.
 
-    invoker_uuid: str  # the writer_uuid from the lock
+    invoker_uuid: str  # the writer_uuid from the lease
 
     pipeline_id: str
     # technically not _just_ metadata, because it is used directly in
@@ -167,7 +167,7 @@ def invocation_metadata_parser(
     )
     parser.add_argument(
         "--invoker-uuid",
-        help="The UUID of the invoker. This is generally the writer UUID from the lock.",
+        help="The UUID of the invoker. This is generally the writer UUID from the lease.",
     )
     parser.add_argument("--pipeline-id", required=True)
     return parser

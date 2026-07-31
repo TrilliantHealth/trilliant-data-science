@@ -13,7 +13,7 @@ from thds.core import config, log, scope
 
 from ..._utils.diagnostics import format_environment_diagnostics, format_exception_diagnostics
 from ..._utils.once import Once
-from ..core import deferred_work, lock, metadata, pipeline_id, uris
+from ..core import deferred_work, lease, metadata, pipeline_id, uris
 from ..core.entry import route_return_value_or_exception
 from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
@@ -200,21 +200,21 @@ def unpickle_invocation(
 
 
 @contextlib.contextmanager
-def _manage_lock(lock_uri: str, lock_writer_id: str) -> ty.Iterator[ty.Optional[Exception]]:
-    stop_lock: ty.Callable = lambda: None  # noqa: E731
+def _manage_lease(lease_uri: str, lease_writer_id: str) -> ty.Iterator[ty.Optional[Exception]]:
+    stop_lease: ty.Callable = lambda: None  # noqa: E731
     try:
-        stop_lock = lock.add_lock_to_maintenance_daemon(
-            lock.make_remote_lock_writer(lock_uri, expected_writer_id=lock_writer_id)
+        stop_lease = lease.add_lease_to_maintenance_daemon(
+            lease.make_remote_lease_writer(lease_uri, expected_writer_id=lease_writer_id)
         )
         yield None  # pause for execution
-    except lock.CannotMaintainLock as e:
-        logger.info(f"Cannot maintain lock: {e}. Continuing without the lock.")
+    except lease.CannotMaintainLease as e:
+        logger.info(f"Cannot maintain lease: {e}. Continuing without the lease.")
         yield None  # pause for execution
-    except lock.LockWasStolenError as stolen_lock_error:
-        logger.error(f"Lock was stolen: {stolen_lock_error}. Will exit without running the function.")
-        yield stolen_lock_error  # pause to upload failure
+    except lease.LeaseLostError as lost_lease_error:
+        logger.error(f"Lease was lost: {lost_lease_error}. Will exit without running the function.")
+        yield lost_lease_error  # pause to upload failure
 
-    stop_lock()  # not critical since we don't _own_ the lock, but keeps things cleaner
+    stop_lease()  # not critical since we don't _own_ the lease, but keeps things cleaner
 
 
 @scope.bound
@@ -231,7 +231,9 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
     fs = uris.lookup_blob_store(memo_uri)
 
     # any recursively-called functions that use metadata will retain the original invoker.
-    lock_error = scope.enter(_manage_lock(fs.join(memo_uri, "lock"), invocation_metadata.invoker_uuid))
+    lease_error = scope.enter(
+        _manage_lease(fs.join(memo_uri, lease.LEASE_DIRNAME), invocation_metadata.invoker_uuid)
+    )
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
 
     try:
@@ -244,12 +246,12 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
         # ONLY failures in this code should transmit an EXCEPTION
         # back to the orchestrator side.
 
-        # if the lock was stolen, we will write an exception
+        # if the lease was lost, we will write an exception
         # so that the orchestrator knows that it failed.
         # in theory, it could resume waiting for a result, though
         # currently it does not do this.
-        if lock_error:
-            raise lock_error
+        if lease_error:
+            raise lease_error
 
         with unwrap_use_runner(func):
             return func(*args, **kwargs)

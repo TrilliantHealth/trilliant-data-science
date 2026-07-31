@@ -137,3 +137,13 @@ class MopsFuture(ty.Generic[R]):
 
     def set_exception(self, exception: BaseException) -> None:
         self._inner.set_exception(exception)
+
+    def tuple_future(self) -> "futures.PFuture[tuple[R, ty.Optional[ResultMetadata]]]":
+        """A (value, metadata)-yielding view of this future, for re-rooting it across a
+        pickle boundary (see lease_waiter). Tuple-mode futures return their (picklable,
+        lazily-activated) inner directly; plain-mode futures are already resolved in
+        practice, but this blocks on .result() if one somehow is not."""
+        if self._yields_tuple:
+            return ty.cast("futures.PFuture[tuple[R, ty.Optional[ResultMetadata]]]", self._inner)
+
+        return futures.resolved((self.result(), self.result_metadata))

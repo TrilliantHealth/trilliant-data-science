@@ -13,7 +13,7 @@ When a mops function runs, it creates files in a predictable hierarchy:
 ├── invocation          # Pickled function + args
 ├── result              # Pickled return value (or absent if failed)
 ├── exception           # Pickled exception (if function raised)
-├── lock/               # Lock files for coordinating concurrent runs
+├── lock/               # Leasefile coordinating concurrent runs (dir name is historical)
 └── *-metadata-<run_id>.txt   # Debug metadata files
 ----
 
@@ -192,12 +192,12 @@ The `result` file references URIs pointing to one run's outputs (the winner). Th
 By examining metadata files:
 
 * **Same run_id timestamp, different words** = truly simultaneous races
-* **Different timestamps** = runs started at different times (maybe k8s retry, lock expiry, etc.)
+* **Different timestamps** = runs started at different times (maybe k8s retry, lease expiry, etc.)
 
-The `invoker_uuid` in the metadata (separate from run_id) tells you about lock ownership:
+The `invoker_uuid` in the metadata (separate from run_id) tells you about lease ownership:
 
-* **Same invoker_uuid** = same lock holder, but multiple actual executions (e.g., k8s ran multiple pods from the same Job)
-* **Different invoker_uuid** = different lock holders raced
+* **Same invoker_uuid** = same lease holder, but multiple actual executions (e.g., k8s ran multiple pods from the same Job)
+* **Different invoker_uuid** = different lease holders raced
 
 ## Using mops-inspect
 
@@ -212,9 +212,9 @@ This shows the function, args, result, exception (if any), and metadata in a rea
 
 ## Common Issues
 
-### Lock-related issues
+### Lease-related issues
 
-See link:invocation_locks.adoc[Invocation Locks] for details on lock behavior, timeouts, and stolen locks.
+See link:invocation_leases.adoc[Invocation Leases] for details on lease behavior, timeouts, and lost leases.
 
 ### Non-deterministic outputs break memoization
 
@@ -222,7 +222,7 @@ If your function produces different bytes for the same inputs (common with Parqu
 
 1. The first run produces output with hash A
 2. Downstream memoized functions consume that output (keyed on hash A)
-3. The runtime re-executes your function (k8s retry, lock expiry, etc.)
+3. The runtime re-executes your function (k8s retry, lease expiry, etc.)
 4. The second run produces output with hash B
 5. Downstream functions now see a _different_ input hash - their memoization is invalidated
 

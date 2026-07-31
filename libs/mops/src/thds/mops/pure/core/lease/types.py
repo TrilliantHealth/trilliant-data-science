@@ -1,14 +1,14 @@
 import typing as ty
 
 
-class LockContents(ty.TypedDict):
+class LeaseContents(ty.TypedDict):
     """Only writer_id, written_at, and expire are technically required for the algorithm
     - everything else is debugging info.
 
     In fact, expire_s would be 'optional' as well (this can be acquirer-only state), but
     it is advantegous to embed this explicitly, partly so that we can have remote
-    'maintainers' that do not need to have any information other than the lock uri passed
-    to them in order to maintain the lock.
+    'maintainers' that do not need to have any information other than the lease uri passed
+    to them in order to maintain the lease.
     """
 
     writer_id: str
@@ -25,7 +25,7 @@ class LockContents(ty.TypedDict):
     released_at: str
 
 
-class LockAcquired(ty.Protocol):
+class LeaseAcquired(ty.Protocol):
     writer_id: str
 
     def maintain(self) -> None: ...  # pragma: no cover

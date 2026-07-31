@@ -132,7 +132,7 @@ The memo URI for a call is only honestly derivable by running the orchestrator p
 (argument serialization has content-addressing side effects; pipeline-id masks and
 `calls=` logic keys all participate), so the injection tools are *shims*: the
 orchestrator hands the memo URI to a shim only after the memo check has missed, the
-invocation lock is held, and the invocation pickle has been uploaded. Injection
+invocation lease is held, and the invocation pickle has been uploaded. Injection
 therefore happens exactly where real computation would have, with full provenance, and
 only for calls that would actually have run.
 

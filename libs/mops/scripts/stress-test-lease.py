@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-# Loop thds.mops.pure.core.lock.cli.acquire_once N times in parallel with the same
+# Loop thds.mops.pure.core.lease.cli.acquire_once N times in parallel with the same
 # parameters, but different paths for --out-times, for M minutes.  Then, read all the
-# output files (one per parallel run), and verify that none of those locked-time windows
-# overlap (which would be a violation of the lock).
+# output files (one per parallel run), and verify that none of those leased-time windows
+# overlap (which would be a violation of the lease).
 #
 # The output time windows are CSV files with the following columns:
-# after_acquire: a unix epoch time immediately after acquiring the lock
-# before_release: a unix epoch time immediately after releasing the lock
+# after_acquire: a unix epoch time immediately after acquiring the lease
+# before_release: a unix epoch time immediately after releasing the lease
 import argparse
 import concurrent.futures
 import re
@@ -20,7 +20,7 @@ from timeit import default_timer
 from uuid import uuid4
 
 from thds.core import log
-from thds.mops.pure.core.lock.cli import acquire_and_hold_once
+from thds.mops.pure.core.lease.cli import acquire_and_hold_once
 
 
 def loop_1_for_m(idx: int, acquire_once: ty.Callable[[], None], minutes: float):
@@ -31,7 +31,7 @@ def loop_1_for_m(idx: int, acquire_once: ty.Callable[[], None], minutes: float):
             time.sleep(2)  # once we've gotten it, take a break and let somebody else get it.
 
 
-def loop_n_for_m(lock_uri: str, times_dir: Path, hold_once_acquired_s: float, n: int, minutes: float):
+def loop_n_for_m(lease_uri: str, times_dir: Path, hold_once_acquired_s: float, n: int, minutes: float):
     assert times_dir.is_dir() or not times_dir.exists(), f"{times_dir} exists and is not a directory"
     times_dir.mkdir(exist_ok=True, parents=True)
 
@@ -41,7 +41,10 @@ def loop_n_for_m(lock_uri: str, times_dir: Path, hold_once_acquired_s: float, n:
                 loop_1_for_m,
                 i,
                 acquire_once=partial(
-                    acquire_and_hold_once, lock_uri, hold_once_acquired_s, times_dir / f"lock-times-{i}"
+                    acquire_and_hold_once,
+                    lease_uri,
+                    hold_once_acquired_s,
+                    times_dir / f"lease-times-{i}",
                 ),
                 minutes=minutes,
             )
@@ -51,13 +54,13 @@ def loop_n_for_m(lock_uri: str, times_dir: Path, hold_once_acquired_s: float, n:
             future.result()
 
 
-class LockTimes(ty.NamedTuple):
+class LeaseTimes(ty.NamedTuple):
     after_acquire: float
     before_release: float
     idx: int
 
 
-def _error_on_first_overlapping_interval(times_tuples: ty.List[LockTimes]) -> ty.Tuple[float, float]:
+def _error_on_first_overlapping_interval(times_tuples: ty.List[LeaseTimes]) -> ty.Tuple[float, float]:
     times_tuples.sort(key=lambda x: x.after_acquire)  # sort by start time
 
     smallest_gap = 100000.0
@@ -75,20 +78,20 @@ def _error_on_first_overlapping_interval(times_tuples: ty.List[LockTimes]) -> ty
     return smallest_gap, biggest_gap
 
 
-def validate_lockfiles(times_dir: Path):
-    times_files = list(times_dir.glob("lock-times-*"))
+def validate_leasefiles(times_dir: Path):
+    times_files = list(times_dir.glob("lease-times-*"))
 
     times_tuples = []
-    for lock_times_file in times_files:
+    for lease_times_file in times_files:
         # get index from end of filename
-        idx = int(re.search(r"\d+$", lock_times_file.stem).group(0))  # type: ignore
+        idx = int(re.search(r"\d+$", lease_times_file.stem).group(0))  # type: ignore
 
-        for line in open(lock_times_file).read().splitlines():
+        for line in open(lease_times_file).read().splitlines():
             after_acquire, before_release = line.strip().split(",")
             assert after_acquire < before_release, (
                 f"after_acquire {after_acquire} >= before_release {before_release}"
             )
-            times_tuples.append(LockTimes(float(after_acquire), float(before_release), idx))
+            times_tuples.append(LeaseTimes(float(after_acquire), float(before_release), idx))
 
     if times_tuples:
         smallest_gap, biggest_gap = _error_on_first_overlapping_interval(times_tuples)
@@ -98,40 +101,40 @@ def validate_lockfiles(times_dir: Path):
         )
 
 
-def repeatedly_validate_lockfiles(times_dir: Path):
+def repeatedly_validate_leasefiles(times_dir: Path):
     while True:
         time.sleep(5)  # check every 5 seconds until process exit.
-        validate_lockfiles(times_dir)
+        validate_leasefiles(times_dir)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("lock_uri")
+    parser.add_argument("lease_uri")
     parser.add_argument("n", type=int)
     parser.add_argument(
         "--minutes", type=float, default=100.0, help="Test for a long time or a short one?"
     )
     parser.add_argument(
-        "--hold-once-acquired-s", type=float, default=5.0, help="How often the locks should 'cycle'"
+        "--hold-once-acquired-s", type=float, default=5.0, help="How often the leases should 'cycle'"
     )
     parser.add_argument(
         "--times-dir",
         type=Path,
-        default=Path(f".lock-times-{uuid4().hex}"),
-        help="Where to write the lock times",
+        default=Path(f".lease-times-{uuid4().hex}"),
+        help="Where to write the lease times",
     )
 
     args = parser.parse_args()
 
     if args.times_dir.exists():
-        validate_lockfiles(args.times_dir)
+        validate_leasefiles(args.times_dir)
         return
 
-    threading.Thread(target=repeatedly_validate_lockfiles, args=(args.times_dir,), daemon=True).start()
-    # keep validating these times files at all times - if a lock breaks, we want to know about it immediately.
+    threading.Thread(target=repeatedly_validate_leasefiles, args=(args.times_dir,), daemon=True).start()
+    # keep validating these times files at all times - if a lease breaks, we want to know about it immediately.
 
-    loop_n_for_m(args.lock_uri, args.times_dir, args.hold_once_acquired_s, args.n, args.minutes)
-    validate_lockfiles(args.times_dir)
+    loop_n_for_m(args.lease_uri, args.times_dir, args.hold_once_acquired_s, args.n, args.minutes)
+    validate_leasefiles(args.times_dir)
 
 
 if __name__ == "__main__":

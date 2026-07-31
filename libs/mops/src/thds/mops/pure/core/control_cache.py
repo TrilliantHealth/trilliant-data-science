@@ -12,7 +12,7 @@ CONTROL_CACHE_TTL_IN_SECONDS = config.item(
 # mops-created files. Set it to a negative value to bypass caching completely
 # (which also results in hashes not being checked). This can apply to a local
 # (stack) context, or can apply globally to the process. The former may be used
-# selectively within mops for issues of known correctness, e.g. locks, whereas
+# selectively within mops for issues of known correctness, e.g. leases, whereas
 # the latter will be useful for debugging any cases where files have been
 # remotely deleted.
 

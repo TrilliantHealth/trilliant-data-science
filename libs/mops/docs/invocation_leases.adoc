@@ -1,0 +1,125 @@
+link:../README.md[↑]
+
+# Invocation Leases
+
+No configuration or code changes are necessary to use this feature. It is baked directly into the
+`MemoizingPicklingRunner` and has been in production use for years.
+
+NOTE: These leases coordinate work across orchestrators _and_ within one. Concurrent
+same-process calls to the same invocation need no extra locking: one caller wins the
+lease, and the rest wake on its completion (see below).
+
+These were historically called "locks", but they are properly leases: they have built-in expiration
+dates and therefore do not ever require human intervention to recover from failed states. The code and
+docs now say "lease" everywhere, with one deliberate exception - the on-storage paths (the `lock/`
+directory under each memo URI, containing `lock.json`) keep the old name, because they are shared with
+every other mops process that may coordinate on the same memo URI. Renaming them is deferred to a major
+version.
+
+## Goals
+
+- Allow orchestrators to resume their previously-started remote invocations after exiting
+- Prevent separate orchestrators from starting remote invocations if one already has started.
+
+It is not specifically a goal of this feature to provide global-to-the-team Directed Acyclic Runner
+capabilities, but it is a practical outcome of the implementation. In other words, it should be possible
+to have the same program or multiple programs arbitrarily call functions and allow them to coordinate on
+invoking those that are not yet running, or awaiting the results of those that do.
+
+****
+A failure in this system should never affect the _correctness_ of results; only the efficiency with
+which we use remote resources. Multiple invocations should continue to return equivalent results no
+matter how many times the function is invoked with the same arguments.
+****
+
+## Basic operation
+
+The orchestrator creates/acquires an expiring lease after checking for an existing
+link:./memoization.adoc[memoized] result, but prior to passing control to the runtime shim (which starts the remote
+execution). If the lease cannot be acquired (because it is currently held by another process), the
+submitting thread does not wait: it returns a pending future immediately, and a single shared daemon
+thread polls every lease-blocked invocation in the process. Each poll checks for an existing result and
+then attempts to acquire the lease again, backing off exponentially from 1 second up to a cap of 22
+seconds - so short-lived invocations are picked up quickly without hammering storage during long ones.
+
+If the result is ever found prior to acquiring the lease, the future resolves with it. If the lease is
+ever acquired (because it expired), the runtime shim will be called on a fresh thread to start our own
+invocation, and the future resolves with its outcome. Any error encountered while waiting also resolves
+the future (exceptionally) - a lease-blocked future is never silently stranded.
+
+When the lease holder is a thread in this same process, the waiter also subscribes to the holder's
+completion, via a process-local registry (`runner/same_process_in_flight.py`). The future then resolves as soon as
+the holder finishes, without waiting out the backoff. Timed polling remains the backstop, so a raced
+registry lookup costs at most one poll cycle.
+
+The lease should be maintained by the acquirer to prevent expiration. In practice, this
+involves adding the lease to a daemon thread that will periodically 'update' the lease's
+`written_at` timestamp on a regular schedule. If this timestamp is not updated for longer
+than the expiration time,footnote:[Note well - the times in view here are inherently,
+unavoidably, untrustworthy. For this to work at all, all systems taking the lease must have
+quite similar notions of 'what time it is'. Usually NTP will ensure this to a sufficient
+degree for us, but in cases where inexplicable things happen, one consideration should be
+whether the various systems have different notions of time. Also, we make no attempt to
+deal with leap seconds or time running backwards because of network time syncs - it is
+hoped that this will resolve to noise with the relatively large time periods being used
+for the leases.] the lease is considered to have expired without release, and the next
+attempt to acquire it will succeed.
+
+NOTE: The lease may be added to the maintenance daemon mulitple times. It will always
+be added immediately before calling the shim (which is assumed to take a long time to even
+get started, and may or may not be synchronous, i.e. wait until the actual function has
+run in full). But, if the shim was in fact a FutureShim, returning a Future that
+represents that it was an async shim, the lease will be re-added to maintenance as soon as
+the LazyFuture returned by the Runner is first "activated" (via .result or similar
+methods). This allows invocations to be created (and shims to be called) in a process pool
+worker, but the eventual maintenance to be resumed by some central owning 'orchestrator'
+process, since those process pool workers will eventually die (and their maintenance
+daemon(s) along with them).
+
+The `MemoizingPicklingRunner` also passes the lease writer id to the remote. On the remote side, early in
+startup, the remote will identify the current lease writer id, and only if it matches will it continue to
+execute. This allows a form of "last writer wins" to break ties in cases where the acquirer did not
+maintain the lease (perhaps due to failure of the orchestrator process).
+
+The remote process will maintain the lease as well once it has started. This way, if the orchestrator
+itself dies, then the lease will not expire until after the remote side exits (whether successfully or
+unsuccessfully).
+
+When a runtime shim exits (whether successfully or unsuccessfully), the orchestrator will _release_ the lease
+immediately. This is mostly useful as a debugging indication that the orchestrator continued running
+until runtime shim exit, since (in successful cases) the presence of a `result` payload will mean that no other
+orchestrator will ever even attempt to acquire the lease.
+
+## Known Limitations
+
+### Delayed remote maintenance + dying orchestrators
+
+With Kubernetes and Databricks, it is possible to have a large delay between acquiring the lease/beginning
+the invocation, and the remote function actually beginning to run, because it takes time for nodes and
+clusters to spin up.
+
+In this situation, if the orchestrator dies before the remote begins executing, the lease expiration will
+eventually arrive, due to lack of lease maintenance. Then any other orchestrator, including a restart of
+the original one, will be able to acquire the lease, despite there existing a 'pending' execution of the
+function invocation.
+
+The remote runners are configured to exit with a `LeaseLostError` if, upon startup, they discover
+that some other acquirer has acquired the lease before they were able to start.
+
+In theory, this gives us "last orchestrator wins" semantics, which will generally be what we want as far
+as the user experience goes, but it will tend to slightly delay completion of a given function, since it
+will often be the first remote runner that chooses to exit even though it had been allocated runtime on a
+cluster. Since its orchestrator is probably dead and no longer polling for its completion, this is not a
+major issue; the later orchestrator will simply have to wait until its remote runner makes it to the head
+of the cluster queue on its own terms.
+
+### azure Python SDK network errors
+
+If you're running a huge pipeline, like Demand Forecast, it may be advantageous to opt out of the
+network-hungry lease maintenance on the orchestrator side of things. This will tend to create the above
+situation more frequently, but the lease should still basically prevent multiple invocations from actually
+beginning their computation.
+
+The relevant configuration is a core.config item, so you can programmatically disable it by importing
+`MAINTAIN_LEASES` from `thds.mops.pure.runner.local` and calling `.set_global(False)` on it. You can also
+set `THDS_MOPS_PURE_LOCAL_MAINTAIN_LEASES=0` in your environment.

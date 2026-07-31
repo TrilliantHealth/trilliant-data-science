@@ -6,7 +6,7 @@ from pathlib import Path
 from thds.core import concurrency, futures, log
 
 from ...config import max_concurrent_network_ops
-from ..core import lock, memo
+from ..core import lease, memo
 from ..core import metadata as metadata_mod
 from ..core.types import NoResultAfterShimSuccess
 from ..tools.summarize import run_summary
@@ -70,7 +70,7 @@ class PostShimResultGetter(ty.Generic[T]):
         [str, ResultAndInvocationType],
         tuple[T, ty.Optional[metadata_mod.ResultMetadata]],
     ]
-    release_lock: ty.Optional[ty.Callable[[], None]] = None
+    release_lease: ty.Optional[ty.Callable[[], None]] = None
 
     def __call__(self, _shim_result: ty.Any) -> tuple[T, ty.Optional[metadata_mod.ResultMetadata]]:
         """Check if the result exists, and return it if it does.
@@ -90,15 +90,15 @@ class PostShimResultGetter(ty.Generic[T]):
                     memo_uri, ResultAndInvocationType(value_or_error, "invoked")
                 )
         finally:
-            if self.release_lock is not None:
+            if self.release_lease is not None:
                 try:
-                    self.release_lock()
+                    self.release_lease()
                 except Exception:
-                    logger.exception("Failed to release lock after shim result retrieval.")
+                    logger.exception("Failed to release lease after shim result retrieval.")
 
 
-def lock_maintaining_future(
-    lock_acquired: lock.LockAcquired,
+def lease_maintaining_future(
+    lease_acquired: lease.LeaseAcquired,
     post_shim_result_getter: PostShimResultGetter[futures.R1],
     inner_future: futures.PFuture[futures.R],
 ) -> concurrent.futures.Future[futures.R1]:
@@ -108,7 +108,7 @@ def lock_maintaining_future(
     when the user calls `.result()` or some other method on the Future.
 
     This Future will be used to retrieve the result of a shim invocation, and will
-    maintain the lock while it is being retrieved.
+    maintain the lease while it is being retrieved.
     """
-    post_shim_result_getter.release_lock = lock.maintain_to_release(lock_acquired)
+    post_shim_result_getter.release_lease = lease.maintain_to_release(lease_acquired)
     return futures.chain_futures(inner_future, post_shim_result_getter)

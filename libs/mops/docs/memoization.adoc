@@ -95,7 +95,7 @@ local or remote) consuming the same arguments reads it back.
   being _called for_, not by being explicitly distributed — calling code doesn't need to
   know whether a result was computed two seconds or two months ago, or by which process.
 * **Concurrent callers**: when two orchestrators call the same function with the same
-  arguments at the same time, mops's link:./invocation_locks.adoc[lock/lease mechanism]
+  arguments at the same time, mops's link:./invocation_leases.adoc[lease mechanism]
   ensures one computes and the other waits, rather than both racing to recompute.
 * **Provenance is free**: the `memo_uri` _is_ the provenance — module + function + args +
   pipeline id, deterministic.

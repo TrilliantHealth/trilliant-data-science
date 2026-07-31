@@ -1,22 +1,22 @@
-"""The intent of this module is to provide a best-effort "lock"
+"""The intent of this module is to provide a best-effort "lease"
 that can be built on top of just `getbytes` and `putbytes` operations.
 
-It is important to note that this lock, while it should work under nearly all
-circumstances, is not actually a true lock - it is _possible_ for multiple holders of the
-lock to believe that they hold it exclusively, under degenerate conditions involving very
+It is important to note that this lease, while it should work under nearly all
+circumstances, is not actually a true lease - it is _possible_ for multiple holders of the
+lease to believe that they hold it exclusively, under degenerate conditions involving very
 slow networks. Therefore, it should only be used as a performance optimization, and not in
-cases where absolute application correctness depend upon an exclusive lock with full
+cases where absolute application correctness depend upon an exclusive lease with full
 guarantees.
 
-While it is possible that a lock may be acquired multiple times, the _more likely_ failure
-scenario is contention for the lock. There is a built in safety margin to reduce cases of
-multiple lock acquirers, and with a very large number of lockers, it is possible that no
+While it is possible that a lease may be acquired multiple times, the _more likely_ failure
+scenario is contention for the lease. There is a built in safety margin to reduce cases of
+multiple lease acquirers, and with a very large number of writers, it is possible that no
 acquirer will ever get to see its own write 'persist' long enough to determine that it has
-the lock.
+the lease.
 
-Again, this algorithm is _not_ designed to be a perfect lock - only to make it relatively
-efficient for a single caller to acquire a lock and maintain it for a period of time while
-other potential acquirers instead determine that they ought to wait for the lock to be
+Again, this algorithm is _not_ designed to be a perfect lease - only to make it relatively
+efficient for a single caller to acquire a lease and maintain it for a period of time while
+other potential acquirers instead determine that they ought to wait for the lease to be
 released.
 """
 
@@ -30,65 +30,65 @@ from thds import humenc
 from thds.core import log
 
 from . import _funcs
-from .read import get_writer_id, make_read_lockfile
-from .types import LockAcquired, LockContents
-from .write import LockEmitter, LockfileWriter
+from .read import get_writer_id, make_read_leasefile
+from .types import LeaseAcquired, LeaseContents
+from .write import LeaseEmitter, LeasefileWriter
 
 logger = log.getLogger(__name__)
 
 
 def acquire(  # noqa: C901
-    lock_dir_uri: str,
+    lease_dir_uri: str,
     *,
     expire: timedelta = timedelta(seconds=30),
     acquire_margin: timedelta = timedelta(seconds=0.0),
     debug: bool = True,
     block: ty.Optional[timedelta] = timedelta(seconds=0),
-) -> ty.Optional[LockAcquired]:
-    """Attempt to acquire an expiring lock.
+) -> ty.Optional[LeaseAcquired]:
+    """Attempt to acquire an expiring lease.
 
-    Return a callable suitable for 'maintaining the lock as active' if the lock was
-    acquired, plus a Callable suitable for releasing the lock - otherwise, return None to
-    indicate that the lock is not owned.
+    Return a callable suitable for 'maintaining the lease as active' if the lease was
+    acquired, plus a Callable suitable for releasing the lease - otherwise, return None to
+    indicate that the lease is not owned.
 
-    The lock_dir_uri must be identical across multiple processes.
+    The lease_dir_uri must be identical across multiple processes.
 
     It is strongly recommended that expire and acquire_margin also be identical
-    across all processes attempting to acquire the same lock.
+    across all processes attempting to acquire the same lease.
 
-    It is up to the caller to call `lock.maintain` at regular intervals less than
+    It is up to the caller to call `lease.maintain` at regular intervals less than
     `expire`.  It is polite and more efficient for other acquirers for you to call
-    `lock.release` when the lock is no longer needed.
+    `lease.release` when the lease is no longer needed.
 
-    A lock that has not been updated in 'expire' seconds is considered 'released' and may
+    A lease that has not been updated in 'expire' seconds is considered 'released' and may
     be acquired by any other process attempting to acquire it. If you do not `.maintain()`
-    the lock, you will lose it.
+    the lease, you will lose it.
 
     `acquire_margin` is the minimum amount of time that will be waited after attempting to
-    acquire the lock, to confirm that no other writer has also attempted to acquire
+    acquire the lease, to confirm that no other writer has also attempted to acquire
     it. This should be scaled to be longer than the longest delay you expect _any_
-    candidate process to experience between checking the lock uri, finding it acquirable,
-    and successfully writing back to the lock uri itself. If the default value (0) is
+    candidate process to experience between checking the lease uri, finding it acquirable,
+    and successfully writing back to the lease uri itself. If the default value (0) is
     provided, then the acquire_margin will be determined automatically to be twice the
     amount of time elapsed between the beginning of the check and the end of the write. If
     you have acquirers accessing this from very different environments, it may be safer to
     specify a higher acquire_margin that will be closer to the largest latency you expect
     any of your clients to experience.
 
-    `block` is the _minimum_ amount of time to wait before returning None if the lock
-    cannot be required. A zero length block will cause acquire to return None after the
+    `block` is the _minimum_ amount of time to wait before returning None if the lease
+    cannot be acquired. A zero length block will cause acquire to return None after the
     first unsuccessful attempt. Passing block=None will block until first acquisition.
 
-    If you fail to acquire the lock and want to try again, it is recommended that you call
+    If you fail to acquire the lease and want to try again, it is recommended that you call
     this at spaced intervals, not in a tight loop, in order to avoid performance issues.
 
     """
     if acquire_margin * 2 > expire:
-        # You should not be waiting nearly as much time as it would take for the lock to
-        # become expire to decide that you have acquired the lock.
+        # You should not be waiting nearly as much time as it would take for the lease to
+        # become expire to decide that you have acquired the lease.
         #
         # If network or other delays are encountered, other candidate acquirers will end
-        # up convinced that the lock has gone expire, right about the time you decide you
+        # up convinced that the lease has gone expire, right about the time you decide you
         # have acquired it.
         raise ValueError(
             f"Acquire margin ({acquire_margin.total_seconds()})"
@@ -108,30 +108,30 @@ def acquire(  # noqa: C901
     # useful to us because we are only using this as a big UUID, not as a hash of an
     # actual input.
 
-    lockfile_writer = LockfileWriter(
+    leasefile_writer = LeasefileWriter(
         my_writer_id,
-        lock_dir_uri,
-        LockEmitter(my_writer_id, expire),
+        lease_dir_uri,
+        LeaseEmitter(my_writer_id, expire),
         expire.total_seconds(),
         debug=debug,
     )
 
-    read_lockfile = make_read_lockfile(_funcs.make_lock_uri(lock_dir_uri))
+    read_leasefile = make_read_leasefile(_funcs.make_lease_uri(lease_dir_uri))
 
-    def is_released(lock_contents: LockContents) -> bool:
-        return bool(lock_contents.get("released_at"))
+    def is_released(lease_contents: LeaseContents) -> bool:
+        return bool(lease_contents.get("released_at"))
 
-    def is_fresh(lock_contents: LockContents) -> bool:
-        written_at_str = lock_contents.get("written_at")
+    def is_fresh(lease_contents: LeaseContents) -> bool:
+        written_at_str = lease_contents.get("written_at")
         if not written_at_str:
             # this likely won't happen in practice b/c we check released first.
             return False  # pragma: no cover
-        lock_expire_s = lock_contents["expire_s"]
-        if round(lock_expire_s, 4) != round(expire.total_seconds(), 4):
+        lease_expire_s = lease_contents["expire_s"]
+        if round(lease_expire_s, 4) != round(expire.total_seconds(), 4):
             logger.warning(
-                f"Remote lock {lock_dir_uri} has expire duration {lock_expire_s},"
+                f"Remote lease {lease_dir_uri} has expire duration {lease_expire_s},"
                 f" which is different than the local configuration {expire}."
-                " This may lead to multiple simultaneous acquirers on the lock."
+                " This may lead to multiple simultaneous acquirers on the lease."
             )
         return datetime.fromisoformat(written_at_str) + expire >= _funcs.utc_now()
 
@@ -143,8 +143,8 @@ def acquire(  # noqa: C901
         if acquire_margin_s and read_write_delay > acquire_margin_s:
             logger.warning(
                 f"It took longer ({read_write_delay}) than the acquire margin"
-                " between the lock check and completing the lock write."
-                " There is danger that another process may think it has acquired the lock."
+                " between the lease check and completing the lease write."
+                " There is danger that another process may think it has acquired the lease."
                 " You should make the acquire_margin longer to reduce the chances of this happening."
             )
         auto_acquire_delay = read_write_delay * 2
@@ -154,23 +154,23 @@ def acquire(  # noqa: C901
 
     while True:
         before_read = timeit.default_timer()
-        maybe_lock_contents = read_lockfile()
-        if maybe_lock_contents:
-            lock = maybe_lock_contents
-            if is_released(lock):
-                logger.debug("Lock %s was released - attempting to lock", lock_dir_uri)
-            elif not is_fresh(lock):
-                logger.debug("Lock %s has expired - will attempt to steal it!", lock_dir_uri)
-            elif get_writer_id(lock) == my_writer_id:
-                # LOCK ACQUIRED!
-                lockfile_writer.mark_acquired()
+        maybe_lease_contents = read_leasefile()
+        if maybe_lease_contents:
+            lease = maybe_lease_contents
+            if is_released(lease):
+                logger.debug("Lease %s was released - attempting to lease", lease_dir_uri)
+            elif not is_fresh(lease):
+                logger.debug("Lease %s has expired - will attempt to take it over!", lease_dir_uri)
+            elif get_writer_id(lease) == my_writer_id:
+                # LEASE ACQUIRED!
+                leasefile_writer.mark_acquired()
                 # You still need to maintain it by calling .maintain() periodically!
-                return lockfile_writer
+                return leasefile_writer
 
             else:
-                # lock is fresh and held by another acquirer - failed to acquire!
+                # lease is fresh and held by another acquirer - failed to acquire!
                 if acquire_delay:
-                    logger.info(f"Lost race for lock {lock_dir_uri}")
+                    logger.info(f"Lost race for lease {lease_dir_uri}")
                     # this is info (not debug) because we expect it to be rare.
                     acquire_delay = 0.0
                 if block is not None and _funcs.utc_now() > start + block:
@@ -182,16 +182,16 @@ def acquire(  # noqa: C901
                 # block=0.0 and then do the polling themselves.
                 continue
         else:
-            logger.debug("Lock %s does not exist - will attempt to lock it.", lock_dir_uri)
+            logger.debug("Lease %s does not exist - will attempt to lease it.", lease_dir_uri)
 
-        # lock has expired or does not exist - attempt to acquire it by writing!
-        lockfile_writer.write()
+        # lease has expired or does not exist - attempt to acquire it by writing!
+        leasefile_writer.write()
 
         # wait for a long enough time that we feel confident we were the last writer and
         # not just the fastest write-then-reader.
         acquire_delay = determine_acquire_delay(before_read)
         logger.debug(
-            "Waiting %s seconds before checking lock to see if we acquired it...", acquire_delay
+            "Waiting %s seconds before checking lease to see if we acquired it...", acquire_delay
         )
         time.sleep(acquire_delay)
-        # go back to the beginning of the loop, and see if we managed to acquire the lock!
+        # go back to the beginning of the loop, and see if we managed to acquire the lease!

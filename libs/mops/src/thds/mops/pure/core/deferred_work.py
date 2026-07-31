@@ -48,6 +48,30 @@ def open_context() -> ty.Iterator[None]:
             )
 
 
+def capture_context() -> dict[ty.Hashable, ty.Callable[[], ty.Any]] | None:
+    """Capture the open context (if any) so it can be resumed on another thread.
+
+    The context is a StackContext, i.e. thread-local: work deferred during argument
+    serialization on the submitting thread is invisible to any other thread. When an
+    invocation's dispatch later happens on a lease-waiter takeover thread, perform_all()
+    there would silently find nothing to do, and the invocation pickle would reference
+    Source uploads that never happened. The runner captures the dict at submit time and
+    the takeover thread re-enters it via resume_context.
+    """
+    return _DEFERRED_INVOCATION_WORK()
+
+
+def resume_context(
+    work_items: dict[ty.Hashable, ty.Callable[[], ty.Any]] | None,
+) -> ty.ContextManager[ty.Any]:
+    """Make a previously-captured context current, so perform_all() sees its items.
+
+    Safe to enter even on the thread that originally opened the context (the same dict
+    is simply pushed again), and with None (perform_all() then no-ops).
+    """
+    return _DEFERRED_INVOCATION_WORK.set(work_items)
+
+
 def add(work_owner: str, work_id: ty.Hashable, work: ty.Callable[[], ty.Any]) -> None:
     """Add some work to an open context. The work will be performed when perform_all() is
     called. If there is no open context, perform the work immediately.

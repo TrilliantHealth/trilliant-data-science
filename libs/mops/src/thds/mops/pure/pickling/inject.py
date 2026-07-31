@@ -10,7 +10,7 @@ identifiable.
 The memo URI for a call is only honestly derivable by running the orchestrator path
 (argument serialization has content-addressing side effects), so both tools here are
 shims: the orchestrator hands the memo URI to a shim only after the memo check has
-missed, the invocation lock is held, and the invocation pickle has been uploaded -
+missed, the invocation lease is held, and the invocation pickle has been uploaded -
 meaning injection happens exactly where real computation would have, with full
 provenance.
 
@@ -61,7 +61,7 @@ class MemoUriCapture(Exception):
 def capturing_shim(shim_args: ty.Sequence[str]) -> None:
     """A shim that never computes: it raises MemoUriCapture carrying the memo URI.
 
-    The orchestrator releases the invocation lock and propagates the exception.
+    The orchestrator releases the invocation lease and propagates the exception.
     """
     raise MemoUriCapture(shim_args[1], shim_args[2:])
 
