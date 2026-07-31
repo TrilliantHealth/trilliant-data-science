@@ -1,3 +1,9 @@
+### 3.26
+
+- No published API changes; this release is internal GPU support. `require_gpu()`, `ResourceDefinition`
+  and the rest of `node_selection` are untouched.
+
+
 ### 3.25
 
 - A lease-blocked `submit()` no longer parks its thread until the lease holder finishes: it returns a

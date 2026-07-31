@@ -20,8 +20,19 @@ from .node_selection import (  # noqa
     tolerates_spot,
 )
 
+# One try block each: a module missing from an install must not hide the others.
+try:
+    from .job_transforms import mount_shm  # noqa: F401
+except ModuleNotFoundError:
+    pass
+
 try:
     from . import thds_std  # noqa: F401
+except ModuleNotFoundError:
+    pass
+
+try:
+    from . import thds_std_gpu  # noqa: F401
 except ModuleNotFoundError:
     pass
 
