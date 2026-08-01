@@ -1,3 +1,14 @@
+### 3.26.20260801
+
+- Fix a regression introduced with the 3.25 lease waiter: a lease takeover dispatched the invocation
+  outside the contextvars context that `submit()` established. Serialization on the takeover thread
+  therefore lost the Source hashref map (and the args/kwargs contexts), and the remote failed to unpickle
+  any Source argument with `source_from_hashref called without a hashref map context`. All lease-waiter
+  work - result checks, lease acquisition, takeover dispatch - now runs in a contextvars snapshot taken
+  at submit time. This subsumes the 3.25 deferred-work-only capture, which is removed.
+- Invocation serialization now raises on the orchestrator when no hashref context is open, instead of
+  silently writing an empty header for the remote to crash on.
+
 ### 3.26
 
 - No published API changes; this release is internal GPU support. `require_gpu()`, `ResourceDefinition`

@@ -1,6 +1,7 @@
 """Joins pickle functionality and Blob Store functionality to run functions remotely."""
 
 import concurrent.futures
+import contextvars
 import typing as ty
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -156,8 +157,6 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             run_summary.extract_source_uris((args, kwargs)),
         )
 
-        deferred_uploads = deferred_work.capture_context()
-
         def invoke_with_lease(
             lease_owned: lease.LeaseAcquired,
             log_invocation: ty.Callable[[str], ty.Any] = _LogNewInvocation,
@@ -165,9 +164,9 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             """The 'we own this invocation' path: upload the invocation, hand off to the
             runtime shim, and wrap the shim's answer in a future.
 
-            Usually runs on the submitting thread (lease acquired on the first try), but
-            a lease_waiter takeover runs it on a fresh thread - so it re-enters the
-            stack-local context that argument serialization established at submit time.
+            Runs on the submitting thread when the lease is acquired on the first try; a
+            lease_waiter takeover runs it inside a contextvars snapshot of that thread
+            (see the lease-blocked branch below).
             """
             # once we own the lease, we are in 'run this ourselves' mode forever. If our
             # invocation fails, we fail, without any attempt to go 'back' to waiting for
@@ -178,28 +177,22 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             same_process_in_flight.register(memo_uri, completion_signal)
 
             try:
-                with (
-                    uris.ACTIVE_STORAGE_ROOT.set(storage_root),
-                    deferred_work.resume_context(deferred_uploads),
-                ):
-                    with _BEFORE_INVOCATION_SEMAPHORE:
-                        log_invocation(f"Invoking {memo_uri}")
-                        upload_invocation_and_deps()
+                with _BEFORE_INVOCATION_SEMAPHORE:
+                    log_invocation(f"Invoking {memo_uri}")
+                    upload_invocation_and_deps()
 
-                    # can't hold the semaphore while we block on the shim, though.
-                    shim = shim_builder(func, args_, kwargs_)
-                    future_or_shim_result = (
-                        shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
-                            (
-                                memo_uri,
-                                *metadata.format_invocation_cli_args(
-                                    metadata.InvocationMetadata.new(
-                                        pipeline_id, invoked_at, lease_owned.writer_id
-                                    )
-                                ),
+                # can't hold the semaphore while we block on the shim, though.
+                shim = shim_builder(func, args_, kwargs_)
+                future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
+                    (
+                        memo_uri,
+                        *metadata.format_invocation_cli_args(
+                            metadata.InvocationMetadata.new(
+                                pipeline_id, invoked_at, lease_owned.writer_id
                             )
-                        )
+                        ),
                     )
+                )
 
                 future_result_getter = PostShimResultGetter[T](memo_uri, p_unwrap_value_or_error)
                 if hasattr(future_or_shim_result, "add_done_callback"):
@@ -261,21 +254,29 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # return a pending future immediately, rather than parking this thread in a
         # sleep/check loop for however long the other caller takes.
         def check_awaited_result() -> ResultAndInvocationType | None:
-            with _BEFORE_INVOCATION_SEMAPHORE, uris.ACTIVE_STORAGE_ROOT.set(storage_root):
+            with _BEFORE_INVOCATION_SEMAPHORE:
                 return check_result_exists("awaited")
 
         def acquire_lease_for_takeover() -> lease.LeaseAcquired | None:
             with _BEFORE_INVOCATION_SEMAPHORE:
                 return acquire_lease()
 
+        # The closures below run on other threads, after submit()'s stack-local contexts
+        # (hashref map, args/kwargs, deferred uploads) have been torn down - so each runs
+        # in a snapshot. Two, because a Context cannot be entered by two threads at once.
+        polling_context = contextvars.copy_context()
+        takeover_context = contextvars.copy_context()
+
         return MopsFuture.from_tuple_future(
             lease_waiter.future_awaiting_lease(
                 memo_uri,
                 what=val_or_res,
-                check_result=check_awaited_result,
-                unwrap=partial(p_unwrap_value_or_error, memo_uri),
-                acquire_lease=acquire_lease_for_takeover,
-                invoke_with_lease=partial(invoke_with_lease, log_invocation=_LogInvocationAfterTakeover),
+                check_result=lambda: polling_context.run(check_awaited_result),
+                unwrap=lambda result: polling_context.run(p_unwrap_value_or_error, memo_uri, result),
+                acquire_lease=lambda: polling_context.run(acquire_lease_for_takeover),
+                invoke_with_lease=lambda lease_owned: takeover_context.run(
+                    invoke_with_lease, lease_owned, log_invocation=_LogInvocationAfterTakeover
+                ),
             ),
             memo_uri,
         )

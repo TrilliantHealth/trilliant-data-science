@@ -158,6 +158,13 @@ class MemoizingPicklingRunner:
         # (via SourceArgumentPickler). Embed it as a JSON header so the remote side
         # can resolve all Source arguments from the invocation file alone.
         hashref_map = stacklocal_hashrefs()
+        if hashref_map is None:
+            raise RuntimeError(
+                "No hashref context is open, so any Source arguments recorded during"
+                " argument serialization would be lost. submit() opens this context;"
+                " serialization outside it means a runner failed to carry submit's"
+                " context onto the thread running this invocation."
+            )
         header = json.dumps({"hashrefs": hashref_map} if hashref_map else {}, indent=2)
         return (
             header.encode("utf-8")
