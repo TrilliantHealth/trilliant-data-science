@@ -8,6 +8,10 @@
   at submit time. This subsumes the 3.25 deferred-work-only capture, which is removed.
 - Invocation serialization now raises on the orchestrator when no hashref context is open, instead of
   silently writing an empty header for the remote to crash on.
+- Release the invocation lease when a shim future fails or is cancelled. Previously only the
+  result-getting path released it, and that path never runs for a failed shim - so a failed remote job
+  left its lease maintained until process exit. The lease could then never expire, and every retry of the
+  invocation (including the same process's own) waited on it forever.
 
 ### 3.26
 

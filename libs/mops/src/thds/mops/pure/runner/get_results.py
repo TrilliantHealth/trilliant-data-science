@@ -97,6 +97,27 @@ class PostShimResultGetter(ty.Generic[T]):
                     logger.exception("Failed to release lease after shim result retrieval.")
 
 
+def _release_lease_on_failure(
+    release_lease: ty.Callable[[], None], shim_future: futures.PFuture
+) -> None:
+    """The chained result getter (whose finally releases the lease) only runs when the
+    shim future succeeds. A failed or cancelled shim future would otherwise leave the
+    lease maintained until process exit - never expiring, so every retry of the
+    invocation (including this process's own) would wait on it forever."""
+    try:
+        failed = shim_future.exception() is not None
+    except BaseException:  # noqa: B036 - cancellation also means the getter will never run
+        failed = True
+
+    if not failed:
+        return
+
+    try:
+        release_lease()
+    except Exception:
+        logger.exception("Failed to release lease after failed shim future.")
+
+
 def lease_maintaining_future(
     lease_acquired: lease.LeaseAcquired,
     post_shim_result_getter: PostShimResultGetter[futures.R1],
@@ -110,5 +131,7 @@ def lease_maintaining_future(
     This Future will be used to retrieve the result of a shim invocation, and will
     maintain the lease while it is being retrieved.
     """
-    post_shim_result_getter.release_lease = lease.maintain_to_release(lease_acquired)
+    release_lease = lease.maintain_to_release(lease_acquired)
+    post_shim_result_getter.release_lease = release_lease
+    inner_future.add_done_callback(lambda fut: _release_lease_on_failure(release_lease, fut))
     return futures.chain_futures(inner_future, post_shim_result_getter)
