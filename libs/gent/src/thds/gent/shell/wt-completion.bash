@@ -22,7 +22,7 @@ _wt_complete() {
 
     # Otherwise, completion depends on the subcommand
     case "$subcommand" in
-        cd|init|start|path)
+        cd|init|start|path|status)
             # Complete with worktree names
             COMPREPLY=($(compgen -W "$(wt-completion --worktrees 2>/dev/null)" -- "$cur"))
             ;;
@@ -35,7 +35,7 @@ _wt_complete() {
                 COMPREPLY=($(compgen -W "$(wt-completion --worktrees 2>/dev/null)" -- "$cur"))
             fi
             ;;
-        co|add)
+        co|sw)
             # First arg: branches and worktrees
             # Second arg: base branch
             if [[ $cword -eq 2 ]]; then

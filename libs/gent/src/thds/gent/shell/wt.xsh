@@ -86,10 +86,10 @@ def _wt(args):
     # Set marker so Python knows it's running through the shell wrapper
     os.environ['_WT_SHELL_WRAPPER'] = '1'
 
-    if cmd in ('root', 'cd', 'co'):
+    if cmd in ('root', 'cd', 'co', 'sw'):
         # `wt cd -` / `wt co -`: jump back to the previous worktree (like `cd -`).
         # Handled here so the dash never reaches the Python CLI.
-        if cmd in ('cd', 'co') and rest and rest[0] == '-':
+        if cmd in ('cd', 'co', 'sw') and rest and rest[0] == '-':
             previous = os.environ.get('_GENT_PREV_WT', '')
             if previous and os.path.isdir(previous):
                 os.environ['_GENT_PREV_WT'] = os.getcwd()
@@ -215,7 +215,7 @@ def _wt_completer(prefix, line, begidx, endidx, ctx):
             worktrees = {w for w in worktrees if w.startswith(prefix)}
             return worktrees, len(prefix)
 
-    elif subcommand in ('co', 'add'):
+    elif subcommand in ('co', 'sw'):
         # First arg: branches and worktrees, second arg: base branch
         if arg_position == 1:
             branches = _get_completions('--branches')

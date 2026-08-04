@@ -96,7 +96,9 @@ my-project/
 ```bash
 wt clone <url> [dir]   # Clone a repository with worktree structure
 wt list                # List all worktrees
+wt status [branch]     # Report anything notable about a worktree (silent when clean)
 wt co <branch> [base]  # Checkout existing or create new branch as worktree
+wt sw <branch> [base]  # Alias for `wt co`
 wt cd <branch>         # Navigate to a worktree (use `-` for the previous one)
 wt init [branch]       # Initialize worktree environment (.gent/init script)
 wt start [branch]      # Run start hook (e.g. open editor)
@@ -142,6 +144,23 @@ wt cd -                 # Jump back to the previous worktree (like `cd -`)
 
 `wt co -` does the same thing. The previous worktree is remembered per terminal, so `wt cd -` toggles
 between your two most recent worktrees.
+
+**Check on a worktree:**
+
+```bash
+wt status                  # the worktree you are standing in
+wt status feature/old      # a specific one, by directory or branch name
+wt status --all            # everything notable in the repository
+```
+
+`wt status` prints nothing when there is nothing to say, so `--all` over a large repository lists only
+the worktrees that need attention. It reports uncommitted changes, unpushed commits, commits not yet in a
+base ref (`--base`, default `origin/main`), and worktrees whose directory name no longer matches their
+branch.
+
+That last one is the reason to prefer `wt co` over `git switch`: gent's conventions rely on a worktree's
+directory name being its branch name, and a `git switch` inside a worktree silently breaks it. Nothing
+about the worktree looks wrong afterward, so `wt status` is how you find out.
 
 **Clean up:**
 

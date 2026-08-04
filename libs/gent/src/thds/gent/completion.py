@@ -23,7 +23,7 @@ import sys
 import argh
 
 # Import command definitions from main entry point
-from thds.gent.__main__ import COMMANDS
+from thds.gent.__main__ import ALIASES, COMMANDS
 from thds.gent.utils import find_worktree_root, get_bare_path, get_branch_list, parse_git_worktree_list
 
 
@@ -99,9 +99,15 @@ def get_subcommands(with_descriptions: bool = False) -> list[str]:
         List of subcommand completion candidates
     """
     if with_descriptions:
-        return [f"{cmd}\t{info['description']}" for cmd, info in COMMANDS.items()]
-    else:
-        return list(COMMANDS.keys())
+        # An alias gets its own row pointing at its target, rather than
+        # repeating the description, so the two never look like separate
+        # commands that happen to do the same thing.
+        return [
+            *(f"{cmd}\t{info['description']}" for cmd, info in COMMANDS.items()),
+            *(f"{alias}\tAlias for '{target}'" for alias, target in ALIASES.items()),
+        ]
+
+    return [*COMMANDS, *ALIASES]
 
 
 @argh.arg("--worktrees", help="List worktree names")

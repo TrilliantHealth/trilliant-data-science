@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from thds.gent.__main__ import ALIASES, COMMANDS
+
 
 def test_worktrees_mode_lists_worktree_names(worktree_git_repo, run_completion):
     """Test that --worktrees mode lists existing worktree names."""
@@ -162,18 +164,7 @@ def test_subcommands_with_descriptions(worktree_git_repo, run_completion):
         parts = line.split("\t")
         assert len(parts) == 2
         command, description = parts
-        assert command in [
-            "clone",
-            "root",
-            "cd",
-            "path",
-            "list",
-            "rm",
-            "init",
-            "start",
-            "co",
-            "setup-shell",
-        ]
+        assert command in {*COMMANDS, *ALIASES}
         assert len(description) > 0
 
 

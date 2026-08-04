@@ -64,12 +64,37 @@ COMMANDS: dict[str, CommandInfo] = {
         "description": "Checkout existing branch or create new worktree",
         "usage": "wt co <branch-name> [base-branch]",
     },
+    "status": {
+        "module": "thds.gent.commands.status",
+        "description": "Print a one-line status for a worktree (silent when clean)",
+        "usage": "wt status [branch-or-path]",
+    },
     "setup-shell": {
         "module": "thds.gent.commands.setup_shell",
         "description": "Set up shell integration (~/.gent/)",
         "usage": "wt setup-shell",
     },
 }
+
+# Alternate spellings for commands in COMMANDS. Aliases dispatch identically to
+# their target but are hidden from the help listing.
+#
+# Anything added here must also be taught to the shell wrappers (shell/wt.sh,
+# shell/wt.xsh) if its target is a navigation command, or the alias will run the
+# Python CLI without changing the shell's directory.
+ALIASES: dict[str, str] = {
+    "sw": "co",
+}
+
+
+def aliases_for(command: str) -> list[str]:
+    """Alternate spellings that dispatch to *command*."""
+    return sorted(alias for alias, target in ALIASES.items() if target == command)
+
+
+def _command_label(command: str) -> str:
+    """Command name as shown in help, e.g. 'co (sw)'."""
+    return f"{command} ({', '.join(aliases_for(command))})" if aliases_for(command) else command
 
 
 def show_help() -> None:
@@ -82,18 +107,19 @@ def show_help() -> None:
     print()
     print("Commands:")
 
-    # Find longest command name for alignment
-    max_len = max(len(cmd) for cmd in COMMANDS.keys())
+    labels = {cmd: _command_label(cmd) for cmd in COMMANDS}
+    max_len = max(len(label) for label in labels.values())
 
     for cmd, info in COMMANDS.items():
-        padding = " " * (max_len - len(cmd) + 2)
-        print(f"  {cmd}{padding}{info['description']}")
+        padding = " " * (max_len - len(labels[cmd]) + 2)
+        print(f"  {labels[cmd]}{padding}{info['description']}")
 
     print()
     print("Examples:")
     print("  wt clone git@github.com:user/repo.git    # Clone with worktree structure")
     print("  wt list                                   # List all worktrees")
     print("  wt co feature/new                         # Create worktree from current branch")
+    print("  wt sw feature/new                         # Same thing - 'sw' is an alias for 'co'")
     print("  wt co feature/new main                    # Create worktree from main branch")
     print("  wt cd main                                # Navigate to main worktree")
     print("  wt init                                   # Initialize current worktree")
@@ -110,7 +136,7 @@ def main() -> None:
         show_help()
         sys.exit(0)
 
-    command = sys.argv[1]
+    command = ALIASES.get(sys.argv[1], sys.argv[1])
 
     # Check if command exists
     if command not in COMMANDS:

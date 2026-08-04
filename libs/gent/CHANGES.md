@@ -1,3 +1,14 @@
+## 1.6
+
+- Added `wt status`, which reports anything notable about a worktree in one line and prints nothing when
+  there is nothing to say. It catches worktrees whose directory name no longer matches their HEAD, which
+  breaks the naming convention `wt cd` and tab completion depend on and is otherwise invisible. Also
+  reports uncommitted changes, unpushed commits, and commits not yet in a base ref. `--all` covers every
+  worktree in the repository.
+- Added `wt sw` as an alias for `wt co`. Aliases are declared in a single `ALIASES` mapping and are
+  hidden from the help listing. Requires re-running `wt setup-shell` (shell integration bumped to v6),
+  since the shell wrapper needs to know `sw` changes directories.
+
 ## 1.5
 
 - Fixed `wt clone` writing the `remote.origin.fetch` refspec with literal surrounding quotes

@@ -47,10 +47,10 @@ wt() {
     export _WT_SHELL_WRAPPER=1
 
     case "$cmd" in
-        root|cd|co)
+        root|cd|co|sw)
             # `wt cd -` / `wt co -`: jump back to the previous worktree (like `cd -`).
             # Handled entirely in the shell so the dash never reaches the Python CLI.
-            if { [ "$cmd" = "cd" ] || [ "$cmd" = "co" ]; } && [ "$1" = "-" ]; then
+            if { [ "$cmd" = "cd" ] || [ "$cmd" = "co" ] || [ "$cmd" = "sw" ]; } && [ "$1" = "-" ]; then
                 if [ -n "$_GENT_PREV_WT" ] && [ -d "$_GENT_PREV_WT" ]; then
                     local previous="$_GENT_PREV_WT"
                     export _GENT_PREV_WT="$PWD"

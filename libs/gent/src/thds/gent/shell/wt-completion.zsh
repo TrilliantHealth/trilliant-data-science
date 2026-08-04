@@ -53,7 +53,7 @@ _wt() {
             ;;
         args)
             case ${words[1]} in
-                cd|init|start|path)
+                cd|init|start|path|status)
                     _wt_get_worktrees
                     ;;
                 rm)
@@ -65,7 +65,7 @@ _wt() {
                         _wt_get_worktrees
                     fi
                     ;;
-                co|add)
+                co|sw)
                     if [[ $CURRENT -eq 2 ]]; then
                         _wt_get_branches_and_worktrees
                     elif [[ $CURRENT -eq 3 ]]; then
