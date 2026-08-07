@@ -34,13 +34,6 @@ def _reportable(worktrees: ty.Iterable[WorktreeInfo]) -> list[WorktreeInfo]:
     return [wt for wt in worktrees if not wt.bare and wt.path.name != ".bare"]
 
 
-def _by_name(worktrees: ty.Iterable[WorktreeInfo], target: str) -> WorktreeInfo | None:
-    return next(
-        (wt for wt in worktrees if wt.branch == target or str(wt.relative) == target),
-        None,
-    )
-
-
 def _containing(worktrees: ty.Iterable[WorktreeInfo], directory: Path) -> WorktreeInfo | None:
     """The worktree *directory* lives in, which may be several levels down inside it."""
     resolved = directory.resolve()
@@ -49,6 +42,26 @@ def _containing(worktrees: ty.Iterable[WorktreeInfo], directory: Path) -> Worktr
         key=lambda wt: len(wt.path.parts),
         default=None,
     )
+
+
+def _by_name(worktrees: ty.Iterable[WorktreeInfo], target: str) -> WorktreeInfo | None:
+    """The worktree *target* names: a branch, a repo-relative path, or a real path.
+
+    Accepting a path matters for scripts, which hold a directory and rarely the
+    branch; converting one to the other requires knowing this repo's layout. An
+    absolute path is resolved even when it points inside the worktree rather than
+    at its root, matching what a bare `wt status` does with the cwd.
+    """
+    named = next(
+        (wt for wt in worktrees if wt.branch == target or str(wt.relative) == target),
+        None,
+    )
+    if named is not None:
+        return named
+
+    candidate = Path(target).expanduser()
+
+    return _containing(worktrees, candidate) if candidate.is_absolute() else None
 
 
 def _dirty_count(worktree: Path) -> int:

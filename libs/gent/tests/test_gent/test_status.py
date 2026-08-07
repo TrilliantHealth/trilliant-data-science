@@ -98,3 +98,48 @@ def test_unknown_target_warns(worktree_git_repo, run_wt):
 
     assert result.stdout.strip() == ""
     assert "No worktree found" in result.stderr
+
+
+def test_finds_worktree_by_absolute_path(worktree_git_repo, run_wt):
+    """Scripts hold a directory, not a branch name.
+
+    Converting one to the other means knowing this repo's layout, which a caller
+    with a path generally does not.
+    """
+    feature = _worktree(worktree_git_repo, run_wt, "feature/by-path")
+    write_file(feature, "dirty.txt", "uncommitted\n")
+
+    result = run_wt("status", [str(feature)], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert "1 dirty" in result.stdout
+
+
+def test_an_absolute_path_inside_a_worktree_resolves_to_it(worktree_git_repo, run_wt):
+    """Matching what a bare `wt status` does with a cwd several levels down."""
+    feature = _worktree(worktree_git_repo, run_wt, "feature/deep-path")
+    write_file(feature, "nested/deep/file.txt", "uncommitted\n")
+
+    result = run_wt("status", [str(feature / "nested" / "deep")], cwd=worktree_git_repo / "main")
+
+    assert "1 dirty" in result.stdout
+
+
+def test_a_clean_worktree_named_by_path_still_says_nothing(worktree_git_repo, run_wt):
+    feature = _worktree(worktree_git_repo, run_wt, "feature/clean-path")
+
+    result = run_wt("status", [str(feature)], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
+
+
+def test_an_absolute_path_outside_the_repo_warns(worktree_git_repo, run_wt, tmp_path):
+    """It must not silently report nothing, which would read as 'clean'."""
+    outside = tmp_path / "not-in-the-repo"
+    outside.mkdir()
+
+    result = run_wt("status", [str(outside)], cwd=worktree_git_repo / "main")
+
+    assert result.stdout.strip() == ""
+    assert "No worktree found" in result.stderr
