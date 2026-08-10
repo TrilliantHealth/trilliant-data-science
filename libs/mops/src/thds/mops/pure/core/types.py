@@ -1,5 +1,6 @@
 """Core abstractions for the remote runner system."""
 
+import datetime as dt
 import typing as ty
 from pathlib import Path
 
@@ -122,6 +123,58 @@ class BlobStore(Protocol):
         """
 
     def is_blob_not_found(self, __exc: Exception) -> bool: ...
+
+
+class BlobListing(ty.NamedTuple):
+    """One entry from a listing.
+
+    `modified_at` is assigned by the storage service, not by whoever wrote the object, so it
+    is the one timestamp in a distributed run that needs no agreement between machines. It
+    is None only for stores that cannot report one.
+
+    It is deliberately not a resume mechanism: no object store can filter a listing by time
+    server-side, so callers resuming an incremental read must do it by URI (see
+    `list`). Treat this as display data - how stale something is, how long ago it
+    arrived.
+    """
+
+    uri: str
+    modified_at: None | dt.datetime
+
+
+Listings = list[BlobListing]
+# named because `list` as a method name shadows the builtin inside the class body below,
+# which would otherwise make an annotation there subscript the method.
+
+
+@ty.runtime_checkable
+class ListableBlobStore(ty.Protocol):
+    """An optional capability, kept separate from BlobStore so implementing it stays a
+    choice. `AdlsBlobStore` has offered listing for some time; this only names the shape so
+    a caller can check for it instead of assuming a concrete implementation.
+
+    Nothing on the invocation path lists - memoization derives every URI it needs, which is
+    why BlobStore requires no such method. Only observability tooling, which must discover
+    objects written by processes it never spoke to, needs this. A store without it still
+    runs every mops workload; its runs just cannot be read back by those tools.
+    """
+
+    def list(self, __prefix_uri: str, __start_at: str = "") -> Listings:
+        """Entries directly under a prefix, non-recursively, in lexicographic order by URI.
+
+        Ordering is guaranteed rather than incidental: ADLS, S3 and GCS all specify it, and
+        every incremental reader depends on it.
+
+        `start_at` begins the listing at the first entry whose URI sorts at or after it -
+        inclusive, and it need not name a real object, since it is a position in the sort
+        order rather than a lookup. A caller resuming from a watermark therefore re-reads
+        one entry, which is harmless for an idempotent consumer and much safer than the
+        exclusive alternative, where an off-by-one silently skips an object.
+
+        Inclusivity differs by service (ADLS `beginFrom` and GCS `startOffset` are
+        inclusive; S3 `StartAfter` is exclusive), so an implementation must normalize to
+        this contract rather than pass the caller's value straight through.
+        """
 
 
 Args = ty.Sequence

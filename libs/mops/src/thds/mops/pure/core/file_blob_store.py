@@ -1,3 +1,4 @@
+import datetime as dt
 import os
 import shutil
 import typing as ty
@@ -8,10 +9,24 @@ from thds.core import config, log
 from thds.core.files import FILE_SCHEME, atomic_write_path, path_from_uri, remove_file_scheme, to_uri
 from thds.core.link import link
 
-from ..core.types import AnyStrSrc, BlobStore
+from ..core.types import AnyStrSrc, BlobListing, BlobStore, Listings
 
 MOPS_ROOT = config.item("control_root", default=Path.home() / ".mops")
 logger = log.getLogger(__name__)
+
+
+def _listings(root: Path) -> ty.Iterator[BlobListing]:
+    """A file removed between `iterdir` and `stat` is skipped rather than failing the whole
+    listing - concurrent writers and TTL cleanup make that a normal occurrence, and one
+    vanished file should not cost a reader every other entry."""
+    for path in root.iterdir():
+        try:
+            if path.is_file():
+                yield BlobListing(
+                    to_uri(path), dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.timezone.utc)
+                )
+        except OSError:
+            logger.debug("Skipping %s while listing; it went away.", path)
 
 
 @contextmanager
@@ -83,6 +98,21 @@ class FileBlobStore(BlobStore):
 
     def exists(self, remote_uri: str) -> bool:
         return path_from_uri(remote_uri).exists()
+
+    def list(self, prefix_uri: str, start_at: str = "") -> Listings:
+        """The optional ListableBlobStore capability - see `core.types`.
+
+        Non-recursive, matching AdlsBlobStore. Sorted, which a filesystem does not do on its
+        own - `iterdir` yields in directory order.
+        """
+        root = path_from_uri(prefix_uri)
+        if not root.is_dir():
+            return []
+
+        listed = sorted(_listings(root), key=lambda entry: entry.uri)
+        # sort on the URI alone: BlobListing's tuple ordering would fall through to
+        # modified_at on a tie, which cannot be compared when one side is None.
+        return [entry for entry in listed if entry.uri >= start_at] if start_at else listed
 
     def join(self, *parts: str) -> str:
         return os.path.join(*parts)

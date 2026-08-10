@@ -69,10 +69,10 @@
 
 - `ListableBlobStore` names the optional listing capability `AdlsBlobStore` already offered, so a caller
   can check for it rather than assume a concrete implementation; `FileBlobStore` now implements it too.
-  Listing returns `BlobListing` in lexicographic order, and `list_from` resumes at a given URI instead of
-  re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking an
-  off-by-one that skips one. No object store can filter a listing by modification time, so resuming is by
-  position in the sort order. Nothing on the invocation path lists.
+  Listing returns `BlobListing` in lexicographic order, and an optional `start_at` resumes at a given URI
+  instead of re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking
+  an off-by-one that skips one. No object store can filter a listing by modification time, so resuming is
+  by position in the sort order. Nothing on the invocation path lists.
 
 - The orchestrator publishes its own events to the blob store, batched on a timer
   (`thds.mops.console.upload_interval_seconds`, default 15s), so the stream there is sufficient on its
@@ -83,10 +83,10 @@
 
 - `ListableBlobStore` names the optional listing capability `AdlsBlobStore` already offered, so a caller
   can check for it rather than assume a concrete implementation; `FileBlobStore` now implements it too.
-  Listing returns `BlobListing` in lexicographic order, and `list_from` resumes at a given URI instead of
-  re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking an
-  off-by-one that skips one. No object store can filter a listing by modification time, so resuming is by
-  position in the sort order. Nothing on the invocation path lists.
+  Listing returns `BlobListing` in lexicographic order, and an optional `start_at` resumes at a given URI
+  instead of re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking
+  an off-by-one that skips one. No object store can filter a listing by modification time, so resuming is
+  by position in the sort order. Nothing on the invocation path lists.
 
 ### 3.26.20260801
 

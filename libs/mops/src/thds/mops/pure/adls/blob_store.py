@@ -14,7 +14,8 @@ from thds.core import config, fretry, home, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
 from ..core.control_cache import CONTROL_CACHE_TTL_IN_SECONDS, exists_with_expiry
-from ..core.types import AnyStrSrc, BlobStore
+from ..core.types import AnyStrSrc, BlobListing, BlobStore, Listings
+from . import listing
 
 T = ty.TypeVar("T")
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
@@ -42,6 +43,13 @@ def is_creds_failure(exc: Exception) -> bool:
 _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9, delay=1.0))
 # sometimes Azure Cli credentials expire but would succeed if retried
 # and the azure library does not seem to retry these on its own.
+
+
+def _as_listings(fqn: adls.AdlsFqn, listed: ty.Iterable[listing.Listed]) -> Listings:
+    return [
+        BlobListing(str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, entry.name)), entry.last_modified)
+        for entry in listed
+    ]
 
 
 class AdlsBlobStore(BlobStore):
@@ -102,12 +110,29 @@ class AdlsBlobStore(BlobStore):
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
 
-    def list(self, uri: str) -> ty.List[str]:
+    def list(self, uri: str, start_at: str = "") -> Listings:
+        """`get_paths` returns last_modified in the listing response, so reporting it costs
+        no extra request - no per-path HEAD.
+
+        `beginFrom` takes a name relative to the listed directory, so a full-URI watermark
+        is reduced to its final segment. Listing is non-recursive, which is what makes that
+        reduction sound: every entry is a direct child, so the segment is the whole of what
+        the service compares.
+        """
         fqn = adls.fqn.parse(uri)
-        return [
-            str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, path.name))
-            for path in get_global_fs_client(fqn.sa, fqn.container).get_paths(fqn.path, recursive=False)
-        ]
+        client = get_global_fs_client(fqn.sa, fqn.container)
+        if not start_at:
+            return _as_listings(
+                fqn,
+                (
+                    listing.Listed(path.name, path.last_modified)
+                    for path in client.get_paths(fqn.path, recursive=False)
+                ),
+            )
+
+        return _as_listings(
+            fqn, listing.paths_from(client, fqn, adls.fqn.parse(start_at).path.rsplit("/", 1)[-1])
+        )
 
 
 class DangerouslyCachingStore(AdlsBlobStore):

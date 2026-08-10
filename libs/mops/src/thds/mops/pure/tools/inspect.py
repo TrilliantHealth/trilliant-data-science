@@ -24,7 +24,7 @@ from pprint import pprint
 from thds import adls
 from thds.core import log, parallel, scope, thunks, tmp
 from thds.mops.parallel import Thunk
-from thds.mops.pure.core import uris
+from thds.mops.pure.core import types, uris
 from thds.mops.pure.core.memo import results
 from thds.mops.pure.pickling._pickle import CallableUnpickler, read_metadata_and_object
 from thds.mops.pure.pickling.remote import unpickle_invocation
@@ -375,7 +375,11 @@ def _diff_memospace(uri: str) -> ty.List[str]:
 
     logger.info(f"Diffing against all siblings in the memospace {memospace_uri}")
 
-    sibling_uris = fs.list(memospace_uri)  # type: ignore
+    if not isinstance(fs, types.ListableBlobStore):
+        logger.warning(f"The blob store for '{memospace_uri}' cannot list, so siblings cannot be found.")
+        return []
+
+    sibling_uris = [listing.uri for listing in fs.list(memospace_uri)]
     sibling_uris = [s_uri for s_uri in sibling_uris if not uri.startswith(s_uri)]
     # eliminate the URI itself - but we use prefix match because we might have specified invocation or something.
 
