@@ -193,3 +193,31 @@ def test_submit_returns_mops_future_with_memo_uri_and_metadata(tmp_path):
     assert fut2.result() == 7
     assert fut2.memo_uri == fut1.memo_uri
     assert fut2.result_metadata is not None
+
+
+@pytest.mark.parametrize(
+    "invoc_type,emits",
+    [
+        pytest.param("memoized", True, id="memoized-hits-are-reported"),
+        pytest.param("awaited", True, id="awaited-is-a-memoized-hit-this-run-waited-for"),
+        pytest.param("invoked", False, id="invoked-work-is-reported-by-its-remote"),
+    ],
+)
+def test_reused_results_emit_a_console_event(monkeypatch, invoc_type, emits):
+    """Nothing else will ever report a result this run did not compute: no remote of ours
+    ran it, and its summary stays on this machine."""
+    reported = []
+    monkeypatch.setattr(get_results.console, "memoized", lambda *a, **k: reported.append(k))
+
+    get_results.unwrap_value_or_error(
+        lambda type_hint, uri: (None, "THE_VALUE"),
+        None,
+        "runner_prefix",
+        (),
+        "adls://x/memo",
+        get_results.ResultAndInvocationType(
+            memo.results.Success(value_uri="adls://x/value"), invoc_type
+        ),
+    )
+
+    assert bool(reported) == emits

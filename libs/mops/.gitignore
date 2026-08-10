@@ -1,3 +1,8 @@
 **/mops2-mpf
 .lock-times-*
 *.hjson
+
+# test output written relative to wherever pytest was run from
+.mops-test/
+**/mops/console/
+**/mops/console-throwaway/

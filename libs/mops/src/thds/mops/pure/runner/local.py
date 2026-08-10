@@ -17,6 +17,7 @@ from ..core import deferred_work, lease, memo, metadata, pipeline_id_mask, uris
 from ..core.lease.maintain import MAINTAIN_LEASES  # noqa: F401
 from ..core.partial import unwrap_partial
 from ..core.types import Args, Kwargs, T
+from ..tools import console
 from ..tools.summarize import run_summary
 from . import lease_waiter, same_process_in_flight, strings, types
 from .get_results import (
@@ -181,6 +182,10 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     log_invocation(f"Invoking {memo_uri}")
                     upload_invocation_and_deps()
 
+                console.invoked(memo_uri, attempt_id=lease_owned.writer_id, at=invoked_at)
+                # paired with the remote's 'started' - the interval between them is queue
+                # wait (image pull, scheduling), which neither side can measure alone.
+
                 # can't hold the semaphore while we block on the shim, though.
                 shim = shim_builder(func, args_, kwargs_)
                 future_or_shim_result = shim(  # ACTUAL INVOCATION (handoff to remote shim) HAPPENS HERE
@@ -188,7 +193,10 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                         memo_uri,
                         *metadata.format_invocation_cli_args(
                             metadata.InvocationMetadata.new(
-                                pipeline_id, invoked_at, lease_owned.writer_id
+                                pipeline_id,
+                                invoked_at,
+                                lease_owned.writer_id,
+                                console.current_run_name(),
                             )
                         ),
                     )
@@ -218,7 +226,18 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     f.set_result_metadata(md)
                     return f
 
-            except Exception:
+            except Exception as exc:
+                console.emit(
+                    console.failed(
+                        memo_uri,
+                        attempt_id=lease_owned.writer_id,
+                        at=datetime.now(tz=timezone.utc),
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
+                )
+                # the remote never ran, or ran and reported nothing, so nothing else will
+                # ever mark this invocation terminal. Without this it reads as invoked
+                # forever - indistinguishable from work still waiting for a pod.
                 try:
                     release_lease_in_current_process()
                 except Exception:

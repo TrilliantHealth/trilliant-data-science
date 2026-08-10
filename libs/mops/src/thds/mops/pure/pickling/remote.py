@@ -22,6 +22,7 @@ from ..core.source import hashref_context
 from ..core.types import Args, BlobStore, Kwargs, T
 from ..core.use_runner import unwrap_use_runner
 from ..runner import strings
+from ..tools import console
 from . import _pickle, mprunner, pickles, sha256_b64
 
 logger = log.getLogger(__name__)
@@ -236,6 +237,14 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
     )
     scope.enter(uris.ACTIVE_STORAGE_ROOT.set(uris.get_root(memo_uri)))
 
+    console.remote_started(
+        memo_uri,
+        invocation_metadata.console_run_name,
+        invocation_metadata.invoker_uuid,
+        started_at,
+        invocation_metadata.invoked_at.isoformat(),
+    )
+
     try:
         func, args, kwargs = unpickle_invocation(memo_uri)
     except Exception:
@@ -256,7 +265,7 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
         with unwrap_use_runner(func):
             return func(*args, **kwargs)
 
-    return route_return_value_or_exception(
+    exc = route_return_value_or_exception(
         ResultExcWithMetadataChannel(
             fs,
             result_dumper(),
@@ -270,3 +279,12 @@ def run_pickled_invocation(memo_uri: str, *metadata_args: str) -> None | Excepti
         mprunner.RUNNER_NAME,  # auto-detected as runner name, not prefix
         invocation_run_id=run_id,
     )
+    console.remote_finished(
+        memo_uri,
+        invocation_metadata.console_run_name,
+        invocation_metadata.invoker_uuid,
+        datetime.now(tz=timezone.utc),
+        exc is not None,
+        started_at.isoformat(),
+    )
+    return exc

@@ -88,14 +88,23 @@ class InvocationMetadata:
     # memoization. but this is a more convenient way to pass alongside
     # everything else that is used for debugging and monitoring.
 
+    console_run_name: str
+    # names the orchestrator run for observability; empty when the console is disabled.
+    # No default: ResultMetadata extends this, and a defaulted field here would force
+    # defaults onto every field it adds. `new()` and the arg parser both supply "".
+    # Older remotes parse with parse_known_args and simply ignore the flag.
+
     @staticmethod
-    def new(pipeline_id: str, invoked_at: datetime, invoker_uuid: str) -> "InvocationMetadata":
+    def new(
+        pipeline_id: str, invoked_at: datetime, invoker_uuid: str, console_run_name: str = ""
+    ) -> "InvocationMetadata":
         return InvocationMetadata(
             pipeline_id=pipeline_id,
             invoker_code_version=get_invoker_code_version(),
             invoker_uuid=invoker_uuid,
             invoked_at=invoked_at,
             invoked_by=get_invoked_by(),
+            console_run_name=console_run_name,
         )
 
 
@@ -170,6 +179,7 @@ def invocation_metadata_parser(
         help="The UUID of the invoker. This is generally the writer UUID from the lease.",
     )
     parser.add_argument("--pipeline-id", required=True)
+    parser.add_argument("--console-run-name", default="")
     return parser
 
 

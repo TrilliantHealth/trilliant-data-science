@@ -1,3 +1,93 @@
+### 3.27
+
+- **Run events, so in-flight work is visible.** Summary files record only completed invocations, so
+  nothing showed what a run was currently doing. Each orchestrator process appends `events-<pid>.jsonl`
+  under `.mops/events/<day>/<run name>/`, recording each invocation as it is handed to the shim. Remotes
+  write `started` and a terminal event to `<blob root>/mops/console/<day>/<run name>/events/`. The
+  interval between invocation and `started` is time spent waiting to be scheduled, which neither side can
+  measure alone. A remote's events are one object each and written indented, since they are read by
+  people opening them as often as by the console. A `started` event repeats the invocation time from the
+  metadata the remote was handed, so an invocation that reached a remote keeps its queue wait even when
+  the orchestrator died before publishing its own last events.
+
+- An orchestrator's uploaded event batches are named `.jsonl` rather than `.json`, which is what they are
+  \- a remote's single event keeps `.json`. Readers sniff the content either way.
+
+- **Test and CI runs are kept out of the way.** Automated suites produce runs continuously, at a rate
+  nobody reads, and a project using `mops` inside its own tests produces them in that project's working
+  directory - either way crowding out the runs someone went looking for. A process running under pytest
+  (`PYTEST_VERSION` or `PYTEST_CURRENT_TEST`) or a CI host (`CI`) writes to `.mops/events-throwaway/` and
+  `<blob root>/mops/console-throwaway/` instead. Both halves move together, so a throwaway run is still a
+  whole run - point the console at it with `--events-root` or `--events-uri`. Redirected rather than
+  suppressed, so a suite still covers the write path; a break in it would otherwise surface first in
+  someone's real run. Set `thds.mops.console.throwaway_runs` to force it from a caller nothing would
+  recognise.
+
+- **A remote says where it is running, in its own runtime's terms.** A `started` event carries `runtime`
+  (`"k8s"`, `"databricks"`, ...) and a `where` mapping of whatever addresses that execution. `mops` core
+  names no runtime: it calls the provider at the dotted import path in `MOPS_RUNTIME_CONTEXT` and records
+  the mapping it gets back, so a runtime `mops` has never heard of still reports and a reader that does
+  not recognise one still has key/value pairs to show. A shim is a callable on the launching side with no
+  remote half, so the launcher exports a name and the remote imports it - the same crossing
+  `mops.metadata.extra_generator` already makes. `mops.k8s` and `dbxtend` each ship a provider and set
+  the variable, so existing runs keep reporting pod and cluster coordinates with no configuration.
+
+- Emission is fire-and-forget onto a bounded queue drained by one background thread; a full queue drops
+  events and logs a count at exit rather than blocking the caller. On by default - two small objects
+  across a job lasting minutes to hours is not a cost worth opting into. Silence either half with
+  `thds.mops.console.events_dir` (empty) or `thds.mops.console.remote_events`.
+
+- `mops` writes these events and defines their vocabulary; it does not read them back. Folding a stream
+  into run state, and everything built on that, belongs to whatever is doing the reading - so a change to
+  how runs are displayed does not touch a library every invocation imports.
+
+- `InvocationMetadata` gains `console_run_name`, passed to remotes as `--console-run-name`. Remotes parse
+  with `parse_known_args`, so older ones ignore it.
+
+- `lease.read_lease(memo_uri)` and `lease.lease_uri_for(memo_uri)` read a lease without participating in
+  it. When a remote dies without reporting, its events simply stop, which looks identical to a remote
+  still running; the lease is the only thing that keeps being refreshed. Never raises - a caller
+  diagnosing a stuck invocation is told "no information" rather than handed an exception.
+
+- The internal Grafana log-URL metadata generator is now a Datadog one. Grafana is gone, so it wrote
+  links to a host that no longer answers. Set `mops.metadata.extra_generator` to point at it; the query
+  falls back from the pod to the job name, which catches every pod a job produced.
+
+- The orchestrator publishes its own events to the blob store, batched on a timer
+  (`thds.mops.console.upload_interval_seconds`, default 15s), so the stream there is sufficient on its
+  own to reconstruct a run. It also emits a `failed` event for invocations no remote ever reported on - a
+  shim that raised, or one that exited cleanly having written no result - carrying an error string, since
+  there is no pickled exception to read. A `started` event carries namespace and job name alongside the
+  pod: a pod name alone cannot be resolved, and only the remote knows the rest. It also repeats the
+  invocation time it was handed, so an invocation that reached a remote keeps its queue wait even when
+  the orchestrator died before publishing its last events. Memoized hits emit an event too - this run
+  never invoked them, so nothing else would ever report them, and to a remote observer they would simply
+  not exist. The event is stamped at the moment the cache answered and carries `original_*` timestamps
+  from the result's stored metadata, so a reader can also reconstruct when the reused work actually ran.
+  Awaited results count as memoized here: computed under another orchestrator's lease, whose remote
+  reported to that run rather than this one.
+
+- `ListableBlobStore` names the optional listing capability `AdlsBlobStore` already offered, so a caller
+  can check for it rather than assume a concrete implementation; `FileBlobStore` now implements it too.
+  Listing returns `BlobListing` in lexicographic order, and `list_from` resumes at a given URI instead of
+  re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking an
+  off-by-one that skips one. No object store can filter a listing by modification time, so resuming is by
+  position in the sort order. Nothing on the invocation path lists.
+
+- The orchestrator publishes its own events to the blob store, batched on a timer
+  (`thds.mops.console.upload_interval_seconds`, default 15s), so the stream there is sufficient on its
+  own to reconstruct a run. It also emits a `failed` event for invocations no remote ever reported on - a
+  shim that raised, or one that exited cleanly having written no result - carrying an error string, since
+  there is no pickled exception to read. A `started` event carries namespace and job name alongside the
+  pod: a pod name alone cannot be resolved, and only the remote knows the rest.
+
+- `ListableBlobStore` names the optional listing capability `AdlsBlobStore` already offered, so a caller
+  can check for it rather than assume a concrete implementation; `FileBlobStore` now implements it too.
+  Listing returns `BlobListing` in lexicographic order, and `list_from` resumes at a given URI instead of
+  re-listing a whole prefix - inclusive of that URI, re-reading one entry rather than risking an
+  off-by-one that skips one. No object store can filter a listing by modification time, so resuming is by
+  position in the sort order. Nothing on the invocation path lists.
+
 ### 3.26.20260801
 
 - Fix a regression introduced with the 3.25 lease waiter: a lease takeover dispatched the invocation

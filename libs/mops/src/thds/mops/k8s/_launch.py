@@ -14,7 +14,7 @@ from thds.mops.pure.core.metadata import EXTRA_METADATA_GENERATOR
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config, counts, job_future, logging
+from . import config, counts, job_future, logging, runtime_context
 from ._shared import logger
 from .auth import api_client, upsert_namespace
 from .node_selection import NodeNarrowing, ResourceDefinition
@@ -168,6 +168,8 @@ def launch(  # noqa: C901
 
         add_env_var(config.k8s_namespace_env_var_key(), target.namespace)
         add_env_var("MOPS_K8S_JOB_NAME", name)
+        add_env_var("MOPS_RUNTIME_CONTEXT", runtime_context.PROVIDER)
+        # so the remote can say where it is running without mops core knowing what a pod is.
         # Pass the extra_metadata_generator config to the remote side via env var.
         # This is needed because east_config.toml is only loaded on the local side
         # (when thds_std is imported). Only set if configured - OSS users won't have this.
