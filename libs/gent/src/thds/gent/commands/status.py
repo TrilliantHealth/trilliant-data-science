@@ -105,7 +105,14 @@ def _status_parts(info: WorktreeInfo, base: str) -> list[str]:
     an unpushed local branch is the normal state of a fresh worktree, and every
     worktree falls behind as main moves. Reporting either would mean most
     worktrees are never silent, which defeats the point.
+
+    A directory git lists but that no longer exists is reported rather than
+    raised: every git call below would fail on a missing cwd, and one such
+    worktree must not be able to suppress the report for all the others.
     """
+    if not info.path.is_dir():
+        return ["directory is gone (git worktree prune)"]
+
     dirty = _dirty_count(info.path)
     unpushed = _unpushed_commits(info.path)
     unmerged = _unmerged_commits(info.path, base)
@@ -152,7 +159,15 @@ def main(target: str | None, *, base: str = "origin/main", all: bool = False) ->
     # for callers that parse this, and rich would wrap long lines.
     if all:
         for wt in worktrees:
-            parts = _status_parts(wt, base)
+            # Per-worktree, because reporting across all of them is the whole
+            # point: one unreadable entry warns about itself instead of costing
+            # you the report for every other worktree.
+            try:
+                parts = _status_parts(wt, base)
+            except (subprocess.CalledProcessError, OSError, ValueError) as e:
+                output.warning(f"{wt.relative}: could not check ({e})")
+                continue
+
             if parts:
                 print(f"{wt.relative}: {', '.join(parts)}")
         return

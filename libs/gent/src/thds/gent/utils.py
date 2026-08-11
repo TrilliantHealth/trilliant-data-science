@@ -531,6 +531,24 @@ def cleanup_empty_parent_dirs(path: Path, root: Path) -> None:
             break
 
 
+def _relative_name(worktree_path: Path, root: Path) -> Path:
+    """How a worktree is named within *root*, falling back to its absolute path.
+
+    `git worktree add` accepts a path anywhere on disk, so a worktree can exist
+    that this layout has no relative name for. Returning the absolute path keeps
+    such an entry reportable: every caller only stringifies this for display or
+    compares it against a branch name, and an absolute path matches no branch,
+    which is the right answer for a directory that isn't named after one.
+    """
+    if worktree_path == root:
+        return Path(".bare")
+
+    try:
+        return worktree_path.relative_to(root)
+    except ValueError:
+        return worktree_path
+
+
 def parse_git_worktree_list(root: Path) -> list[WorktreeInfo]:
     """
     Parse git worktree list --porcelain output.
@@ -541,11 +559,17 @@ def parse_git_worktree_list(root: Path) -> list[WorktreeInfo]:
     Returns:
         List of WorktreeInfo objects containing:
         - path: Absolute path to worktree
-        - relative: Path relative to root (or Path('.bare') for bare repo)
+        - relative: Path relative to root, or the absolute path when the worktree
+          lives outside it (or Path('.bare') for bare repo)
         - head: Short hash of HEAD (first 10 chars) or None
         - branch: Branch name (without refs/heads/ prefix) or None
         - bare: Whether this is the bare repository
         - detached: Whether HEAD is detached
+
+    A worktree outside *root* is reported rather than skipped. `git worktree add`
+    accepts any path, so one can exist that this layout has no relative name for -
+    and callers that report across every worktree are the ones most likely to be
+    looking for exactly that kind of stray.
 
     Raises:
         subprocess.CalledProcessError: If git command fails
@@ -587,7 +611,7 @@ def parse_git_worktree_list(root: Path) -> list[WorktreeInfo]:
     def parse_worktree_record(record: list[str]) -> WorktreeInfo:
         """Parse a worktree record into WorktreeInfo."""
         worktree_path = Path(record[0].split(" ", 1)[1])
-        relative = worktree_path.relative_to(root) if worktree_path != root else Path(".bare")
+        relative = _relative_name(worktree_path, root)
 
         head = None
         branch = None

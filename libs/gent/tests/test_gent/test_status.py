@@ -1,5 +1,6 @@
 """Tests for the `wt status` command."""
 
+import shutil
 from pathlib import Path
 
 from tests.conftest import git_add, git_commit, git_run, write_file
@@ -85,6 +86,38 @@ def test_all_emits_one_line_per_worktree(worktree_git_repo, run_wt):
     result = run_wt("status", ["--all"], cwd=worktree_git_repo / "main")
 
     assert len([line for line in result.stdout.splitlines() if line.strip()]) == 1
+
+
+def test_all_survives_a_worktree_outside_the_repo_root(worktree_git_repo, run_wt, tmp_path):
+    """One stray worktree used to cost the report for every other worktree.
+
+    `git worktree add` accepts any path, so the layout has no relative name for
+    this one - and deriving one raised, which aborted the whole listing.
+    """
+    stray = tmp_path / "outside-the-root"
+    git_run(worktree_git_repo / "main", "worktree", "add", "-b", "feature/stray", str(stray))
+    noisy = _worktree(worktree_git_repo, run_wt, "feature/noisy")
+    write_file(noisy, "dirty.txt", "uncommitted\n")
+
+    result = run_wt("status", ["--all"], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert "Failed to list worktrees" not in result.stdout + result.stderr
+    assert "feature/noisy: 1 dirty" in result.stdout
+
+
+def test_all_reports_a_worktree_whose_directory_is_gone(worktree_git_repo, run_wt):
+    """git keeps listing a deleted worktree until prune, and every git call needs a cwd."""
+    doomed = _worktree(worktree_git_repo, run_wt, "feature/deleted")
+    shutil.rmtree(doomed)
+    noisy = _worktree(worktree_git_repo, run_wt, "feature/noisy")
+    write_file(noisy, "dirty.txt", "uncommitted\n")
+
+    result = run_wt("status", ["--all"], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert "feature/deleted: directory is gone" in result.stdout
+    assert "feature/noisy: 1 dirty" in result.stdout
 
 
 def test_bare_repo_is_not_reported(worktree_git_repo, run_wt):

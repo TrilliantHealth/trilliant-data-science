@@ -1,3 +1,14 @@
+### 1.6.20260811
+
+- Fixed `wt status --all` reporting nothing at all when any worktree lives outside the repository root.
+  `git worktree add` accepts a path anywhere on disk, so the layout has no relative name for such a
+  worktree; deriving one raised, and since the whole listing was parsed in one pass, a single stray entry
+  suppressed the status of every other worktree. Outside worktrees are now reported by absolute path.
+- `wt status --all` also survives a worktree whose directory has been deleted but not yet pruned. Every
+  check runs git in the worktree, and a missing directory made that raise. Such a worktree is now
+  reported as `directory is gone (git worktree prune)`, and any other per-worktree failure warns and
+  moves on rather than ending the run - reporting across all of them is the point of `--all`.
+
 ## 1.6
 
 - Added `wt status`, which reports anything notable about a worktree in one line and prints nothing when
