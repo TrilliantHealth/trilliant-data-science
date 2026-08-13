@@ -24,10 +24,14 @@ import typing as ty
 
 from thds.core import config, log
 
-RUNTIME_CONTEXT_PROVIDER = config.item("mops.console.runtime_context", default="")
+RUNTIME_CONTEXT_PROVIDER = config.item("mops.runtime_context", default="")
 # Dotted import path to a callable returning a RuntimeContext, resolved on the remote.
 # The launcher is responsible for setting this in the remote's environment; each of
 # mops's own launchers defaults it to its own provider.
+#
+# This name derives the environment variable MOPS_RUNTIME_CONTEXT, which is what the
+# launchers set. Renaming it breaks that correspondence silently: remotes report no
+# coordinates and nothing raises.
 
 logger = log.getLogger(__name__)
 
