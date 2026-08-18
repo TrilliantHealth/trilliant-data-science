@@ -1,7 +1,7 @@
 [project]
 name = "thds.mllegos"
 # Patch version is a datetime determined upon release
-version = "1.0"
+version = "1.1"
 description = "Composable components for basic ML tasks"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -14,6 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 sklearn = ["scikit-learn"]
+skopt = ["scikit-optimize"]
 pyecharts = ["pyecharts~=2.0"]
 
 [project.urls]
@@ -65,7 +66,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["azure", "joblib", "pyarrow.*", "pyecharts.*", "ruamel.*", "scipy.*", "sklearn.*"]
+module = ["azure", "joblib", "pyarrow.*", "pyecharts.*", "ruamel.*", "scipy.*", "sklearn.*", "skopt.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -26,6 +26,22 @@ thing well, they're easier to test, maintain, understand, and use in new and une
 
 ## A sampling of the current legos
 
+### IO
+
+- `io` has pickle \<-> `thds.core.source.Source` helpers: `to_pickle_source` writes any picklable object
+  to a timestamped file and wraps it as a `Source`; `load_pickle_source_typed` unpickles and verifies the
+  value's type before returning it. The module is free of ML-framework imports, so it is safe to use in
+  modules that must load on minimal installs.
+- `sklegos.io` wraps those helpers with estimator-typed signatures: `dump_model` / `load_model` for
+  pickled `sklearn`-compatible estimators.
+
+### Search spaces
+
+- `search_space` has `IntRange` / `FloatRange` - frozen, dependency-free dataclasses for declaring
+  hyperparameter search dimensions in plain configuration objects (safe as memoization-key components) -
+  and `build_skopt_space`, which materializes a mapping of them into live `skopt.space` dimensions
+  (requires the `skopt` extra).
+
 ### Eval
 
 `sklegos.eval` contains the following legos:
