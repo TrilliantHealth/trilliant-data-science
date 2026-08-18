@@ -1,6 +1,11 @@
+### 0.14.18
+
+- Prevented references/aliases (e.g. `&id001`, `*id001`) from being written to the schema YAML file on
+  round trip.
+
 ### 0.14.17
 
-- Fixed a bug in Markdown docgen that caused the Source table to render incorrectly
+- Fixed a bug in Markdown docgen that caused the Source table to render incorrectly.
 
 ### 0.14.16
 

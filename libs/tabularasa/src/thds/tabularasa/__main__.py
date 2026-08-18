@@ -105,6 +105,10 @@ except ImportError:
 else:
 
     def _yaml():
+        import ruamel.yaml.representer
+
+        ruamel.yaml.representer.RoundTripRepresenter.ignore_aliases = lambda *args: True  # type: ignore[method-assign]
+
         yaml = YAML()
         yaml.preserve_quotes = True  # type: ignore[assignment]
         yaml.width = 100  # type: ignore[assignment]
