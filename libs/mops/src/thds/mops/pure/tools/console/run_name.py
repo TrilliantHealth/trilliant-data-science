@@ -82,4 +82,9 @@ def claim(enabled: bool = True) -> str:
     Idempotent, and safe to call when the console is off - it returns empty and mints
     nothing, exactly as `current` does.
     """
-    return current(enabled)
+    name = current(enabled)
+    if name:
+        from . import run_metadata
+
+        run_metadata.claim(name)
+    return name

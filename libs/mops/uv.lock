@@ -1216,7 +1216,7 @@ dev = [
 
 [[package]]
 name = "thds-mops"
-version = "3.27"
+version = "3.28"
 source = { editable = "." }
 dependencies = [
     { name = "azure-core" },

@@ -28,6 +28,7 @@ import typing as ty
 from thds.core import config, log
 
 from ...core import uris
+from . import run_metadata
 from .blob_sink import events_root, object_name
 from .events import Event
 
@@ -126,9 +127,14 @@ def start(memo_uri: str, run_name: str) -> None:
     if key in _UPLOADERS:
         return
 
+    started = False
     with _UPLOADERS_LOCK:
         if key not in _UPLOADERS:
             _UPLOADERS[key] = _Uploader(memo_uri, run_name)
+            started = True
+
+    if started:
+        run_metadata.publish(memo_uri, run_name)
 
 
 def _snapshot() -> tuple[_Uploader, ...]:

@@ -3,9 +3,18 @@
 import datetime as dt
 import os
 
-from thds.mops.pure.tools.console import run_name
+import pytest
+
+from thds.mops.pure.tools.console import run_metadata, run_name
 
 _A_DAY = dt.datetime(2026, 8, 9, 14, 30, tzinfo=dt.timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _reset_metadata_publisher():
+    run_metadata._reset_for_test()
+    yield
+    run_metadata._reset_for_test()
 
 
 def test_the_day_is_the_directory():

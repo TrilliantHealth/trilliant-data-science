@@ -1,8 +1,9 @@
 import json
 
 import pytest
+import tomli
 
-from thds.mops.pure.tools.console import throwaway, upload
+from thds.mops.pure.tools.console import run_metadata, throwaway, upload
 
 _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
 
@@ -14,8 +15,10 @@ def _reset(monkeypatch):
     # send them to the throwaway location. Where that redirect happens is tested in
     # `test_console_blob_sink`; what is under test here is the batching.
     upload._reset()
+    run_metadata._reset_for_test()
     yield
     upload._reset()
+    run_metadata._reset_for_test()
 
 
 def _event(key, at="2026-08-07T12:00:00+00:00"):
@@ -40,6 +43,16 @@ def test_a_batch_becomes_one_object(tmp_path):
     written = list((tmp_path / "mops/console/mr.Run.abc/events").iterdir())
     assert len(written) == 1
     assert len(written[0].read_text().splitlines()) == 3
+
+
+def test_start_publishes_run_metadata_immediately(tmp_path):
+    upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
+
+    run_root = tmp_path / "mops/console/mr.Run.abc"
+    metadata_files = list(run_root.glob("*.toml"))
+    assert len(metadata_files) == 1
+    assert tomli.loads(metadata_files[0].read_text())["run_name"] == "mr.Run.abc"
+    assert not (run_root / "events").exists()
 
 
 def test_flushing_twice_does_not_republish(tmp_path):

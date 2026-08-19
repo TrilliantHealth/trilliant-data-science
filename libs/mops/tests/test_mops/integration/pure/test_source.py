@@ -3,7 +3,7 @@
 import typing as ty
 from datetime import datetime
 from pathlib import Path
-from random import randint
+from uuid import uuid4
 
 import pytest
 
@@ -32,7 +32,9 @@ def test_that_sources_get_transferred_both_directions_via_local_hashrefs(temp_fi
     src_a = from_file(temp_file("Captain"))
     src_b = from_file(temp_file(" Planet"))
 
-    mask = f"test/mops-combine-sources/{randint(0, 99999)}"
+    # This test specifically exercises the invocation-time local hashref round trip. A
+    # cache hit skips that path and returns a remote-only Source with no cached_path.
+    mask = f"test/mops-combine-sources/{uuid4().hex}"
     with pipeline_id_mask(mask):
         cp = memoize_in(TEST_TMP_URI)(a_function_that_combines_two_sources)((src_a, src_b))["yes"]
 

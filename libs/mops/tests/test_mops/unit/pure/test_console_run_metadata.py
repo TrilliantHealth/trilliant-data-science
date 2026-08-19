@@ -1,0 +1,127 @@
+import multiprocessing as mp
+import os
+import time
+from pathlib import Path
+
+import pytest
+import tomli
+
+from thds.mops.pure.tools.console import blob_sink, run_metadata, run_name, throwaway, upload, writer
+
+_MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
+
+
+@pytest.fixture(autouse=True)
+def _real_run(monkeypatch):
+    monkeypatch.setattr(throwaway, "here", lambda: False)
+    run_metadata._reset_for_test()
+    yield
+    run_metadata._reset_for_test()
+
+
+def _metadata(cwd: Path, command: str = "apps/unified-asset/k8s/run.py --date 2026-08-18"):
+    return run_metadata._RunMetadata(
+        command=command,
+        argv=("apps/unified-asset/k8s/run.py", "--date", "2026-08-18"),
+        cwd=str(cwd),
+        started_at="2026-08-18T12:34:56+00:00",
+        run_name="2026-08-18/mr.Run.abc",
+        invoked_by="lemon@example",
+        invoker_code_version="20260818.1234-abc1234",
+        python_executable="/usr/bin/python3",
+        python_version="3.10.18",
+        process_id=12345,
+    )
+
+
+def test_filename_describes_the_repo_relative_script(tmp_path):
+    assert (
+        run_metadata._filename(_metadata(tmp_path))
+        == "apps_unified-asset_k8s_run_py--by-lemon_example.toml"
+    )
+
+
+def test_filename_uses_only_the_script_name_outside_the_cwd(tmp_path):
+    run = _metadata(tmp_path)._replace(argv=("/usr/local/bin/my-run",))
+
+    assert run_metadata._filename(run) == "my-run--by-lemon_example.toml"
+
+
+def test_toml_preserves_the_command_and_argv(tmp_path):
+    run = _metadata(tmp_path)
+
+    parsed = tomli.loads(run_metadata._to_toml(run))
+
+    assert parsed == run._asdict() | {"argv": list(run.argv)}
+
+
+def test_publish_writes_named_metadata_at_the_run_root(tmp_path):
+    run = _metadata(tmp_path)
+    memo_uri = f"file://{tmp_path}/{_MEMO_URI_SUFFIX}"
+
+    run_metadata._publish(memo_uri, run)
+
+    written = (
+        tmp_path
+        / "mops/console/2026-08-18/mr.Run.abc/apps_unified-asset_k8s_run_py--by-lemon_example.toml"
+    )
+    assert tomli.loads(written.read_text()) == run._asdict() | {"argv": list(run.argv)}
+
+
+def test_publish_does_not_replace_existing_metadata(tmp_path):
+    memo_uri = f"file://{tmp_path}/{_MEMO_URI_SUFFIX}"
+    first = _metadata(tmp_path)
+    run_metadata._publish(memo_uri, first)
+
+    run_metadata._publish(memo_uri, first._replace(command="a later process"))
+
+    written = (
+        tmp_path
+        / "mops/console/2026-08-18/mr.Run.abc/apps_unified-asset_k8s_run_py--by-lemon_example.toml"
+    )
+    assert tomli.loads(written.read_text())["command"] == first.command
+
+
+def test_publish_failure_does_not_raise():
+    run_metadata.publish("not-a-memo-uri", "2026-08-18/mr.Run.abc")
+
+
+def test_a_child_process_cannot_publish_run_metadata(tmp_path, monkeypatch):
+    monkeypatch.setenv(run_metadata._OWNER_PID_ENV, str(os.getpid() + 1))
+
+    run_metadata.publish(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "2026-08-18/mr.Run.abc")
+
+    assert not list(tmp_path.rglob("*.toml"))
+
+
+def _child_discovers_root(memo_uri: str, run: str) -> None:
+    # Attempt publication before telling the parent about the root. If ownership were
+    # broken, this would leave child metadata in place before the parent could act.
+    throwaway.here = lambda: False
+    upload.start(memo_uri, run)
+    writer.record_remote_events_uri(blob_sink.events_root(memo_uri, run))
+
+
+def test_claiming_parent_publishes_a_root_discovered_by_a_child(tmp_path, monkeypatch):
+    local_events = tmp_path / "local-events"
+    run = "2026-08-18/mr.Run.abc"
+    remote_root = tmp_path / "remote"
+    memo_uri = f"file://{remote_root}/{_MEMO_URI_SUFFIX}"
+    monkeypatch.setenv(writer.CONSOLE_EVENTS_DIR.envname, str(local_events))
+    monkeypatch.setenv(run_name.RUN_NAME.envname, run)
+
+    with writer.CONSOLE_EVENTS_DIR.set_local(local_events):
+        with run_name.RUN_NAME.set_local(run):
+            assert run_name.claim() == run
+            child = mp.get_context("spawn").Process(target=_child_discovers_root, args=(memo_uri, run))
+            child.start()
+            child.join(timeout=10)
+            assert child.exitcode == 0
+
+            written = remote_root / "mops/console/2026-08-18/mr.Run.abc"
+            deadline = time.monotonic() + 3
+            while not list(written.glob("*.toml")) and time.monotonic() < deadline:
+                time.sleep(0.05)
+
+    metadata_file = next(iter(written.glob("*.toml")))
+    assert tomli.loads(metadata_file.read_text())["process_id"] == os.getpid()

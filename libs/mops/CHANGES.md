@@ -1,3 +1,11 @@
+### 3.28
+
+- Write a named TOML file at the root of each remote console run directory when the orchestrator first
+  uses it. The process that claims the run is the sole writer, including when child dispatch processes
+  discover the remote directory. The filename identifies the launched script, while the file records its
+  command, arguments, working directory, start time, invoker, code version, process ID, and Python
+  runtime.
+
 ### 3.27
 
 - **Run events, so in-flight work is visible.** Summary files record only completed invocations, so
