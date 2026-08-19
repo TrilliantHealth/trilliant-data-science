@@ -169,6 +169,11 @@ def launch(  # noqa: C901
         add_env_var(config.k8s_namespace_env_var_key(), target.namespace)
         add_env_var("MOPS_K8S_JOB_NAME", name)
         add_env_var("MOPS_RUNTIME_CONTEXT", runtime_context.PROVIDER)
+        if console_run := os.getenv("THDS_MOPS_CONSOLE_RUN_NAME", ""):
+            add_env_var("THDS_MOPS_CONSOLE_RUN_NAME", console_run)
+            add_env_var(
+                "THDS_MOPS_CONSOLE_RUN_OWNER_PID", os.getenv("THDS_MOPS_CONSOLE_RUN_OWNER_PID", "0")
+            )
         # so the remote can say where it is running without mops core knowing what a pod is.
         # Pass the extra_metadata_generator config to the remote side via env var.
         # This is needed because east_config.toml is only loaded on the local side

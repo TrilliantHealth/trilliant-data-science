@@ -11,6 +11,11 @@ of functions, and the whole reason its events go to a local queue first is that 
 expensive producer. Batches are uploaded on a timer, so the cost is a handful of objects
 per minute regardless of invocation rate.
 
+Nothing is published until the run performs an actual invocation. Cache hits are useful
+locally as a checklist, but a fully memoized run creates no new shared account. Once a miss
+opens the remote side, each process replays its local JSONL from the beginning so earlier
+cache hits are present without having occupied memory while the run was undecided.
+
 Each batch is named by the time it was written, like every other object in the events
 prefix, so a reader resumes across both kinds with one listing.
 
@@ -46,12 +51,6 @@ UPLOAD_INTERVAL_SECONDS = config.item(
 logger = log.getLogger(__name__)
 
 
-def _root_of(memo_uri: str) -> str:
-    from ...core.memo import function_memospace
-
-    return function_memospace.parse_memo_uri(memo_uri).runner_prefix.rsplit("/", 1)[0]
-
-
 class _Uploader:
     """Accumulates events and flushes them on a timer.
 
@@ -59,9 +58,8 @@ class _Uploader:
     yet, and to know when enough time has passed to be worth a request.
     """
 
-    def __init__(self, memo_uri: str, run_name: str) -> None:
-        self._memo_uri = memo_uri
-        self._run_name = run_name
+    def __init__(self, events_root_uri: str) -> None:
+        self._events_root_uri = events_root_uri
         self._pending: list[Event] = []
         self._lock = threading.Lock()
         self._seq = 0
@@ -69,10 +67,7 @@ class _Uploader:
 
     @property
     def events_root_uri(self) -> str:
-        try:
-            return events_root(self._memo_uri, self._run_name)
-        except (ValueError, AssertionError):
-            return ""
+        return self._events_root_uri
 
     def add(self, events: ty.Iterable[Event]) -> None:
         with self._lock:
@@ -88,10 +83,10 @@ class _Uploader:
             return
 
         try:
-            blob_store = uris.lookup_blob_store(self._memo_uri)
+            blob_store = uris.lookup_blob_store(self._events_root_uri)
             blob_store.putbytes(
                 blob_store.join(
-                    events_root(self._memo_uri, self._run_name),
+                    self._events_root_uri,
                     "events",
                     object_name(batch[-1], f"orchestrator-{self._pid}-{self._seq}", lines=True),
                 ),
@@ -107,11 +102,25 @@ _UPLOADERS: dict[str, _Uploader] = {}
 _UPLOADERS_LOCK = threading.Lock()
 
 
-def _key(memo_uri: str) -> str:
-    try:
-        return _root_of(memo_uri)
-    except (ValueError, AssertionError):
-        return memo_uri
+def start_root(events_root_uri: str, run_name: str) -> bool:
+    """Ensure this process can publish to an already-discovered run root.
+
+    Returns whether a new uploader was created. Unlike `start`, this does not publish run
+    metadata: another process may have discovered the root, while only the run-owning
+    parent may describe the run.
+    """
+    if not CONSOLE_UPLOAD_EVENTS() or not run_name or not events_root_uri:
+        return False
+
+    if events_root_uri in _UPLOADERS:
+        return False
+
+    with _UPLOADERS_LOCK:
+        if events_root_uri in _UPLOADERS:
+            return False
+
+        _UPLOADERS[events_root_uri] = _Uploader(events_root_uri)
+        return True
 
 
 def start(memo_uri: str, run_name: str) -> None:
@@ -123,17 +132,12 @@ def start(memo_uri: str, run_name: str) -> None:
     if not CONSOLE_UPLOAD_EVENTS() or not run_name:
         return
 
-    key = _key(memo_uri)
-    if key in _UPLOADERS:
+    try:
+        root = events_root(memo_uri, run_name)
+    except (ValueError, AssertionError):
         return
 
-    started = False
-    with _UPLOADERS_LOCK:
-        if key not in _UPLOADERS:
-            _UPLOADERS[key] = _Uploader(memo_uri, run_name)
-            started = True
-
-    if started:
+    if start_root(root, run_name):
         run_metadata.publish(memo_uri, run_name)
 
 
@@ -142,24 +146,12 @@ def _snapshot() -> tuple[_Uploader, ...]:
         return tuple(_UPLOADERS.values())
 
 
-def add(events_batch: ty.Sequence[Event]) -> None:
-    """Route events to the right uploader by root. No-op until `start` has been called."""
-    uploaders = _snapshot()
-    if not uploaders:
-        return
-
-    if len(uploaders) == 1:
-        uploaders[0].add(events_batch)
-        return
-
-    by_root: dict[str, list[Event]] = {}
-    for event in events_batch:
-        key = _key(event.get("memo_uri", ""))
-        if key in _UPLOADERS:
-            by_root.setdefault(key, []).append(event)
-
-    for key, batch in by_root.items():
-        _UPLOADERS[key].add(batch)
+def add_to(events_root_uri: str, events_batch: ty.Sequence[Event]) -> None:
+    """Add events to one known root, without re-routing them to every uploader."""
+    with _UPLOADERS_LOCK:
+        uploader = _UPLOADERS.get(events_root_uri)
+    if uploader:
+        uploader.add(events_batch)
 
 
 def flush(known_roots: ty.Sequence[str] = ()) -> None:

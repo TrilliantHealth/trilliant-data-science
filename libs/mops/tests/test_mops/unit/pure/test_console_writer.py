@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from thds.mops.pure.tools import console
-from thds.mops.pure.tools.console import events, run_name, throwaway, writer
+from thds.mops.pure.tools.console import events, run_metadata, run_name, throwaway, upload, writer
 
 _AT = dt.datetime(2026, 8, 6, 12, 0, tzinfo=dt.timezone.utc)
 
@@ -16,6 +16,12 @@ def _real_run(monkeypatch):
     """These assert where a real run's events go, and run under pytest - which is one of
     the things that moves them aside. That redirect is tested in `test_console_throwaway`."""
     monkeypatch.setattr(throwaway, "here", lambda: False)
+    upload._reset()
+    run_metadata._reset_for_test()
+    yield
+    _reset_writer()
+    upload._reset()
+    run_metadata._reset_for_test()
 
 
 def test_invoked_decomposes_the_memo_uri():
@@ -105,6 +111,95 @@ def test_file_is_named_for_the_writing_process(tmp_path):
         _reset_writer()
 
         assert [p.name for p in writer.events_dir().glob("*.jsonl")] == [f"events-{os.getpid()}.jsonl"]
+
+
+def _memo_uri(root: Path, args_hash: str) -> str:
+    return f"file://{root}/mops2-mpf/pipe/pkg.mod--fn/{args_hash}"
+
+
+def test_a_memoized_only_run_stays_local(tmp_path):
+    events_dir = tmp_path / "events"
+    blob_root = tmp_path / "blob"
+    run = "2026-08-19/mr.MemoOnly.abc"
+    with writer.CONSOLE_EVENTS_DIR.set_local(events_dir), run_name.RUN_NAME.set_local(run):
+        run_name.claim()
+        console.memoized(_memo_uri(blob_root, "cached"), at=_AT)
+        _reset_writer()
+
+        assert [event["was_memoized"] for event in _events_in(writer.events_dir())] == [True]
+        assert not (blob_root / "mops/console" / run).exists()
+
+
+def test_the_first_invocation_publishes_the_local_history_before_it(tmp_path):
+    events_dir = tmp_path / "events"
+    blob_root = tmp_path / "blob"
+    run = "2026-08-19/mr.Partial.abc"
+    with writer.CONSOLE_EVENTS_DIR.set_local(events_dir), run_name.RUN_NAME.set_local(run):
+        console.memoized(_memo_uri(blob_root, "cached"), at=_AT)
+        console.invoked(_memo_uri(blob_root, "new"), attempt_id="Writer.new", at=_AT)
+        _reset_writer()
+
+        published = [
+            json.loads(line)
+            for path in (blob_root / "mops/console" / run / "events").iterdir()
+            for line in path.read_text().splitlines()
+        ]
+        assert [(event["event"], event.get("was_memoized", False)) for event in published] == [
+            ("completed", True),
+            ("invoked", False),
+        ]
+
+
+def test_an_invocation_publishes_cache_hits_from_other_roots(tmp_path):
+    events_dir = tmp_path / "events"
+    cached_root = tmp_path / "cached"
+    invoked_root = tmp_path / "invoked"
+    run = "2026-08-19/mr.ManyRoots.abc"
+    with writer.CONSOLE_EVENTS_DIR.set_local(events_dir), run_name.RUN_NAME.set_local(run):
+        console.memoized(_memo_uri(cached_root, "cached"), at=_AT)
+        console.invoked(_memo_uri(invoked_root, "new"), attempt_id="Writer.new", at=_AT)
+        _reset_writer()
+
+        def published(root: Path) -> list[dict]:
+            return [
+                json.loads(line)
+                for path in (root / "mops/console" / run / "events").iterdir()
+                for line in path.read_text().splitlines()
+            ]
+
+        assert [event["invocation_key"] for event in published(cached_root)] == [
+            "pipe/pkg.mod:fn/cached"
+        ]
+        assert [event["invocation_key"] for event in published(invoked_root)] == ["pipe/pkg.mod:fn/new"]
+
+
+def test_an_invocation_in_one_writer_publishes_another_writers_cache_hits(tmp_path):
+    blob_root = tmp_path / "blob"
+    run = "2026-08-19/mr.ManyProcesses.abc"
+    with writer.CONSOLE_EVENTS_DIR.set_local(tmp_path / "events"), run_name.RUN_NAME.set_local(run):
+        directory = writer.events_dir()
+        directory.mkdir(parents=True)
+        memo_writer = writer._Writer(directory / "events-memo-process.jsonl", run)
+        invoking_writer = writer._Writer(directory / "events-invoking-process.jsonl", run)
+        memo_uri = _memo_uri(blob_root, "cached")
+        invoked_uri = _memo_uri(blob_root, "new")
+
+        memo_writer.emit(events.memoized(memo_uri, at=_AT))
+        upload.start(invoked_uri, run)
+        writer.record_remote_events_uri(upload.roots()[0])
+        invoking_writer.emit(events.invoked(invoked_uri, attempt_id="Writer.new", at=_AT))
+        memo_writer.close()
+        invoking_writer.close()
+
+        published = [
+            json.loads(line)
+            for path in (blob_root / "mops/console" / run / "events").iterdir()
+            for line in path.read_text().splitlines()
+        ]
+        assert {event["invocation_key"] for event in published} == {
+            "pipe/pkg.mod:fn/cached",
+            "pipe/pkg.mod:fn/new",
+        }
 
 
 def test_an_unusable_directory_is_disabled_after_one_attempt(tmp_path, monkeypatch):

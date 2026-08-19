@@ -23,11 +23,13 @@ def test_a_memoized_event_carries_the_original_computation():
         invoked_at="2026-08-01T10:00:00+00:00",
         started_at="2026-08-01T10:05:00+00:00",
         ended_at="2026-08-01T10:20:00+00:00",
+        run_name="2026-08-01/mr.Original.abc",
     )
 
     assert event["original_invoked_at"] == "2026-08-01T10:00:00+00:00"
     assert event["original_started_at"] == "2026-08-01T10:05:00+00:00"
     assert event["original_ended_at"] == "2026-08-01T10:20:00+00:00"
+    assert event["original_run_name"] == "2026-08-01/mr.Original.abc"
     assert "invoked_at" not in event
     assert "started_at" not in event
 

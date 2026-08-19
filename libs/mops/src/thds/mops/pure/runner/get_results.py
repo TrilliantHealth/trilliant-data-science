@@ -63,6 +63,7 @@ def unwrap_value_or_error(
                 invoked_at=_iso(metadata, "invoked_at"),
                 started_at=_iso(metadata, "remote_started_at"),
                 ended_at=_iso(metadata, "remote_ended_at"),
+                run_name=getattr(metadata, "console_run_name", ""),
             )
             # this run never invoked it, so nothing else will ever report it - and to a
             # remote observer the invocation would simply not exist. An awaited result is

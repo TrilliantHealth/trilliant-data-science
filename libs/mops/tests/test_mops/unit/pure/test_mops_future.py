@@ -1,4 +1,5 @@
 import concurrent.futures
+import datetime as dt
 import pickle
 
 import pytest
@@ -6,7 +7,7 @@ import pytest
 from thds.core import futures
 from thds.mops import pure
 from thds.mops.pure._futures import MopsFuture
-from thds.mops.pure.core import memo
+from thds.mops.pure.core import memo, metadata
 from thds.mops.pure.runner import get_results
 
 
@@ -221,3 +222,34 @@ def test_reused_results_emit_a_console_event(monkeypatch, invoc_type, emits):
     )
 
     assert bool(reported) == emits
+
+
+def test_a_reused_result_names_the_run_that_computed_it(monkeypatch):
+    reported = []
+    monkeypatch.setattr(get_results.console, "memoized", lambda *a, **k: reported.append(k))
+    result_metadata = metadata.ResultMetadata(
+        invoked_at=dt.datetime(2026, 8, 1, 10, tzinfo=dt.timezone.utc),
+        invoked_by="lemon@example",
+        invoker_code_version="v1",
+        invoker_uuid="Writer.original",
+        pipeline_id="pipeline",
+        console_run_name="2026-08-01/mr.Original.abc",
+        remote_code_version="v1",
+        remote_started_at=dt.datetime(2026, 8, 1, 10, 1, tzinfo=dt.timezone.utc),
+        remote_ended_at=dt.datetime(2026, 8, 1, 10, 5, tzinfo=dt.timezone.utc),
+        remote_wall_minutes=4.0,
+        result_wall_minutes=5.0,
+    )
+
+    get_results.unwrap_value_or_error(
+        lambda type_hint, uri: (result_metadata, "THE_VALUE"),
+        None,
+        "runner_prefix",
+        (),
+        "adls://x/memo",
+        get_results.ResultAndInvocationType(
+            memo.results.Success(value_uri="adls://x/value"), "memoized"
+        ),
+    )
+
+    assert reported[0]["run_name"] == "2026-08-01/mr.Original.abc"

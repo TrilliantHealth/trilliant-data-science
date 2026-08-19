@@ -23,7 +23,7 @@ from pathlib import Path
 
 from thds.core import config, log
 
-from . import run_name, throwaway, upload
+from . import history_upload, run_name, throwaway, upload
 from .events import Event
 
 CONSOLE_EVENTS_DIR = config.item(
@@ -48,10 +48,12 @@ class _Writer:
     Mutable by necessity - it wraps an OS file handle and a drain thread.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, run_name_: str) -> None:
         self._queue: queue.Queue[None | Event] = queue.Queue(maxsize=_MAX_QUEUE)
         self._dropped = 0
         self._path = path
+        self._run_name = run_name_
+        self._uploaded_offsets: dict[str, int] = {}
         self._thread = threading.Thread(target=self._drain, name="mops-console-events", daemon=True)
         self._thread.start()
         atexit.register(self.close)
@@ -76,7 +78,7 @@ class _Writer:
 
                 if event is None:
                     f.flush()
-                    upload.flush(self._known_roots())
+                    self._upload_local_events()
                     return
 
                 if event is not _NOTHING_ARRIVED:
@@ -84,7 +86,6 @@ class _Writer:
                         f.write(json.dumps(event) + "\n")
                     except (OSError, TypeError, ValueError):
                         logger.exception("Failed to write a mops console event")
-                    upload.add([event])
 
                 if self._queue.empty():
                     f.flush()
@@ -92,7 +93,8 @@ class _Writer:
                     # file sees whole lines promptly without paying a syscall per append.
 
                 if time.monotonic() - last_upload >= upload.UPLOAD_INTERVAL_SECONDS():
-                    upload.flush(self._known_roots())
+                    f.flush()
+                    self._upload_local_events()
                     last_upload = time.monotonic()
                     # publishing happens on this thread rather than its own: it is already
                     # off the invocation path, and a batch is only worth sending once
@@ -106,6 +108,23 @@ class _Writer:
         manifest is what lets a remote watcher entering any single root find the rest.
         """
         return remote_events_uris(self._path.parent)
+
+    def _upload_local_events(self) -> None:
+        """Publish this process's local history once any process performed work.
+
+        An uploader or shared pointer is the run-level gate established by an actual
+        `invoked` event. Once it exists, the replay discovers every root in this file,
+        including roots with cache hits only. A newly discovered root starts at byte zero,
+        so events written before the first miss are included without being retained in
+        memory while the run is undecided.
+        """
+        activating_roots = list(dict.fromkeys((*upload.roots(), *self._known_roots())))
+        self._uploaded_offsets = history_upload.upload_new(
+            self._path,
+            self._run_name,
+            activating_roots,
+            self._uploaded_offsets,
+        )
 
     def close(self) -> None:
         if self._dropped:
@@ -235,7 +254,10 @@ def _writer() -> None | _Writer:
             directory = events_dir()
             try:
                 directory.mkdir(parents=True, exist_ok=True)
-                _WRITER = _Writer(directory / f"events-{os.getpid()}.jsonl")
+                _WRITER = _Writer(
+                    directory / f"events-{os.getpid()}.jsonl",
+                    run_name.current(True),
+                )
             except OSError:
                 logger.exception("Could not open mops console events dir '%s'; disabling.", directory)
                 _WRITER = _UNUSABLE

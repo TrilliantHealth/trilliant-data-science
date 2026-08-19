@@ -25,9 +25,14 @@ def _event(key, at="2026-08-07T12:00:00+00:00"):
     return {"event": "invoked", "invocation_key": key, "at": at, "function_name": "m:f"}
 
 
+def _add_to_only_root(events):
+    [root] = upload.roots()
+    upload.add_to(root, events)
+
+
 def test_nothing_is_published_before_a_run_is_named(tmp_path):
     """A run with the console off mints no name, and must not write to the blob store."""
-    upload.add([_event("a")])
+    upload.add_to("file:///run-not-started", [_event("a")])
     upload.flush()
 
     assert not list(tmp_path.rglob("*.json"))
@@ -37,7 +42,7 @@ def test_a_batch_becomes_one_object(tmp_path):
     """The whole point: an orchestrator dispatching tens of thousands of invocations must
     not write an object each."""
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([_event("a"), _event("b"), _event("c")])
+    _add_to_only_root([_event("a"), _event("b"), _event("c")])
     upload.flush()
 
     written = list((tmp_path / "mops/console/mr.Run.abc/events").iterdir())
@@ -57,7 +62,7 @@ def test_start_publishes_run_metadata_immediately(tmp_path):
 
 def test_flushing_twice_does_not_republish(tmp_path):
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([_event("a")])
+    _add_to_only_root([_event("a")])
     upload.flush()
     upload.flush()
 
@@ -67,7 +72,7 @@ def test_flushing_twice_does_not_republish(tmp_path):
 def test_an_unwritable_destination_does_not_raise(tmp_path):
     """Publishing is diagnostic. Failing it must never interrupt the run it describes."""
     upload.start("not-a-uri-at-all", "mr.Run.abc")
-    upload.add([_event("a")])
+    upload.add_to("not-a-uri-at-all", [_event("a")])
 
     upload.flush()  # must not raise
 
@@ -76,7 +81,7 @@ def test_starting_twice_on_the_same_root_keeps_the_first(tmp_path):
     """Every invocation calls start; a root seen before is not re-created."""
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.First.abc")
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.First.abc")
-    upload.add([_event("a")])
+    _add_to_only_root([_event("a")])
     upload.flush()
 
     assert len(list((tmp_path / "mops/console/mr.First.abc/events").iterdir())) == 1
@@ -85,7 +90,7 @@ def test_starting_twice_on_the_same_root_keeps_the_first(tmp_path):
 def test_publishing_can_be_turned_off(tmp_path):
     with upload.CONSOLE_UPLOAD_EVENTS.set_local(False):
         upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-        upload.add([_event("a")])
+        upload.add_to("file:///upload-disabled", [_event("a")])
         upload.flush()
 
     assert not list(tmp_path.rglob("*.json"))
@@ -100,12 +105,9 @@ def test_two_roots_get_separate_uploaders(tmp_path):
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
 
-    upload.add(
-        [
-            {**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"},
-            {**_event("y"), "memo_uri": f"file://{root_b}/{_MEMO_URI_SUFFIX}"},
-        ]
-    )
+    roots = sorted(upload.roots())
+    upload.add_to(roots[0], [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
+    upload.add_to(roots[1], [{**_event("y"), "memo_uri": f"file://{root_b}/{_MEMO_URI_SUFFIX}"}])
     upload.flush()
 
     a_events = list((root_a / "mops/console/mr.Run.abc/events").iterdir())
@@ -123,7 +125,10 @@ def test_a_manifest_is_published_with_all_roots(tmp_path):
     root_b.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
+    upload.add_to(
+        sorted(upload.roots())[0],
+        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],
+    )
     upload.flush()
 
     import os
@@ -146,7 +151,10 @@ def test_a_failed_manifest_write_is_retried(tmp_path):
     root_b.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
+    upload.add_to(
+        sorted(upload.roots())[0],
+        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],
+    )
 
     manifest_name = f"{os.getpid()}.json"
     manifest_a_path = root_a / f"mops/console/mr.Run.abc/roots/{manifest_name}"
@@ -177,7 +185,7 @@ def test_batches_carry_every_event_verbatim(tmp_path):
     """No summarising on the way out - a second observer must be able to reconstruct the
     same state a local reader would."""
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([_event("a"), _event("b")])
+    _add_to_only_root([_event("a"), _event("b")])
     upload.flush()
 
     written = next(iter((tmp_path / "mops/console/mr.Run.abc/events").iterdir()))
@@ -197,7 +205,7 @@ def test_a_manifest_is_backfilled_under_roots_this_process_never_wrote_to(tmp_pa
     root_a = tmp_path / "a"
     root_a.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
+    _add_to_only_root([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
 
     elsewhere = f"file://{tmp_path}/b/mops/console/mr.Run.abc"
     upload.flush(known_roots=(elsewhere,))
@@ -219,7 +227,7 @@ def test_an_unwritable_known_root_does_not_raise(tmp_path):
     root_a = tmp_path / "a"
     root_a.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-    upload.add([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
+    _add_to_only_root([{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
 
     upload.flush(known_roots=("not-a-uri-at-all",))  # must not raise
 

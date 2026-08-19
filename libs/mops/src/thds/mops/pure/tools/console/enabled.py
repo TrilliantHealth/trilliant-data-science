@@ -43,8 +43,8 @@ def _note_run_location(memo_uri: str) -> None:
         return
 
     try:
-        _link_halves(blob_sink.events_root(memo_uri, name))
         upload.start(memo_uri, name)
+        _link_halves(blob_sink.events_root(memo_uri, name))
         # publishing the orchestrator's own events, so a second observer sees invocations
         # rather than only the remotes' side of the run.
     except Exception:
@@ -79,15 +79,15 @@ def memoized(
     invoked_at: str = "",
     started_at: str = "",
     ended_at: str = "",
+    run_name: str = "",
 ) -> None:
     """Tell the console a result was served from the cache.
 
-    Goes through the same local queue and batched upload as `invoked`, so a remote
-    observer sees memoized hits too - without this they exist only in the orchestrator's
-    local summary files, and a run that reuses most of its results looks nearly empty
-    from anywhere else.
+    Always goes through the local queue. It is published only if this run later performs
+    an actual invocation: a memoized-only run is a local checklist, not a new shared run.
+    If a miss does arrive, the writer uploads its local history from the beginning, so
+    cache hits observed before the miss are not lost to a remote observer.
     """
-    _note_run_location(memo_uri)
     emit(
         events.memoized(
             memo_uri,
@@ -96,6 +96,7 @@ def memoized(
             invoked_at=invoked_at,
             started_at=started_at,
             ended_at=ended_at,
+            run_name=run_name,
         )
     )
 

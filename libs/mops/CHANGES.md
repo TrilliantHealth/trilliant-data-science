@@ -1,3 +1,12 @@
+### 3.29
+
+- A run that only reads memoized results keeps its console events and summaries locally but writes
+  nothing to shared blob storage. The first actual invocation opens the remote side and uploads each
+  process's local history from byte zero, including cache hits observed before the miss; processes in a
+  shared run learn that gate through the existing local root pointer. Cache-hit events also retain the
+  original console run name stored with their result, so a reader can identify the run that performed the
+  reused work rather than having only its timestamps.
+
 ### 3.28
 
 - Write a named TOML file at the root of each remote console run directory when the orchestrator first

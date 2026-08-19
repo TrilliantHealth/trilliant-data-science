@@ -78,6 +78,7 @@ class Event(ty.TypedDict, total=False):
     original_invoked_at: str
     original_started_at: str
     original_ended_at: str
+    original_run_name: str
     # when the work behind a memoized result actually happened, from the metadata stored
     # beside it. Named apart from `invoked_at`/`started_at` so a reader places the hit at
     # the moment it was served by default, and can reconstruct the original computation's
@@ -206,6 +207,7 @@ def memoized(
     invoked_at: str = "",
     started_at: str = "",
     ended_at: str = "",
+    run_name: str = "",
 ) -> Event:
     """A result served from the cache, with when its work originally ran.
 
@@ -222,6 +224,7 @@ def memoized(
         ("original_invoked_at", invoked_at),
         ("original_started_at", started_at),
         ("original_ended_at", ended_at),
+        ("original_run_name", run_name),
     ):
         if value:
             event[field] = value  # type: ignore[literal-required]
