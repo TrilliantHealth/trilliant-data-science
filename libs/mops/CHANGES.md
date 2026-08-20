@@ -7,6 +7,13 @@
   original console run name stored with their result, so a reader can identify the run that performed the
   reused work rather than having only its timestamps.
 
+### 3.28.20260819
+
+- Fix default metadata generator config pointing at removed `th_grafana` module; now points to
+  `th_datadog`.
+- Cache `load_metadata_generator` per import path so misconfigured generators warn once per process
+  instead of per invocation.
+
 ### 3.28
 
 - Write a named TOML file at the root of each remote console run directory when the orchestrator first

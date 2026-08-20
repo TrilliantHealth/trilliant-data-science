@@ -30,20 +30,31 @@ EXTRA_METADATA_GENERATOR = config.item("mops.metadata.extra_generator", default=
 MetadataGenerator = ty.Callable[["ResultMetadata"], ty.Dict[str, str]]
 
 
+_generator_cache: ty.Dict[str, ty.Optional[MetadataGenerator]] = {}
+
+
 def load_metadata_generator() -> ty.Optional[MetadataGenerator]:
-    """Load the configured extra metadata generator, if any."""
+    """Load the configured extra metadata generator, if any.
+
+    Caches per import path so import errors warn once per process per config value.
+    """
     import_path = EXTRA_METADATA_GENERATOR()
     if not import_path:
         return None
+
+    if import_path in _generator_cache:
+        return _generator_cache[import_path]
 
     try:
         module_path, func_name = import_path.rsplit(".", 1)
         module = importlib.import_module(module_path)
         func = getattr(module, func_name)
-        return ty.cast(MetadataGenerator, func)
+        _generator_cache[import_path] = ty.cast(MetadataGenerator, func)
     except (ValueError, ImportError, AttributeError) as e:
         _logger.warning(f"Failed to load extra metadata generator '{import_path}': {e}")
-        return None
+        _generator_cache[import_path] = None
+
+    return _generator_cache[import_path]
 
 
 def format_extra_metadata(extra: ty.Dict[str, str]) -> str:
