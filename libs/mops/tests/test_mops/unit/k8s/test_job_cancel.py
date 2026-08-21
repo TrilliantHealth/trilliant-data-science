@@ -1,3 +1,4 @@
+import concurrent.futures
 import contextlib
 import typing as ty
 from unittest import mock
@@ -56,6 +57,34 @@ def test_cancellable_job_future_cancel_deletes_job():
         api.return_value.delete_namespaced_job.assert_called_once_with(
             name="job-x", namespace="ns-y", propagation_policy="Foreground"
         )
+
+
+def test_cancel_settles_an_unsettled_future_as_cancelled():
+    # A deleted Job never reaches a terminal state the watch loop could
+    # translate, so cancel must settle the future itself - its done-callbacks
+    # (the invocation-lease release among them) fire now instead of never.
+    inner: concurrent.futures.Future = concurrent.futures.Future()
+    fut = _CancellableJobFuture(
+        ty.cast("futures.PFuture[bool]", inner), job_name="job-x", target=_TARGET
+    )
+    settled: list["futures.PFuture[bool]"] = []
+    fut.add_done_callback(settled.append)
+    with _mock_batch_api():
+        assert fut.cancel() is True
+
+    assert fut.done()
+    assert isinstance(fut.exception(), concurrent.futures.CancelledError)
+    assert len(settled) == 1
+
+
+def test_cancel_leaves_a_completed_future_alone():
+    # The Job finished before the cancel landed: the completion wins, and the
+    # already-published result stays retrievable rather than being clobbered.
+    fut = _CancellableJobFuture(futures.resolved(True), job_name="job-x", target=_TARGET)
+    with _mock_batch_api():
+        fut.cancel()
+
+    assert fut.result() is True
 
 
 def test_cancellable_job_future_is_cancellable_via_try_cancel():

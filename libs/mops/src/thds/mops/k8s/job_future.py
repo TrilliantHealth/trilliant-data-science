@@ -1,5 +1,6 @@
 import threading
 import typing as ty
+from concurrent.futures import CancelledError, InvalidStateError
 
 from kubernetes import client
 
@@ -133,10 +134,22 @@ class _CancellableJobFuture(futures.PFuture[bool]):
         self._target = target
 
     def cancel(self) -> bool:
-        """Delete the Job (cascading to its pod). True if deleted, False if it
-        was already gone - matching the chain's tri-state where this layer can
-        always give a definite bool (a k8s Job is always deletable-or-absent)."""
-        return delete_job(self._job_name, self._target)
+        """Delete the Job (cascading to its pod), then settle the completion
+        future as cancelled so its done-callbacks (invocation-lease release
+        among them) fire now - a deleted Job never reaches a terminal state,
+        so the watch loop would never settle it. A future the Job's own
+        completion already settled is left alone: the completion wins. True
+        if deleted, False if it was already gone - matching the chain's
+        tri-state where this layer can always give a definite bool (a k8s Job
+        is always deletable-or-absent)."""
+        deleted = delete_job(self._job_name, self._target)
+        if not self._inner.done():
+            try:
+                self._inner.set_exception(CancelledError(f"Job {self._job_name} was cancelled"))
+            except InvalidStateError:
+                pass  # completed between the check and the settle - the completion wins
+
+        return deleted
 
     def running(self) -> bool:
         return self._inner.running()

@@ -1,3 +1,11 @@
+### 3.29.20260821
+
+- Fix: cancelling a Kubernetes-backed invocation now settles the job's completion future as cancelled
+  after deleting the Job. Previously the future never settled (a deleted Job never reaches a terminal
+  state the watch loop could translate), so the invocation lease kept being maintained until process
+  exit, and any retry of the same invocation (in a long-lived orchestrator process especially) blocked on
+  that lease indefinitely.
+
 ### 3.29
 
 - A run that only reads memoized results keeps its console events and summaries locally but writes
