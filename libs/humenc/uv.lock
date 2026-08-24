@@ -206,7 +206,7 @@ wheels = [
 
 [[package]]
 name = "thds-core"
-version = "1.56"
+version = "1.57"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },

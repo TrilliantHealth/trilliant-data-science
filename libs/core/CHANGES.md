@@ -1,3 +1,29 @@
+### 1.57
+
+- **BREAKING:** `dict_utils.flatten` and `dict_utils.unflatten` are keyed by **tuples of path segments**
+  rather than by a separator-joined string. `flatten({"a": {"b": 1}})` now returns `{("a", "b"): 1}`
+  instead of `{"a.b": 1}`, and `unflatten` expects those tuple keys. The `sep` parameter is gone from
+  both, as is the module-level `DEFAULT_SEP`. A separator can't round-trip: any key containing it
+  flattens to a path that unflattens to a different shape, so `{"a.b": 1}` and `{"a": {"b": 1}}` were
+  indistinguishable once flattened. Tuples make the segmentation explicit and lossless.
+
+  `flatten_with_str_keys(d, parent_key=None, sep=".")` is the drop-in replacement for callers that do
+  want joined string keys - it takes the same `sep` and returns the same `dict[str, Any]` the old
+  `flatten` did. `DotDict.flatten()` is a shorthand for it over `self`.
+
+- **BREAKING:** `DotDict(non_mapping)` raises `ValueError` instead of silently returning an empty
+  `DotDict`. Positional arguments that aren't `dict`s were dropped on the floor, so a caller passing an
+  `attrs` instance, a `NamedTuple`, or a non-`dict` `Mapping` got an empty result and no indication why.
+
+- `DotDict.set_value` creates missing intermediate levels instead of raising `KeyError`. Previously
+  `set_value("a.b.c", 1)` required `a.b` to already exist, which made it unusable for building a nested
+  structure up from empty - the common case. Note this is a silent behavior change for any caller that
+  relied on the `KeyError` to detect an absent path; use `get_value` for that.
+
+- `DotDict.__setattr__` routes dunder names to `object.__setattr__` rather than into the dict, so
+  machinery that sets attributes like `__orig_class__` (e.g. subscripted generic instantiation,
+  `DotDict[int](...)`) no longer pollutes the mapping with an entry.
+
 ### 1.56.20260729
 
 - `progress.report_still_alive` no longer deadlocks when the wrapped block raises. The sentinel that

@@ -2,7 +2,13 @@ from typing import Any
 
 import pytest
 
-from thds.core.dict_utils import DotDict, flatten, merge_dicts, unflatten
+from thds.core.dict_utils import (
+    DotDict,
+    flatten,
+    flatten_with_str_keys,
+    merge_dicts,
+    unflatten,
+)
 
 
 def test_constructing_with_dotdicts():
@@ -19,14 +25,14 @@ def test_constructing_with_dicts():
 
 
 def test_already_flatten():
-    assert {"a": 1, "b": 2} == flatten({"a": 1, "b": 2})
-    assert {"a": None, "b": 2} == flatten({"a": None, "b": 2})
+    assert {"a": 1, "b": 2} == flatten_with_str_keys({"a": 1, "b": 2})
+    assert {"a": None, "b": 2} == flatten_with_str_keys({"a": None, "b": 2})
     assert {} == flatten({})
 
 
 def test_deeply_nested():
     nested_dict = {"a": {"b": {"c": {"d": 1, "e": 2}}}, "f": 3}
-    assert {"a.b.c.d": 1, "a.b.c.e": 2, "f": 3} == flatten(nested_dict)
+    assert {"a.b.c.d": 1, "a.b.c.e": 2, "f": 3} == flatten_with_str_keys(nested_dict)
 
 
 def test_unflatten():
@@ -43,7 +49,7 @@ def test_flatten_with_different_seperators(sep):
         f"{sep}".join(["a", "b", "c", "d"]): 1,
         f"{sep}".join(["a", "b", "c", "e"]): 2,
         "f": 3,
-    } == flatten(nested_dict, sep=sep)
+    } == flatten_with_str_keys(nested_dict, sep=sep)
 
 
 @pytest.mark.parametrize("convert", [True, False])
