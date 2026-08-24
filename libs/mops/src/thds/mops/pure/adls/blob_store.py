@@ -14,7 +14,7 @@ from thds.core import config, fretry, home, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
 from ..core.control_cache import CONTROL_CACHE_TTL_IN_SECONDS, exists_with_expiry
-from ..core.types import AnyStrSrc, BlobListing, BlobStore, Listings
+from ..core.types import AnyStrSrc, BlobListing, BlobStore
 from . import listing
 
 T = ty.TypeVar("T")
@@ -45,11 +45,9 @@ _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9,
 # and the azure library does not seem to retry these on its own.
 
 
-def _as_listings(fqn: adls.AdlsFqn, listed: ty.Iterable[listing.Listed]) -> Listings:
-    return [
-        BlobListing(str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, entry.name)), entry.last_modified)
-        for entry in listed
-    ]
+def _as_listings(fqn: adls.AdlsFqn, listed: ty.Iterable[listing.Listed]) -> ty.Iterator[BlobListing]:
+    for entry in listed:
+        yield BlobListing(str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, entry.name)), entry.last_modified)
 
 
 class AdlsBlobStore(BlobStore):
@@ -110,7 +108,7 @@ class AdlsBlobStore(BlobStore):
     def is_blob_not_found(self, exc: Exception) -> bool:
         return is_blob_not_found(exc)
 
-    def list(self, uri: str, start_at: str = "") -> Listings:
+    def list(self, uri: str, start_at: str = "") -> ty.Iterator[BlobListing]:
         """`get_paths` returns last_modified in the listing response, so reporting it costs
         no extra request - no per-path HEAD.
 

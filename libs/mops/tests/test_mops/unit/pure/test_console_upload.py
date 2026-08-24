@@ -118,6 +118,11 @@ def test_two_roots_get_separate_uploaders(tmp_path):
     assert json.loads(b_events[0].read_text())["invocation_key"] == "y"
 
 
+def _latest_manifest(roots_dir):
+    """The manifest file with the highest root count (last written)."""
+    return max(roots_dir.glob("*.json"), key=lambda p: p.name)
+
+
 def test_a_manifest_is_published_with_all_roots(tmp_path):
     root_a = tmp_path / "a"
     root_b = tmp_path / "b"
@@ -131,18 +136,14 @@ def test_a_manifest_is_published_with_all_roots(tmp_path):
     )
     upload.flush()
 
-    import os
-
-    manifest_name = f"{os.getpid()}.json"
-    manifest_a = json.loads((root_a / f"mops/console/mr.Run.abc/roots/{manifest_name}").read_text())
-    manifest_b = json.loads((root_b / f"mops/console/mr.Run.abc/roots/{manifest_name}").read_text())
+    manifest_a = json.loads(_latest_manifest(root_a / "mops/console/mr.Run.abc/roots").read_text())
+    manifest_b = json.loads(_latest_manifest(root_b / "mops/console/mr.Run.abc/roots").read_text())
     assert len(manifest_a["roots"]) == 2
     assert manifest_a == manifest_b
 
 
 def test_a_failed_manifest_write_is_retried(tmp_path):
     """A transient failure on one root must not prevent retry on the next flush."""
-    import os
     from unittest import mock
 
     root_a = tmp_path / "a"
@@ -156,14 +157,12 @@ def test_a_failed_manifest_write_is_retried(tmp_path):
         [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],
     )
 
-    manifest_name = f"{os.getpid()}.json"
-    manifest_a_path = root_a / f"mops/console/mr.Run.abc/roots/{manifest_name}"
-    manifest_b_path = root_b / f"mops/console/mr.Run.abc/roots/{manifest_name}"
-
+    roots_a = root_a / "mops/console/mr.Run.abc/roots"
+    roots_b = root_b / "mops/console/mr.Run.abc/roots"
     original_putbytes = upload.uris.lookup_blob_store(f"file://{root_a}").putbytes
 
     def fail_on_a(uri, *args, **kwargs):
-        if str(root_a) in uri and manifest_name in uri:
+        if str(root_a) in uri and "/roots/" in uri:
             raise OSError("transient")
 
         return original_putbytes(uri, *args, **kwargs)
@@ -173,12 +172,14 @@ def test_a_failed_manifest_write_is_retried(tmp_path):
     ):
         upload.flush()
 
-    assert manifest_b_path.exists()
-    assert not manifest_a_path.exists()
+    assert list(roots_b.glob("*.json"))
+    assert not roots_a.exists() or not list(roots_a.glob("*.json"))
 
     upload.flush()
-    assert manifest_a_path.exists()
-    assert json.loads(manifest_a_path.read_text()) == json.loads(manifest_b_path.read_text())
+    assert list(roots_a.glob("*.json"))
+    manifest_a = json.loads(_latest_manifest(roots_a).read_text())
+    manifest_b = json.loads(_latest_manifest(roots_b).read_text())
+    assert manifest_a == manifest_b
 
 
 def test_batches_carry_every_event_verbatim(tmp_path):
@@ -200,8 +201,6 @@ def test_a_manifest_is_backfilled_under_roots_this_process_never_wrote_to(tmp_pa
     they do share is the run's local pointer file. Its contents are published as a
     manifest under every root - including one whose own writer has already exited - so
     a remote watcher entering any single root discovers the rest."""
-    import os
-
     root_a = tmp_path / "a"
     root_a.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
@@ -210,11 +209,10 @@ def test_a_manifest_is_backfilled_under_roots_this_process_never_wrote_to(tmp_pa
     elsewhere = f"file://{tmp_path}/b/mops/console/mr.Run.abc"
     upload.flush(known_roots=(elsewhere,))
 
-    manifest_name = f"{os.getpid()}.json"
-    own = json.loads((root_a / f"mops/console/mr.Run.abc/roots/{manifest_name}").read_text())
+    own = json.loads(_latest_manifest(root_a / "mops/console/mr.Run.abc/roots").read_text())
     assert elsewhere in own["roots"]
     assert len(own["roots"]) == 2
-    backfilled = json.loads((tmp_path / f"b/mops/console/mr.Run.abc/roots/{manifest_name}").read_text())
+    backfilled = json.loads(_latest_manifest(tmp_path / "b/mops/console/mr.Run.abc/roots").read_text())
     assert backfilled == own
 
 
@@ -222,8 +220,6 @@ def test_an_unwritable_known_root_does_not_raise(tmp_path):
     """Nothing guarantees write access to a root some other process chose. A refused
     backfill is a debug line, never an error - and it must not block the manifest under
     this process's own root."""
-    import os
-
     root_a = tmp_path / "a"
     root_a.mkdir()
     upload.start(f"file://{root_a}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
@@ -231,5 +227,5 @@ def test_an_unwritable_known_root_does_not_raise(tmp_path):
 
     upload.flush(known_roots=("not-a-uri-at-all",))  # must not raise
 
-    manifest = json.loads((root_a / f"mops/console/mr.Run.abc/roots/{os.getpid()}.json").read_text())
+    manifest = json.loads(_latest_manifest(root_a / "mops/console/mr.Run.abc/roots").read_text())
     assert "not-a-uri-at-all" in manifest["roots"]

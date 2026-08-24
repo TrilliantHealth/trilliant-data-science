@@ -142,9 +142,10 @@ class BlobListing(ty.NamedTuple):
     modified_at: None | dt.datetime
 
 
-Listings = list[BlobListing]
+Listings = ty.Iterable[BlobListing]
 # named because `list` as a method name shadows the builtin inside the class body below,
-# which would otherwise make an annotation there subscript the method.
+# which would otherwise make an annotation there subscript the method. Iterable rather
+# than list so ADLS can stream pages lazily on large prefixes.
 
 
 @ty.runtime_checkable

@@ -201,7 +201,7 @@ def _publish_manifest(known_roots: ty.Sequence[str] = ()) -> None:
     if targets == prev_roots and targets == prev_written:
         return
 
-    manifest_name = f"{os.getpid()}.json"
+    manifest_name = f"{os.getpid()}-{len(targets)}.json"
     manifest = json.dumps({"roots": sorted(targets)}, indent=2).encode()
     written: set[str] = set()
     for root in sorted(targets):

@@ -1,3 +1,12 @@
+### 3.29.20260824
+
+- `ListableBlobStore.list` returns `Iterable[BlobListing]` instead of `list[BlobListing]`. ADLS listings
+  are paged internally, and the previous `list` return type forced materializing every page before the
+  caller saw anything. Callers that index into the result need to wrap in `list()` first.
+- Root manifests are now written as `{pid}-{n}.json` (append-only) instead of overwriting `{pid}.json`.
+  The previous scheme produced stale reads through the control-file cache when an orchestrator discovered
+  a second blob root after writing the first manifest.
+
 ### 3.29.20260821
 
 - Fix: cancelling a Kubernetes-backed invocation now settles the job's completion future as cancelled
