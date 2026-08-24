@@ -120,7 +120,7 @@ def test_two_roots_get_separate_uploaders(tmp_path):
 
 def _latest_manifest(roots_dir):
     """The manifest file with the highest root count (last written)."""
-    return max(roots_dir.glob("*.json"), key=lambda p: p.name)
+    return max(roots_dir.glob("*.json"), key=lambda p: int(p.stem.rsplit("-", 1)[-1]))
 
 
 def test_a_manifest_is_published_with_all_roots(tmp_path):
