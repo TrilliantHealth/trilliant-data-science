@@ -14,6 +14,7 @@ from .._futures import MopsFuture
 from ..core.memo.unique_name_for_function import full_name_and_callable
 from ..core.use_runner import use_runner
 from ..pickling.mprunner import MemoizingPicklingRunner
+from ..runner import peek
 from ..runner.shim_builder import make_builder
 from ..runner.simple_shims import samethread_shim
 from ..runner.types import Shim, ShimBuilder
@@ -146,6 +147,15 @@ class Magic(ty.Generic[P, R]):
         self._register_shared(args, kwargs)
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self.runner.submit(self.__wrapped__, *args, **kwargs)
+
+    def peek(self, *args: P.args, **kwargs: P.kwargs) -> ty.Union[R, peek.Unmemoized[R]]:
+        """The memoized result this call would return without computing it, or
+        `Unmemoized`. `Unmemoized.invoke()` makes the call this peek declined to make,
+        under whatever shim is in force when it is called - only the memo location is
+        fixed at peek time. See docs/peek.adoc."""
+        self._register_shared(args, kwargs)  # affects serialization, hence the memo key
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+            return self.runner.peek(self.__wrapped__, *args, **kwargs)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """This is the wrapped function - call this as though it were the function itself."""
@@ -289,6 +299,15 @@ class Wand(ty.Generic[P, R]):
         been started. Mirrors `Magic.submit`."""
         with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
             return self._runner.submit(self.__wrapped__, *args, **kwargs)
+
+    def peek(self, *args: P.args, **kwargs: P.kwargs) -> ty.Union[R, peek.Unmemoized[R]]:
+        """The memoized result this call would return without computing it, or
+        `Unmemoized`. `Unmemoized.invoke()` makes the call this peek declined to make.
+        Writes no invocation, result, exception, or lease state. See docs/peek.adoc."""
+        with core.pipeline_id.set_pipeline_id_for_stack(self._pipeline_id):
+            # the returned Unmemoized invokes into the memospace resolved here, so it
+            # does not need this pipeline id (or any other context) still to be set.
+            return self._runner.peek(self.__wrapped__, *args, **kwargs)
 
 
 # The shim names that actually build a runner. `"off"` is a `ShimName` too but produces no

@@ -11,28 +11,20 @@ from thds.core import concurrency, futures, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
 from ..._utils.on_slow import LogSlow, on_slow
-from ...config import max_concurrent_network_ops, max_concurrent_serialization
+from ...config import max_concurrent_network_ops
 from .._futures import MopsFuture
-from ..core import deferred_work, lease, memo, metadata, pipeline_id_mask, uris
+from ..core import deferred_work, lease, memo, metadata
 from ..core.lease.maintain import MAINTAIN_LEASES  # noqa: F401
-from ..core.partial import unwrap_partial
 from ..core.types import Args, Kwargs, T
 from ..tools import console
 from ..tools.summarize import run_summary
-from . import lease_waiter, same_process_in_flight, strings, types
+from . import lease_waiter, prepare, same_process_in_flight, strings, types
 from .get_results import (
     PostShimResultGetter,
     ResultAndInvocationType,
     lease_maintaining_future,
     unwrap_value_or_error,
 )
-
-# Pickling is 100% GIL-bound — hundreds of threads pickling simultaneously
-# just convoy behind the GIL, inflating wall-clock time per thread without
-# improving throughput. A semaphore limits concurrency so each pickle finishes fast.
-# Reentrant because serialization (__getstate__) can trigger lazy mops calls
-# that themselves need to serialize — blocking the same thread would deadlock.
-_SERIALIZATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(int(max_concurrent_serialization()))
 
 # this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
 # of progress _complete_, rather than issuing many instructions to the
@@ -81,30 +73,12 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         """
         invoked_at = datetime.now(tz=timezone.utc)
         # capture immediately, because many things may delay actual start.
-        storage_root = uris.get_root(function_memospace)
-        scope.enter(uris.ACTIVE_STORAGE_ROOT.set(storage_root))
-        fs = uris.lookup_blob_store(function_memospace)
         val_or_res = "value" if rerun_exceptions else "result"
 
-        # we need to unwrap any partial object and combine its wrapped
-        # args, kwargs with the provided args, kwargs, otherwise the
-        # args and kwargs will not get properly considered in the memoization key.
-        func, args, kwargs = unwrap_partial(func, args_, kwargs_)
-        pipeline_id = scope.enter(pipeline_id_mask.including_function_docstr(func))
-        # TODO pipeline_id should probably be passed in explicitly
-
-        scope.enter(deferred_work.open_context())  # optimize Source objects during serialization
-
-        with (
-            _SERIALIZATION_SEMAPHORE,
-            on_slow(lambda s: LogSlow(f"serialize_args_kwargs took {s:.1f}s for {function_memospace}")),
-        ):
-            args_kwargs_bytes = serialize_args_kwargs(storage_root, func, args, kwargs)
-        memo_uri = fs.join(
-            function_memospace,
-            *memo.calls.combine_function_logic_keys(memo.calls.resolve(calls_registry, func)),
-            # ^ these will embedded as extra nesting.
-            memo.args_kwargs_content_address(args_kwargs_bytes),
+        storage_root, fs, func, args, kwargs, pipeline_id, args_kwargs_bytes, memo_uri = (
+            prepare.prepare_call(
+                serialize_args_kwargs, calls_registry, function_memospace, func, args_, kwargs_
+            )
         )
 
         # Define some important and reusable 'chunks of work'

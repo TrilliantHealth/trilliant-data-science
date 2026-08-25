@@ -1,0 +1,133 @@
+link:../README.md[↑]
+
+= Peeking at memoized results
+
+`peek` answers "what would this call return?" without ever computing it.
+
+[source,python]
+----
+result = my_wand.peek(chat_id, week_start)
+if isinstance(result, pure.Unmemoized):
+    ...          # no memoized result exists; nothing was spent finding out
+else:
+    use(result)  # the memoized value, exactly as a call would have returned it
+----
+
+The contract, in one line:
+
+> Given the same arguments, `f.peek(...)` produces exactly what `f(...)` would
+> produce in every case where the call would *not* compute; it returns
+> `Unmemoized` in exactly the cases where the call *would* compute.
+
+Everything follows from that:
+
+* The memo URI is derived by the same code an invocation uses - same argument
+  serialization, same pipeline-id resolution, same `calls=[...]` logic keys,
+  same redirects - so a peek can never disagree with a call about the key.
+* A memoized *exception* follows the runner's `rerun_exceptions` setting: if a
+  call would re-raise it, the peek re-raises it; if a call would recompute, the
+  peek says `Unmemoized`.
+* A peek writes no invocation, result, exception, or lease state. Argument
+  serialization may stage deferred uploads (e.g. for `Source` arguments); a peek
+  drops them. The one exception is `.shared()` arguments - see below.
+* A peek reports nothing. A hit is not a cache hit *this* run made, so it emits no
+  console event and writes no run-summary entry - otherwise polling would invent
+  history, and N peeks would read as N cache hits that never happened.
+* An ambient link:memoization.adoc[`require_all`] does not make a peek raise: a
+  missing result is a peek's *answer*, not its failure.
+
+Both explicit mops controls for *not* behaving like a plain call sit outside the
+contract, deliberately. `require_all` is above; it is exempted for the peek only, and
+is deliberately *not* carried into `Unmemoized.invoke()` - invoking inside a
+`require_all` block raises `RequiredResultNotFound` just as a direct call would,
+because that is what the block asks for. Under `Magic.off()` a call bypasses
+memoization entirely and always computes, whereas a peek still reports on the
+memospace it would otherwise have used - so a peek under `off()` answers about the
+store rather than about what the call would do.
+
+== Where it lives
+
+* `@pure.magic(...)` and `pure.magic.wand(...)` wrappers each have a `.peek()`
+  method with the same signature as the call itself, fully type-checked:
+  `my_fn.peek(*args, **kwargs) -> R | Unmemoized[R]`.
+* `MemoizingPicklingRunner.peek(func, *args, **kwargs)` is the underlying
+  runner-level API, for code that holds a runner directly (e.g. `use_runner`
+  users).
+
+== `Unmemoized`
+
+`Unmemoized` is created only by mops - application code never constructs one, and a
+mops-wrapped function must never return one as its result. It carries the
+derived `memo_uri` (for debugging and logging) and one capability:
+
+[source,python]
+----
+missed = my_wand.peek(x)
+if isinstance(missed, pure.Unmemoized):
+    value = missed.invoke()  # perform the call the peek declined to make
+----
+
+`invoke()` behaves exactly like calling the function directly - including
+re-checking the memo first, so a result computed by someone else since the peek
+is returned rather than recomputed. (It is a vacant-entry handle, in the spirit
+of Rust's `HashMap::entry` API.)
+
+It fills the `memo_uri` it reports, and not some other one. The handle carries the
+function memospace the peek resolved - blob root, pipeline id, memospace handlers
+and config, function name and logic keys - so it can be invoked anywhere:
+
+[source,python]
+----
+with pure.pipeline_id_mask("nightly"):
+    missed = my_wand.peek(x)     # memo_uri is under .../nightly/...
+missed.invoke()                  # still fills .../nightly/..., not the default
+----
+
+Only the *location* is carried. *How* the call runs - the shim, and so the runtime it
+lands on - is resolved when `invoke()` is called, not when the peek ran. That is what
+lets a caller peek now and invoke later on whatever compute is available then, and it
+means a handle peeked under `Magic.off()` is still invocable once a runner is back.
+
+The arguments hash is the one component that cannot be carried, because `invoke()`
+re-serializes the arguments - that is what registers the deferred uploads a peek
+deliberately drops. So an argument mutated between the peek and the invoke would
+fill a different hole; `invoke()` re-derives the URI first and raises
+`UnmemoizedContextLost` *before* computing or writing anything. mops functions are
+not supposed to receive arguments that mutate underneath them
+(link:pure_functions.adoc[pure functions]), so this should only fire on a real bug.
+
+`Unmemoized` is deliberately not serializable - `pickle` raises. It is a statement
+about the blob store *at the moment of the peek*; persisting or transmitting it
+would turn a fresh answer into a stale claim. Code that wants the answer in
+another process should peek again there - it costs one existence check. This
+refusal is also what keeps `R | Unmemoized[R]` unambiguous: an `Unmemoized` can never
+come back *as* a memoized value.
+
+== `.shared()` arguments are the one thing a peek writes
+
+Deriving a memo key means serializing the arguments, and `.shared()` arguments
+serialize by uploading their content-addressed bytes inline (plus a small
+`objname_` debug marker). That machinery predates `peek` and is not deferrable
+without invasive changes to it, so a peek of a function with shared arguments
+materializes those blobs.
+
+This is bounded and benign: the bytes are content-addressed, so the write is
+idempotent and shared with every other caller that has the same object; and it is
+argument content, never invocation, result, exception, or lease state. Peek's
+guarantee is that it does not advance or claim an invocation - not that it touches
+no bytes at all.
+
+== Purity
+
+Peeking from inside a memoized function is allowed only when the outcome cannot
+change the function's return value (e.g. peek-then-`invoke()`, which returns the
+same value either way, and is just caching). Using a peek to decide *whether* to
+compute something - returning different results depending on cache state - makes
+the function impure: same arguments, different answers. Don't.
+
+== What peek is for
+
+Any "which of these have already run?" question that should not trigger the
+runs: rebuilding a local materialization of previously computed results after a
+process restart, reporting pipeline progress, or deciding what to surface in a
+UI - all without spending compute on the items that were never run.

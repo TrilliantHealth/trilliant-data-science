@@ -22,7 +22,7 @@ from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.source import hashref_context, stacklocal_hashrefs
 from ..core.types import Args, F, Kwargs, Serializer, T
-from ..runner import local, shim_builder
+from ..runner import local, peek, shim_builder
 from ..runner.types import FutureShim, Shim, ShimBuilder
 from ..tools.summarize import run_summary
 from . import _pickle, pickles, sha256_b64
@@ -187,6 +187,25 @@ class MemoizingPicklingRunner:
 
         We are trying to mimic the interface that concurrent.futures.Executors provide.
         """
+        return self._submit_in_memospace(
+            memo.make_function_memospace(
+                _runner_prefix_for_pickled_functions(self._get_storage_root()), func
+            ),
+            func,
+            args,
+            kwargs,
+        )
+
+    def _submit_in_memospace(
+        self, function_memospace: str, func: ty.Callable[..., T], args: Args, kwargs: Kwargs
+    ) -> MopsFuture[T]:
+        """`submit`, but into an already-derived function memospace.
+
+        The memospace fixes everything about the memo URI except the arguments hash -
+        blob root, pipeline id, memospace handlers and config, function name and logic
+        keys - so a caller holding one (`peek`) can invoke later without re-resolving
+        any of it from ambient context.
+        """
         logger.debug("Preparing to run function via remote shim")
         with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs), hashref_context({}):
             return local.invoke_via_shim_or_return_memoized(
@@ -198,12 +217,50 @@ class MemoizingPicklingRunner:
                 self._calls_registry,
             )(
                 self._rerun_exceptions,
-                memo.make_function_memospace(
-                    _runner_prefix_for_pickled_functions(self._get_storage_root()), func
-                ),
+                function_memospace,
                 func,
                 args,
                 kwargs,
+            )
+
+    def peek(
+        self, func: ty.Callable[..., T], /, *args: ty.Any, **kwargs: ty.Any
+    ) -> ty.Union[T, peek.Unmemoized[T]]:
+        """The memoized result this call would return without computing, or `Unmemoized`.
+
+        Derives the memo key exactly as `submit` would (same contexts, same
+        serialization) but writes no invocation, result, exception, or lease state;
+        `.shared()` argument bytes are the exception, see runner/peek.py.
+        `Unmemoized.invoke()` performs the call as `__call__` would, into the
+        memospace this peek resolved, so the location does not depend on the ambient
+        context still being in place."""
+        function_memospace = memo.make_function_memospace(
+            _runner_prefix_for_pickled_functions(self._get_storage_root()), func
+        )
+        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs), hashref_context({}):
+            return peek.peek_memoized(
+                self._serialize_args_kwargs,
+                _pickle.read_metadata_and_object,
+                self._calls_registry,
+                self._rerun_exceptions,
+                function_memospace,
+                func,
+                args,
+                kwargs,
+                invoke=lambda peeked_uri: peek.invoke_filling(
+                    peeked_uri,
+                    lambda: self._derive_memo_uri(function_memospace, func, args, kwargs),
+                    lambda: self._submit_in_memospace(function_memospace, func, args, kwargs),
+                ),
+            )
+
+    def _derive_memo_uri(
+        self, function_memospace: str, func: ty.Callable, args: Args, kwargs: Kwargs
+    ) -> str:
+        """Where this call would store its result, without reading or writing anything."""
+        with _ARGS_CONTEXT.set(args), _KWARGS_CONTEXT.set(kwargs), hashref_context({}):
+            return peek.derive_memo_uri(
+                self._serialize_args_kwargs, self._calls_registry, function_memospace, func, args, kwargs
             )
 
     def __call__(self, func: ty.Callable[..., T], args: Args, kwargs: Kwargs) -> T:

@@ -27,6 +27,22 @@ def _iso(metadata: ty.Any, field: str) -> str:
     return value.isoformat() if isinstance(value, datetime) else ""
 
 
+def read_value_or_raise(
+    get_meta_and_result: types.GetMetaAndResult,
+    result: ty.Union[memo.results.Success, memo.results.Error],
+) -> ty.Any:
+    """Deserialize a stored result, re-raising a stored exception, and report nothing.
+
+    For readers that are not an invocation - a `peek` hit is not a cache hit this run
+    made, and recording one would invent history. Callers that *are* an invocation
+    want `unwrap_value_or_error`."""
+    if isinstance(result, memo.results.Success):
+        return get_meta_and_result("value", result.value_uri)[1]
+
+    assert isinstance(result, memo.results.Error), "Must be Error or Success"
+    raise get_meta_and_result("EXCEPTION", result.exception_uri)[1]
+
+
 def unwrap_value_or_error(
     get_meta_and_result: types.GetMetaAndResult,
     run_directory: ty.Optional[Path],

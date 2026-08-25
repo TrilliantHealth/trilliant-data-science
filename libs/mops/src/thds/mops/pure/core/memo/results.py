@@ -74,15 +74,37 @@ class RequiredResultNotFound(Exception):
         self.uri = uri
 
 
+def read_value(memo_uri: str) -> ty.Optional[Success]:
+    """The stored return value, if any. No ambient requirement is consulted, so a
+    missing result is an answer rather than an error."""
+    fs = lookup_blob_store(memo_uri)
+    value_uri = fs.join(memo_uri, RESULT)
+    return Success(value_uri) if fs.exists(value_uri) else None
+
+
+def read_exception(memo_uri: str) -> ty.Optional[Error]:
+    fs = lookup_blob_store(memo_uri)
+    error_uri = fs.join(memo_uri, EXCEPTION)
+    return Error(error_uri) if fs.exists(error_uri) else None
+
+
+def read_result(memo_uri: str, check_for_exception: bool = False) -> ty.Union[None, Success, Error]:
+    """What the store holds for this invocation, and nothing else."""
+    return read_value(memo_uri) or (read_exception(memo_uri) if check_for_exception else None)
+
+
 def check_if_result_exists(
     memo_uri: str,
     check_for_exception: bool = False,
     before_raise: ty.Optional[ty.Callable[[], ty.Any]] = None,
 ) -> ty.Union[None, Success, Error]:
-    fs = lookup_blob_store(memo_uri)
-    value_uri = fs.join(memo_uri, RESULT)
-    if fs.exists(value_uri):
-        return Success(value_uri)
+    """`read_result`, but honoring any ambient `require_all`.
+
+    A stored exception does not satisfy a requirement: the raise happens before
+    the exception is looked for at all.
+    """
+    if value := read_value(memo_uri):
+        return value
 
     required_msg = _should_require_result(memo_uri)
     if required_msg:  # might be custom or the default. either way it indicates a required result.
@@ -94,11 +116,4 @@ def check_if_result_exists(
             error_msg += f": {required_msg}"
         raise RequiredResultNotFound(error_msg, memo_uri)
 
-    if not check_for_exception:
-        return None
-
-    error_uri = fs.join(memo_uri, EXCEPTION)
-    if fs.exists(error_uri):
-        return Error(error_uri)
-
-    return None
+    return read_exception(memo_uri) if check_for_exception else None

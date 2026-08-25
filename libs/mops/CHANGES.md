@@ -1,3 +1,24 @@
+### 3.30
+
+- New: `peek` - ask whether a memoized result exists (and get it) without computing one. `@pure.magic`
+  and `pure.magic.wand` wrappers gain a `.peek(*args, **kwargs)` method returning either the memoized
+  value or a `Unmemoized` handle; `MemoizingPicklingRunner.peek` is the runner-level equivalent.
+  `Unmemoized.invoke()` performs the call the peek declined to make, filling the `memo_uri` it reports:
+  it carries the function memospace the peek resolved (blob root, pipeline id, memospace handlers and
+  config, function name and logic keys), so leaving the `pipeline_id_mask` the peek ran under does not
+  move the result somewhere else. Only the location is fixed: the shim, and so the runtime the call lands
+  on, is resolved when `invoke()` runs, so a handle can be held and invoked later wherever compute is
+  available. The arguments hash cannot be carried, because `invoke()` re-serializes to register the
+  deferred uploads a peek drops, so an argument mutated in between raises `UnmemoizedContextLost` -
+  re-deriving the URI first, so nothing is computed or written at the wrong location. `Unmemoized`
+  refuses pickling, so it can never be stored as a memoized value. A peek writes no invocation, result,
+  exception, or lease state, reports no console event or run-summary entry (a hit is not a cache hit this
+  run made, so polling cannot invent history), and is exempt from `require_all`; `.shared()` arguments
+  are the one thing it writes, since their content-addressed bytes upload inline while serializing. See
+  docs/peek.adoc.
+- `get_results.read_value_or_raise` deserializes a stored result without reporting it, for readers that
+  do not represent an invocation. `unwrap_value_or_error` is unchanged.
+
 ### 3.29.20260824
 
 - `ListableBlobStore.list` returns `Iterable[BlobListing]` instead of `list[BlobListing]`. ADLS listings

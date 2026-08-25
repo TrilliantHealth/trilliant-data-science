@@ -200,6 +200,8 @@ change your current code, you have several options, which are link:advanced_memo
 
 == Related
 
+* link:peek.adoc[Peek] - ask whether a memoized result exists (and get it) without
+  computing one.
 * link:storage_tiers.adoc[Storage tiers] - routing memos, intermediates, and final
   outputs to storage with lifecycles that match their roles, and the rules that keep
   memoization correct when intermediate bytes expire.

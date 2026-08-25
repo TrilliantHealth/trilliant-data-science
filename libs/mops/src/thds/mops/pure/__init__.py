@@ -24,6 +24,7 @@ from .core.use_runner import use_runner  # noqa
 from .pickling import inject  # noqa
 from .pickling.memoize_only import memoize_in  # noqa
 from .pickling.mprunner import MemoizingPicklingRunner  # noqa
+from .runner.peek import Unmemoized, UnmemoizedContextLost  # noqa
 from .runner.simple_shims import samethread_shim, subprocess_shim  # noqa
 from .runner.types import FutureShim, Shim, ShimBuilder  # noqa
 
