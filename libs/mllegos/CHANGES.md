@@ -1,5 +1,11 @@
 # Changes
 
+## 1.2
+
+- New `eval.viz.cls` module: `confusion_matrix_heatmap`, a pyecharts heatmap for binary confusion
+  matrices (behind the existing `pyecharts` extra), with a `ConfusionMatrix` TypedDict for the
+  tp/fp/fn/tn counts.
+
 ## 1.1
 
 - Add `io`: `to_pickle_source` / `load_pickle_source` / `load_pickle_source_typed` - typed pickle \<->

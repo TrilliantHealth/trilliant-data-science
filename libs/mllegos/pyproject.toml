@@ -1,7 +1,7 @@
 [project]
 name = "thds.mllegos"
 # Patch version is a datetime determined upon release
-version = "1.1"
+version = "1.2"
 description = "Composable components for basic ML tasks"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
