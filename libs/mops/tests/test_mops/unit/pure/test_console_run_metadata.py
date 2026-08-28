@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import tomli
 
+from thds.core import meta
 from thds.mops.pure.tools.console import blob_sink, run_metadata, run_name, throwaway, upload, writer
 
 _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
@@ -27,6 +28,10 @@ def _metadata(cwd: Path, command: str = "apps/unified-asset/k8s/run.py --date 20
         started_at="2026-08-18T12:34:56+00:00",
         run_name="2026-08-18/mr.Run.abc",
         invoked_by="lemon@example",
+        hostname="example",
+        platform="macOS-15.6-arm64-arm-64bit",
+        repo="ds-monorepo",
+        branch="mops/a-branch",
         invoker_code_version="20260818.1234-abc1234",
         python_executable="/usr/bin/python3",
         python_version="3.10.18",
@@ -53,6 +58,18 @@ def test_toml_preserves_the_command_and_argv(tmp_path):
     parsed = tomli.loads(run_metadata._to_toml(run))
 
     assert parsed == run._asdict() | {"argv": list(run.argv)}
+
+
+def test_the_current_process_is_described_from_its_checkout(monkeypatch):
+    monkeypatch.setenv(meta.GIT_BRANCH, "a-branch-from-a-docker-build")
+
+    current = run_metadata._current("2026-08-18/mr.Run.abc")
+
+    assert current.hostname and current.platform
+    assert current.repo == "ds-monorepo"
+    assert current.branch == "a-branch-from-a-docker-build"
+    # the build's record wins over asking git, since an image has no `.git` to ask.
+    assert tomli.loads(run_metadata._to_toml(current))["hostname"] == current.hostname
 
 
 def test_publish_writes_named_metadata_at_the_run_root(tmp_path):

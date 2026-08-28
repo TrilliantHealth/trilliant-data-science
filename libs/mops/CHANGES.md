@@ -1,3 +1,10 @@
+### 3.31
+
+- The console's run metadata file (`<script>--by-<user>.toml` at a run's events root) now records
+  `hostname`, `platform`, `repo` and `branch` alongside the command, cwd and code version, so a run can
+  be traced to the machine and checkout it was started from. `branch` honours `GIT_BRANCH` when a docker
+  build set it, since an image has no `.git` to ask.
+
 ### 3.30
 
 - New: `peek` - ask whether a memoized result exists (and get it) without computing one. `@pure.magic`

@@ -12,7 +12,7 @@ import threading
 import typing as ty
 from pathlib import Path
 
-from thds.core import files, log
+from thds.core import files, git, hostname, log, meta
 
 from ...core import metadata, uris
 from . import blob_sink
@@ -25,16 +25,35 @@ _DISCOVERY_POLL_AFTER_FIRST_ROOT_SECONDS = 5.0
 
 
 class _RunMetadata(ty.NamedTuple):
+    """Enough to reconstruct how a run was started: the command, where and by whom it was
+    run, and which code. Every field is a string except the pid, so the file reads without
+    a schema."""
+
     command: str
     argv: tuple[str, ...]
     cwd: str
     started_at: str
     run_name: str
     invoked_by: str
+    hostname: str
+    platform: str  # OS and machine, e.g. `macOS-15.6-arm64-arm-64bit`
+    repo: str  # the git remote's repository name; empty outside a checkout
+    branch: str  # empty when detached, or outside a checkout without `GIT_BRANCH` set
     invoker_code_version: str
     python_executable: str
     python_version: str
     process_id: int
+
+
+def _branch() -> str:
+    """The checked-out branch, or the one a docker build recorded for an image with no `.git`."""
+    if branch := os.environ.get(meta.GIT_BRANCH):
+        return branch
+
+    try:
+        return git.get_branch()
+    except git.NO_GIT:
+        return ""
 
 
 def _current(run_name: str) -> _RunMetadata:
@@ -46,6 +65,10 @@ def _current(run_name: str) -> _RunMetadata:
         started_at=dt.datetime.now(dt.timezone.utc).isoformat(),
         run_name=run_name,
         invoked_by=metadata.get_invoked_by(),
+        hostname=hostname.friendly(),
+        platform=platform.platform(),
+        repo=meta.get_repo_name(),
+        branch=_branch(),
         invoker_code_version=metadata.get_invoker_code_version(),
         python_executable=sys.executable,
         python_version=platform.python_version(),
@@ -83,6 +106,10 @@ def _to_toml(run: _RunMetadata) -> str:
             f"started_at = {_toml_string(run.started_at)}",
             f"run_name = {_toml_string(run.run_name)}",
             f"invoked_by = {_toml_string(run.invoked_by)}",
+            f"hostname = {_toml_string(run.hostname)}",
+            f"platform = {_toml_string(run.platform)}",
+            f"repo = {_toml_string(run.repo)}",
+            f"branch = {_toml_string(run.branch)}",
             f"invoker_code_version = {_toml_string(run.invoker_code_version)}",
             f"python_executable = {_toml_string(run.python_executable)}",
             f"python_version = {_toml_string(run.python_version)}",
