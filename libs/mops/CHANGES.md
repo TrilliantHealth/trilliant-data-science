@@ -1,3 +1,13 @@
+### 3.32
+
+- New: `mops.pure.label_run("nightly-2026-09")` names an orchestrator run; call it before the first
+  `mops` invocation. First label wins; a later or conflicting one is logged once and ignored. Unlabelled
+  runs are published as `user@host`.
+- Each run is pointed at from a day-level index,
+  `<blob root>/mops/console/<day>/_index/<HHMMSS>Z--<label>--<run name>`, so one listing shows a day's
+  runs. The run metadata file gains a `label` field and is now published to every root a run opens,
+  including one that only served memoized results.
+
 ### 3.31
 
 - The console's run metadata file (`<script>--by-<user>.toml` at a run's events root) now records

@@ -100,27 +100,34 @@ class _Uploader:
 
 _UPLOADERS: dict[str, _Uploader] = {}
 _UPLOADERS_LOCK = threading.Lock()
+_DESCRIBED: set[str] = set()
+# roots this process has finished describing (or has no part in describing). Kept apart from
+# the uploaders so a description that failed is tried again on the next call, while the
+# uploader it accompanies is made once.
 
 
 def start_root(events_root_uri: str, run_name: str) -> bool:
-    """Ensure this process can publish to an already-discovered run root.
+    """Ensure this process can publish to a run root, and describe the run there.
 
-    Returns whether a new uploader was created. Unlike `start`, this does not publish run
-    metadata: another process may have discovered the root, while only the run-owning
-    parent may describe the run.
+    Returns whether a new uploader was created. The run metadata goes out for every root -
+    one that only ever served memoized results included, since a reader holding that root
+    is otherwise left with no account of the run - and is retried on each call until it is
+    out. Only the run-owning process actually writes it; `run_metadata` checks.
     """
     if not CONSOLE_UPLOAD_EVENTS() or not run_name or not events_root_uri:
         return False
 
-    if events_root_uri in _UPLOADERS:
-        return False
+    created = False
+    if events_root_uri not in _UPLOADERS:
+        with _UPLOADERS_LOCK:
+            if events_root_uri not in _UPLOADERS:
+                _UPLOADERS[events_root_uri] = _Uploader(events_root_uri)
+                created = True
 
-    with _UPLOADERS_LOCK:
-        if events_root_uri in _UPLOADERS:
-            return False
+    if events_root_uri not in _DESCRIBED and run_metadata.publish_root(events_root_uri, run_name):
+        _DESCRIBED.add(events_root_uri)
 
-        _UPLOADERS[events_root_uri] = _Uploader(events_root_uri)
-        return True
+    return created
 
 
 def start(memo_uri: str, run_name: str) -> None:
@@ -137,8 +144,7 @@ def start(memo_uri: str, run_name: str) -> None:
     except (ValueError, AssertionError):
         return
 
-    if start_root(root, run_name):
-        run_metadata.publish(memo_uri, run_name)
+    start_root(root, run_name)
 
 
 def _snapshot() -> tuple[_Uploader, ...]:
@@ -235,5 +241,6 @@ def _reset() -> None:
     """
     global _MANIFEST_WRITTEN, _UPLOADERS_LOCK
     _UPLOADERS.clear()
+    _DESCRIBED.clear()
     _UPLOADERS_LOCK = threading.Lock()
     _MANIFEST_WRITTEN = (frozenset(), frozenset())

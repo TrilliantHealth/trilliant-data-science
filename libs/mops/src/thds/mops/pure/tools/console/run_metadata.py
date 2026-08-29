@@ -15,7 +15,7 @@ from pathlib import Path
 from thds.core import files, git, hostname, log, meta
 
 from ...core import metadata, uris
-from . import blob_sink
+from . import blob_sink, run_index
 
 logger = log.getLogger(__name__)
 
@@ -34,6 +34,7 @@ class _RunMetadata(ty.NamedTuple):
     cwd: str
     started_at: str
     run_name: str
+    label: str  # what the application called the run, else `invoked_by` (`user@host`)
     invoked_by: str
     hostname: str
     platform: str  # OS and machine, e.g. `macOS-15.6-arm64-arm-64bit`
@@ -64,6 +65,7 @@ def _current(run_name: str) -> _RunMetadata:
         cwd=str(Path.cwd()),
         started_at=dt.datetime.now(dt.timezone.utc).isoformat(),
         run_name=run_name,
+        label="",  # settled when first published, since `label_run` may not have been called yet
         invoked_by=metadata.get_invoked_by(),
         hostname=hostname.friendly(),
         platform=platform.platform(),
@@ -105,6 +107,7 @@ def _to_toml(run: _RunMetadata) -> str:
             f"cwd = {_toml_string(run.cwd)}",
             f"started_at = {_toml_string(run.started_at)}",
             f"run_name = {_toml_string(run.run_name)}",
+            f"label = {_toml_string(run.label)}",
             f"invoked_by = {_toml_string(run.invoked_by)}",
             f"hostname = {_toml_string(run.hostname)}",
             f"platform = {_toml_string(run.platform)}",
@@ -122,11 +125,20 @@ def _to_toml(run: _RunMetadata) -> str:
     )
 
 
+def _labelled(run: _RunMetadata) -> _RunMetadata:
+    return run._replace(label=run_index.freeze_label(run.invoked_by))
+
+
 def _publish_root(root: str, run: _RunMetadata) -> None:
+    run = _labelled(run)
     blob_store = uris.lookup_blob_store(root)
     uri = blob_store.join(root, _filename(run))
     if not blob_store.exists(uri):
         blob_store.putbytes(uri, _to_toml(run).encode(), type_hint="application/toml")
+
+    run_index.publish(root, dt.datetime.fromisoformat(run.started_at), run.label, run.run_name)
+    # not behind the metadata check: a pointer is the same bytes every time, so rewriting it
+    # is harmless, and a retry after the file went out but the pointer did not still gets one.
 
 
 def _publish(memo_uri: str, run: _RunMetadata) -> None:
@@ -223,14 +235,31 @@ def claim(run_name: str) -> None:
             atexit.register(_stop_publisher)
 
 
-def publish(memo_uri: str, run_name: str) -> None:
-    """Publish from the run-owning process, never from one of its children."""
+def publish_root(events_root: str, run_name: str) -> bool:
+    """Publish from the run-owning process, never from one of its children.
+
+    True once there is nothing left for this process to do for the root - it is published,
+    or describing the run is not this process's job. False means try again later.
+    """
     try:
         run = _claim(run_name)
         if run is not None:
-            _publish_once(blob_sink.events_root(memo_uri, run.run_name), run)
+            _publish_once(events_root, run)
     except Exception:
         logger.debug("Could not publish mops run metadata; continuing.", exc_info=True)
+        return False
+
+    return True
+
+
+def publish(memo_uri: str, run_name: str) -> None:
+    try:
+        root = blob_sink.events_root(memo_uri, run_name)
+    except Exception:
+        logger.debug("Could not publish mops run metadata; continuing.", exc_info=True)
+        return
+
+    publish_root(root, run_name)
 
 
 def _stop_publisher() -> None:
@@ -257,6 +286,7 @@ def _reset_for_test() -> None:
     _PUBLISHED_ROOTS.clear()
     _STOP_PUBLISHER = threading.Event()
     os.environ.pop(_OWNER_PID_ENV, None)
+    run_index._reset_for_test()
 
 
 os.register_at_fork(after_in_child=_reset_after_fork)

@@ -1,6 +1,6 @@
 [project]
 name = "thds.mops"
-version = "3.31"
+version = "3.32"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
 readme = "README.md"

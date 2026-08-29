@@ -7,7 +7,15 @@ import pytest
 import tomli
 
 from thds.core import meta
-from thds.mops.pure.tools.console import blob_sink, run_metadata, run_name, throwaway, upload, writer
+from thds.mops.pure.tools.console import (
+    blob_sink,
+    run_index,
+    run_metadata,
+    run_name,
+    throwaway,
+    upload,
+    writer,
+)
 
 _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
 
@@ -27,6 +35,7 @@ def _metadata(cwd: Path, command: str = "apps/unified-asset/k8s/run.py --date 20
         cwd=str(cwd),
         started_at="2026-08-18T12:34:56+00:00",
         run_name="2026-08-18/mr.Run.abc",
+        label="",
         invoked_by="lemon@example",
         hostname="example",
         platform="macOS-15.6-arm64-arm-64bit",
@@ -82,7 +91,28 @@ def test_publish_writes_named_metadata_at_the_run_root(tmp_path):
         tmp_path
         / "mops/console/2026-08-18/mr.Run.abc/apps_unified-asset_k8s_run_py--by-lemon_example.toml"
     )
-    assert tomli.loads(written.read_text()) == run._asdict() | {"argv": list(run.argv)}
+    assert tomli.loads(written.read_text()) == run._asdict() | {
+        "argv": list(run.argv),
+        "label": "lemon@example",
+    }
+    # nobody labelled the run, so it is published as who started it and where.
+
+    pointer = tmp_path / "mops/console/2026-08-18/_index/123456Z--lemon@example--mr.Run.abc"
+    assert pointer.read_text().strip() == f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
+
+
+def test_a_root_that_only_served_memoized_results_still_describes_the_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        run_metadata, "_current", lambda name: _metadata(tmp_path)._replace(run_name=name)
+    )
+    root = f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
+
+    assert upload.start_root(root, "2026-08-18/mr.Run.abc")
+
+    assert list((tmp_path / "mops/console/2026-08-18/mr.Run.abc").glob("*.toml"))
+    assert list((tmp_path / "mops/console/2026-08-18/_index").iterdir())
+    # the history-upload path opens roots that no `invoked` event ever did; without this a
+    # console pointed at such a root has no account of the run and no entry in the day's index.
 
 
 def test_publish_does_not_replace_existing_metadata(tmp_path):
@@ -97,6 +127,51 @@ def test_publish_does_not_replace_existing_metadata(tmp_path):
         / "mops/console/2026-08-18/mr.Run.abc/apps_unified-asset_k8s_run_py--by-lemon_example.toml"
     )
     assert tomli.loads(written.read_text())["command"] == first.command
+
+
+def test_a_pointer_is_written_even_when_the_metadata_already_was(tmp_path):
+    memo_uri = f"file://{tmp_path}/{_MEMO_URI_SUFFIX}"
+    run = _metadata(tmp_path)
+    run_metadata._publish(memo_uri, run)
+    index = tmp_path / "mops/console/2026-08-18/_index"
+    next(index.iterdir()).unlink()
+    # the file went out and the pointer did not - a failure between the two writes.
+
+    run_metadata._publish(memo_uri, run)
+
+    assert [path.name for path in index.iterdir()] == ["123456Z--lemon@example--mr.Run.abc"]
+
+
+def test_a_failed_description_is_retried_on_the_next_opening_of_the_root(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        run_metadata, "_current", lambda name: _metadata(tmp_path)._replace(run_name=name)
+    )
+    root = f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
+    real_publish = run_index.publish
+    attempts: list[str] = []
+
+    def flaky(*args, **kwargs):
+        attempts.append("pointer")
+        if len(attempts) == 1:
+            raise OSError("the blob store blinked")
+
+        real_publish(*args, **kwargs)
+
+    monkeypatch.setattr(run_index, "publish", flaky)
+    upload._reset()
+
+    assert upload.start_root(root, "2026-08-18/mr.Run.abc")
+    assert not list((tmp_path / "mops/console/2026-08-18").glob("_index/*"))
+
+    assert not upload.start_root(root, "2026-08-18/mr.Run.abc")
+    # the uploader was already there; the description was not, so it is tried again.
+    assert [p.name for p in (tmp_path / "mops/console/2026-08-18/_index").iterdir()] == [
+        "123456Z--lemon@example--mr.Run.abc"
+    ]
+
+    upload.start_root(root, "2026-08-18/mr.Run.abc")
+    assert attempts == ["pointer", "pointer"]
+    # and once it is out, later openings leave it alone.
 
 
 def test_publish_failure_does_not_raise():
