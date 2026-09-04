@@ -18,9 +18,11 @@ import argh
 from thds.gent import output
 from thds.gent.utils import (
     WorktreeInfo,
+    dirty_count,
     find_worktree_root,
     parse_git_worktree_list,
     run_git,
+    unmerged_commits,
 )
 
 
@@ -64,25 +66,11 @@ def _by_name(worktrees: ty.Iterable[WorktreeInfo], target: str) -> WorktreeInfo 
     return _containing(worktrees, candidate) if candidate.is_absolute() else None
 
 
-def _dirty_count(worktree: Path) -> int:
-    result = run_git("status", "--porcelain", cwd=worktree, check=False)
-    return len([line for line in result.stdout.splitlines() if line.strip()])
-
-
 def _unpushed_commits(worktree: Path) -> int:
     """Commits on HEAD that the upstream does not have. Zero when there is no upstream."""
     result = run_git("rev-list", "--count", "@{upstream}..HEAD", cwd=worktree, check=False)
     if result.returncode != 0:
         return 0
-
-    return int(result.stdout.strip() or 0)
-
-
-def _unmerged_commits(worktree: Path, base: str) -> int | None:
-    """Commits on HEAD not reachable from *base*, or None if base is unknown."""
-    result = run_git("rev-list", "--count", f"{base}..HEAD", cwd=worktree, check=False)
-    if result.returncode != 0:
-        return None
 
     return int(result.stdout.strip() or 0)
 
@@ -113,9 +101,9 @@ def _status_parts(info: WorktreeInfo, base: str) -> list[str]:
     if not info.path.is_dir():
         return ["directory is gone (git worktree prune)"]
 
-    dirty = _dirty_count(info.path)
+    dirty = dirty_count(info.path)
     unpushed = _unpushed_commits(info.path)
-    unmerged = _unmerged_commits(info.path, base)
+    unmerged = unmerged_commits(info.path, base)
 
     return [
         part

@@ -504,6 +504,20 @@ def get_branch_list(cwd: Path, remote: bool = False, strip_remote_prefix: bool =
     return branches
 
 
+def dirty_count(worktree_path: Path) -> int:
+    """Count uncommitted changes in a worktree."""
+    result = run_git("status", "--porcelain", cwd=worktree_path, check=False)
+    return len([line for line in result.stdout.splitlines() if line.strip()])
+
+
+def unmerged_commits(worktree_path: Path, base_ref: str) -> int | None:
+    """Commits on HEAD not reachable from base_ref, or None if base_ref is unknown."""
+    result = run_git("rev-list", "--count", f"{base_ref}..HEAD", cwd=worktree_path, check=False)
+    if result.returncode != 0:
+        return None
+    return int(result.stdout.strip() or 0)
+
+
 def cleanup_empty_parent_dirs(path: Path, root: Path) -> None:
     """
     Remove empty parent directories up to root.

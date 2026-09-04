@@ -328,19 +328,25 @@ def run_wt():
         Function that runs wt command and returns CompletedProcess
     """
 
-    def _run_wt(command: str, args: list[str], cwd: Path | None = None):
+    def _run_wt(
+        command: str,
+        args: list[str],
+        cwd: Path | None = None,
+        input_text: str | None = None,
+    ):
         """Run a wt command and return the result.
 
         Args:
             command: The wt subcommand to run (e.g., "co", "rm", "list")
             args: List of arguments to pass to the command
             cwd: Working directory to run the command in
+            input_text: Optional text to pipe to stdin
 
         Returns:
             CompletedProcess with stdout, stderr, and returncode
         """
         cmd = ["wt", command] + args
-        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, input=input_text)
         return result
 
     return _run_wt

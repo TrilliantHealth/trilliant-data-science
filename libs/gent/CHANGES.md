@@ -1,3 +1,10 @@
+## 1.7
+
+- Added `wt prune`, which removes worktrees whose remote branch has been deleted. It fetches with
+  `--prune` to sync remote refs, identifies candidates, and shows a numbered list for selective removal.
+  Worktrees with unmerged commits or uncommitted changes require `--force`. Pass `--yes` to skip the
+  prompt (removes only clean, merged worktrees unless combined with `--force`).
+
 ### 1.6.20260811
 
 - Fixed `wt status --all` reporting nothing at all when any worktree lives outside the repository root.

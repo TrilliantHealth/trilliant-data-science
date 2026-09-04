@@ -49,6 +49,11 @@ COMMANDS: dict[str, CommandInfo] = {
         "description": "Remove a worktree",
         "usage": "wt rm [--force] [branch-name]",
     },
+    "prune": {
+        "module": "thds.gent.commands.prune",
+        "description": "Remove worktrees whose remote branch is gone",
+        "usage": "wt prune [--yes] [--force]",
+    },
     "init": {
         "module": "thds.gent.commands.init",
         "description": "Initialize worktree (install deps, etc.)",
