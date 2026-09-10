@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from thds.core import source
@@ -63,3 +64,37 @@ def test_same_microsecond_collision_raises(tmp_path: Path, monkeypatch: pytest.M
     io.to_pickle_source("data", "stem", out_dir=tmp_path)
     with pytest.raises(FileExistsError):
         io.to_pickle_source("data", "stem", out_dir=tmp_path)
+
+
+def test_parquet_round_trip(tmp_path: Path) -> None:
+    df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+    src = io.to_parquet_source(df, "a_frame", out_dir=tmp_path)
+    assert isinstance(src, source.Source)
+    assert Path(os.fspath(src)).name == "a_frame.parquet"
+    pd.testing.assert_frame_equal(pd.read_parquet(src), df)
+
+
+def test_parquet_series_written_as_one_column_frame() -> None:
+    series = pd.Series([1.0, 2.0], name="score")
+    src = io.to_parquet_source(series, "a_series")
+    round_tripped = pd.read_parquet(src)
+    pd.testing.assert_frame_equal(round_tripped, series.to_frame())
+
+
+def test_parquet_existing_file_raises(tmp_path: Path) -> None:
+    df = pd.DataFrame({"a": [1]})
+    io.to_parquet_source(df, "same_name", out_dir=tmp_path)
+    with pytest.raises(FileExistsError):
+        io.to_parquet_source(df, "same_name", out_dir=tmp_path)
+
+
+def test_json_round_trip(tmp_path: Path) -> None:
+    data = {"metric": 0.9, "labels": ["a", "b"]}
+    src = io.to_json_source(data, "stats", out_dir=tmp_path)
+    assert Path(os.fspath(src)).name == "stats.json"
+    assert io.load_json_source(src) == data
+
+
+def test_json_indent_is_applied(tmp_path: Path) -> None:
+    src = io.to_json_source({"a": 1}, "pretty", out_dir=tmp_path, indent=2)
+    assert Path(os.fspath(src)).read_text() == '{\n  "a": 1\n}'

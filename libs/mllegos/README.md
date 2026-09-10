@@ -28,9 +28,11 @@ thing well, they're easier to test, maintain, understand, and use in new and une
 
 ### IO
 
-- `io` has pickle \<-> `thds.core.source.Source` helpers: `to_pickle_source` writes any picklable object
-  to a timestamped file and wraps it as a `Source`; `load_pickle_source_typed` unpickles and verifies the
-  value's type before returning it. The module is free of ML-framework imports, so it is safe to use in
+- `io` has pickle, parquet, and JSON \<-> `thds.core.source.Source` helpers: `to_pickle_source` writes
+  any picklable object to a timestamped file and wraps it as a `Source`; `load_pickle_source_typed`
+  unpickles and verifies the value's type before returning it; `to_parquet_source` / `to_json_source` /
+  `load_json_source` do the same for DataFrames and JSON-serializable values. The module is free of
+  ML-framework imports (pandas loads only when the parquet helper is called), so it is safe to use in
   modules that must load on minimal installs.
 - `sklegos.io` wraps those helpers with estimator-typed signatures: `dump_model` / `load_model` for
   pickled `sklearn`-compatible estimators.
@@ -53,6 +55,10 @@ thing well, they're easier to test, maintain, understand, and use in new and une
     (precision/recall/f1-score/support) for all classes
 - `viz.basic` contains some slighlty lower-level wrappers for making more custom scatterplots and bar
   charts with `pyecharts`
+- `binary_cls` computes plain-value binary classification scores: `confusion_counts`, `binary_cls_scores`
+  (accuracy/precision/recall/F-beta family/average precision) for 0/1-encoded arrays, `cls_scores` for
+  arrays of any label dtype with a `pos_label`, and `frame_cls_scores` / `score_by_variable` for pandas
+  frames
 - see `notebooks/demo_sklearn_classification_report_tools.ipynb` for working examples of all of the above
 
 ### Feature extraction
@@ -63,6 +69,16 @@ thing well, they're easier to test, maintain, understand, and use in new and une
   encode hierarchy membership from left to right (e.g. ICD-10 diagnoses/procedures, NUCC taxonomies). It
   dynamically estimates code vocabularies by aggregating evidence from rare codes to shared prefixes with
   better support.
+- `sparse` has `to_sparse` / `to_dense` conversion functions (safe to wrap in a pickled
+  `FunctionTransformer`) and transformers for count-valued struct columns: `SparseCountFeatures` turns
+  arrays of `{value, count}` dicts into a sparse count matrix with stable feature names,
+  `SparseCountFeatureNormalized` divides those counts by a dense column, and
+  `DenseToSparseNamedTransformer` converts dense columns to sparse while preserving feature names.
+
+`sklegos.encoding` declares feature-encoding specs as frozen dataclasses (`ContinuousFeatureConf`,
+`OneHotEncoderConf` - hashable, picklable, safe as memoization-key components) and maps them onto
+unfitted sklearn transformers via `scaling_transformer` and `one_hot_encoder`; assembly policy around the
+encoders (dtype casts, imputation steps, pipeline order) stays with the caller.
 
 ### Feature selection
 

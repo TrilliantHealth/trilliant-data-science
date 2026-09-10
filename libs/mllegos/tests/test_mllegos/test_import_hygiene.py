@@ -3,9 +3,10 @@ import sys
 
 
 def test_ml_free_modules_import_without_ml_deps() -> None:
-    """`io` and `search_space` must load with no ML frameworks installed."""
+    """`io` and `search_space` must load with no ML frameworks - not even pandas - installed."""
     code = (
         "import sys; "
+        "sys.modules['pandas'] = None; "
         "sys.modules['sklearn'] = None; sys.modules['skopt'] = None; sys.modules['xgboost'] = None; "
         "import thds.mllegos.io; import thds.mllegos.search_space; print('ok')"
     )
