@@ -1,3 +1,11 @@
+### 1.58
+
+- New: `log.env` carries logger context across a process boundary. A launcher passes
+  `log.env.as_env(**context)` in a child's environment and the child's base logger context starts from
+  it, so every line it logs is attributable without being told again in-process. Context is inherited by
+  the whole process tree; `log.env.suppress(environ, *keys)` returns an environment with some or all of
+  it dropped, for a boundary where it should not carry.
+
 ### 1.57
 
 - **BREAKING:** `dict_utils.flatten` and `dict_utils.unflatten` are keyed by **tuples of path segments**

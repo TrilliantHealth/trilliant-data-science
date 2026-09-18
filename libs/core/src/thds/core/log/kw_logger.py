@@ -10,6 +10,7 @@ from typing import Any, Dict, MutableMapping, Optional
 
 from .. import config
 from ..stack_context import StackContext
+from . import env
 
 LOGLEVEL = config.item("thds.core.log.level", logging.INFO, parse=logging.getLevelName)
 _LOGGING_KWARGS = ("exc_info", "stack_info", "stacklevel", "extra")
@@ -28,7 +29,9 @@ class _THContext(Dict[str, Any]):
         return ",".join(map("(%s=%s)".__mod__, self.items())) if self else "()"
 
 
-_LOG_CONTEXT: StackContext[_THContext] = StackContext("TH_LOG_CONTEXT", _THContext())
+_LOG_CONTEXT: StackContext[_THContext] = StackContext("TH_LOG_CONTEXT", _THContext(env.from_env()))
+# the base context is whatever our launcher published into the environment (see log.env),
+# so a subprocess logs what it is without being told again in-process.
 
 
 @contextlib.contextmanager
