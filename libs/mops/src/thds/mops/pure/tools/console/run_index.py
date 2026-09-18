@@ -3,7 +3,8 @@
 `<blob root>/mops/console/<day>/_index/<HHMMSS>Z--<label>--<run name>` - the start time (UTC,
 like the day), a label, and the run's own name, so a listing of the index is a readable
 table of the day's runs without opening anything. The pointer's body is the run's events
-root.
+root, or a JSON object with the events root and optional metadata (project, branch) that
+the console can show without opening each run.
 
 The label is what an application says its run is, via `label_run` - `nightly-2026-09`,
 `weekly-2026-09` - and falls back to who started it and where. It need not be unique;
@@ -11,8 +12,11 @@ the run name is, and the time tells two of the same label apart.
 """
 
 import datetime as dt
+import json
 import re
 import threading
+import types
+import typing as ty
 
 from thds.core import log
 
@@ -79,15 +83,34 @@ def entry_name(started_at: dt.datetime, label: str, run_name: str) -> str:
     return f"{stamp}--{_safe(label)}--{_safe(run_name.rsplit('/', 1)[-1])}"
 
 
-def publish(events_root: str, started_at: dt.datetime, label: str, run_name: str) -> None:
-    """Point at a run from its day's index. The run's events root is `<day>/<run name>`,
-    so the index sits beside the run."""
+def _pointer_body(events_root: str, metadata: ty.Mapping[str, str]) -> bytes:
+    if not metadata:
+        return (events_root + "\n").encode()
+
+    return json.dumps(
+        {"events_root": events_root, **metadata}, separators=(",", ":"), sort_keys=True
+    ).encode()
+
+
+def publish(
+    events_root: str,
+    started_at: dt.datetime,
+    label: str,
+    run_name: str,
+    metadata: ty.Mapping[str, str] = types.MappingProxyType({}),
+) -> None:
+    """Point at a run from its day's index.
+
+    `metadata` is written into the pointer body as JSON alongside the events root, so the
+    console can show project and branch in the picker without opening each run. Old readers
+    that expect a bare URI fall back to the name-derived events root.
+    """
     blob_store = uris.lookup_blob_store(events_root)
     day_dir = events_root.rstrip("/").rsplit("/", 1)[0]
     blob_store.putbytes(
         blob_store.join(day_dir, INDEX_DIRNAME, entry_name(started_at, label, run_name)),
-        (events_root + "\n").encode(),
-        type_hint="text/plain",
+        _pointer_body(events_root, metadata),
+        type_hint="application/json" if metadata else "text/plain",
     )
 
 

@@ -97,8 +97,13 @@ def test_publish_writes_named_metadata_at_the_run_root(tmp_path):
     }
     # nobody labelled the run, so it is published as who started it and where.
 
+    import json
+
     pointer = tmp_path / "mops/console/2026-08-18/_index/123456Z--lemon@example--mr.Run.abc"
-    assert pointer.read_text().strip() == f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
+    body = json.loads(pointer.read_text())
+    assert body["events_root"] == f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
+    assert body["branch"] == "mops/a-branch"
+    assert body["project"]
 
 
 def test_a_root_that_only_served_memoized_results_still_describes_the_run(tmp_path, monkeypatch):

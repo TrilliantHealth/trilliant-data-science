@@ -57,6 +57,19 @@ def _branch() -> str:
         return ""
 
 
+def _project(cwd: str) -> str:
+    """The working directory relative to the git root, or the basename outside a checkout."""
+    try:
+        root = git._simple_run("git rev-parse --show-toplevel")
+    except git.NO_GIT:
+        return Path(cwd).name
+
+    try:
+        return str(Path(cwd).resolve().relative_to(Path(root).resolve()))
+    except ValueError:
+        return Path(cwd).name
+
+
 def _current(run_name: str) -> _RunMetadata:
     argv = tuple(sys.argv)
     return _RunMetadata(
@@ -129,6 +142,18 @@ def _labelled(run: _RunMetadata) -> _RunMetadata:
     return run._replace(label=run_index.freeze_label(run.invoked_by))
 
 
+def _index_metadata(run: _RunMetadata) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    project = _project(run.cwd)
+    if project and project != ".":
+        metadata["project"] = project
+
+    if run.branch:
+        metadata["branch"] = run.branch
+
+    return metadata
+
+
 def _publish_root(root: str, run: _RunMetadata) -> None:
     run = _labelled(run)
     blob_store = uris.lookup_blob_store(root)
@@ -136,9 +161,13 @@ def _publish_root(root: str, run: _RunMetadata) -> None:
     if not blob_store.exists(uri):
         blob_store.putbytes(uri, _to_toml(run).encode(), type_hint="application/toml")
 
-    run_index.publish(root, dt.datetime.fromisoformat(run.started_at), run.label, run.run_name)
-    # not behind the metadata check: a pointer is the same bytes every time, so rewriting it
-    # is harmless, and a retry after the file went out but the pointer did not still gets one.
+    run_index.publish(
+        root,
+        dt.datetime.fromisoformat(run.started_at),
+        run.label,
+        run.run_name,
+        _index_metadata(run),
+    )
 
 
 def _publish(memo_uri: str, run: _RunMetadata) -> None:
