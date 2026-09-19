@@ -10,6 +10,7 @@ from functools import partial
 from kubernetes import client
 
 from thds import core
+from thds.mops.pure.core import metadata
 from thds.mops.pure.core.metadata import EXTRA_METADATA_GENERATOR
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
@@ -180,6 +181,7 @@ def launch(  # noqa: C901
         # (when thds_std is imported). Only set if configured - OSS users won't have this.
         if extra_meta_gen := EXTRA_METADATA_GENERATOR():
             add_env_var("MOPS_METADATA_EXTRA_GENERATOR", extra_meta_gen)
+        add_env_var("MOPS_METADATA_LOCAL_INVOKED_BY", metadata.get_invoked_by())
 
         logger.debug("Creating container definition ...")
         logger.debug("Setting container CPU/RAM requirements ...")

@@ -1,3 +1,8 @@
+### 3.32.20260919
+
+- Orchestrator pods and worker jobs now inherit `MOPS_METADATA_LOCAL_INVOKED_BY` from whoever launched
+  them, so `get_invoked_by()` returns the human who started the pipeline rather than `root@pod-hostname`.
+
 ### 3.32
 
 - New: `mops.pure.label_run("nightly-2026-09")` names an orchestrator run; call it before the first
