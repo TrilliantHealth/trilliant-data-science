@@ -151,6 +151,9 @@ def _index_metadata(run: _RunMetadata) -> dict[str, str]:
     if run.branch:
         metadata["branch"] = run.branch
 
+    if run.invoked_by:
+        metadata["invoked_by"] = run.invoked_by
+
     return metadata
 
 
