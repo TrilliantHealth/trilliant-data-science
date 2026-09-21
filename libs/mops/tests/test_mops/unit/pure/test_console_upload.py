@@ -3,7 +3,7 @@ import json
 import pytest
 import tomli
 
-from thds.mops.pure.tools.console import run_metadata, throwaway, upload
+from thds.mops.pure.tools.console import run_metadata, throwaway, upload, writer
 
 _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
 
@@ -14,9 +14,15 @@ def _reset(monkeypatch):
     # these assert against `mops/console` paths, and running under pytest would otherwise
     # send them to the throwaway location. Where that redirect happens is tested in
     # `test_console_blob_sink`; what is under test here is the batching.
+    if isinstance(writer._WRITER, writer._Writer):
+        writer._WRITER.close()
+    writer._WRITER = None
     upload._reset()
     run_metadata._reset_for_test()
     yield
+    if isinstance(writer._WRITER, writer._Writer):
+        writer._WRITER.close()
+    writer._WRITER = None
     upload._reset()
     run_metadata._reset_for_test()
 

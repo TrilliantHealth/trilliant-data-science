@@ -95,6 +95,40 @@ OS thread is used for each pod being scraped). Either set the `MOPS_NO_K8S_LOGS`
 environment variable, or programmatically pass `suppress_logs=True` to either
 `k8s.shim` (declarative API) or `launch` (imperative API).
 
+## Live Kubernetes cost estimates
+
+When console events are enabled, a process launching Kubernetes Jobs starts a detached local observer for
+the run. Concurrent launchers use one observer per Kubernetes target. It records node-time intervals
+beside the console event log and uses a cloud provider to classify and price each node. The observer is
+tied to the process that owns the console run, so it survives short-lived dispatch workers and exits when
+the orchestrator exits. It is not a Kubernetes workload or an always-running service.
+
+The console presents this as a best-effort estimate that is likely low. Observer coverage measures only
+the recorded orchestrator run windows. Nodes can remain allocated and billable after an orchestrator
+exits while the node pool scales down, and a resumed pipeline can leave unobserved node lifetime between
+its old and new run observers. Combining those runs improves the estimate but does not recover those
+gaps, even when every recorded run window says 100% observed.
+
+The observer needs `get` and `list` access to Nodes in addition to the Pod access the orchestrator
+already uses. The supplied orchestrator ClusterRole includes these permissions. Set
+`mops.k8s.cost.enabled=false` to disable observation, or change
+`mops.k8s.cost.poll_seconds` from its 10-second default.
+
+`mops.k8s.cost.provider` defaults to `auto`. Built-in providers inspect node metadata to decide whether
+they apply; the built-in `azure` provider reads AKS agent-pool, region, SKU and priority labels, then looks
+up current Linux regular or spot rates from the Azure Retail Prices API. Set the option to a built-in name
+to require it, or to the dotted import path of a zero-argument factory returning a
+`thds.mops.k8s.cost.model.Provider` value containing a name, node-classification function, and pricing
+function. The factory and its dependencies must be importable by the local
+orchestrator process; the provider runs in the local observer and does not need to be installed in Jobs.
+If a provider returns several candidate rates, the observer preserves them and logs a warning. The console
+shows the resulting cost range and labels the pricing as ambiguous instead of discarding the node-time.
+
+The estimate assigns the full cost of every node in a participating provider allocation group, such as
+an AKS agent pool. It therefore assumes that group is dedicated to the pipeline; it does not infer or
+allocate shared-node ownership. Contract discounts, reservations, storage and network charges are not
+included. The estimate is neither an invoice nor an upper bound.
+
 ## Common failure modes
 
 [sidebar]

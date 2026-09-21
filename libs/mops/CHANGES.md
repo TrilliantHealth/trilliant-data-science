@@ -1,3 +1,12 @@
+### 3.33
+
+- New: Kubernetes runs observed by `mops-console` record an immediate best-effort node-cost estimate,
+  labelled as likely low because post-orchestrator and between-run node lifetime is unobserved. A
+  detached local observer follows the console run owner across short-lived dispatch workers and writes
+  node-time and coverage intervals without requiring a cluster service. Cloud-specific node
+  classification and pricing are pluggable; the built-in Azure provider supports regular and spot pools.
+  Disable it with `mops.k8s.cost.enabled=false`.
+
 ### 3.32.20260919
 
 - Orchestrator pods and worker jobs now inherit `MOPS_METADATA_LOCAL_INVOKED_BY` from whoever launched

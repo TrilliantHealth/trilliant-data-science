@@ -15,7 +15,7 @@ from thds.mops.pure.core.metadata import EXTRA_METADATA_GENERATOR
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config, counts, job_future, logging, runtime_context
+from . import config, cost, counts, job_future, logging, runtime_context
 from ._shared import logger
 from .auth import api_client, upsert_namespace
 from .node_selection import NodeNarrowing, ResourceDefinition
@@ -246,7 +246,7 @@ def launch(  # noqa: C901
             ),
         )
         logger.debug("Finished creating base job definition ...")
-        return v1_job_body
+        return cost.add_to(v1_job_body)
 
     def job_with_all_transforms() -> client.models.V1Job:
         actual_transform = transform_job if transform_job is not None else _load_job_transform()
@@ -256,6 +256,8 @@ def launch(  # noqa: C901
         job_with_all_transforms()
         logger.info("Dry run assembly successful; not launching...")
         return core.futures.LazyFuture(partial(core.futures.ResolvedFuture, True))
+
+    cost.ensure_started(target)
 
     @k8s_sdk_retry()
     def launch_job() -> client.models.V1Job:

@@ -20,6 +20,7 @@ import typing as ty
 from functools import wraps
 
 from thds.core import cpus, futures, log
+from thds.mops.pure.tools.console import run_name, writer
 
 from . import _launch, auth, counts
 
@@ -176,6 +177,10 @@ def make_counting_process_pool_executor(
     If you fail to heed this advice, you will get weird launched/finished counts at a
     minimum. Although these job counts are not mission-critical, you _will_ be confused.
     """
+    run_name.claim(bool(writer.CONSOLE_EVENTS_DIR().name))
+    # Claim in the process that owns the pool. Workers inherit both the run name and
+    # owner pid, so local services they start can outlive short-lived dispatch workers.
+
     start_method: str = "spawn"
     # 'spawn' prevents weird batch processing deadlocks that seem to only happen on Linux with 'fork'.
     # it is strongly recommended to use 'spawn' for this reason.
