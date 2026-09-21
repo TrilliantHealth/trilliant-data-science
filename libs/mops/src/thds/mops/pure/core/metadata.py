@@ -14,7 +14,7 @@ import typing as ty
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from thds.core import calgitver, config, hostname
+from thds.core import calgitver, config, hostname, log
 
 _logger = logging.getLogger(__name__)
 
@@ -55,6 +55,29 @@ def load_metadata_generator() -> ty.Optional[MetadataGenerator]:
         _generator_cache[import_path] = None
 
     return _generator_cache[import_path]
+
+
+def log_context_metadata() -> ty.Dict[str, str]:
+    """Whatever tagged this invocation's logs, to record alongside its result.
+
+    A launcher that runs many invocations in one process tags each one's lines with what
+    it is; recording those same fields is what lets a reader get from a result back to the
+    lines that produced it. `mops` does not interpret them - it sets none of them, and
+    which keys mean what is the launcher's business.
+
+    Call this before entering any scope of your own, so the snapshot is the launcher's
+    context and not a description of what `mops` was doing when it looked. The whole
+    context, not just `log.env`: a launcher that runs items on its own threads has no
+    child to hand an environment to, so only `logger_context` carries its tags.
+
+    Values with a space or a newline are dropped: the metadata file is `key=value` lines
+    parsed by splitting, and a log context is not ours to constrain.
+    """
+    return {
+        key: str(value)
+        for key, value in log.logger_context_values().items()
+        if str(value) and not any(c in str(value) for c in " \n\r")
+    }
 
 
 def format_extra_metadata(extra: ty.Dict[str, str]) -> str:
@@ -167,8 +190,12 @@ class ResultMetadata(InvocationMetadata):
 def invocation_metadata_parser(
     parser: ty.Optional[argparse.ArgumentParser] = None,
 ) -> argparse.ArgumentParser:
-    parser = parser or argparse.ArgumentParser()
+    parser = parser or argparse.ArgumentParser(allow_abbrev=False)
     assert parser
+    # no abbreviation: extra metadata reaches this parser as `--<key>=<value>` too, and a key
+    # that happens to prefix a real flag (`remote` against `--remote-code-version`) is an
+    # ambiguous option rather than the unrecognized one it should be. Metadata is always
+    # written with full flag names, so nothing legitimate relies on abbreviating.
     parser.add_argument(
         "--invoked-by",
         help="Who invoked this function. Will be used recursively (for nested functions).",

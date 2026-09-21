@@ -1,28 +1,48 @@
+import datetime as dt
+from types import SimpleNamespace
+
 import pytest
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
-from thds.mops.pure.adls import listing
-
-
-@pytest.mark.parametrize("directory_marker", ["true", True], ids=["string", "boolean"])
-def test_directory_entries_are_skipped_however_the_service_spells_them(directory_marker):
-    """The service has sent `isDirectory` as the string "true" and could as easily send a
-    boolean - an equality test against either spelling silently accepts the other's
-    directories as files, and a directory yielded as an event object fails to download."""
-    payload = {
-        "paths": [
-            {"name": "events", "isDirectory": directory_marker},
-            {"name": "events/e1.json", "lastModified": "Wed, 12 Aug 2026 12:00:00 GMT"},
-        ]
-    }
-
-    assert [entry.name for entry in listing._files_in(payload)] == ["events/e1.json"]
+from thds.mops.pure.adls import blob_store
 
 
-def test_entries_without_the_marker_are_files():
-    assert [e.name for e in listing._files_in({"paths": [{"name": "f.json"}]})] == ["f.json"]
+def _client_whose_listing_raises(exc: Exception):  # noqa: ANN202
+    def get_paths(path, recursive):
+        raise exc
+        yield  # pragma: no cover - makes this a generator, so the raise happens on iteration
+
+    return SimpleNamespace(get_paths=get_paths)
 
 
-def test_a_missing_last_modified_is_none_rather_than_an_error():
-    (entry,) = listing._files_in({"paths": [{"name": "f.json"}]})
+def test_a_prefix_nothing_was_written_under_lists_as_empty(monkeypatch):
+    not_found = ResourceNotFoundError("The specified path does not exist.")
+    not_found.status_code = 404
+    monkeypatch.setattr(
+        blob_store, "get_global_fs_client", lambda sa, c: _client_whose_listing_raises(not_found)
+    )
+    assert list(blob_store.AdlsBlobStore().list("adls://thdsscratch/tmp/fresh/queue/manifest")) == []
 
-    assert entry.last_modified is None
+
+def test_listing_timestamps_are_aware_utc(monkeypatch):
+    naive = dt.datetime(2026, 9, 18, 14, 0, 0)  # what the SDK's strptime of "... GMT" yields
+
+    def get_paths(path, recursive):
+        yield SimpleNamespace(name="tmp/q/manifest/000001", last_modified=naive)
+
+    monkeypatch.setattr(
+        blob_store, "get_global_fs_client", lambda sa, c: SimpleNamespace(get_paths=get_paths)
+    )
+    (entry,) = blob_store.AdlsBlobStore().list("adls://thdsscratch/tmp/q/manifest")
+    assert entry.modified_at == naive.replace(tzinfo=dt.timezone.utc)
+    assert entry.modified_at < dt.datetime.now(dt.timezone.utc)  # comparable, which is the point
+
+
+def test_other_listing_errors_still_raise(monkeypatch):
+    forbidden = HttpResponseError("forbidden")
+    forbidden.status_code = 403
+    monkeypatch.setattr(
+        blob_store, "get_global_fs_client", lambda sa, c: _client_whose_listing_raises(forbidden)
+    )
+    with pytest.raises(HttpResponseError):
+        list(blob_store.AdlsBlobStore().list("adls://thdsscratch/tmp/prefix"))

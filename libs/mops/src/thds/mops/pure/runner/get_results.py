@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from thds.core import concurrency, futures, log
+from thds.core import cache, concurrency, futures, log
 
 from ...config import max_concurrent_network_ops
 from ..core import lease, memo
@@ -87,10 +87,13 @@ def unwrap_value_or_error(
             # orchestrator's lease, whose remote reported to that run, not this one.
 
 
-_AFTER_INVOCATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(
-    int(max_concurrent_network_ops()) * 3
-)
-# _IN prioritizes retrieving the result of a Shim that has completed.
+@cache.locking
+def _after_invocation_semaphore() -> concurrency.ReentrantBoundedSemaphore:
+    # _AFTER prioritizes retrieving the result of a Shim that has completed.
+    # Built on first use, not at import - see `local._before_invocation_semaphore`.
+    return concurrency.ReentrantBoundedSemaphore(int(max_concurrent_network_ops()) * 3)
+
+
 logger = log.getLogger(__name__)
 T = ty.TypeVar("T")
 
@@ -119,7 +122,7 @@ class PostShimResultGetter(ty.Generic[T]):
         memo_uri = self.memo_uri
 
         try:
-            with _AFTER_INVOCATION_SEMAPHORE:
+            with _after_invocation_semaphore():
                 value_or_error = memo.results.check_if_result_exists(memo_uri, check_for_exception=True)
                 if not value_or_error:
                     console.emit(

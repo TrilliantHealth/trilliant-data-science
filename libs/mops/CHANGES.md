@@ -1,3 +1,30 @@
+### 3.34
+
+- Fixed: the `max_concurrent_network_ops` semaphores (before-invocation and after-invocation) are sized
+  on first use rather than at import. An application that raised the limit in its entry point - after
+  importing mops, as any entry point does - kept the default of 8, and its orchestrator dispatch was
+  capped at roughly 8 invocations per second of ADLS round-trips no matter how many threads it ran.
+- Fixed: `RequiredResultNotFound` survives pickling, so a process pool hands the real error back instead
+  of a `TypeError` from reconstructing it.
+- New: the ADLS and local-file blob stores implement `put_unless_exists` (atomic create-if-absent). This
+  is the coordination primitive `thds.mops-queue` builds its work-queue claims on; the capability
+  protocol lives there, as its only consumer.
+- `mops.k8s.load_configured_job_transform` is now public, so a caller passing `transform_job` can compose
+  with the configured default instead of replacing it.
+- Fixed: stopping remote lease maintenance now forgets the registration, so a later registration for the
+  same writer id in the same process is maintained instead of receiving the stopped callback.
+- New: `mops.k8s.jobs.job_was_deleted(name)` reports that the Job watch saw the Job deleted. `get_job` is
+  unchanged and still returns the Job's final state after deletion.
+- Fixed: listing an ADLS prefix nothing has been written under returns no entries, as the local-file
+  store already did, instead of raising the service's path-not-found error; and the listing's
+  `modified_at` is timezone-aware UTC, so it compares with `datetime.now(timezone.utc)` as the local-file
+  store's already did.
+- New: result metadata records the logger context an invocation was tagged with, so a launcher that runs
+  many invocations in one process can be read back from any one of their results. Captured when the
+  result channel is built, which is before `mops` enters scopes of its own. Caller-provided extra
+  metadata wins on a key collision.
+
+
 ### 3.33
 
 - New: Kubernetes runs observed by `mops-console` record an immediate best-effort node-cost estimate,

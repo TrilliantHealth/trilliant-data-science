@@ -63,6 +63,11 @@ class ResultExcWithMetadataChannel:
     # static extra metadata provided by the caller, merged with (and overridden by)
     # anything the configured extra-metadata generator produces.
 
+    log_context: ty.Mapping[str, str] = dataclasses.field(default_factory=metadata.log_context_metadata)
+    # what tagged this invocation's logs, captured here because a channel is built before
+    # the routing scope and the blob-store calls that write this metadata push context of
+    # mops's own. Lowest precedence of the three.
+
     @cached_property
     def _result_metadata(self) -> metadata.ResultMetadata:
         """Lazily compute ResultMetadata (used by header and extra metadata)."""
@@ -82,8 +87,9 @@ class ResultExcWithMetadataChannel:
 
     @cached_property
     def _extra_metadata_content(self) -> bytes:
-        """Caller-provided extra metadata plus the configured generator's, if any."""
-        extra = dict(self.extra_metadata)
+        """The invocation's log context, caller-provided extra metadata, and the configured
+        generator's, in increasing order of precedence."""
+        extra = {**self.log_context, **self.extra_metadata}
         generator = metadata.load_metadata_generator()
         if generator is not None:
             try:

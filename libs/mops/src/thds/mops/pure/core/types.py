@@ -130,7 +130,8 @@ class BlobListing(ty.NamedTuple):
 
     `modified_at` is assigned by the storage service, not by whoever wrote the object, so it
     is the one timestamp in a distributed run that needs no agreement between machines. It
-    is None only for stores that cannot report one.
+    is timezone-aware UTC, so it compares directly with `datetime.now(timezone.utc)`, and
+    None only for stores that cannot report one.
 
     It is deliberately not a resume mechanism: no object store can filter a listing by time
     server-side, so callers resuming an incremental read must do it by URI (see
@@ -164,7 +165,9 @@ class ListableBlobStore(ty.Protocol):
         """Entries directly under a prefix, non-recursively, in lexicographic order by URI.
 
         Ordering is guaranteed rather than incidental: ADLS, S3 and GCS all specify it, and
-        every incremental reader depends on it.
+        every incremental reader depends on it. A prefix nothing has been written under
+        lists as empty, never as an error: a reader that starts before the first writer
+        (a fresh queue's first census, e.g.) sees no entries, on every store alike.
 
         `start_at` begins the listing at the first entry whose URI sorts at or after it -
         inclusive, and it need not name a real object, since it is a position in the sort

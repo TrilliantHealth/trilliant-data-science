@@ -73,6 +73,11 @@ class RequiredResultNotFound(Exception):
         super().__init__(message)
         self.uri = uri
 
+    def __reduce__(self) -> tuple:
+        # so the exception survives a process pool boundary, where the default
+        # reconstruction would call __init__ with the message alone
+        return (RequiredResultNotFound, (str(self), self.uri))
+
 
 def read_value(memo_uri: str) -> ty.Optional[Success]:
     """The stored return value, if any. No ambient requirement is consulted, so a

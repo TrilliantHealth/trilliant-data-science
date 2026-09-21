@@ -1,15 +1,17 @@
 """This abstraction matches what is required by the BlobStore abstraction in pure.core.uris"""
 
+import datetime as dt
 import logging
 import typing as ty
 from pathlib import Path
 
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, ResourceExistsError
+from azure.storage.blob import ContentSettings
 from azure.storage.filedatalake import DataLakeFileClient
 
 from thds import adls
 from thds.adls.errors import blob_not_found_translation, is_blob_not_found
-from thds.adls.global_client import get_global_fs_client
+from thds.adls.global_client import get_global_blob_container_client, get_global_fs_client
 from thds.core import config, fretry, home, link, log, scope
 
 from ..._utils.on_slow import LogSlow, on_slow
@@ -45,9 +47,26 @@ _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9,
 # and the azure library does not seem to retry these on its own.
 
 
+def _aware_utc(ts: ty.Optional[dt.datetime]) -> ty.Optional[dt.datetime]:
+    """The SDK parses a listing's RFC 1123 `Last-Modified` with `strptime`, which drops the
+    GMT it names; the contract promises an aware UTC timestamp."""
+    return ts.replace(tzinfo=dt.timezone.utc) if ts is not None and ts.tzinfo is None else ts
+
+
 def _as_listings(fqn: adls.AdlsFqn, listed: ty.Iterable[listing.Listed]) -> ty.Iterator[BlobListing]:
-    for entry in listed:
-        yield BlobListing(str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, entry.name)), entry.last_modified)
+    """ADLS's hierarchical namespace reports a prefix nothing has been written under as a
+    missing directory; the listing contract says it is simply empty."""
+    try:
+        for entry in listed:
+            yield BlobListing(
+                str(adls.fqn.AdlsFqn(fqn.sa, fqn.container, entry.name)),
+                _aware_utc(entry.last_modified),
+            )
+    except HttpResponseError as e:
+        if not is_blob_not_found(e):
+            raise
+
+        logger.debug("Nothing exists under %s", fqn)
 
 
 class AdlsBlobStore(BlobStore):
@@ -97,6 +116,32 @@ class AdlsBlobStore(BlobStore):
             lambda secs: LogSlow(f"Took {int(secs)}s to check if file exists."),
             slow_seconds=1.2,
         )(lambda: self._client(fqn).exists())()
+
+    @_azure_creds_retry
+    @scope.bound
+    def put_unless_exists(
+        self, remote_uri: str, data: bytes, *, type_hint: str = "application/octet-stream"
+    ) -> bool:
+        """Atomic create-if-absent: True only for the one caller that created the blob.
+
+        Uses the blob endpoint rather than the DataLake one because its upload is a
+        single atomic operation, so overwrite=False is one conditional round trip
+        (If-None-Match: *) with no separate create/append/flush window.
+        """
+        fqn = adls.fqn.parse(remote_uri)
+        scope.enter(log.logger_context(create_if_absent=fqn))
+        try:
+            get_global_blob_container_client(fqn.sa, fqn.container).get_blob_client(
+                fqn.path
+            ).upload_blob(
+                data,
+                overwrite=False,
+                length=len(data) or None,
+                content_settings=ContentSettings(content_type=type_hint),
+            )
+            return True
+        except ResourceExistsError:
+            return False
 
     def join(self, *parts: str) -> str:
         return adls.fqn.join(*parts).rstrip("/")

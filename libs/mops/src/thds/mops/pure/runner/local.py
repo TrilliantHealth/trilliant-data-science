@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 
-from thds.core import concurrency, futures, log, scope
+from thds.core import cache, concurrency, futures, log, scope
 from thds.termtool.colorize import colorized, make_colorized_out
 
 from ..._utils.on_slow import LogSlow, on_slow
@@ -26,13 +26,21 @@ from .get_results import (
     unwrap_value_or_error,
 )
 
-# this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
-# of progress _complete_, rather than issuing many instructions to the
-# underlying client and allowing it to randomly order the operations
-# such that it takes longer to get a full unit of work complete.
-# Reentrant for the same reason as above — a mops call during argument
-# resolution can trigger another mops call on the same thread.
-_BEFORE_INVOCATION_SEMAPHORE = concurrency.ReentrantBoundedSemaphore(int(max_concurrent_network_ops()))
+
+@cache.locking
+def _before_invocation_semaphore() -> concurrency.ReentrantBoundedSemaphore:
+    # this semaphore (and a similar one in get_results) allow us to prioritize getting a single unit
+    # of progress _complete_, rather than issuing many instructions to the
+    # underlying client and allowing it to randomly order the operations
+    # such that it takes longer to get a full unit of work complete.
+    # Reentrant for the same reason as above — a mops call during argument
+    # resolution can trigger another mops call on the same thread.
+    #
+    # Built on first use, not at import, so an application that raises
+    # `max_concurrent_network_ops` in its entry point (after importing mops) gets the size it asked for.
+    return concurrency.ReentrantBoundedSemaphore(int(max_concurrent_network_ops()))
+
+
 # _BEFORE prioritizes uploading a single invocation and its dependencies so the Shim can start running.
 
 _DarkBlue = colorized(fg="white", bg="#00008b")
@@ -152,7 +160,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             same_process_in_flight.register(memo_uri, completion_signal)
 
             try:
-                with _BEFORE_INVOCATION_SEMAPHORE:
+                with _before_invocation_semaphore():
                     log_invocation(f"Invoking {memo_uri}")
                     upload_invocation_and_deps()
 
@@ -226,7 +234,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # the network ops being grouped by _BEFORE_INVOCATION include one or more
         # download attempts (consider possible Paths) plus
         # one or more uploads (embedded Paths & Sources/refs, and then invocation).
-        with _BEFORE_INVOCATION_SEMAPHORE:
+        with _before_invocation_semaphore():
             # it's possible that our result may already exist from a previous run of this pipeline id.
             # we can short-circuit the entire process by looking for that result and returning it immediately.
             result = check_result_exists("memoized")
@@ -247,11 +255,11 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
         # return a pending future immediately, rather than parking this thread in a
         # sleep/check loop for however long the other caller takes.
         def check_awaited_result() -> ResultAndInvocationType | None:
-            with _BEFORE_INVOCATION_SEMAPHORE:
+            with _before_invocation_semaphore():
                 return check_result_exists("awaited")
 
         def acquire_lease_for_takeover() -> lease.LeaseAcquired | None:
-            with _BEFORE_INVOCATION_SEMAPHORE:
+            with _before_invocation_semaphore():
                 return acquire_lease()
 
         # The closures below run on other threads, after submit()'s stack-local contexts

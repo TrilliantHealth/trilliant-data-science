@@ -35,7 +35,7 @@ def _identity_transform(v1_job_body: "client.models.V1Job") -> "client.models.V1
     return v1_job_body
 
 
-def _load_job_transform() -> JobTransform:
+def load_configured_job_transform() -> JobTransform:
     """Load the configured job transform function, or return identity transform."""
     import_path = JOB_TRANSFORM()
     if not import_path:
@@ -249,7 +249,9 @@ def launch(  # noqa: C901
         return cost.add_to(v1_job_body)
 
     def job_with_all_transforms() -> client.models.V1Job:
-        actual_transform = transform_job if transform_job is not None else _load_job_transform()
+        actual_transform = (
+            transform_job if transform_job is not None else load_configured_job_transform()
+        )
         return actual_transform(assemble_base_job())
 
     if dry_run:

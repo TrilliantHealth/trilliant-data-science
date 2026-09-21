@@ -1,3 +1,8 @@
+### 1.58.20260921
+
+- New: `log.logger_context_values()` snapshots the context every log line from that point would carry,
+  for recording what a piece of work was alongside something other than a log line.
+
 ### 1.58
 
 - New: `log.env` carries logger context across a process boundary. A launcher passes

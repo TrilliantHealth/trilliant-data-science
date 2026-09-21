@@ -1,6 +1,7 @@
 import datetime as dt
 import os
 import shutil
+import tempfile
 import typing as ty
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ from thds.core.link import link
 from ..core.types import AnyStrSrc, BlobListing, BlobStore, Listings
 
 MOPS_ROOT = config.item("control_root", default=Path.home() / ".mops")
+_PUT_UNLESS_EXISTS_TEMP = ".~put-unless-exists~"  # infix of an in-flight temp; never a real blob name
 logger = log.getLogger(__name__)
 
 
@@ -21,6 +23,9 @@ def _listings(root: Path) -> ty.Iterator[BlobListing]:
     vanished file should not cost a reader every other entry."""
     for path in root.iterdir():
         try:
+            if _PUT_UNLESS_EXISTS_TEMP in path.name:
+                continue
+
             if path.is_file():
                 yield BlobListing(
                     to_uri(path), dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.timezone.utc)
@@ -98,6 +103,31 @@ class FileBlobStore(BlobStore):
 
     def exists(self, remote_uri: str) -> bool:
         return path_from_uri(remote_uri).exists()
+
+    def put_unless_exists(self, remote_uri: str, data: bytes, *, type_hint: str = "bytes") -> bool:
+        """Atomic create-if-absent: True only for the one caller that created the blob.
+
+        The body is written to a same-directory temp file and the final name is claimed
+        with an atomic no-replace hardlink, so the name is never visible with a partial
+        body and a failed or interrupted attempt leaves the name safely retryable.
+
+        The temp file is always unlinked, on both paths: `os.link` gives the inode a second
+        name, so dropping the temp name after a successful claim leaves the body reachable at
+        the final name. One temp file exists per in-flight caller in the directory, and none
+        outlive the call.
+        """
+        path = path_from_uri(remote_uri)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(prefix=path.name + _PUT_UNLESS_EXISTS_TEMP, dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            os.link(tmp, path)
+            return True
+        except FileExistsError:
+            return False
+        finally:
+            os.unlink(tmp)
 
     def list(self, prefix_uri: str, start_at: str = "") -> Listings:
         """The optional ListableBlobStore capability - see `core.types`.

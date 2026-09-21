@@ -41,6 +41,16 @@ def logger_context(**kwargs):
         yield
 
 
+def logger_context_values() -> Dict[str, Any]:
+    """A snapshot of the context every log line from here would carry.
+
+    For recording what a piece of work was alongside something other than a log line. What
+    it holds depends on where you call it, since each `logger_context` nests on the last -
+    read it where the scopes you want are the only ones entered.
+    """
+    return dict(_LOG_CONTEXT())
+
+
 def _embed_th_context_in_extra_kw(kwargs: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
     """Extracts the key-value pairs embedded via `logger_context, overlays those with
     keyword arguments to the logger, and embeds them all in the logger's "extra" dictionary.

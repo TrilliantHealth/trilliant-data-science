@@ -103,6 +103,9 @@ class _ShouldExit:
 
     def stop_maintaining(self) -> None:
         self.should_exit = True
+        _LEASE_RELEASERS_BY_ID.pop(
+            self.lease_acquired.writer_id, None
+        )  # a later registration starts fresh
         self.lease_acquired.release()
 
 

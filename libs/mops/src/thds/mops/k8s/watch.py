@@ -391,14 +391,26 @@ class _SeenObjectContainer(ty.Generic[K, T]):
         # known copy of everything forever.
         self._last_seen_times: ty.Dict[K, float] = dict()
         self._last_api_update_time = 0.0
+        self._deleted: ty.Set[K] = set()
+        # ^ keys whose most recent event was a deletion. Their final state stays in _objs
+        # exactly as before (a completed Job still reads as complete after its TTL deletion);
+        # this only lets a caller ask the more precise question.
         self.backup_fetch = backup_fetch
 
-    def set_object(self, key: K, obj: T) -> None:
+    def set_object(self, key: K, obj: T, deleted: bool = False) -> None:
         """Set an object in the cache, updating the last seen time."""
         now = _watch_timer()
         self._last_api_update_time = now
         self._last_seen_times[key] = now
         self._objs[key] = obj
+        if deleted:
+            self._deleted.add(key)
+        else:
+            self._deleted.discard(key)
+
+    def was_deleted(self, key: K) -> bool:
+        """The watch saw this object deleted, and nothing since. Cache-only; never fetches."""
+        return key in self._deleted
 
     def _is_stale(self, key: K) -> bool:
         return is_stale(self._last_api_update_time, self._last_seen_times.get(key) or 0)
@@ -432,6 +444,7 @@ class _SeenObjectContainer(ty.Generic[K, T]):
             )
             self._objs.pop(key, None)
             self._last_seen_times.pop(key, None)
+            self._deleted.discard(key)
 
         return None
 
@@ -483,7 +496,7 @@ class WatchingObjectSource(ty.Generic[T]):
             return
 
         key = (target, self.get_name(obj))
-        self._seen_objects.set_object(key, obj)
+        self._seen_objects.set_object(key, obj, deleted=event_type == "DELETED")
         self._uncertain_futures.update(key, obj)
         logger.debug("%s %s updated", self.typename, key)
 
@@ -514,6 +527,15 @@ class WatchingObjectSource(ty.Generic[T]):
         scope.enter(logger_context(name=obj_name, target=str(target)))
         self._limiter(target, self._start_watcher_thread)
         return self._seen_objects.get((target, obj_name))
+
+    def was_deleted(self, obj_name: str, target: ty.Optional[K8sTarget] = None) -> bool:
+        """True once the watch has seen this object's deletion and no later event for it.
+        `get` keeps returning the final state (a finished Job still reads as finished after
+        its TTL deletion); this is for callers that need to know the object is gone. Reads
+        only the cache, so a deletion during a watch outage is not seen."""
+        target = target or resolve_target()
+        self._limiter(target, self._start_watcher_thread)
+        return self._seen_objects.was_deleted((target, obj_name))
 
     def create_future(
         self,

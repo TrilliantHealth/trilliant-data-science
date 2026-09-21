@@ -39,6 +39,11 @@ def get_job(job_name: str, target: ty.Optional[K8sTarget] = None) -> ty.Optional
     return _JOB_SOURCE.get(job_name, target=target)
 
 
+def job_was_deleted(job_name: str, target: ty.Optional[K8sTarget] = None) -> bool:
+    """The watch saw the Job deleted. `get_job` still returns its final state."""
+    return _JOB_SOURCE.was_deleted(job_name, target=target)
+
+
 @k8s_sdk_retry()
 def delete_job(job_name: str, target: ty.Optional[K8sTarget] = None) -> bool:
     """Delete a Job, cascading to its pod(s). Returns True if the Job was

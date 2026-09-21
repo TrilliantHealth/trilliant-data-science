@@ -43,6 +43,19 @@ def test_keyword_context_formatting(caplog):
         caplog.records[0].message.endswith("(foo='bar',baz=7) i have said certain things to you")
 
 
+def test_logger_context_values_snapshots_the_nested_scopes():
+    outer = dict(log.logger_context_values())
+    with log.logger_context(foo="bar"):
+        assert log.logger_context_values()["foo"] == "bar"
+        with log.logger_context(baz=7):
+            assert log.logger_context_values()["foo"] == "bar"
+            assert log.logger_context_values()["baz"] == 7
+
+        assert "baz" not in log.logger_context_values()
+
+    assert log.logger_context_values() == outer
+
+
 def test_levels_dont_break(capsys, caplog):
     logger = log.getLogger("test")
     with capsys.disabled(), caplog.at_level(logging.DEBUG):
