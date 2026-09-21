@@ -8,7 +8,12 @@ from pathlib import Path
 
 import aiohttp.http_exceptions
 import requests.exceptions
-from azure.core.exceptions import AzureError, HttpResponseError, ResourceModifiedError
+from azure.core.exceptions import (
+    AzureError,
+    HttpResponseError,
+    ResourceModifiedError,
+    ServiceResponseError,
+)
 from azure.storage.filedatalake import DataLakeFileClient, FileProperties, FileSystemClient, aio
 
 from thds.core import fretry, hash_cache, hashing, log, scope, tmp
@@ -318,6 +323,10 @@ def _excs_to_retry() -> ty.Callable[[Exception], bool]:
                 None,
                 (
                     requests.exceptions.ConnectionError,
+                    # a read that dies mid-response: the SDK's own wrapper around the
+                    # socket timeout, and unpicklable, so a process pool loses the real
+                    # error and the child with it if this is not retried here.
+                    ServiceResponseError,
                     aiohttp.http_exceptions.ContentLengthError,
                     aiohttp.client_exceptions.ClientPayloadError,
                     getattr(

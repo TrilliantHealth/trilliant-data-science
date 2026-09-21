@@ -1,3 +1,11 @@
+### 4.5.20260920
+
+- Retry `ServiceResponseError` (which covers `ServiceResponseTimeoutError`) on sync downloads. A read
+  that dies mid-response is the same spurious transport failure as the connection errors already in the
+  retry set. It also cannot cross a process boundary: the exception holds a live traceback, so a
+  `ProcessPoolExecutor` child that raises it dies in `reduction.dumps` with
+  `TypeError: cannot pickle 'traceback' object`, losing both the real error and the worker.
+
 ### 4.5.20260722
 
 - `AdlsFqn.parse` accepts a scheme'd container root without a trailing slash: `adls://sa/container` now
