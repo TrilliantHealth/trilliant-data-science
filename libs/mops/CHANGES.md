@@ -1,3 +1,9 @@
+### 3.34.20260923
+
+- Fixed: a `SystemExit` or `KeyboardInterrupt` escaping an invocation (for instance from `argparse` in an
+  in-process invocation) now releases its lease and fails any lease-blocked waiters. Previously the lease
+  was maintained until the process exited, so every other caller of that memo waited forever.
+
 ### 3.34
 
 - Fixed: the `max_concurrent_network_ops` semaphores (before-invocation and after-invocation) are sized

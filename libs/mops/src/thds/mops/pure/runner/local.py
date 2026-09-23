@@ -208,7 +208,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                     f.set_result_metadata(md)
                     return f
 
-            except Exception as exc:
+            except BaseException as exc:  # noqa: B036 - e.g. SystemExit from an in-process shim
                 console.emit(
                     console.failed(
                         memo_uri,

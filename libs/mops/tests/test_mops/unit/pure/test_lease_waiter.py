@@ -160,6 +160,48 @@ def test_error_while_polling_fails_the_future_instead_of_stranding_it():
         fut.result(timeout=10)
 
 
+def test_system_exit_in_takeover_fails_the_future():
+    def invoke(_lease):
+        raise SystemExit(2)
+
+    fut = lease_waiter.future_awaiting_lease(
+        "memo://unit/takeover-system-exit",
+        what="result",
+        check_result=_never_result,
+        unwrap=_no_unwrap,
+        acquire_lease=_FakeLease,
+        invoke_with_lease=invoke,
+    )
+    with pytest.raises(SystemExit):
+        fut.result(timeout=10)
+
+
+def test_system_exit_while_polling_fails_the_future_and_the_waiter_keeps_serving():
+    def exit_on_unwrap(_result):
+        raise SystemExit(2)
+
+    exited = lease_waiter.future_awaiting_lease(
+        "memo://unit/poll-system-exit",
+        what="result",
+        check_result=lambda: "RESULT",
+        unwrap=exit_on_unwrap,
+        acquire_lease=_no_lease,
+        invoke_with_lease=_no_invoke,
+    )
+    with pytest.raises(SystemExit):
+        exited.result(timeout=10)
+
+    later = lease_waiter.future_awaiting_lease(
+        "memo://unit/poll-after-system-exit",
+        what="result",
+        check_result=lambda: "RESULT",
+        unwrap=lambda r: (r.lower(), None),
+        acquire_lease=_no_lease,
+        invoke_with_lease=_no_invoke,
+    )
+    assert later.result(timeout=10) == ("result", None)
+
+
 def test_cancelling_the_future_stops_the_polling():
     checks = []
 

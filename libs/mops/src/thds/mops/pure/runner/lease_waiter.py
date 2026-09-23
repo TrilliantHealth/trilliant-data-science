@@ -130,7 +130,7 @@ def _take_over(item: _AwaitedLease, lease_owned: lease.LeaseAcquired) -> None:
     exit kill the work mid-flight."""
     try:
         mops_future = item.invoke_with_lease(lease_owned)
-    except Exception as e:
+    except BaseException as e:  # noqa: B036 - e.g. SystemExit; nothing else settles it
         exc = e
         logger.exception("Takeover invocation for %s failed.", item.memo_uri)
         _settle(lambda: item.outer.set_exception(exc))
@@ -201,7 +201,7 @@ def _poll(item: _AwaitedLease) -> float | None:
 def _poll_and_reschedule(item: _AwaitedLease) -> None:
     try:
         delay_s = _poll(item)
-    except Exception as e:
+    except BaseException as e:  # noqa: B036 - SystemExit must not kill the daemon
         # e.g. a network failure during check/acquire. Fail the future, exactly as the
         # pre-3.25 blocking wait raised out of submit().
         exc = e
