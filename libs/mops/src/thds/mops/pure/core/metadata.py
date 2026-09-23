@@ -80,15 +80,26 @@ def log_context_metadata() -> ty.Dict[str, str]:
     }
 
 
-def format_extra_metadata(extra: ty.Dict[str, str]) -> str:
-    """Format extra metadata dict as lines for the metadata file."""
-    if not extra:
+_EXTRA_SECTION = "=== Extra Metadata ==="
+LOG_CONTEXT_SECTION = "=== Log Context ==="
+# Written after every section a mops before 3.34.20260923 reads: those readers stop at the
+# first section they do not know, and they parse the ones they do as command-line flags, so
+# a context key such as `remote` would be an ambiguous abbreviation that exits the process.
+
+
+def _format_section(header: str, keyvals: ty.Mapping[str, str]) -> str:
+    if not keyvals:
         return ""
 
-    lines = ["", "=== Extra Metadata ==="]
-    for key, value in sorted(extra.items()):
-        lines.append(f"{key}={value}")
-    return "\n".join(lines) + "\n"
+    return "\n".join(["", header, *(f"{k}={v}" for k, v in sorted(keyvals.items()))]) + "\n"
+
+
+def format_extra_metadata(extra: ty.Mapping[str, str]) -> str:
+    return _format_section(_EXTRA_SECTION, extra)
+
+
+def format_log_context_metadata(log_context: ty.Mapping[str, str]) -> str:
+    return _format_section(LOG_CONTEXT_SECTION, log_context)
 
 
 def get_invoker_code_version() -> str:
@@ -270,26 +281,32 @@ def parse_result_metadata(metadata_keyvals: ty.Sequence[str]) -> ResultMetadata:
     """Parse metadata values from a result list.
 
     Metadata args are of the form key=value, and are separated by newlines.
-    Continues through whitelisted sections (=== Extra Metadata ===) but stops
-    at any other === section (forward-compatible with future sections).
+    Continues through the extra-metadata and log-context sections but stops at
+    any other === section (forward-compatible with future sections).
 
-    Extra key=value pairs not recognized by the parser are captured in the
-    `extra` field, making them available to tools like mops-inspect.
+    Extra key=value pairs not recognized by the parser, and the log context, are
+    captured in the `extra` field, making them available to tools like mops-inspect.
+    The log context is never parsed as flags, so its keys cannot set a field.
     """
-    # Sections we explicitly want to parse through
-    whitelisted_sections = {"=== Extra Metadata ==="}
-
     filtered_lines: ty.List[str] = []
+    log_context: ty.Dict[str, str] = {}
+    section = ""
     for line in metadata_keyvals:
-        # Stop at any === section we don't explicitly whitelist
-        if line.startswith("===") and line not in whitelisted_sections:
-            break
+        if line.startswith("==="):
+            if line not in (_EXTRA_SECTION, LOG_CONTEXT_SECTION):
+                break
 
-        # Skip whitelisted section headers (they're just visual markers)
-        if line in whitelisted_sections:
+            section = line
             continue
 
-        if line:
+        if not line:
+            continue
+
+        if section == LOG_CONTEXT_SECTION:
+            key, sep, value = line.partition("=")
+            if sep:
+                log_context[key] = value
+        else:
             filtered_lines.append(line)
 
     def to_arg(kv: str) -> ty.Optional[str]:
@@ -312,7 +329,7 @@ def parse_result_metadata(metadata_keyvals: ty.Sequence[str]) -> ResultMetadata:
             if key != "extra":
                 extra[key] = value
 
-    return ResultMetadata(**vars(metadata), extra=extra)
+    return ResultMetadata(**vars(metadata), extra={**log_context, **extra})
 
 
 def _format_metadata(

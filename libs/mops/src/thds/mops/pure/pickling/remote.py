@@ -87,19 +87,20 @@ class ResultExcWithMetadataChannel:
 
     @cached_property
     def _extra_metadata_content(self) -> bytes:
-        """The invocation's log context, caller-provided extra metadata, and the configured
-        generator's, in increasing order of precedence."""
-        extra = {**self.log_context, **self.extra_metadata}
+        """Caller-provided extra metadata overridden by the configured generator's, then the
+        log context in a section of its own, which readers rank below both."""
+        extra = dict(self.extra_metadata)
         generator = metadata.load_metadata_generator()
         if generator is not None:
             try:
                 extra.update(generator(self._result_metadata))
             except Exception as e:
                 logger.warning(f"Extra metadata generator failed: {e}")
-        if not extra:
-            return b""
 
-        return metadata.format_extra_metadata(extra).encode("utf-8")
+        return (
+            metadata.format_extra_metadata(extra)
+            + metadata.format_log_context_metadata(self.log_context)
+        ).encode("utf-8")
 
     def _write_metadata_only(self, prefix: str, extra_content: bytes = b"") -> None:
         """This is a mops v3 thing that is unnecessary but adds clarity when debugging.

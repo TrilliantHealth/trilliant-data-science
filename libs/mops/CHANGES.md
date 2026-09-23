@@ -1,5 +1,11 @@
 ### 3.34.20260923
 
+- Fixed: the log context recorded in result metadata (new in 3.34) is written in a section of its own,
+  which readers from 3.33 and earlier skip. In the extra-metadata section they parsed it as command-line
+  flags, and a key such as `remote` was an ambiguous option that exited any process reading the result.
+  Results written by 3.34 before this fix still do that to those readers.
+- Fixed: a log-context key named like a metadata field (`pipeline_id`) no longer overwrites that field
+  when a result is read.
 - Fixed: a `SystemExit` or `KeyboardInterrupt` escaping an invocation (for instance from `argparse` in an
   in-process invocation) now releases its lease and fails any lease-blocked waiters. Previously the lease
   was maintained until the process exited, so every other caller of that memo waited forever.
