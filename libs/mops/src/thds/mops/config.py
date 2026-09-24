@@ -53,9 +53,17 @@ max_concurrent_serialization = config.item("mops.max_concurrent_serialization", 
 open_files_limit = config.item("mops.resources.max_open_files", 10000)
 
 
-def _filter_to_known_mops_config(config: ty.Dict[str, ty.Any]) -> ty.Dict[str, ty.Any]:
-    return {k: v for k, v in config.items() if k.startswith("mops.") or k.startswith("thds.mops")}
+def _filter_to_known_mops_config(raw: ty.Mapping[str, ty.Any]) -> ty.Dict[str, ty.Any]:
+    """Only mops' own items. The same file also holds `pure.magic` entries keyed by an
+    application's module path, which `pure.magic.load_config_file` loads on request; and
+    another package's items (`thds.mops_queue.*`) are not registered yet while mops is
+    importing, so setting them here would fail the import."""
+    return {k: v for k, v in config.flatten_config(raw).items() if k.startswith(("mops.", "thds.mops."))}
+
+
+def _load_global_defaults(config_file: ty.Optional[Path]) -> None:
+    config.set_global_defaults(_filter_to_known_mops_config(load(config_file)))
 
 
 # load this after creating the config items
-config.set_global_defaults(_filter_to_known_mops_config(load(first_found_config_file())))
+_load_global_defaults(first_found_config_file())

@@ -1,3 +1,11 @@
+### 3.34.20260924
+
+- Fixed: a `.mops.toml` (or `MOPS_CONFIG`) file loaded at import now honors TOML tables such as
+  `[mops.memo."pkg.mod--func"]`. Previously only top-level dotted keys were read, and every table was
+  dropped without a warning.
+- Fixed: that file no longer sets other packages' config (e.g. `thds.mops_queue.*`), which failed the
+  import of `mops` because those items are not registered yet.
+
 ### 3.34.20260923
 
 - Fixed: the log context recorded in result metadata (new in 3.34) is written in a section of its own,
