@@ -1,4 +1,5 @@
 import datetime as dt
+import time
 from types import SimpleNamespace
 
 from kubernetes import client
@@ -87,3 +88,65 @@ def test_observation_transition_preserves_its_input_state():
     assert advanced.seen_nodes == frozenset({"uid"})
     assert len(advanced.prices) == 1
     assert [value["kind"] for value in observations] == ["heartbeat", "node"]
+
+
+def _observe_until(monkeypatch, tmp_path, stop, poll_seconds=10.0, sample_seconds=0.15):
+    """Drive the real `observe` loop with a sample that takes as long as a cluster call."""
+    monkeypatch.setattr(observer, "api_client", lambda context: None)
+    monkeypatch.setattr(observer.client, "CoreV1Api", lambda api_client: None)
+    monkeypatch.setattr(observer.ledger, "append", lambda writer, observations: writer)
+
+    def slow_sample(*_args):
+        time.sleep(sample_seconds)
+        return (), frozenset()
+
+    monkeypatch.setattr(observer, "_sample", slow_sample)
+    observer.observe(K8sTarget("ctx", "ns"), "console-run", tmp_path, stop, poll_seconds=poll_seconds)
+
+
+def test_observe_exits_once_its_owner_is_gone(monkeypatch, tmp_path):
+    """A stop that fires immediately must end the loop after one closing sample."""
+    calls = 0
+
+    def stop(_timeout: float) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls > 10:
+            raise AssertionError("observe() kept looping after stop() asked it to finish")
+        return True
+
+    _observe_until(monkeypatch, tmp_path, stop)
+
+    assert calls == 2, "expected the in-flight sample plus exactly one closing sample"
+
+
+def test_observe_keeps_polling_while_its_owner_lives(monkeypatch, tmp_path):
+    """The stop signal is also the sleep, so a live owner must keep the loop going."""
+    calls = 0
+
+    def stop(_timeout: float) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls > 10:
+            raise AssertionError("observe() kept looping after stop() asked it to finish")
+        return calls >= 3  # alive for two polls, then gone
+
+    _observe_until(monkeypatch, tmp_path, stop)
+
+    assert calls == 4, "two live polls, the stop that fired, then the closing sample"
+
+
+def test_observe_takes_a_single_sample_when_given_no_interval(monkeypatch, tmp_path):
+    """poll_seconds=0 means 'sample once and return', independent of the stop signal."""
+    calls = 0
+
+    def stop(_timeout: float) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls > 10:
+            raise AssertionError("observe() kept looping with poll_seconds=0")
+        return False
+
+    _observe_until(monkeypatch, tmp_path, stop, poll_seconds=0.0)
+
+    assert calls == 1

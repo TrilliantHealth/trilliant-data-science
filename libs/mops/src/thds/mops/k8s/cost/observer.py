@@ -142,6 +142,7 @@ def observe(
     resolver = providers.resolve(configured_provider)
     api = client.CoreV1Api(api_client=api_client(target.kubeconfig_context))
     cost_writer = ledger.create(run_dir, lambda: writer.remote_events_uris(run_dir))
+    closing = False
 
     while True:
         now = dt.datetime.now(tz=dt.timezone.utc)
@@ -170,9 +171,12 @@ def observe(
             state = state._replace(previous=now)
 
         if stop(poll_seconds):
-            if dt.datetime.now(tz=dt.timezone.utc) - state.previous < dt.timedelta(seconds=0.1):
+            if closing:
                 break
             # Take one final sample so a normal orchestrator exit closes its coverage.
+            # `state.previous` is the start of the billed interval, so it cannot double as
+            # loop bookkeeping.
+            closing = True
             poll_seconds = 0.0
             continue
         if poll_seconds == 0.0:

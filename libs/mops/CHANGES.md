@@ -1,5 +1,13 @@
 ### 3.34.20260924
 
+- Fixed: the Kubernetes cost observer now exits when the process that started it does. It decided it had
+  taken its closing sample by checking whether the last one was stamped within 100ms, but that stamp is
+  taken before the Kubernetes call, which never returns that fast - so the loop set its poll interval to
+  zero and spun at full rate for the life of the process, polling the cluster and uploading observations
+  long after the run that started it had finished.
+
+### 3.34.20260924
+
 - Fixed: a `.mops.toml` (or `MOPS_CONFIG`) file loaded at import now honors TOML tables such as
   `[mops.memo."pkg.mod--func"]`. Previously only top-level dotted keys were read, and every table was
   dropped without a warning.
