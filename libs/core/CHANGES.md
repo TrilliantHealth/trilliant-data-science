@@ -1,3 +1,12 @@
+### 1.58.20260924
+
+- Fixed: a config item with a boolean default now reads the word in its environment variable. `bool` is
+  not self-parsing - values arrive from the environment as strings, and every non-empty string is truthy
+  - so `FOO=false` resolved to `True` and such an item could not be turned off from a shell at all. Both
+    the parser inferred from a bool default and an explicitly passed `parse=bool` now use `tobool`. Items
+    already passing `parse=config.tobool` are unaffected. An empty value is still treated as unset, so it
+    continues to mean "use the default" rather than `False`.
+
 ### 1.58.20260921
 
 - New: `log.logger_context_values()` snapshots the context every log line from that point would carry,

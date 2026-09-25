@@ -85,6 +85,11 @@ def _type_parser(default: T) -> ty.Callable[[ty.Any], T]:
         return lambda x: x  # cannot learn anything about how to parse a future value from None
     try:
         default_type = type(default)
+        if default_type is bool:
+            # `bool` is NOT self-parsing: environment values arrive as strings, and every
+            # non-empty string is truthy, so `bool` is a truthiness test rather than a
+            # parser, and `FOO=false` would resolve True. `tobool` reads the word.
+            return ty.cast(ty.Callable[[ty.Any], T], tobool)
         if default == default_type(default):  # type: ignore
             # if this succeeds and doesn't raise, then the type is self-parsing.
             # in other words, type(4)(4) == 4, type('foobar')('foobar') == 'foobar'
@@ -126,6 +131,10 @@ class ConfigItem(ty.Generic[T]):
             )
         registry[name] = self
         self.name = name
+        if parse is bool:
+            # `parse=bool` can only have meant "this is a boolean"; taken literally it is a
+            # truthiness test over the raw environment string, which no caller wants.
+            parse = ty.cast(ty.Callable[[ty.Any], T], tobool)
         self.parse = parse or _type_parser(default)
         raw_resolved_global = _getenv(name, secret=secret)
         if raw_resolved_global:
