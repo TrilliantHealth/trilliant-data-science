@@ -53,7 +53,7 @@ def test_sample_learns_a_pool_and_charges_all_of_its_nodes():
     pod = client.V1Pod(spec=client.V1PodSpec(containers=[], node_name="pool-a-1"))
     api = SimpleNamespace(
         list_namespaced_pod=lambda **_: SimpleNamespace(items=[pod]),
-        list_node=lambda: SimpleNamespace(items=nodes),
+        list_node=lambda **_: SimpleNamespace(items=nodes),
     )
 
     observed, groups = observer._sample(
@@ -62,6 +62,7 @@ def test_sample_learns_a_pool_and_charges_all_of_its_nodes():
         "namespace",
         "run",
         frozenset(),
+        (5.0, 20.0),
     )
 
     assert groups == frozenset({("azure", "pool-a")})
@@ -91,17 +92,25 @@ def test_observation_transition_preserves_its_input_state():
 
 
 def _observe_until(monkeypatch, tmp_path, stop, poll_seconds=10.0, sample_seconds=0.15):
-    """Drive the real `observe` loop with a sample that takes as long as a cluster call."""
+    """Drive the real `observe` loop with a sample that takes as long as a cluster call.
+
+    Returns the arguments the loop handed each `_sample`, so a caller can assert on what it
+    passed down and not only on how many times it went round.
+    """
     monkeypatch.setattr(observer, "api_client", lambda context: None)
     monkeypatch.setattr(observer.client, "CoreV1Api", lambda api_client: None)
     monkeypatch.setattr(observer.ledger, "append", lambda writer, observations: writer)
 
-    def slow_sample(*_args):
+    sampled: list[tuple] = []
+
+    def slow_sample(*args):
+        sampled.append(args)
         time.sleep(sample_seconds)
         return (), frozenset()
 
     monkeypatch.setattr(observer, "_sample", slow_sample)
     observer.observe(K8sTarget("ctx", "ns"), "console-run", tmp_path, stop, poll_seconds=poll_seconds)
+    return sampled
 
 
 def test_observe_exits_once_its_owner_is_gone(monkeypatch, tmp_path):
@@ -150,3 +159,40 @@ def test_observe_takes_a_single_sample_when_given_no_interval(monkeypatch, tmp_p
     _observe_until(monkeypatch, tmp_path, stop, poll_seconds=0.0)
 
     assert calls == 1
+
+
+def test_sample_bounds_both_of_its_kubernetes_calls():
+    """An untimed call blocks the loop forever, so a detached observer survives a laptop
+    sleep or a dropped VPN and never reaches its stop check - an orphan by a different
+    route than the loop's own exit."""
+    seen = {}
+
+    def _record(name):
+        def call(**kwargs):
+            seen[name] = kwargs.get("_request_timeout")
+            return SimpleNamespace(items=[])
+
+        return call
+
+    api = SimpleNamespace(list_namespaced_pod=_record("pods"), list_node=_record("nodes"))
+
+    observer._sample(api, (azure.PROVIDER,), "namespace", "run", frozenset(), (5.0, 20.0))
+
+    assert seen == {"pods": (5.0, 20.0), "nodes": (5.0, 20.0)}
+
+
+def test_observe_hands_its_configured_timeout_to_every_sample(monkeypatch, tmp_path):
+    """The bound only holds if the loop actually passes it: asserting on `_sample` alone
+    would still pass with `observe` handing down `None`."""
+
+    def stop(_timeout: float) -> bool:
+        return True
+
+    with (
+        observer.CONNECT_TIMEOUT_SECONDS.set_local(3.0),
+        observer.READ_TIMEOUT_SECONDS.set_local(7.0),
+    ):
+        sampled = _observe_until(monkeypatch, tmp_path, stop)
+
+    assert sampled, "expected the loop to have sampled at least once"
+    assert [args[-1] for args in sampled] == [(3.0, 7.0)] * len(sampled)

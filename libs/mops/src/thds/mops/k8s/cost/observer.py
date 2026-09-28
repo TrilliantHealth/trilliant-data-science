@@ -19,6 +19,11 @@ logger = log.getLogger(__name__)
 
 ENABLED = config.item("mops.k8s.cost.enabled", default=True, parse=config.tobool)
 POLL_SECONDS = config.item("mops.k8s.cost.poll_seconds", default=10.0, parse=float)
+# The observer is detached and outlives its owner by design, so an unbounded read is an
+# orphan waiting to happen: a laptop sleep or a dropped VPN leaves it blocked in the client
+# forever, never reaching the stop check. Matches the watch's timeouts (see k8s/config.py).
+CONNECT_TIMEOUT_SECONDS = config.item("mops.k8s.cost.connect_timeout", default=5.0, parse=float)
+READ_TIMEOUT_SECONDS = config.item("mops.k8s.cost.read_timeout", default=20.0, parse=float)
 
 PriceKey = tuple[str, str, str, str]
 Stop = ty.Callable[[float], bool]
@@ -38,13 +43,21 @@ def _sample(
     namespace: str,
     run_label: str,
     known_groups: frozenset[tuple[str, str]],
+    request_timeout: tuple[float, float],
 ) -> tuple[tuple[model.Node, ...], frozenset[tuple[str, str]]]:
-    """Nodes chargeable to the run and accumulated provider allocation groups."""
+    """Nodes chargeable to the run and accumulated provider allocation groups.
+
+    `request_timeout` is required rather than defaulted: an untimed call here blocks the
+    loop indefinitely, which is the one failure the caller cannot recover from.
+    """
     pods = api.list_namespaced_pod(
         namespace=namespace,
         label_selector=f"{labels.RUN_LABEL}={run_label}",
+        _request_timeout=request_timeout,
     ).items
-    nodes = tuple(providers.node(resolver, raw) for raw in api.list_node().items)
+    nodes = tuple(
+        providers.node(resolver, raw) for raw in api.list_node(_request_timeout=request_timeout).items
+    )
     by_name = {node.name: node for node in nodes}
     assigned = {
         node
@@ -142,6 +155,7 @@ def observe(
     resolver = providers.resolve(configured_provider)
     api = client.CoreV1Api(api_client=api_client(target.kubeconfig_context))
     cost_writer = ledger.create(run_dir, lambda: writer.remote_events_uris(run_dir))
+    request_timeout = (CONNECT_TIMEOUT_SECONDS(), READ_TIMEOUT_SECONDS())
     closing = False
 
     while True:
@@ -153,6 +167,7 @@ def observe(
                 target.namespace,
                 labels.value(console_run),
                 state.known_groups,
+                request_timeout,
             )
             state, observations = _observations(
                 state._replace(known_groups=known_groups),
