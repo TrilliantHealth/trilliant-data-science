@@ -6,7 +6,7 @@ import random
 import time
 import typing as ty
 
-from azure.storage.blob import BlobSasPermissions, BlobServiceClient, UserDelegationKey
+from azure.storage.blob import BlobProperties, BlobSasPermissions, BlobServiceClient, UserDelegationKey
 
 from thds.core import cache, log, parallel, thunks
 
@@ -41,6 +41,17 @@ class CopyInfo(ty.NamedTuple):
         return bool(self.request)
 
 
+def _hashes_exist_and_are_equal(src_props: BlobProperties, dest_props: BlobProperties) -> bool:
+    # exclude etag from comparison since it's unique per blob and will always differ
+    src_hashes = {
+        k: v for k, v in extract_hashes_from_props(src_props).items() if k != ETAG_FAKE_HASH_NAME
+    }
+    dest_hashes = {
+        k: v for k, v in extract_hashes_from_props(dest_props).items() if k != ETAG_FAKE_HASH_NAME
+    }
+    return bool(src_hashes) and src_hashes == dest_hashes
+
+
 def _copy_file(
     src: AdlsFqn,
     dest: AdlsFqn,
@@ -58,24 +69,10 @@ def _copy_file(
         dest.path
     )
 
-    def hashes_exist_and_are_equal() -> bool:
-        src_blob_props = src_blob_client.get_blob_properties()
-        dest_blob_props = dest_blob_client.get_blob_properties()
-        # exclude etag from comparison since it's unique per blob and will always differ
-        src_hashes = {
-            k: v
-            for k, v in extract_hashes_from_props(src_blob_props).items()
-            if k != ETAG_FAKE_HASH_NAME
-        }
-        dest_hashes = {
-            k: v
-            for k, v in extract_hashes_from_props(dest_blob_props).items()
-            if k != ETAG_FAKE_HASH_NAME
-        }
-        return src_hashes == dest_hashes
-
     if dest_blob_client.exists():
-        if hashes_exist_and_are_equal():
+        if _hashes_exist_and_are_equal(
+            src_blob_client.get_blob_properties(), dest_blob_client.get_blob_properties()
+        ):
             # no point in copying if the files are the same
             logger.info(
                 "%s already exists with the same md5 as the file at %s, no copy will occur", dest, src
@@ -159,8 +156,9 @@ def copy_file(
 
     if wait:
         copy_info = func()
-        wait_for_copy(dest_fqn, timeout=timeout)
-        logger.info("Finished copying %s to %s", src_fqn, dest_fqn)
+        if copy_info.copy_occurred:
+            wait_for_copy(dest_fqn, timeout=timeout)
+            logger.info("Finished copying %s to %s", src_fqn, dest_fqn)
         return copy_info
 
     return func()

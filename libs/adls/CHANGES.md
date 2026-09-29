@@ -1,3 +1,11 @@
+### 4.5.20260928
+
+- `copy_file` skips an existing destination only when source and destination share at least one hash and
+  every hash matches. Two blobs with no comparable hashes (no MD5 and no recorded hash metadata) used to
+  count as identical, so the copy was skipped without checking the contents.
+- `copy_file` no longer raises when the destination already matches the source and was written by an
+  upload rather than a copy. It skipped the copy but still waited on a copy status the blob never had.
+
 ### 4.5.20260920
 
 - Retry `ServiceResponseError` (which covers `ServiceResponseTimeoutError`) on sync downloads. A read

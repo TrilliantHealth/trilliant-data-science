@@ -27,6 +27,45 @@ def test_unit_wait_for_copy(mock_copy_status: ty.Callable[[ty.Optional[str]], No
     assert copy.wait_for_copy(fqn_) == fqn_
 
 
+def test_unit_copy_file_does_not_wait_when_no_copy_started(
+    mocker: MockFixture, mock_copy_status: ty.Callable[[ty.Optional[str]], None]
+) -> None:
+    """A dest that already matches src is left alone; if it was written by an upload rather
+    than a copy it has no copy status, which `wait_for_copy` would reject."""
+    src, dest = fqn.AdlsFqn("account", "container", "src"), fqn.AdlsFqn("account", "container", "dest")
+    mocker.patch.object(copy, "_copy_file", autospec=True, return_value=copy.CopyInfo(src, dest, {}))
+    mocker.patch.object(copy, "get_global_blob_service_client", autospec=True)
+    mock_copy_status(None)
+
+    info = copy.copy_file(src, dest, get_account_key=lambda _client: "key")
+
+    assert not info.copy_occurred
+
+
+def _props(md5: ty.Optional[bytes] = None, etag: str = "") -> BlobProperties:
+    props = BlobProperties()
+    props.name = "path"
+    props.etag = etag
+    props.content_settings.content_md5 = md5  # type: ignore[assignment]
+    return props
+
+
+@pytest.mark.parametrize(
+    "src, dest, expected",
+    [
+        pytest.param(_props(b"a" * 16), _props(b"a" * 16), True, id="same md5"),
+        pytest.param(_props(b"a" * 16), _props(b"b" * 16), False, id="different md5"),
+        pytest.param(_props(b"a" * 16), _props(), False, id="dest has no hash"),
+        pytest.param(_props(etag='"0x1"'), _props(etag='"0x2"'), False, id="only etags"),
+        pytest.param(_props(), _props(), False, id="neither has a hash"),
+    ],
+)
+def test_unit_hashes_exist_and_are_equal(
+    src: BlobProperties, dest: BlobProperties, expected: bool
+) -> None:
+    assert copy._hashes_exist_and_are_equal(src, dest) is expected
+
+
 @pytest.mark.parametrize(
     "status",
     [
