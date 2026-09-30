@@ -9,6 +9,8 @@ import tomli
 from thds.core import meta
 from thds.mops.pure.tools.console import (
     blob_sink,
+    describer,
+    refusals,
     run_index,
     run_metadata,
     run_name,
@@ -24,8 +26,12 @@ _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
 def _real_run(monkeypatch):
     monkeypatch.setattr(throwaway, "here", lambda: False)
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
     yield
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
 
 
 def _metadata(cwd: Path, command: str = "apps/unified-asset/k8s/run.py --date 2026-08-18"):
@@ -113,6 +119,7 @@ def test_a_root_that_only_served_memoized_results_still_describes_the_run(tmp_pa
     root = f"file://{tmp_path}/mops/console/2026-08-18/mr.Run.abc"
 
     assert upload.start_root(root, "2026-08-18/mr.Run.abc")
+    describer._wait_for_test()
 
     assert list((tmp_path / "mops/console/2026-08-18/mr.Run.abc").glob("*.toml"))
     assert list((tmp_path / "mops/console/2026-08-18/_index").iterdir())
@@ -166,15 +173,18 @@ def test_a_failed_description_is_retried_on_the_next_opening_of_the_root(tmp_pat
     upload._reset()
 
     assert upload.start_root(root, "2026-08-18/mr.Run.abc")
+    describer._wait_for_test()
     assert not list((tmp_path / "mops/console/2026-08-18").glob("_index/*"))
 
     assert not upload.start_root(root, "2026-08-18/mr.Run.abc")
+    describer._wait_for_test()
     # the uploader was already there; the description was not, so it is tried again.
     assert [p.name for p in (tmp_path / "mops/console/2026-08-18/_index").iterdir()] == [
         "123456Z--lemon@example--mr.Run.abc"
     ]
 
     upload.start_root(root, "2026-08-18/mr.Run.abc")
+    describer._wait_for_test()
     assert attempts == ["pointer", "pointer"]
     # and once it is out, later openings leave it alone.
 

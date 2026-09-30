@@ -33,7 +33,7 @@ import typing as ty
 from thds.core import config, log
 
 from ...core import uris
-from . import run_metadata
+from . import describer, refusals
 from .blob_sink import events_root, object_name
 from .events import Event
 
@@ -79,7 +79,7 @@ class _Uploader:
         with self._lock:
             batch, self._pending = self._pending, []
 
-        if not batch:
+        if not batch or refusals.refused(self._events_root_uri):
             return
 
         try:
@@ -94,16 +94,14 @@ class _Uploader:
                 type_hint="application/mops-console-events",
             )
             self._seq += 1
+        except PermissionError as err:
+            refusals.note(self._events_root_uri, err)
         except Exception:
             logger.debug("Could not publish a batch of console events; continuing.", exc_info=True)
 
 
 _UPLOADERS: dict[str, _Uploader] = {}
 _UPLOADERS_LOCK = threading.Lock()
-_DESCRIBED: set[str] = set()
-# roots this process has finished describing (or has no part in describing). Kept apart from
-# the uploaders so a description that failed is tried again on the next call, while the
-# uploader it accompanies is made once.
 
 
 def start_root(events_root_uri: str, run_name: str) -> bool:
@@ -112,7 +110,8 @@ def start_root(events_root_uri: str, run_name: str) -> bool:
     Returns whether a new uploader was created. The run metadata goes out for every root -
     one that only ever served memoized results included, since a reader holding that root
     is otherwise left with no account of the run - and is retried on each call until it is
-    out. Only the run-owning process actually writes it; `run_metadata` checks.
+    out. It is written in the background by the run-owning process only; `describer` and
+    `run_metadata` see to that.
     """
     if not CONSOLE_UPLOAD_EVENTS() or not run_name or not events_root_uri:
         return False
@@ -124,8 +123,7 @@ def start_root(events_root_uri: str, run_name: str) -> bool:
                 _UPLOADERS[events_root_uri] = _Uploader(events_root_uri)
                 created = True
 
-    if events_root_uri not in _DESCRIBED and run_metadata.publish_root(events_root_uri, run_name):
-        _DESCRIBED.add(events_root_uri)
+    describer.request(events_root_uri, run_name)
 
     return created
 
@@ -191,9 +189,9 @@ def _publish_manifest(known_roots: ty.Sequence[str] = ()) -> None:
     this process knows of - its own and `known_roots` - and is written under every one
     of them: backfilling a root some other process wrote, and may already have exited
     from, is what lets a reader entering that root alone discover the rest. Best-effort,
-    since nothing guarantees write access to a root someone else chose - a refusal costs
-    a debug line, and discovery from that root stays incomplete unless a process that
-    can write there publishes the full set.
+    since nothing guarantees write access to a root someone else chose - a refusal drops
+    that root (see `refusals`), and discovery from it stays incomplete unless a process
+    that can write there publishes the full set.
 
     Re-published when the root set grows, or when a previous attempt failed to write to
     every root. `_MANIFEST_WRITTEN` tracks both the root set and the set of roots that
@@ -211,7 +209,7 @@ def _publish_manifest(known_roots: ty.Sequence[str] = ()) -> None:
     manifest = json.dumps({"roots": sorted(targets)}, indent=2).encode()
     written: set[str] = set()
     for root in sorted(targets):
-        if targets == prev_roots and root in prev_written:
+        if (targets == prev_roots and root in prev_written) or refusals.refused(root):
             written.add(root)
             continue
 
@@ -222,6 +220,9 @@ def _publish_manifest(known_roots: ty.Sequence[str] = ()) -> None:
                 manifest,
                 type_hint="application/json",
             )
+            written.add(root)
+        except PermissionError as err:
+            refusals.note(root, err)
             written.add(root)
         except Exception:
             logger.debug("Could not publish a roots manifest to %s; continuing.", root, exc_info=True)
@@ -241,6 +242,5 @@ def _reset() -> None:
     """
     global _MANIFEST_WRITTEN, _UPLOADERS_LOCK
     _UPLOADERS.clear()
-    _DESCRIBED.clear()
     _UPLOADERS_LOCK = threading.Lock()
     _MANIFEST_WRITTEN = (frozenset(), frozenset())

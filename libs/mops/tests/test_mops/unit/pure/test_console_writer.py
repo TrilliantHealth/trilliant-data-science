@@ -6,7 +6,16 @@ from pathlib import Path
 import pytest
 
 from thds.mops.pure.tools import console
-from thds.mops.pure.tools.console import events, run_metadata, run_name, throwaway, upload, writer
+from thds.mops.pure.tools.console import (
+    describer,
+    events,
+    refusals,
+    run_metadata,
+    run_name,
+    throwaway,
+    upload,
+    writer,
+)
 
 _AT = dt.datetime(2026, 8, 6, 12, 0, tzinfo=dt.timezone.utc)
 
@@ -18,10 +27,14 @@ def _real_run(monkeypatch):
     monkeypatch.setattr(throwaway, "here", lambda: False)
     upload._reset()
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
     yield
     _reset_writer()
     upload._reset()
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
 
 
 def test_invoked_decomposes_the_memo_uri():

@@ -15,7 +15,7 @@ from pathlib import Path
 from thds.core import files, git, hostname, log, meta
 
 from ...core import metadata, uris
-from . import blob_sink, run_index
+from . import blob_sink, refusals, run_index
 
 logger = log.getLogger(__name__)
 
@@ -179,6 +179,9 @@ def _publish(memo_uri: str, run: _RunMetadata) -> None:
 
 _STATE_LOCK = threading.Lock()
 _PUBLISH_LOCK = threading.Lock()
+_ROOT_LOCKS: dict[str, threading.Lock] = {}
+# one per root, held across that root's blob store round trips, so a slow root never
+# holds up another. `_PUBLISH_LOCK` guards only this dict.
 _CLAIMED: None | _RunMetadata = None
 _PUBLISHED_ROOTS: set[str] = set()
 _PUBLISHER: None | threading.Thread = None
@@ -209,9 +212,16 @@ def _claim(run_name: str) -> None | _RunMetadata:
 
 def _publish_once(root: str, run: _RunMetadata) -> None:
     with _PUBLISH_LOCK:
-        if root in _PUBLISHED_ROOTS:
+        root_lock = _ROOT_LOCKS.setdefault(root, threading.Lock())
+
+    with root_lock:
+        if root in _PUBLISHED_ROOTS or refusals.refused(root):
             return
-        _publish_root(root, run)
+        try:
+            _publish_root(root, run)
+        except PermissionError as err:
+            refusals.note(root, err)
+            return
         _PUBLISHED_ROOTS.add(root)
 
 
@@ -306,6 +316,7 @@ def _reset_after_fork() -> None:
     _PUBLISHER = None
     _STATE_LOCK = threading.Lock()
     _PUBLISH_LOCK = threading.Lock()
+    _ROOT_LOCKS.clear()
     _STOP_PUBLISHER = threading.Event()
     _PUBLISHED_ROOTS.clear()
 
@@ -316,6 +327,7 @@ def _reset_for_test() -> None:
     _CLAIMED = None
     _PUBLISHER = None
     _PUBLISHED_ROOTS.clear()
+    _ROOT_LOCKS.clear()
     _STOP_PUBLISHER = threading.Event()
     os.environ.pop(_OWNER_PID_ENV, None)
     run_index._reset_for_test()

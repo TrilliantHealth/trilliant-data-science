@@ -1,6 +1,7 @@
 """This abstraction matches what is required by the BlobStore abstraction in pure.core.uris"""
 
 import datetime as dt
+import functools
 import logging
 import typing as ty
 from pathlib import Path
@@ -20,6 +21,7 @@ from ..core.types import AnyStrSrc, BlobListing, BlobStore
 from . import listing
 
 T = ty.TypeVar("T")
+F = ty.TypeVar("F", bound=ty.Callable)
 ToBytes = ty.Callable[[T, ty.BinaryIO], ty.Any]
 FromBytes = ty.Callable[[ty.BinaryIO], T]
 _5_MB = 5 * 2**20
@@ -45,6 +47,22 @@ def is_creds_failure(exc: Exception) -> bool:
 _azure_creds_retry = fretry.retry_sleep(is_creds_failure, fretry.expo(retries=9, delay=1.0))
 # sometimes Azure Cli credentials expire but would succeed if retried
 # and the azure library does not seem to retry these on its own.
+
+
+def _refusal_as_permission_error(func: F) -> F:
+    """A write the caller's role does not allow raises `PermissionError`, as a local
+    filesystem would, and is not retried: fresh credentials carry the same role."""
+
+    @functools.wraps(func)
+    def wrapper(*args: ty.Any, **kwargs: ty.Any) -> ty.Any:
+        try:
+            return func(*args, **kwargs)
+        except HttpResponseError as err:
+            if getattr(err, "error_code", None) == "AuthorizationPermissionMismatch":
+                raise PermissionError(str(err)) from err
+            raise
+
+    return ty.cast(F, wrapper)
 
 
 def _aware_utc(ts: ty.Optional[dt.datetime]) -> ty.Optional[dt.datetime]:
@@ -94,6 +112,7 @@ class AdlsBlobStore(BlobStore):
         return adls.download_to_cache(remote_uri)
 
     @_azure_creds_retry
+    @_refusal_as_permission_error
     @scope.bound
     def putbytes(
         self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"
@@ -102,6 +121,7 @@ class AdlsBlobStore(BlobStore):
         adls.upload(remote_uri, data, content_type=type_hint)
 
     @_azure_creds_retry
+    @_refusal_as_permission_error
     @scope.bound
     def putfile(self, path: Path, remote_uri: str) -> None:
         scope.enter(log.logger_context(upload="mops-putfile"))
@@ -118,6 +138,7 @@ class AdlsBlobStore(BlobStore):
         )(lambda: self._client(fqn).exists())()
 
     @_azure_creds_retry
+    @_refusal_as_permission_error
     @scope.bound
     def put_unless_exists(
         self, remote_uri: str, data: bytes, *, type_hint: str = "application/octet-stream"

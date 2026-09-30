@@ -1,3 +1,15 @@
+### 3.34.20260930
+
+- Fixed: an invocation no longer waits while the console describes the run at a blob root. That
+  description (the run's metadata file and its day-index pointer) is written on a background thread, so a
+  blob store that is slow to answer, or slow to give up, delays only the console.
+- Fixed: the console stops writing to a blob root after the first refused write, with one warning. A run
+  that reads memoized results from a root it may not write to used to retry every console write there on
+  every flush.
+- Changed: an ADLS write the caller's role does not allow (`AuthorizationPermissionMismatch`) raises
+  `PermissionError` at once, as the local file store does. It was retried as an expired credential for
+  about eight minutes before failing.
+
 ### 3.34.20260924
 
 - Fixed: the Kubernetes cost observer now exits when the process that started it does. It decided it had

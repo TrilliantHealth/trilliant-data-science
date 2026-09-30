@@ -3,7 +3,7 @@ import json
 import pytest
 import tomli
 
-from thds.mops.pure.tools.console import run_metadata, throwaway, upload, writer
+from thds.mops.pure.tools.console import describer, refusals, run_metadata, throwaway, upload, writer
 
 _MEMO_URI_SUFFIX = "mops2-mpf/pipe/pkg.mod--fn/hash123"
 
@@ -19,12 +19,16 @@ def _reset(monkeypatch):
     writer._WRITER = None
     upload._reset()
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
     yield
     if isinstance(writer._WRITER, writer._Writer):
         writer._WRITER.close()
     writer._WRITER = None
     upload._reset()
     run_metadata._reset_for_test()
+    describer._reset_for_test()
+    refusals._reset_for_test()
 
 
 def _event(key, at="2026-08-07T12:00:00+00:00"):
@@ -56,8 +60,9 @@ def test_a_batch_becomes_one_object(tmp_path):
     assert len(written[0].read_text().splitlines()) == 3
 
 
-def test_start_publishes_run_metadata_immediately(tmp_path):
+def test_start_publishes_run_metadata(tmp_path):
     upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
+    describer._wait_for_test()
 
     run_root = tmp_path / "mops/console/mr.Run.abc"
     metadata_files = list(run_root.glob("*.toml"))
