@@ -4,7 +4,7 @@ from pathlib import Path
 
 from attrs import define
 
-from thds.adls import hashes
+from thds.adls import download, hashes
 from thds.adls._etag import (
     ETAG_FAKE_HASH_NAME,
     _raw_etag_bytes,
@@ -12,6 +12,7 @@ from thds.adls._etag import (
     extract_etag_bytes,
     hash_file_fake_etag,
 )
+from thds.adls.fqn import AdlsFqn
 from thds.core.hashing import Hash
 
 
@@ -76,7 +77,7 @@ def test_etag_cache_round_trip(tmp_path: Path):
     assert result_hash.bytes == fake_etag_bytes
 
     # Now verify we can retrieve it (this is what happens on cache hit check)
-    retrieved_hash = hash_file_fake_etag(test_file)
+    retrieved_hash = hash_file_fake_etag(test_file, fake_etag_bytes)
     assert retrieved_hash is not None
     assert retrieved_hash.algo == ETAG_FAKE_HASH_NAME
     assert retrieved_hash.bytes == fake_etag_bytes
@@ -87,14 +88,14 @@ def test_etag_cache_returns_none_for_unknown_file(tmp_path: Path):
     unknown_file = tmp_path / "unknown.txt"
     unknown_file.write_bytes(b"this file was never cached")
 
-    result = hash_file_fake_etag(unknown_file)
+    result = hash_file_fake_etag(unknown_file, bytes.fromhex("AAAA"))
     assert result is None
 
 
 def test_etag_cache_returns_none_for_nonexistent_file(tmp_path: Path):
     """Test that hash_file_fake_etag returns None for files that don't exist"""
     nonexistent = tmp_path / "does_not_exist.txt"
-    result = hash_file_fake_etag(nonexistent)
+    result = hash_file_fake_etag(nonexistent, bytes.fromhex("AAAA"))
     assert result is None
 
 
@@ -112,8 +113,34 @@ def test_etag_cache_content_sensitive(tmp_path: Path):
     add_to_etag_cache(file2, etag2)
 
     # Each file should get its own cached etag
-    assert hash_file_fake_etag(file1).bytes == etag1  # type: ignore
-    assert hash_file_fake_etag(file2).bytes == etag2  # type: ignore
+    assert hash_file_fake_etag(file1, etag1).bytes == etag1  # type: ignore
+    assert hash_file_fake_etag(file2, etag2).bytes == etag2  # type: ignore
+    assert hash_file_fake_etag(file1, etag2) is None
+
+
+def test_etag_cache_identical_content_at_different_paths(tmp_path: Path):
+    """Blobs with identical content at different paths have different etag 'fake hashes';
+    verifying one must not evict the other."""
+    file1 = tmp_path / "a" / "status.json"
+    file2 = tmp_path / "b" / "status.json"
+    for f in (file1, file2):
+        f.parent.mkdir()
+        f.write_bytes(b'{"active": true}')
+
+    etag1 = extract_etag_bytes('"0x8DE4EC15EF69095"', "container/a/status.json")
+    etag2 = extract_etag_bytes('"0x8DE4EC15EF69095"', "container/b/status.json")
+    assert etag1 != etag2
+
+    add_to_etag_cache(file1, etag1)
+    add_to_etag_cache(file2, etag2)
+
+    assert hash_file_fake_etag(file1, etag1) == Hash(ETAG_FAKE_HASH_NAME, etag1)
+    assert hash_file_fake_etag(file2, etag2) == Hash(ETAG_FAKE_HASH_NAME, etag2)
+    for f, path, etag in ((file1, "a/status.json", etag1), (file2, "b/status.json", etag2)):
+        hit = download._attempt_cache_hit(
+            Hash(ETAG_FAKE_HASH_NAME, etag), AdlsFqn("sa", "container", path), f, cache=None
+        )
+        assert hit and hit.hit == f
 
 
 # --- Tests for extract_hashes_from_props with etag ---

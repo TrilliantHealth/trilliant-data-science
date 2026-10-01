@@ -34,25 +34,30 @@ def extract_etag_bytes(etag_str: str, blob_path: str) -> bytes:
 _ETAG_CACHE = config.item("cache-path", home.HOMEDIR() / ".thds/adls/xxhash-onto-etag", parse=Path)
 
 
+def _verified_marker(xxh_bytes: bytes, etag: bytes) -> Path:
+    # One empty marker per (content, etag) pair, because blobs with identical
+    # content at different paths have different fake etags (the path is mixed in).
+    return _ETAG_CACHE() / f"{xxh_bytes.hex()}.{etag.hex()}"
+
+
 def add_to_etag_cache(local_path: types.StrOrPath, etag: bytes) -> hash_cache.Hash:
-    xxh_bytes = hash_cache.hash_file(local_path, xxhash.xxh3_128())
-    etag_path = _ETAG_CACHE() / xxh_bytes.hex()
-    etag_path.parent.mkdir(parents=True, exist_ok=True)
-    etag_path.write_bytes(etag)
-    logger.debug("Writing etag 'hash' to path at %s", etag_path)
+    marker = _verified_marker(hash_cache.hash_file(local_path, xxhash.xxh3_128()), etag)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    logger.debug("Recorded verified etag 'hash' at %s", marker)
     return hash_cache.Hash(ETAG_FAKE_HASH_NAME, etag)
 
 
-def hash_file_fake_etag(local_path: types.StrOrPath) -> ty.Optional[hash_cache.Hash]:
+def hash_file_fake_etag(local_path: types.StrOrPath, etag: bytes) -> ty.Optional[hash_cache.Hash]:
+    """The etag 'fake hash' of the file if its content was previously verified against this etag."""
     try:
         xxh_bytes = hash_cache.hash_file(local_path, xxhash.xxh3_128())
     except FileNotFoundError:
         return None
 
-    etag_path = _ETAG_CACHE() / xxh_bytes.hex()
-    if etag_path.is_file():
-        etag_bytes = etag_path.read_bytes()
-        logger.debug("Reusing etag 'fake hash' from path at %s", etag_path)
-        return hash_cache.Hash(ETAG_FAKE_HASH_NAME, etag_bytes)
+    marker = _verified_marker(xxh_bytes, etag)
+    if marker.is_file():
+        logger.debug("Reusing etag 'fake hash' verified at %s", marker)
+        return hash_cache.Hash(ETAG_FAKE_HASH_NAME, etag)
 
     return None

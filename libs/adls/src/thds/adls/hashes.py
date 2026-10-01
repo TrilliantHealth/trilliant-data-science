@@ -51,14 +51,18 @@ def _hash_path_if_exists(
     return file_hasher(path)
 
 
-def hash_path_for_algo(
-    algo: str,
+def hash_path_for_expected(
+    expected_hash: hashing.Hash,
 ) -> ty.Callable[[types.StrOrPath], ty.Optional[hashing.Hash]]:
-    """Return a function that hashes a path for the given algorithm."""
-    if algo == ETAG_FAKE_HASH_NAME:
-        return hash_file_fake_etag
+    """Return a function that hashes a path in the algorithm of the expected hash.
 
-    return partial(_hash_path_if_exists, partial(hash_cache.filehash, algo))
+    An etag cannot be computed from file content, only recalled as previously verified,
+    so for an etag the function returns the expected hash or None.
+    """
+    if expected_hash.algo == ETAG_FAKE_HASH_NAME:
+        return partial(hash_file_fake_etag, etag=expected_hash.bytes)
+
+    return partial(_hash_path_if_exists, partial(hash_cache.filehash, expected_hash.algo))
 
 
 def metadata_hash_b64_key(algo: str) -> str:

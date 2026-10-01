@@ -1,3 +1,10 @@
+### 4.5.20260930
+
+- A blob verified by its etag is served from the local cache even after other blobs with byte-identical
+  content were downloaded. The cache held one etag per file content, so many small blobs sharing content
+  evicted each other and every read downloaded again. Etags verified before this release are not reused;
+  each such file downloads once more.
+
 ### 4.5.20260928
 
 - `copy_file` skips an existing destination only when source and destination share at least one hash and

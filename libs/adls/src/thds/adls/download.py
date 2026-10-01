@@ -118,7 +118,7 @@ def _attempt_cache_hit(
     if not expected_hash:
         return None
 
-    hash_path_if_exists = hashes.hash_path_for_algo(expected_hash.algo)
+    hash_path_if_exists = hashes.hash_path_for_expected(expected_hash)
 
     with log.logger_context(hash_for="before-download-dest"):
         local_hash = hash_path_if_exists(local_path)
