@@ -61,6 +61,19 @@ thing well, they're easier to test, maintain, understand, and use in new and une
   frames
 - see `notebooks/demo_sklearn_classification_report_tools.ipynb` for working examples of all of the above
 
+### Explanations
+
+`shaplegos` (requires the `shap` extra: `shap` + `matplotlib`) puts `shap` explanations on named pandas
+feature frames:
+
+- `explain_tree` runs `shap.TreeExplainer` over a frame and returns a `KeyedExplanation` - the
+  `shap.Explanation` plus a `pd.MultiIndex` of the frame's key columns, so one instance's explanation is
+  `keyed.row(customer_id=..., date=...)` rather than a positional index
+- `mean_abs_shap` and `row_contributions` tabulate global and per-instance attributions
+- `plots` wraps the `shap` beeswarm, violin, bar and waterfall figures to accept a `KeyedExplanation`,
+  draw on a `Figure` or `Axes` you pass as `fig` (or a fresh figure), and return the matplotlib `Figure`
+  instead of showing it
+
 ### Feature extraction
 
 `sklegos.feature_extraction` contains the following legos:

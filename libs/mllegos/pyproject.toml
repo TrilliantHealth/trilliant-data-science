@@ -1,7 +1,7 @@
 [project]
 name = "thds.mllegos"
 # Patch version is a datetime determined upon release
-version = "1.3"
+version = "1.4"
 description = "Composable components for basic ML tasks"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -17,6 +17,7 @@ parquet = ["pyarrow"]
 sklearn = ["scikit-learn"]
 skopt = ["scikit-optimize"]
 pyecharts = ["pyecharts~=2.0"]
+shap = ["shap", "matplotlib", "packaging"]
 
 [project.urls]
 Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
@@ -32,6 +33,8 @@ dev = [
     "pytest-cov~=4.0",
     "pytest-mock~=3.10",
     "pandas-stubs",
+    "shap",
+    "xgboost",  # exercises the shap xgboost compat shim
 ]
 
 [build-system]
@@ -67,7 +70,7 @@ exclude = '''(?x)(
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["azure", "joblib", "pyarrow.*", "pyecharts.*", "ruamel.*", "scipy.*", "sklearn.*", "skopt.*"]
+module = ["azure", "joblib", "pyarrow.*", "pyecharts.*", "ruamel.*", "scipy.*", "shap.*", "sklearn.*", "skopt.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
