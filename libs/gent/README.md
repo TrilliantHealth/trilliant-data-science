@@ -167,7 +167,13 @@ about the worktree looks wrong afterward, so `wt status` is how you find out.
 ```bash
 wt rm feature/old-branch         # Remove worktree and branch
 wt rm feature/draft --force      # Force remove with uncommitted changes
+wt rm feature/big --trash        # Return at once; delete the files in the background
 ```
+
+`--trash` (on `wt rm` and `wt prune`) is for worktrees with many files, such as one virtualenv per
+project. It renames the worktree into `.bare/gent-trash/`, which is instant because it's on the same
+volume, and a detached low-priority process deletes it from there. Each `--trash` also deletes anything
+an earlier one left behind. Failures are logged to `.bare/gent-trash.log`.
 
 ## Shell Integration
 

@@ -8,10 +8,11 @@ from pathlib import Path
 
 import argh
 
-from thds.gent import output
+from thds.gent import output, worktree_trash
 from thds.gent.readme import ensure_readme
 from thds.gent.utils import (
     cleanup_empty_parent_dirs,
+    dirty_count,
     error_exit,
     get_bare_path,
     get_worktree_root_or_exit,
@@ -131,13 +132,42 @@ def cleanup_and_delete_branch(
     delete_branch(branch, bare_path, force)
 
 
+def _trash_worktree(worktree_path: Path, root: Path, branch: str, bare_path: Path, force: bool) -> bool:
+    """Apply the checks `git worktree remove` would, move the worktree to the trash,
+    and delete the branch.
+
+    Returns False, having changed nothing, if the worktree needs removing the ordinary way.
+    """
+    if not force and (dirty := dirty_count(worktree_path)):
+        output.error_multiline(
+            f"'{branch}' has {dirty} uncommitted change(s).",
+            "If you are sure you want to remove it, run:",
+            f"  wt rm {branch} --trash -f",
+        )
+    if worktree_trash.is_locked(worktree_path):
+        error_exit(f"'{branch}' is locked; run 'git worktree unlock {worktree_path}' first")
+
+    output.info(f"Moving worktree at {worktree_path} to {worktree_trash.trash_dir(bare_path)}")
+    if not worktree_trash.move_to_trash(worktree_path, bare_path):
+        return False
+
+    output.success(f"Removed worktree at {worktree_path}; its files are being deleted in the background")
+    cleanup_and_delete_branch(worktree_path, root, branch, bare_path, force)
+    worktree_trash.empty_in_background(bare_path)
+    return True
+
+
 @argh.arg(
     "branch", nargs="?", help="Branch name to remove (infers from current directory if not provided)"
 )
 @argh.arg(
     "-f", "--force", help="Force removal of worktree with uncommitted changes and unmerged branches"
 )
-def main(branch: str | None, *, force: bool = False) -> None:
+@argh.arg(
+    "--trash",
+    help="Return at once and delete the worktree's files in a low-priority background process",
+)
+def main(branch: str | None, *, force: bool = False, trash: bool = False) -> None:
     """Remove a git worktree and its local branch.
 
     Examples:
@@ -145,6 +175,7 @@ def main(branch: str | None, *, force: bool = False) -> None:
       wt rm                         # Remove current worktree and branch (when inside it)
       wt rm release/202512 -f       # Force remove with uncommitted changes/unmerged branch
       wt rm feature/old -f          # Complete partial deletion (if worktree already removed)
+      wt rm feature/old --trash     # Return at once; delete the files in the background
     """
     # Get branch name from argument or current worktree
     branch = resolve_branch_argument(branch)
@@ -166,6 +197,10 @@ def main(branch: str | None, *, force: bool = False) -> None:
     # Check if branch can be deleted before removing worktree
     # This prevents orphaning the branch if deletion would fail
     check_branch_can_be_deleted(branch, bare_path, force)
+
+    if trash and _trash_worktree(worktree_path, root, branch, bare_path, force):
+        ensure_readme()
+        return
 
     # Remove the worktree
     output.info(f"Removing worktree at {worktree_path}")

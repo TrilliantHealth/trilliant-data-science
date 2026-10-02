@@ -10,7 +10,7 @@ from pathlib import Path
 
 import argh
 
-from thds.gent import output
+from thds.gent import output, worktree_trash
 from thds.gent.commands.rm import cleanup_and_delete_branch
 from thds.gent.readme import ensure_readme
 from thds.gent.utils import (
@@ -163,15 +163,20 @@ def _select_candidates(candidates: list[Candidate], yes: bool, force: bool) -> l
 
 
 def _remove_worktree(
-    wt: WorktreeInfo, root: Path, bare_path: Path, *, force_remove: bool, force_delete: bool
+    wt: WorktreeInfo, root: Path, bare_path: Path, *, force_remove: bool, force_delete: bool, trash: bool
 ) -> None:
     """Remove a single worktree and its branch."""
     branch = wt.branch or ""
     output.info(f"Removing worktree: {branch}")
 
     args = ["worktree", "remove", *(["--force"] if force_remove else []), str(wt.path)]
+    if trash and worktree_trash.is_locked(wt.path):
+        output.warning(f"Skipped locked worktree {branch}")
+        return
+
     try:
-        run_git(*args, cwd=bare_path)
+        if not (trash and worktree_trash.move_to_trash(wt.path, bare_path)):
+            run_git(*args, cwd=bare_path)
     except subprocess.CalledProcessError as e:
         error_msg = extract_subprocess_error(e)
         output.warning(f"Failed to remove worktree {branch}: {error_msg}")
@@ -188,7 +193,11 @@ def _remove_worktree(
 
 @argh.arg("-y", "--yes", help="Skip prompt; removes only clean, merged worktrees unless --force")
 @argh.arg("-f", "--force", help="Include worktrees with unmerged commits or uncommitted changes")
-def main(*, yes: bool = False, force: bool = False) -> None:
+@argh.arg(
+    "--trash",
+    help="Return at once and delete the worktrees' files in a low-priority background process",
+)
+def main(*, yes: bool = False, force: bool = False, trash: bool = False) -> None:
     """Prune worktrees whose remote branch has been deleted.
 
     Fetches with --prune to sync remote refs, then finds worktrees whose
@@ -199,6 +208,7 @@ def main(*, yes: bool = False, force: bool = False) -> None:
       wt prune                       # Interactive: select which to remove
       wt prune --yes                 # Remove only clean, merged worktrees
       wt prune --yes --force         # Remove all without prompting
+      wt prune --yes --trash         # Delete the files in the background
     """
     root = get_worktree_root_or_exit()
     bare_path = get_bare_path(root)
@@ -256,8 +266,11 @@ def main(*, yes: bool = False, force: bool = False) -> None:
             bare_path,
             force_remove=dirty > 0,
             force_delete=unmerged is None or unmerged > 0,
+            trash=trash,
         )
 
+    if trash:
+        worktree_trash.empty_in_background(bare_path)
     ensure_readme()
     output.success("Done.")
 

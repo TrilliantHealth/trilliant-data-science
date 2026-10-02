@@ -312,3 +312,15 @@ def test_skips_fresh_worktrees(worktree_git_repo, run_wt):
 
     assert result.returncode == 0
     assert fresh.exists(), "fresh worktree should be skipped (< 3 days old)"
+
+
+def test_prune_trash_removes_worktree(worktree_git_repo, run_wt):
+    bare_path = worktree_git_repo / ".bare"
+    _add_remote_ref(bare_path, "main")
+    gone = _worktree(worktree_git_repo, run_wt, "feature/gone")
+
+    result = run_wt("prune", ["--yes", "--trash"], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0, result.stderr
+    assert not gone.exists()
+    assert "feature/gone" not in git_run(bare_path, "worktree", "list").stdout

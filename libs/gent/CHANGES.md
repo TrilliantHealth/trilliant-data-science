@@ -1,3 +1,9 @@
+### 1.7.20260930
+
+- Added `--trash` to `wt rm` and `wt prune`. The worktree is moved into `.bare/gent-trash/` and git
+  forgets it at once, and its files are deleted by a detached low-priority process, so removing a
+  worktree full of virtualenvs no longer takes minutes of CPU.
+
 ## 1.7
 
 - Added `wt prune`, which removes worktrees whose remote branch has been deleted. It fetches with
