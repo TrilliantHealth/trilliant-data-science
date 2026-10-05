@@ -1,3 +1,12 @@
+### 1.7.20261004
+
+- `wt status` and `wt prune` no longer count a branch as unmerged when its changes are already on the
+  base under different commits, as after a rebase or squash merge. The check is whether merging the
+  branch into the base would change nothing; it needs git 2.38 or newer, and older gits keep the plain
+  commit count.
+- `wt prune` deletes a removed worktree's branch only if it still points where it did when listed, so a
+  commit made while prune waits at its prompt keeps its branch.
+
 ### 1.7.20260930
 
 - Added `--trash` to `wt rm` and `wt prune`. The worktree is moved into `.bare/gent-trash/` and git

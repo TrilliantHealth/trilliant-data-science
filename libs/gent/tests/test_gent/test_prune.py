@@ -4,6 +4,8 @@ import os
 import time
 from pathlib import Path
 
+from thds.gent.commands import prune
+
 from tests.conftest import git_run, write_file
 
 
@@ -138,6 +140,49 @@ def test_yes_force_removes_unmerged_worktrees(worktree_git_repo, run_wt):
 
     assert result.returncode == 0
     assert not unmerged.exists(), "unmerged worktree should be removed with --force"
+
+
+def test_yes_removes_squash_merged_worktrees(worktree_git_repo, run_wt):
+    """A branch whose changes reached main under a different commit is not unmerged."""
+    bare_path = worktree_git_repo / ".bare"
+    squashed = _worktree(worktree_git_repo, run_wt, "feature/squashed")
+    _add_local_commit(squashed)
+    git_run(worktree_git_repo / "main", "-c", "merge.ff=true", "merge", "--squash", "feature/squashed")
+    git_run(worktree_git_repo / "main", "commit", "-m", "squash feature/squashed")
+    _add_remote_ref(bare_path, "main")
+    _backdate(squashed)
+
+    result = run_wt("prune", ["--yes"], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert not squashed.exists(), "squash-merged worktree should be removed without --force"
+    assert "feature/squashed" not in git_run(bare_path, "branch", "--list").stdout
+
+
+def test_removes_the_config_section_of_a_deleted_branch(worktree_git_repo, run_wt):
+    bare_path = worktree_git_repo / ".bare"
+    _add_remote_ref(bare_path, "main")
+    gone = _worktree(worktree_git_repo, run_wt, "feature/gone")
+    git_run(gone, "config", "branch.feature/gone.remote", "origin")
+    git_run(gone, "config", "branch.feature/gone.merge", "refs/heads/feature/gone")
+    _backdate(gone)
+
+    result = run_wt("prune", ["--yes"], cwd=worktree_git_repo / "main")
+
+    assert result.returncode == 0
+    assert "branch.feature/gone" not in git_run(bare_path, "config", "--list").stdout
+
+
+def test_keeps_a_branch_that_moved_after_it_was_listed(worktree_git_repo, run_wt):
+    """A commit made while prune waits at its prompt must not be deleted with the branch."""
+    bare_path = worktree_git_repo / ".bare"
+    moved = _worktree(worktree_git_repo, run_wt, "feature/moved")
+    listed_head = git_run(moved, "rev-parse", "HEAD").stdout.strip()
+    _add_local_commit(moved)
+
+    prune._delete_branch_if_unmoved("feature/moved", listed_head, bare_path)
+
+    assert "feature/moved" in git_run(bare_path, "branch", "--list").stdout
 
 
 def test_cleans_empty_parent_directories(worktree_git_repo, run_wt):

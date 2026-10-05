@@ -510,12 +510,32 @@ def dirty_count(worktree_path: Path) -> int:
     return len([line for line in result.stdout.splitlines() if line.strip()])
 
 
+def _landed_by_content(worktree_path: Path, base_ref: str) -> bool:
+    """Whether merging HEAD into base_ref would change nothing.
+
+    A conflict, or a git older than 2.38 (no `merge-tree --write-tree`), fails
+    the merge-tree call and counts as not landed.
+    """
+    merged = run_git("merge-tree", "--write-tree", base_ref, "HEAD", cwd=worktree_path, check=False)
+    if merged.returncode != 0:
+        return False
+
+    base_tree = run_git("rev-parse", f"{base_ref}^{{tree}}", cwd=worktree_path, check=False)
+    return base_tree.returncode == 0 and merged.stdout.split() == base_tree.stdout.split()
+
+
 def unmerged_commits(worktree_path: Path, base_ref: str) -> int | None:
-    """Commits on HEAD not reachable from base_ref, or None if base_ref is unknown."""
+    """Commits on HEAD not reachable from base_ref, or None if base_ref is unknown.
+
+    Zero when the branch's changes are already in base_ref under other commits,
+    as after a rebase or squash merge.
+    """
     result = run_git("rev-list", "--count", f"{base_ref}..HEAD", cwd=worktree_path, check=False)
     if result.returncode != 0:
         return None
-    return int(result.stdout.strip() or 0)
+
+    count = int(result.stdout.strip() or 0)
+    return 0 if count and _landed_by_content(worktree_path, base_ref) else count
 
 
 def cleanup_empty_parent_dirs(path: Path, root: Path) -> None:

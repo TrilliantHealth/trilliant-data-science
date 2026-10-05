@@ -176,3 +176,51 @@ def test_an_absolute_path_outside_the_repo_warns(worktree_git_repo, run_wt, tmp_
 
     assert result.stdout.strip() == ""
     assert "No worktree found" in result.stderr
+
+
+def _squash_onto_main(repo: Path, branch: str) -> None:
+    """Apply *branch*'s changes to main as one new commit, as a squash merge does."""
+    git_run(repo / "main", "-c", "merge.ff=true", "merge", "--squash", branch)
+    git_commit(repo / "main", f"squash {branch}")
+
+
+def test_silent_about_a_branch_squash_merged_into_base(worktree_git_repo, run_wt):
+    worktree = _worktree(worktree_git_repo, run_wt, "feature/squashed")
+    for name in ("one.txt", "two.txt"):
+        write_file(worktree, name, f"{name}\n")
+        git_add(worktree, ".")
+        git_commit(worktree, f"add {name}")
+    _squash_onto_main(worktree_git_repo, "feature/squashed")
+
+    result = run_wt("status", ["feature/squashed", "--base", "main"], cwd=worktree_git_repo / "main")
+
+    assert result.stdout.strip() == ""
+
+
+def test_reports_a_branch_with_changes_beyond_what_was_squashed(worktree_git_repo, run_wt):
+    worktree = _worktree(worktree_git_repo, run_wt, "feature/more")
+    write_file(worktree, "one.txt", "one\n")
+    git_add(worktree, ".")
+    git_commit(worktree, "add one")
+    _squash_onto_main(worktree_git_repo, "feature/more")
+    write_file(worktree, "two.txt", "two\n")
+    git_add(worktree, ".")
+    git_commit(worktree, "add two")
+
+    result = run_wt("status", ["feature/more", "--base", "main"], cwd=worktree_git_repo / "main")
+
+    assert "2 not in main" in result.stdout
+
+
+def test_reports_a_branch_that_conflicts_with_base(worktree_git_repo, run_wt):
+    worktree = _worktree(worktree_git_repo, run_wt, "feature/conflicting")
+    write_file(worktree, "shared.txt", "branch\n")
+    git_add(worktree, ".")
+    git_commit(worktree, "branch version")
+    write_file(worktree_git_repo / "main", "shared.txt", "main\n")
+    git_add(worktree_git_repo / "main", ".")
+    git_commit(worktree_git_repo / "main", "main version")
+
+    result = run_wt("status", ["feature/conflicting", "--base", "main"], cwd=worktree_git_repo / "main")
+
+    assert "1 not in main" in result.stdout

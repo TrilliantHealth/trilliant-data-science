@@ -11,10 +11,10 @@ from pathlib import Path
 import argh
 
 from thds.gent import output, worktree_trash
-from thds.gent.commands.rm import cleanup_and_delete_branch
 from thds.gent.readme import ensure_readme
 from thds.gent.utils import (
     WorktreeInfo,
+    cleanup_empty_parent_dirs,
     dirty_count,
     extract_subprocess_error,
     get_bare_path,
@@ -162,8 +162,32 @@ def _select_candidates(candidates: list[Candidate], yes: bool, force: bool) -> l
     return selected
 
 
+def _delete_branch_if_unmoved(branch: str, head: str | None, bare_path: Path) -> None:
+    """Delete *branch* only if it still points at *head*, the commit selection judged.
+
+    The ref update compares and deletes in one step, so a commit made after
+    selection keeps its branch rather than being lost to a forced delete.
+    """
+    if head is None:
+        output.warning(f"Kept branch {branch}: its head was unknown when listed")
+        return
+
+    result = run_git("update-ref", "-d", f"refs/heads/{branch}", head, cwd=bare_path, check=False)
+    if result.returncode != 0:
+        output.warning(f"Kept branch {branch}: {result.stderr.strip()}")
+        return
+
+    # `git branch -d` drops the branch's config section with the ref; `update-ref` does not.
+    section = run_git("config", "--remove-section", f"branch.{branch}", cwd=bare_path, check=False)
+    if section.returncode != 0 and "no such section" not in section.stderr:
+        output.warning(f"Deleted branch {branch} but kept its config: {section.stderr.strip()}")
+        return
+
+    output.success(f"Deleted branch: {branch}")
+
+
 def _remove_worktree(
-    wt: WorktreeInfo, root: Path, bare_path: Path, *, force_remove: bool, force_delete: bool, trash: bool
+    wt: WorktreeInfo, root: Path, bare_path: Path, *, force_remove: bool, trash: bool
 ) -> None:
     """Remove a single worktree and its branch."""
     branch = wt.branch or ""
@@ -183,12 +207,8 @@ def _remove_worktree(
         return
 
     output.success(f"Removed worktree: {branch}")
-    # Catch SystemExit because delete_branch calls error_multiline (which
-    # calls sys.exit) on unexpected failures — that must not abort the loop.
-    try:
-        cleanup_and_delete_branch(wt.path, root, branch, bare_path, force=force_delete)
-    except SystemExit:
-        pass
+    cleanup_empty_parent_dirs(wt.path, root)
+    _delete_branch_if_unmoved(branch, wt.head, bare_path)
 
 
 @argh.arg("-y", "--yes", help="Skip prompt; removes only clean, merged worktrees unless --force")
@@ -259,15 +279,8 @@ def main(*, yes: bool = False, force: bool = False, trash: bool = False) -> None
             output.info("Aborted.")
         return
 
-    for wt, dirty, unmerged in selected:
-        _remove_worktree(
-            wt,
-            root,
-            bare_path,
-            force_remove=dirty > 0,
-            force_delete=unmerged is None or unmerged > 0,
-            trash=trash,
-        )
+    for wt, dirty, _unmerged in selected:
+        _remove_worktree(wt, root, bare_path, force_remove=dirty > 0, trash=trash)
 
     if trash:
         worktree_trash.empty_in_background(bare_path)
