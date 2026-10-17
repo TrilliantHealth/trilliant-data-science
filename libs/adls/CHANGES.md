@@ -1,3 +1,7 @@
+### 4.5.20261016
+
+- Add the `demand-forecast` named root.
+
 ### 4.5.20260930
 
 - A blob verified by its etag is served from the local cache even after other blobs with byte-identical
