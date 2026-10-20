@@ -3,6 +3,7 @@ import dataclasses
 import json
 import os
 import pickle
+import traceback
 import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from ..core.memo import results
 from ..core.serialize_big_objs import ByIdRegistry, ByIdSerializer
 from ..core.serialize_paths import CoordinatingPathSerializer
 from ..core.source import hashref_context
-from ..core.types import Args, BlobStore, Kwargs, T
+from ..core.types import Args, BlobStore, Kwargs, T, UnpicklableRemoteException
 from ..core.use_runner import unwrap_use_runner
 from ..runner import strings
 from ..tools import console
@@ -49,6 +50,18 @@ def generate_run_id(started_at: datetime) -> str:
     random_words = humenc.encode(os.urandom(2))
 
     return f"{timestamp}-{random_words}"
+
+
+def _exception_bytes(dumper: _pickle.Dumper, exc: Exception) -> bytes:
+    try:
+        return _pickle.gimme_bytes(dumper, exc)
+    except Exception:  # a reducer can raise anything; the original exception matters more
+        logger.warning(
+            "%s cannot be pickled; transmitting it as text", type(exc).__name__, exc_info=True
+        )
+        return _pickle.gimme_bytes(
+            dumper, UnpicklableRemoteException("".join(traceback.format_exception(exc)))
+        )
 
 
 @dataclass  # needed for cached_property
@@ -163,10 +176,9 @@ class ResultExcWithMetadataChannel:
         self._write_metadata_only("result", diagnostics)
 
     def exception(self, exc: Exception) -> None:
-        exc_bytes = _pickle.gimme_bytes(self.dumper, exc)
         self.fs.putbytes(
             self.fs.join(self.call_id, results.EXCEPTION),
-            self._metadata_header + exc_bytes,
+            self._metadata_header + _exception_bytes(self.dumper, exc),
             type_hint="application/mops-exception",
         )
         diagnostics = format_exception_diagnostics(exc).encode("utf-8")

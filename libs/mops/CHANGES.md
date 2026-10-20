@@ -1,3 +1,9 @@
+### 3.34.20261019
+
+- Fixed: a remote exception that cannot be pickled now reaches the caller as an
+  `UnpicklableRemoteException` carrying the original type, message, and traceback as text. The caller
+  used to see only the pickling error (e.g. `cannot pickle '_thread.RLock' object`).
+
 ### 3.34.20260930
 
 - Fixed: an invocation no longer waits while the console describes the run at a blob root. That

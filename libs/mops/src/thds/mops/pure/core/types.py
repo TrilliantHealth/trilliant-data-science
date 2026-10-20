@@ -55,6 +55,13 @@ class NotARunnerContext(Exception):
     """
 
 
+class UnpicklableRemoteException(Exception):
+    """Stands in for a remote exception that could not be pickled.
+
+    Its message is the original exception's type, message, and traceback, as text.
+    """
+
+
 AnyStrSrc = ty.Union[ty.AnyStr, ty.Iterable[ty.AnyStr], ty.IO[ty.AnyStr], Path]
 
 
