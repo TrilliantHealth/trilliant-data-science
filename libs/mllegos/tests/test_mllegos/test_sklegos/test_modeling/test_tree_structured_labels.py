@@ -311,6 +311,11 @@ def perf_multiplier():
     return 40 if os.getenv("CI") else 5
 
 
+# The baseline predicts the test set in well under a millisecond, where scheduler noise swings its
+# measured time by two orders of magnitude; a ratio against that is not a performance check.
+_MIN_BASELINE_PRED_SECONDS = 0.001
+
+
 def _run_time(n_trials: int, func, *args, **kwargs):
     def inner():
         tic = time.perf_counter()
@@ -526,7 +531,7 @@ def test_tree_structured_labels_beats_baseline(
     assert acc > naive_acc
     assert acc >= 0.995
     assert fit_time < (perf_multiplier * naive_fit_time)
-    assert pred_time < (perf_multiplier * n_subtrees * naive_pred_time)
+    assert pred_time < (perf_multiplier * n_subtrees * max(naive_pred_time, _MIN_BASELINE_PRED_SECONDS))
     if sample_data.params.depth > 2:
         assert error_reduction > 0.99
     else:
