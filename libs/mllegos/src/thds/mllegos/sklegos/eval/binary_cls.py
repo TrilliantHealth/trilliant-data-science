@@ -134,4 +134,4 @@ def score_by_variable(
             pos_label=pos_label,
             zero_division=zero_division,
         )
-    )  # type: ignore[return-value]
+    )

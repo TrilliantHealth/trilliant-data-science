@@ -339,7 +339,7 @@ def shim(
     )
 
     if disable_remote():
-        return samethread_shim  # type: ignore[return-value]
+        return samethread_shim  # type: ignore[pyrefly:bad-return]
 
     if isinstance(container_image, str):
         get_container_image: ty.Callable[[], str] = lambda: container_image  # noqa: E731

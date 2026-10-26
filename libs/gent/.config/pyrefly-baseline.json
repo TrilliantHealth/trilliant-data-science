@@ -1,0 +1,12 @@
+{
+  "min_severity": "error",
+  "errors": [
+    {
+      "column": 12,
+      "path": "src/thds/gent/utils.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `Path | None` is not assignable to declared return type `Path`",
+      "severity": "error"
+    }
+  ]
+}

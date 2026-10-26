@@ -93,7 +93,7 @@ class TqdmReporter:
 
     def __call__(self, states: ty.List[ProgressState]):
         try:
-            from tqdm import tqdm  # type: ignore
+            from tqdm import tqdm  # type: ignore[pyrefly:missing-import]
 
             bar = self._bar
             state = _sum_ps(states)
@@ -105,7 +105,7 @@ class TqdmReporter:
                     initial=state.n,
                     unit="byte",
                     unit_scale=True,
-                )  # type: ignore
+                )
             if bar:
                 # if there are zero active states (which is possible),
                 # n and total will be zero after sum, and we don't
@@ -173,7 +173,7 @@ def _proxy_io(io_type: str, stream: T, key: str, total_len: int) -> T:
 
     try:
         old_io = getattr(stream, io_type)
-        total_len = total_len or len(stream)  # type: ignore
+        total_len = total_len or len(stream)  # type: ignore[pyrefly:bad-argument-type]
     except (AttributeError, TypeError):
         return stream
 

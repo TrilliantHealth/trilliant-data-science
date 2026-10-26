@@ -31,7 +31,9 @@ class Sha256B64PathStream:
         lookup_blob_store(full_remote_sha256).putfile(path, full_remote_sha256)
 
     def get_downloader(self, remote_sha256: str) -> Downloader:
-        return UnpicklePathFromUri(storage_content_addressed(remote_sha256, "sha256"))  # type: ignore # NamedTuple silliness
+        return UnpicklePathFromUri(
+            storage_content_addressed(remote_sha256, "sha256")
+        )  # NamedTuple silliness
 
 
 def _pickle_obj_and_upload_to_content_addressed_path(

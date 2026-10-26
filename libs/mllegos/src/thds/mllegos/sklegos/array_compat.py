@@ -28,7 +28,7 @@ def to_np_np(X: np.ndarray) -> np.ndarray:
 @to_np.register(pd.Series)
 @to_np.register(pd.DataFrame)
 def to_np_pd(X: ty.Union[pd.Series, pd.DataFrame]) -> np.ndarray:
-    return X.values  # type: ignore
+    return X.values  # type: ignore[pyrefly:bad-return]
 
 
 if sp is not None:
@@ -59,7 +59,7 @@ def slice_2d(X: A, rows: _MaybeIndexer, cols: _MaybeIndexer) -> A:
 
 
 @slice_2d.register(np.ndarray)
-def slice_2d_np(X: np.ndarray, rows: _MaybeIndexer, cols: _MaybeIndexer) -> np.ndarray:  # type: ignore[misc]
+def slice_2d_np(X: np.ndarray, rows: _MaybeIndexer, cols: _MaybeIndexer) -> np.ndarray:
     if rows is None and cols is None:
         # minor optimization
         return X
@@ -70,7 +70,7 @@ def slice_2d_np(X: np.ndarray, rows: _MaybeIndexer, cols: _MaybeIndexer) -> np.n
 
 
 @slice_2d.register(pd.DataFrame)
-def slice_2d_pd(X: pd.DataFrame, rows: AnyIndexer, cols: AnyIndexer) -> pd.DataFrame:  # type: ignore[misc]
+def slice_2d_pd(X: pd.DataFrame, rows: AnyIndexer, cols: AnyIndexer) -> pd.DataFrame:
     if rows is None and cols is None:
         # minor optimization
         return X
@@ -82,7 +82,7 @@ if sp is not None:
     @slice_2d.register(sp.csr_matrix)
     @slice_2d.register(sp.csc_matrix)
     @slice_2d.register(sp.coo_matrix)
-    def slice_2d_sp(X: types.AnySparseArray, rows: AnyIndexer, cols: AnyIndexer) -> sp.spmatrix:  # type: ignore[misc]
+    def slice_2d_sp(X: types.AnySparseArray, rows: AnyIndexer, cols: AnyIndexer) -> sp.spmatrix:
         if rows is None and cols is None:
             # minor optimization
             return X

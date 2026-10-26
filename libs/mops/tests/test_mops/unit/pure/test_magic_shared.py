@@ -8,7 +8,7 @@ from thds.mops.pure._magic.shared_args import SharedArgRegistrar
 
 @pytest.fixture
 def clear_magic():
-    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()  # type: ignore
+    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()
     yield
 
 
@@ -79,7 +79,8 @@ def test_shared_arg_registrar_extracts_by_name():
     registrar = SharedArgRegistrar(fn, ("b", "c"))
 
     big_list = [1, 2, 3]
-    registrar.register(_FakeRunner(), (42, "hello"), {"c": big_list})  # type: ignore
+    # type: ignore[pyrefly:bad-argument-type]
+    registrar.register(_FakeRunner(), (42, "hello"), {"c": big_list})
     assert ("b", "hello") in registered
     assert ("c", big_list) in registered
 
@@ -97,7 +98,7 @@ def test_shared_arg_registrar_skips_none():
             registered.extend(kwargs.items())
 
     registrar = SharedArgRegistrar(fn, ("mapping",))
-    registrar.register(_FakeRunner(), (1,), {})  # type: ignore
+    registrar.register(_FakeRunner(), (1,), {})  # type: ignore[pyrefly:bad-argument-type]
 
     assert registered == []
 
@@ -116,6 +117,7 @@ def test_shared_arg_registrar_positional():
 
     the_mapping = {"a": 1}
     registrar = SharedArgRegistrar(fn, ("mapping",))
-    registrar.register(_FakeRunner(), ([1, 2], the_mapping), {})  # type: ignore
+    # type: ignore[pyrefly:bad-argument-type]
+    registrar.register(_FakeRunner(), ([1, 2], the_mapping), {})
 
     assert ("mapping", the_mapping) in registered

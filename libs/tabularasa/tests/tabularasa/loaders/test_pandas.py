@@ -21,7 +21,7 @@ def test_loader_dataframe_equals(test_case_with_pandas_module: ReferenceDataTest
                 df,
                 df_expected,
                 check_dtype=True,
-                check_index_type=True,  # type: ignore
+                check_index_type=True,
                 check_exact=True,
                 check_categorical=True,
             )

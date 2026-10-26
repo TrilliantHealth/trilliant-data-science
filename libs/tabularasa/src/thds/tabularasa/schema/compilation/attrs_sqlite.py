@@ -31,7 +31,7 @@ ATTRS_CLASS_LOADER_TEMPLATE = """class {class_name}Loader:
     {accessors}
 """ % (
     thds.tabularasa.loaders.util.AttrsSQLiteDatabase.__name__,
-    thds.tabularasa.loaders.sqlite_util.sqlite_constructor_for_record_type.__name__,  # type: ignore
+    thds.tabularasa.loaders.sqlite_util.sqlite_constructor_for_record_type.__name__,
 )
 
 ATTRS_INDEX_ACCESSOR_TEMPLATE = """

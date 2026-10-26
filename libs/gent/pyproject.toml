@@ -19,7 +19,6 @@ dependencies = [
 # libraries maximum flexibility.
 #################
 
-
 [project.scripts]
 wt = "thds.gent.__main__:main"
 wt-completion = "thds.gent.completion:main"
@@ -29,8 +28,6 @@ repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [
-    "mypy~=1.14",
-    "mypy-extensions~=1.0",
     "pytest~=8.2",
     "pytest-cov~=4.0",
     "pytest-mock~=3.10",
@@ -55,34 +52,33 @@ source = ["thds.gent"]
 [tool.coverage.report]
 show_missing = true
 
-[tool.mypy]
-mypy_path = "src"
-namespace_packages = true
-explicit_package_bases = true
-exclude = '''(?x)(
-    build/
-    | dist/
-    | \S+\.egg-info/
-)'''
-check_untyped_defs = true
-# in the main project code, we should have nothing without full type annotations.
-disallow_untyped_calls = true
-disallow_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = [
-    "azure",
-    "google",
-    "ruamel.*",
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+python-interpreter-path = ".venv/bin/python"
+search-path = ["src", "."]
+project-excludes = [
+    "**/build/",
+    "**/dist/",
+    "**/*.egg-info/",
 ]
-ignore_missing_imports = true
+preset = "legacy"
+check-unannotated-defs = true
+type-ignore-unknown-tag-behavior = "no-effect"
+infer-return-types = "checked"
+ignore-missing-imports = ["azure", "google", "ruamel.*"]
+baseline = ".config/pyrefly-baseline.json"
+baseline-matching-mode = "column-ordered"
 
-[[tool.mypy.overrides]]
-module = "tests.*"
-# we are not as strict about untyped things in tests, though projects should feel free to
-# make these overrides more targeted to keep test readability high.
-disallow_untyped_calls = false
-disallow_untyped_defs = false
+[tool.pyrefly.errors]
+unannotated-return = "error"
+implicit-any-parameter = "error"
+
+[[tool.pyrefly.sub-config]]
+matches = "tests/**"
+
+[tool.pyrefly.sub-config.errors]
+implicit-any-parameter = "ignore"
+unannotated-return = "ignore"
 
 [tool.pytest.ini_options]
 # do not run integration test by default, but CI will pick it up

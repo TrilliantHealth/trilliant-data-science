@@ -90,7 +90,7 @@ def test_typename(type: Type, expected_name: str):
         pytest.param(ty.Tuple[int, str], True, id="parameterized Tuple is collection"),
         pytest.param(ty.Tuple[str, ...], True, id="parameterized variadic Tuple is collection"),
         pytest.param(ty.Sequence, True, id="unparameterized Sequence is collection"),
-        pytest.param(ty.Sequence[types.TV], True, id="parameterized Sequence is collection"),  # type: ignore
+        pytest.param(ty.Sequence[types.TV], True, id="parameterized Sequence is collection"),
         pytest.param(ty.Collection, True, id="unparameterized Collection is collection"),
         pytest.param(
             ty.Collection[types.SimpleNewType], True, id="parameterized Collection is collection"
@@ -135,7 +135,7 @@ def test_is_set_type(type: Type, is_set_expected: bool):
         pytest.param(ty.Dict, True, id="unparameterized Dict is mapping"),
         pytest.param(ty.Dict[str, types.RecordType], True, id="parameterized Dict is mapping"),
         pytest.param(ty.Mapping, True, id="unparameterized Mapping is mapping"),
-        pytest.param(ty.Mapping[types.TV, ty.List], True, id="parameterized Mapping is mapping"),  # type: ignore
+        pytest.param(ty.Mapping[types.TV, ty.List], True, id="parameterized Mapping is mapping"),
         pytest.param(ty.MutableMapping, True, id="unparameterized MutableMapping is mapping"),
         pytest.param(ty.MutableMapping[int, str], True, id="parameterized MutableMapping is mapping"),
         pytest.param(ty.OrderedDict, True, id="unparameterized OrderedDict is mapping"),

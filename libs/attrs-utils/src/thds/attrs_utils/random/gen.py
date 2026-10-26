@@ -80,7 +80,8 @@ def gen_variadic_tuple(random_gen, type_: Type[T]) -> Gen[T]:
 
 def gen_optional(random_gen, type_: Type[T]) -> Gen[T]:
     # more specialized that the union case just below
-    return optional.random_optional_gen(random_gen(type_utils.unwrap_optional(type_)))  # type: ignore [return-value]
+    # type: ignore[pyrefly:bad-return]
+    return optional.random_optional_gen(random_gen(type_utils.unwrap_optional(type_)))
 
 
 def gen_union(random_gen, type_: Type[T]) -> Gen[T]:
@@ -105,9 +106,10 @@ def gen_mapping(random_gen, type_: Type[collection.M]) -> Gen[collection.M]:
     cons = (
         partial(_construct_defauldict, collections.defaultdict(v_gen))
         if type_utils.get_origin(type_) is type_utils.get_origin(DefaultDict)
-        else type_utils.concrete_constructor(type_)  # type: ignore [arg-type]
+        else type_utils.concrete_constructor(type_)
     )
-    return collection.random_mapping_gen(cons, repeat_gen(kv_gen))  # type: ignore [arg-type]
+    # type: ignore[pyrefly:bad-return]
+    return collection.random_mapping_gen(cons, repeat_gen(kv_gen))
 
 
 def gen_collection(random_gen, type_: Type[collection.C]) -> Gen[collection.C]:

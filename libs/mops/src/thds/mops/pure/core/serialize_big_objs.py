@@ -23,7 +23,7 @@ class ByIdRegistry(ty.Generic[T, V]):
     """
 
     def __init__(self) -> None:
-        self._objects: ty.Dict[int, T] = WeakValueDictionary()  # type: ignore
+        self._objects: ty.Dict[int, T] = WeakValueDictionary()  # type: ignore[pyrefly:bad-assignment]
         self._values: ty.Dict[int, V] = dict()
 
     def __setitem__(self, obj: T, value: V) -> None:

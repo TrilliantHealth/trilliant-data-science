@@ -21,8 +21,8 @@ _LOG_CONTEXT = {
 def _header_lines(log_context: dict, extra: dict) -> list:
     """What a result blob starts with, from the same properties `return_value` writes."""
     channel = remote.ResultExcWithMetadataChannel(
-        fs=None,  # type: ignore[arg-type]
-        dumper=None,  # type: ignore[arg-type]
+        fs=None,  # type: ignore[pyrefly:bad-argument-type]
+        dumper=None,  # type: ignore[pyrefly:bad-argument-type]
         call_id="memo://unit/header",
         invocation_metadata=metadata.InvocationMetadata(
             invoked_by="sam@laptop",

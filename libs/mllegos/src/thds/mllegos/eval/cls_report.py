@@ -128,7 +128,7 @@ def multiclass_performance_viz(
         assert inferred_type in COLOR_BY_TYPES, f"color_by dtype must be one of {COLOR_BY_TYPES}"
         # convert to strings because pyecharts is picky
         class_stats[COLOR_BY_COLUMN] = class_stats[color_by].astype(str)
-        color_cats: list[str] = class_stats[COLOR_BY_COLUMN].unique().tolist()  # type: ignore
+        color_cats: list[str] = class_stats[COLOR_BY_COLUMN].unique().tolist()
         color_cats.sort()
     else:
         color_cats = []

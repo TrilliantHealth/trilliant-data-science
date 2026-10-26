@@ -113,8 +113,8 @@ def test_etag_cache_content_sensitive(tmp_path: Path):
     add_to_etag_cache(file2, etag2)
 
     # Each file should get its own cached etag
-    assert hash_file_fake_etag(file1, etag1).bytes == etag1  # type: ignore
-    assert hash_file_fake_etag(file2, etag2).bytes == etag2  # type: ignore
+    assert hash_file_fake_etag(file1, etag1).bytes == etag1  # type: ignore[pyrefly:missing-attribute]
+    assert hash_file_fake_etag(file2, etag2).bytes == etag2  # type: ignore[pyrefly:missing-attribute]
     assert hash_file_fake_etag(file1, etag2) is None
 
 
@@ -183,7 +183,7 @@ def test_extract_hashes_from_props_skips_etag_without_name():
     """When props.name is falsy, etag should not be used at all."""
     for name in ("", None):
         props = FakeFileProperties(
-            name,  # type: ignore[arg-type]
+            name,  # type: ignore[pyrefly:bad-argument-type]
             metadata=dict(),
             content_settings=FakeContentSettings(content_md5=None),
             etag='"0x8DE4EC15EF69095"',

@@ -96,5 +96,5 @@ def test_loader_rows_equal(test_case_with_attrs_module: ReferenceDataTestCase):
         loader: AttrsParquetLoader = test_case.attrs_loader_for(table.name)
         cls: Type = test_case.attrs_class_for(table.name)
         rows_expected = [cls(*tup) for tup in tuples]
-        rows: List[Any] = list(loader())  # type: ignore
+        rows: List[Any] = list(loader())
         assert rows == rows_expected

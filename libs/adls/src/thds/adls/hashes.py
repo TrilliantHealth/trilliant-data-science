@@ -36,7 +36,7 @@ def register_hashes():
     source.set_file_autohash(PREFERRED_ALGOS[0], _xxhash_hasher)
 
     try:
-        from blake3 import blake3  # type: ignore[import-not-found]
+        from blake3 import blake3  # type: ignore[pyrefly:missing-import]
 
         hashing.add_named_hash("blake3", lambda _: blake3())
     except ModuleNotFoundError:

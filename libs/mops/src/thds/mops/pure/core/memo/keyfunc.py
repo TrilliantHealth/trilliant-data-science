@@ -35,7 +35,7 @@ def args_only(keyfunc: ty.Union[ArgsOnlyKeyfunc, Keyfunc]) -> Keyfunc:
     def funcpassthrough_keyfunc(
         c: ty.Callable, args: Args, kwargs: Kwargs
     ) -> ty.Tuple[ty.Callable, Args, Kwargs]:
-        return c, *keyfunc(*args, **kwargs)  # type: ignore
+        return c, *keyfunc(*args, **kwargs)  # type: ignore[pyrefly:bad-return]
 
     return funcpassthrough_keyfunc
 

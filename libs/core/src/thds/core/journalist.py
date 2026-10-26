@@ -24,9 +24,9 @@ from thds.core import log
 _logger = log.getLogger(__name__)
 
 try:
-    import psutil  # type: ignore[import-untyped]
+    import psutil  # type: ignore[pyrefly:missing-import]
 except ImportError:
-    psutil = None  # type: ignore[assignment]
+    psutil = None
 
 
 _SAMPLER_THREAD_NAME = "thds-core-journalist-sampler"

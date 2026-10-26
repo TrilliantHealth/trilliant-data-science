@@ -251,7 +251,8 @@ class DataFrameDiff:
             columns=ColumnDiffSummary._fields,
         )
         df.index.name = "column"
-        percent_df = df.rename(columns="{}_percent".format, copy=False).applymap(  # type: ignore[operator]
+        # type: ignore[pyrefly:not-callable]
+        percent_df = df.rename(columns="{}_percent".format, copy=False).applymap(
             lambda v: _percent(v, len(self.common_keys))
         )
         df = pd.concat([df, percent_df], axis=1)
@@ -264,7 +265,7 @@ class DataFrameDiff:
         is_null = after.isna()
         filled = was_null & ~is_null
         nulled = ~was_null & is_null
-        updated = (before != after).fillna(False) & ~is_null & ~was_null  # type: ignore[attr-defined]
+        updated = (before != after).fillna(False) & ~is_null & ~was_null
         changed_cols_ = updated.any(axis=0) | nulled.any(axis=0) | filled.any(axis=0)
         changed_cols = changed_cols_.index[changed_cols_].tolist()
         if not changed_cols:

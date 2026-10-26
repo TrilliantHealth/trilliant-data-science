@@ -49,7 +49,8 @@ def iterator_sender(gen: ty.Generator[ty.Any, T, R], iterator: ty.Iterable[T]) -
     for how a simple `gen.close()` will do this in 3.13.
     """
 
-    gen_wrapper: return_wrapper[ty.Generator, R] = return_wrapper(gen)  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-assignment, pyrefly:bad-specialization]
+    gen_wrapper: return_wrapper[ty.Generator, R] = return_wrapper(gen)
     with gen_wrapper:
         for i in iterator:
             gen.send(i)

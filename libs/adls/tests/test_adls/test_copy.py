@@ -46,7 +46,7 @@ def _props(md5: ty.Optional[bytes] = None, etag: str = "") -> BlobProperties:
     props = BlobProperties()
     props.name = "path"
     props.etag = etag
-    props.content_settings.content_md5 = md5  # type: ignore[assignment]
+    props.content_settings.content_md5 = md5  # type: ignore[pyrefly:bad-assignment]
     return props
 
 
@@ -165,7 +165,8 @@ def test_integration_copy_file_silent_overwrite(
     )
 
     assert copy_request2
-    assert copy_request2["last_modified"] >= copy_request1["last_modified"]  # type: ignore[operator]
+    # type: ignore[pyrefly:unsupported-operation]
+    assert copy_request2["last_modified"] >= copy_request1["last_modified"]
 
     src_blob_props = file_properties.get_blob_properties(src)
     dest_blob_props = file_properties.get_blob_properties(dest)
@@ -186,7 +187,8 @@ def test_integration_copy_file_warn_on_overwrite(
         assert "will be overwritten" in caplog.text
 
     assert copy_request2
-    assert copy_request2["last_modified"] >= copy_request1["last_modified"]  # type: ignore[operator]
+    # type: ignore[pyrefly:unsupported-operation]
+    assert copy_request2["last_modified"] >= copy_request1["last_modified"]
 
     src_blob_props = file_properties.get_blob_properties(src)
     dest_blob_props = file_properties.get_blob_properties(dest)

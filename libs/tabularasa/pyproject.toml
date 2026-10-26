@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.18"
+version = "0.14.19"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -50,8 +50,6 @@ Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 [dependency-groups]
 dev = [
   # type checks
-  "mypy~=1.11.0",
-  "mypy-extensions~=1.0",
   "pandas-stubs",
   "types-pyyaml",
   "types-setuptools",
@@ -101,31 +99,32 @@ source = ["thds.tabularasa"]
 [tool.coverage.report]
 show_missing = true
 
-[tool.mypy]
-mypy_path = "src"
-namespace_packages = true
-explicit_package_bases = true
-exclude = '''(?x)(
-    build/
-    | dist/
-    | \S+\.egg-info/
-)'''
-check_untyped_defs = true
-plugins = ["pydantic.mypy"]
-
-[[tool.mypy.overrides]]
-module = [
-  "azure",
-  "bourbaki.*",
-  "google",
-  "networkx",
-  "pyarrow.*",
-  "pygraphviz",
-  "pysqlite3",
-  "ruamel.*",
-  "typing_inspect",
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+python-interpreter-path = ".venv/bin/python"
+search-path = ["src", "."]
+project-excludes = [
+    "**/build/",
+    "**/dist/",
+    "**/*.egg-info/",
 ]
-ignore_missing_imports = true
+preset = "legacy"
+check-unannotated-defs = true
+type-ignore-unknown-tag-behavior = "no-effect"
+infer-return-types = "never"
+ignore-missing-imports = [
+    "azure",
+    "bourbaki.*",
+    "google",
+    "networkx",
+    "pyarrow.*",
+    "pygraphviz",
+    "pysqlite3",
+    "ruamel.*",
+    "typing_inspect",
+]
+baseline = ".config/pyrefly-baseline.json"
+baseline-matching-mode = "column-ordered"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

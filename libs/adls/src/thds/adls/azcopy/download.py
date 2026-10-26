@@ -99,7 +99,7 @@ def sync_fastpath(
     if hasattr(download_request, "writer"):
         writer_cm = nullcontext(download_request.writer)
     else:
-        writer_cm = open(download_request.temp_path, "wb")  # type: ignore[assignment]
+        writer_cm = open(download_request.temp_path, "wb")
     with writer_cm as writer:
         dl_file_client.download_file(
             max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
@@ -156,9 +156,9 @@ async def async_fastpath(
     if hasattr(download_request, "writer"):
         writer_cm = nullcontext(download_request.writer)
     else:
-        writer_cm = open(download_request.temp_path, "wb")  # type: ignore[assignment]
+        writer_cm = open(download_request.temp_path, "wb")
     with writer_cm as writer:
-        reader = await dl_file_client.download_file(  # type: ignore[misc]
+        reader = await dl_file_client.download_file(
             # TODO - check above type ignore
             max_concurrency=conf.DOWNLOAD_FILE_MAX_CONCURRENCY(),
             connection_timeout=conf.CONNECTION_TIMEOUT(),

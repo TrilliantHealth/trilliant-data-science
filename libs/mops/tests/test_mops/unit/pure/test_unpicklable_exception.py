@@ -30,7 +30,7 @@ def _fails_holding_a_closed_buffer() -> None:
 
 @pytest.fixture
 def clear_magic():
-    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()  # type: ignore
+    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()
     yield
 
 

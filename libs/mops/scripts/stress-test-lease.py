@@ -84,7 +84,8 @@ def validate_leasefiles(times_dir: Path):
     times_tuples = []
     for lease_times_file in times_files:
         # get index from end of filename
-        idx = int(re.search(r"\d+$", lease_times_file.stem).group(0))  # type: ignore
+        # type: ignore[pyrefly:missing-attribute]
+        idx = int(re.search(r"\d+$", lease_times_file.stem).group(0))
 
         for line in open(lease_times_file).read().splitlines():
             after_acquire, before_release = line.strip().split(",")

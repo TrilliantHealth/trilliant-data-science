@@ -60,8 +60,8 @@ class StructTable(ty.Generic[T]):
         self.from_item = from_item
         if cache_size:
             # Caching is only applied to `.list` and `.get` as `.matching` returns a consumable iterator
-            self.get = functools.lru_cache(cache_size)(self.get)  # type: ignore
-            self.list = functools.lru_cache(cache_size)(self.list)  # type: ignore
+            self.get = functools.lru_cache(cache_size)(self.get)
+            self.list = functools.lru_cache(cache_size)(self.list)
 
     def matching(self, **where: ty.Any) -> ty.Iterator[T]:
         tbl = self._tbl()

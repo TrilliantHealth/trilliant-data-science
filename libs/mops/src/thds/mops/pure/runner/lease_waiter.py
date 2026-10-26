@@ -54,7 +54,7 @@ def _unpickled(future: "futures.PFuture[ValueAndMetadata[R]]") -> "futures.PFutu
     return future
 
 
-class _AwaitedFuture(concurrent.futures.Future, ty.Generic[R]):  # type: ignore[type-arg]
+class _AwaitedFuture(concurrent.futures.Future, ty.Generic[R]):
     """Yields (value, result_metadata) for a lease-blocked invocation.
 
     MopsFutures cross process boundaries via pickle, and the waiter daemon that would

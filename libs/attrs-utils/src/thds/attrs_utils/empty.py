@@ -71,7 +71,7 @@ def _record_constructor(
             f"Couldn't generate signature for {type_} with new defaults {defaults}; using original signature for documenation: {e}"
         )
         repl_signature = signature
-    f.__signature__ = repl_signature  # type: ignore[attr-defined]
+    f.__signature__ = repl_signature  # type: ignore[pyrefly:missing-attribute]
     # ^ allows tab completion in REPLs
     return f
 

@@ -138,14 +138,15 @@ def test_cache_not_valid(
     cache: ADLSFileSystemCache,
     cache_file_properties_future: MockFileProperties,
 ):
-    assert not cache.is_valid_for(cache_file_properties_future)  # type: ignore
+    # type: ignore[pyrefly:bad-argument-type]
+    assert not cache.is_valid_for(cache_file_properties_future)
 
 
 def test_cache_valid(
     cache: ADLSFileSystemCache,
     cache_file_properties_past: MockFileProperties,
 ):
-    assert cache.is_valid_for(cache_file_properties_past)  # type: ignore
+    assert cache.is_valid_for(cache_file_properties_past)  # type: ignore[pyrefly:bad-argument-type]
 
 
 def test_nicer_errors(caplog):

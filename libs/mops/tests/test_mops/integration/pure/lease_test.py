@@ -37,7 +37,7 @@ def lease_uri() -> ty.Iterator[str]:
 
 
 def test_many_acquirers_but_only_one_gets_it(lease_uri):
-    accum = list()  # type: ignore
+    accum = list()
     threads = [Thread(target=acquire_the_lease, args=(lease_uri, accum)) for _ in range(4)]
     for t in threads:
         t.start()

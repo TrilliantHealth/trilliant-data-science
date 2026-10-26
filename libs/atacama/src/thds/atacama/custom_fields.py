@@ -21,6 +21,7 @@ class Set(ma.fields.List):
         # for the serialized output to be stable/deterministic.
         return [self.inner._serialize(each, attr, obj, **kwargs) for each in sorted(value)]
 
-    def _deserialize(self, value, attr, data, **kwargs) -> ty.Set[ty.Any]:  # type: ignore
+    # type: ignore[pyrefly:bad-override]
+    def _deserialize(self, value, attr, data, **kwargs) -> ty.Set[ty.Any]:
         val = super()._deserialize(value, attr, data, **kwargs)
         return set(val)

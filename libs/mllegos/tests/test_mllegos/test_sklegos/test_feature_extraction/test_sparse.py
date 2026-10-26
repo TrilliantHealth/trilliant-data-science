@@ -37,7 +37,7 @@ def test_to_dense_passes_dense_through_and_rejects_others() -> None:
     series = pd.Series([1, 2])
     assert to_dense(series) is series
     with pytest.raises(TypeError, match="Unsupported type"):
-        to_dense([1, 2])  # type: ignore[arg-type]
+        to_dense([1, 2])
 
 
 # DenseToSparseNamedTransformer

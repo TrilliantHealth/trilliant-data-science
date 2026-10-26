@@ -7,7 +7,8 @@ from thds.mops.pure.adls import blob_store
 
 def _http_error(code: str, status: int = 403) -> HttpResponseError:
     err = HttpResponseError("the service said no")
-    err.error_code = code  # type: ignore[attr-defined]  # set by the storage SDK, not azure-core
+    # type: ignore[pyrefly:missing-attribute]
+    err.error_code = code  # set by the storage SDK, not azure-core
     err.status_code = status
     return err
 

@@ -104,7 +104,7 @@ def upload(
 
     blob_container_client = get_global_blob_container_client(dest_.sa, dest_.container)
     blob_client = blob_container_client.get_blob_client(dest_.path)
-    decision = upload_decision_and_metadata(blob_client.get_blob_properties, src)  # type: ignore [arg-type]
+    decision = upload_decision_and_metadata(blob_client.get_blob_properties, src)
     n_bytes = upload_src_len(src, default=0)
 
     def source_from_meta() -> source.Source:

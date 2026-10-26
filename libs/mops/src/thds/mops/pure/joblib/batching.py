@@ -7,8 +7,8 @@ import unittest.mock
 from collections import defaultdict
 from contextlib import contextmanager
 
-import joblib  # type: ignore
-from joblib.parallel import BatchedCalls  # type: ignore
+import joblib  # type: ignore[pyrefly:missing-import]
+from joblib.parallel import BatchedCalls  # type: ignore[pyrefly:missing-import]
 
 from thds.core.log import getLogger
 
@@ -26,7 +26,7 @@ def dispatch_one_batch(self: ty.Any, iterator: ty.Iterable[ty.Any]) -> bool:
     This is an ugly monkey patch, but it _works_.
     """
     if not hasattr(self, "__patch_stats"):
-        self.__patch_stats = defaultdict(int)  # type: ignore
+        self.__patch_stats = defaultdict(int)
 
     batch_size = self._backend.compute_batch_size()
     with self._lock:

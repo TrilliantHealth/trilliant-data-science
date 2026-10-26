@@ -100,11 +100,12 @@ def of(storage_account: str, container: str, path: str = "") -> AdlsFqn:
 
 def parent(fqn: FR) -> FR:
     if isinstance(fqn, AdlsRoot):
-        return fqn  # type: ignore
+        return fqn
     assert isinstance(fqn, AdlsFqn)
     if "/" not in fqn.path.strip("/"):
-        return AdlsFqn(fqn.sa, fqn.container, "")  # type: ignore
-    return AdlsFqn(fqn.sa, fqn.container, join(*fqn.path.split("/")[:-1]))  # type: ignore
+        return AdlsFqn(fqn.sa, fqn.container, "")  # type: ignore[pyrefly:bad-return]
+    # type: ignore[pyrefly:bad-return]
+    return AdlsFqn(fqn.sa, fqn.container, join(*fqn.path.split("/")[:-1]))
 
 
 def split(fqn: FR) -> Tuple[str, ...]:

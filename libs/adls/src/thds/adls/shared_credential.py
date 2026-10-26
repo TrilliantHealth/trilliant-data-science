@@ -134,7 +134,7 @@ def _SharedCredential() -> TokenCredential:
 
     if platform.system() == "Darwin" and not DISABLE_FAST_CACHED_CREDENTIAL():
         # only try this crazy optimization on our local laptops
-        return FastCachedAzureCliCredential()  # type: ignore
+        return FastCachedAzureCliCredential()
     return ThreadSafeAzureCredential(**get_credential_kwargs())
 
 

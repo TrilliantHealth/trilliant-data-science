@@ -146,13 +146,14 @@ if not logging.getLogger().hasHandlers():
         try:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             # ^ I hate doing IO in module scope, but we've waited until the last possible moment...
-            live_config["handlers"]["file"] = {  # type: ignore
+            live_config["handlers"]["file"] = {  # type: ignore[pyrefly:unsupported-operation]
                 "class": "logging.FileHandler",
                 "formatter": "default",
                 "filename": _LOG_FILEPATH,
                 "delay": True,  # no need to have empty logfiles sitting around
             }
-            live_config["root"]["handlers"].append("file")  # type: ignore
+            # type: ignore[pyrefly:bad-index, pyrefly:missing-attribute]
+            live_config["root"]["handlers"].append("file")
         except Exception as err:
             print(f"Unable to create log directory at '{log_path.parent}' - ERROR: {err}")
 

@@ -38,7 +38,7 @@ def test_common_keys(before_index, after_index, matched):
         if isinstance(raw_index, (tuple, list)):
             idx = pd.MultiIndex.from_tuples([tuple(raw_index)])
         else:
-            idx = [raw_index]  # type: ignore
+            idx = [raw_index]
         return pd.DataFrame(index=idx)
 
     diff = DataFrameDiff(_index(before_index), _index(after_index))

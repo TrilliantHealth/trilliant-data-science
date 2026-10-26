@@ -23,7 +23,8 @@ class Foo:
         @attr.define
         class Baz:
             # mypy doesn't like when you wrap a Literal with a NewType - we abuse that here to prove the concept
-            ReallyAnotherLiteralType = NewType("ReallyAnotherLiteralType", LiteralType)  # type: ignore
+            # type: ignore[pyrefly:invalid-argument]
+            ReallyAnotherLiteralType = NewType("ReallyAnotherLiteralType", LiteralType)
             z = ListType
             lit: ReallyAnotherLiteralType = ReallyAnotherLiteralType(2)
 
@@ -48,12 +49,12 @@ def other_module() -> ModuleType:
     # another module with some repeated/imported types that should have lower precedence for naming
     other_module = ModuleType("other_module")
     # add same type to other module to ensure precedence of the first
-    other_module.OtherListType = ListType  # type: ignore
-    other_module.OtherLiteralType = OtherLiteralType  # type: ignore
+    other_module.OtherListType = ListType  # type: ignore[pyrefly:missing-attribute]
+    other_module.OtherLiteralType = OtherLiteralType  # type: ignore[pyrefly:missing-attribute]
     # add another type with a duplicate name, ensuring it's named as it appears in its module,
     # and not as its __name__ would suggest
     OtherFoo = type("OtherFoo", (), {})
-    other_module.Foo = OtherFoo  # type: ignore
+    other_module.Foo = OtherFoo  # type: ignore[pyrefly:missing-attribute]
     return other_module
 
 

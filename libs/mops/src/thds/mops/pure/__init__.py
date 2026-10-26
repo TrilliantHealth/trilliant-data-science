@@ -36,7 +36,7 @@ def _register_things() -> None:
 
     register_entry_handler(
         pickling.mprunner.RUNNER_NAME,
-        pickling.remote.run_pickled_invocation,  # type: ignore
+        pickling.remote.run_pickled_invocation,  # type: ignore[pyrefly:bad-argument-type]
     )
 
     load_plugin_blobstores()

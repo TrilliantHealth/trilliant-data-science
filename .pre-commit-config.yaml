@@ -58,8 +58,8 @@ repos:
         types: [python]
         entry: uv run flake8 --config .flake8
 
-      - id: project-mypys
-        name: project-mypys
+      - id: project-typechecks
+        name: project-typechecks
         language: system
         verbose: true
         always_run: true

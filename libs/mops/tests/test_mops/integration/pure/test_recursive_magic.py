@@ -24,9 +24,9 @@ _PIPELINE_ID = f"test/recursive-magic/{datetime.utcnow().isoformat()}"
 
 @pytest.fixture
 def clear_magic():
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
     yield
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
 
 
 # Decorated at module scope so we exercise the non-__main__ import-resolution path.

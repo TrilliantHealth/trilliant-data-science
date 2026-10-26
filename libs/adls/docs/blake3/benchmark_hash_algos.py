@@ -9,7 +9,7 @@ import string
 import tempfile
 import timeit
 
-from blake3 import blake3  # type: ignore
+from blake3 import blake3  # type: ignore[pyrefly:missing-import]
 
 
 @contextlib.contextmanager
@@ -36,7 +36,7 @@ def createdummyfiles():
 
 
 def hashchunks(testfile, blk_size):
-    filehash = blake3(max_threads=blake3.AUTO)  # type: ignore
+    filehash = blake3(max_threads=blake3.AUTO)
     with open(testfile, "rb") as f:
         while True:
             read_data = f.read(blk_size)

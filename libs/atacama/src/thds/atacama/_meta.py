@@ -15,4 +15,4 @@ _META_DEFAULTS = dict(ordered=True)
 
 
 def meta(**meta) -> SchemaMeta:
-    return type("Meta", (), {**_META_DEFAULTS, **meta})  # type: ignore
+    return type("Meta", (), {**_META_DEFAULTS, **meta})  # type: ignore[pyrefly:bad-return]

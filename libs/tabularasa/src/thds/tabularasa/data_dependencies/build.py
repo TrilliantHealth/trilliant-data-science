@@ -115,7 +115,7 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
             cls.__name__,
             (cls,),
             namespace,
-        )  # type: ignore
+        )
 
     @property
     def options(self) -> BuildOptions:
@@ -154,7 +154,7 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
             unknown_tables = {t for t in tables if t not in self.schema.tables}
             if unknown_tables:
                 raise KeyError(f"Unknown tables: {','.join(unknown_tables)}")
-            build_kw = dict(table_predicate=lambda table: table.name in tables)  # type: ignore
+            build_kw = dict(table_predicate=lambda table: table.name in tables)
 
         if any(
             table.build_time_installed and not table.transient for table in self.schema.tables.values()
@@ -198,7 +198,7 @@ class ReferenceDataBuildCommand(setuptools.command.build_py.build_py):
                 data_dir=self.options.package_data_dir,
                 transient_data_dir=self.options.transient_data_dir,
                 check_hash=check_hash,
-                **build_kw,  # type: ignore
+                **build_kw,  # type: ignore[pyrefly:bad-argument-type]
             )
             package_data_paths.append(self.options.sqlite_db_path)
 

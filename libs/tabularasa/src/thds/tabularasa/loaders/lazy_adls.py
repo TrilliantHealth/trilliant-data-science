@@ -41,4 +41,4 @@ def lazy_attrs_sqlite_loader_maker(
             mmap_size if mmap_size > -1 else default_mmap_size,
         )
 
-    return make_loader  # type: ignore
+    return make_loader

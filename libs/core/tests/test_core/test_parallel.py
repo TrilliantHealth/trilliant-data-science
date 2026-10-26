@@ -42,7 +42,7 @@ def test_parallel_yield_results(caplog):
 
     results: List[int] = list()
     with pytest.raises(TeensError):
-        for res in yield_results([partial(whatever, i) for i in reversed(range(27))]):  # type: ignore
+        for res in yield_results([partial(whatever, i) for i in reversed(range(27))]):
             results.append(res)
 
     assert sorted(results) == list(range(11))

@@ -51,7 +51,7 @@ def _try_bases(
 def try_bases(msg: str, exc_type: Type[Exception]) -> RecF[Type, Params, U]:
     """Helper to be passed as the `otherwise` of a `TypeRecursion` for handling cases of types which
     inherit from some known type that is not otherwise explicitly registered"""
-    return partial(_try_bases, msg, exc_type)  # type: ignore[return-value]
+    return partial(_try_bases, msg, exc_type)
 
 
 class TypeRecursion(StructuredRecursion[Type, Params, U]):
@@ -81,8 +81,8 @@ class TypeRecursion(StructuredRecursion[Type, Params, U]):
         collection: Optional[RecF[Type, Params, U]] = None,
         tuple: Optional[RecF[Type, Params, U]] = None,
         variadic_tuple: Optional[RecF[Type, Params, U]] = None,
-        newtype: Optional[RecF[Type, Params, U]] = default_newtype,  # type: ignore[assignment]
-        annotated: Optional[RecF[Type, Params, U]] = default_annotated,  # type: ignore[assignment]
+        newtype: Optional[RecF[Type, Params, U]] = default_newtype,
+        annotated: Optional[RecF[Type, Params, U]] = default_annotated,
         typevar: Optional[RecF[Type, Params, U]] = None,
         otherwise: RecF[Type, Params, U],
     ):
@@ -166,5 +166,5 @@ class ConstructorFactory(TypeRecursion[Params, Constructor]):
     you do so, then the type checker _can_ detect common errors downstream of any given constructor creation.
     """
 
-    def __call__(self, type_: Type[T], *args: Params.args, **kwargs: Params.kwargs) -> Constructor[T]:  # type: ignore[override]
+    def __call__(self, type_: Type[T], *args: Params.args, **kwargs: Params.kwargs) -> Constructor[T]:
         return super().__call__(type_)

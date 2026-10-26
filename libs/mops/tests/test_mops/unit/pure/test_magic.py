@@ -8,7 +8,7 @@ from thds.mops.pure.runner.simple_shims import samethread_shim, subprocess_shim
 
 @pytest.fixture
 def clear_magic():
-    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()  # type: ignore
+    _magic.api._MAGIC_CONFIG = _magic.sauce.new_config()
     yield
 
 
@@ -18,11 +18,11 @@ def test_magic_shim_configuration(clear_magic):
     def func1():
         pass
 
-    assert samethread_shim is func1._shimbuilder(func1, tuple(), dict())  # type: ignore
+    assert samethread_shim is func1._shimbuilder(func1, tuple(), dict())
 
     # Test shim override
     magic.shim("subprocess", func1)
-    assert subprocess_shim is func1._shimbuilder(func1, tuple(), dict())  # type: ignore
+    assert subprocess_shim is func1._shimbuilder(func1, tuple(), dict())
 
     # Test turning off mops
     magic.shim("off", func1)
@@ -96,7 +96,7 @@ def test_magic_decorator_allows_all_config(clear_magic):
 
     assert func1._get_blob_root() == "file://~/.mops"
     assert func1._pipeline_id == pipeline_id
-    assert subprocess_shim is func1._shimbuilder(func1, tuple(), dict())  # type: ignore
+    assert subprocess_shim is func1._shimbuilder(func1, tuple(), dict())
 
 
 def test_pipeline_id_from_docstring(clear_magic):

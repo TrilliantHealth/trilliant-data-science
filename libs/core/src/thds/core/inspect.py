@@ -74,7 +74,7 @@ def get_argument(arg_name: str, bound_arguments: inspect.BoundArguments) -> ty.A
 def yield_caller_modules_and_frames(*skip: str) -> ty.Iterator[tuple[ModuleType, inspect.FrameInfo]]:
     """Yields caller modules and their frame info, skipping any modules in the skip list."""
     stack = inspect.stack()
-    skip = set(skip) | {__name__}  # type: ignore
+    skip = set(skip) | {__name__}  # type: ignore[pyrefly:bad-assignment]
     for frame_info in stack[1:]:  # don't bother with the current frame, obviously
         module = inspect.getmodule(frame_info.frame)
         if module:

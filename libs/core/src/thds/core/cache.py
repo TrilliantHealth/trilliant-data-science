@@ -139,8 +139,8 @@ def _locking_factory(
                 keys_to_func_locks.clear()
                 hits = misses = 0
 
-        wrapper.cache_info = cache_info  # type: ignore[attr-defined]
-        wrapper.clear_cache = clear_cache  # type: ignore[attr-defined]
+        wrapper.cache_info = cache_info  # type: ignore[pyrefly:missing-attribute]
+        wrapper.clear_cache = clear_cache  # type: ignore[pyrefly:missing-attribute]
 
         return wrapper
 

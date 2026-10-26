@@ -48,16 +48,16 @@ def test_assigning_a_counter_replaces_it():
     original = counts.LAUNCH_COUNT
     replacement = counts._counter("a-different-counter")
     try:
-        counts.LAUNCH_COUNT = replacement  # type: ignore[misc]
+        counts.LAUNCH_COUNT = replacement  # type: ignore[pyrefly:missing-attribute]
 
         assert counts.LAUNCH_COUNT is replacement
     finally:
-        counts.LAUNCH_COUNT = original  # type: ignore[misc]
+        counts.LAUNCH_COUNT = original  # type: ignore[pyrefly:missing-attribute]
 
 
 def test_an_unknown_name_still_raises():
     try:
-        counts.NOT_A_COUNTER  # type: ignore[attr-defined]
+        counts.NOT_A_COUNTER
     except AttributeError:
         return
 

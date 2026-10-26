@@ -427,13 +427,13 @@ async def async_download_or_use_verified(
         co, co_request, dl_file_client = _prep_download_coroutine(
             fs_client, remote_key, local_path, expected_hash, cache
         )
-        await _async_dl_scope.async_enter(dl_file_client)  # type: ignore[arg-type]
+        await _async_dl_scope.async_enter(dl_file_client)  # type: ignore[pyrefly:bad-argument-type]
         # on __aexit__, will release the connection to the pool
         while True:
             if co_request == _IoRequest.FILE_PROPERTIES:
                 if not file_properties:
                     # only fetch these if they haven't already been requested
-                    file_properties = await dl_file_client.get_file_properties()  # type: ignore[misc]
+                    file_properties = await dl_file_client.get_file_properties()
                     # TODO - check above type ignore
                 co_request = co.send(file_properties)
             elif isinstance(co_request, azcopy.download.DownloadRequest):
@@ -455,7 +455,7 @@ async def async_download_or_use_verified(
             try:
                 logger.info(f"Setting missing Hash for {remote_key}")
                 assert file_properties
-                await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))  # type: ignore[misc]
+                await dl_file_client.set_metadata(meta, **etag.match_etag(file_properties))
                 # TODO - check above type ignore
             except (HttpResponseError, ResourceModifiedError) as ex:
                 _log_nonfatal_hash_error_exc(ex, dl_file_client.url)

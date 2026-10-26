@@ -10,7 +10,7 @@ def test_prod_env_via_envvar():
 
 def test_default_env():
     assert active_env() == "dev"
-    assert active_env("foobar") == "foobar"  # type: ignore
+    assert active_env("foobar") == "foobar"  # type: ignore[pyrefly:bad-argument-type]
 
 
 def test_set_active_env_then_get():

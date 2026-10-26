@@ -6,10 +6,10 @@ from typing import Optional, Union
 from cachetools import keys
 
 try:
-    from cachetools.func import _CacheInfo  # type: ignore
+    from cachetools.func import _CacheInfo  # type: ignore[pyrefly:missing-module-attribute]
 except ImportError:
     # this moved between 5.2.1 and 5.3.
-    from cachetools import _CacheInfo  # type: ignore
+    from cachetools import _CacheInfo  # type: ignore[pyrefly:missing-module-attribute]
 
 
 F = ty.TypeVar("F", bound=ty.Callable)
@@ -30,7 +30,8 @@ def locked_cached(
         hits = misses = 0
         _lock = lock or RLock()
 
-        def wrapper(*args, **kwargs):  # type: ignore
+        # type: ignore[pyrefly:implicit-any-parameter, pyrefly:unannotated-return]
+        def wrapper(*args, **kwargs):
             nonlocal hits, misses
             k = key(*args, **kwargs)
 
@@ -69,9 +70,10 @@ def locked_cached(
                 finally:
                     hits = misses = 0
 
-        wrapper.cache_info = cache_info  # type: ignore
-        wrapper.cache_clear = cache_clear  # type: ignore
-        wrapper.cache_parameters = lambda: {"maxsize": maxsize, "typed": typed}  # type: ignore
+        wrapper.cache_info = cache_info  # type: ignore[pyrefly:missing-attribute]
+        wrapper.cache_clear = cache_clear  # type: ignore[pyrefly:missing-attribute]
+        # type: ignore[pyrefly:missing-attribute]
+        wrapper.cache_parameters = lambda: {"maxsize": maxsize, "typed": typed}
         functools.update_wrapper(wrapper, func)
         return ty.cast(F, wrapper)
 

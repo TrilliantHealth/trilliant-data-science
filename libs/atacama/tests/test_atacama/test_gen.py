@@ -58,17 +58,19 @@ def test_nested():
     )
     quux = foobar_schema_cls().fields["quux"]
     assert type(quux) is ma.fields.Nested
-    quux_s = ty.cast(ma.Schema, quux.nested())  # type: ignore
+    quux_s = ty.cast(ma.Schema, quux.nested())  # type: ignore[pyrefly:not-callable]
     assert {"created_at", "data", "updated_at"} == set(quux_s.fields.keys())
     with pytest.raises(ma.validate.ValidationError):
-        quux_s.fields["created_at"].validate("")  # type: ignore
-    assert not quux_s.fields["data"].validate  # type: ignore
+        quux_s.fields["created_at"].validate("")  # type: ignore[pyrefly:not-callable]
+    assert not quux_s.fields["data"].validate
     with pytest.raises(ma.validate.ValidationError):
-        quux_s.fields["updated_at"].validate(datetime(2020, 3, 14, 3, 3, 3))  # type: ignore
-    assert quux_s.fields["updated_at"].validate(datetime(2020, 3, 15, 3, 3, 3))  # type: ignore
+        # type: ignore[pyrefly:not-callable]
+        quux_s.fields["updated_at"].validate(datetime(2020, 3, 14, 3, 3, 3))
+    # type: ignore[pyrefly:not-callable]
+    assert quux_s.fields["updated_at"].validate(datetime(2020, 3, 15, 3, 3, 3))
 
     with pytest.raises(ma.validate.ValidationError):
-        foobar_schema_cls().fields["results_size"].validate(0)  # type: ignore
+        foobar_schema_cls().fields["results_size"].validate(0)  # type: ignore[pyrefly:not-callable]
 
     now = datetime.utcnow()
     now_s = now.isoformat()

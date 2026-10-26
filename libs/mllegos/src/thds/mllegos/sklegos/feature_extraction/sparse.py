@@ -25,7 +25,7 @@ def to_sparse(X: AnyArray) -> sparse.csr_matrix:
 def to_dense(X: AnyArray | pd.DataFrame) -> np.ndarray | pd.Series | pd.DataFrame:
     """Return a dense equivalent of `X`; dense input passes through unchanged."""
     if isinstance(X, sparse.spmatrix):
-        return X.toarray()  # type: ignore[attr-defined]
+        return X.toarray()
     if isinstance(X, (np.ndarray, pd.Series, pd.DataFrame)):
         return X
     raise TypeError(f"Unsupported type passed to to_dense: {type(X)}")

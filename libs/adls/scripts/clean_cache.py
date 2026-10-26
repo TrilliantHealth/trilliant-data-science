@@ -63,8 +63,8 @@ def main():
     with Pool(40) as pool:
         failures = pool.map(_test_and_clean, paths_that_are_fqns)
 
-    for exc, path in filter(None, failures):  # type: ignore
-        print(f"Failed to delete {path} b/c of {exc}")  # type: ignore
+    for exc, path in filter(None, failures):
+        print(f"Failed to delete {path} b/c of {exc}")
 
     for root, dirs, _files in os.walk(args.root, topdown=False):
         for name in dirs:

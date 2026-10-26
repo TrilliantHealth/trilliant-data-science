@@ -130,7 +130,7 @@ def test_format_name_hive() -> None:
 
 def test_format_name_unsupported() -> None:
     with pytest.raises(ValueError):
-        meta.format_name(BRANCH_NAME, format="unsupported")  # type: ignore
+        meta.format_name(BRANCH_NAME, format="unsupported")  # type: ignore[pyrefly:bad-argument-type]
 
 
 def test_get_user_from_envvar(caplog) -> None:

@@ -255,7 +255,7 @@ class MatchesRegex(StrConstraint):
 
             def check_fn(s: pd.Series):
                 return s.str.fullmatch(
-                    re.compile(self.matches.pattern),  # type: ignore[arg-type]
+                    re.compile(self.matches.pattern),  # type: ignore[pyrefly:bad-argument-type]
                     case=self.case_sensitive,
                     na=True,
                 )
@@ -264,7 +264,7 @@ class MatchesRegex(StrConstraint):
 
             def check_fn(s: pd.Series):
                 return s.str.match(
-                    re.compile(self.matches.pattern),  # type: ignore[arg-type]
+                    re.compile(self.matches.pattern),  # type: ignore[pyrefly:bad-argument-type]
                     case=self.case_sensitive,
                     na=True,
                 )

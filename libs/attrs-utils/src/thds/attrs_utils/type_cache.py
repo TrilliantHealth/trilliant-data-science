@@ -54,7 +54,7 @@ class TypeCache(Generic[T]):
         for module_name, m in modules.items():
             ms: Collection[ModuleType]
             ms = [m] if isinstance(m, ModuleType) else m
-            for module in ms:  # type: ignore
+            for module in ms:
                 names = {
                     id(obj): name
                     for name, obj in object_names_recursive(module, cache=set(), name=module_name)

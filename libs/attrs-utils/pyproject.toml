@@ -26,8 +26,6 @@ dev = [
     "cattrs>=22.2.0",
     "docstring-parser",
     "fastjsonschema",
-    "mypy~=1.11.0",
-    "mypy-extensions~=1.0",
     "pytest~=7.2",
     "pytest-cov~=4.0",
     "pytest-mock~=3.10",
@@ -53,27 +51,22 @@ source = ["thds.attrs_utils"]
 [tool.coverage.report]
 show_missing = true
 
-[tool.mypy]
-mypy_path = "src"
-namespace_packages = true
-explicit_package_bases = true
-exclude = '''(?x)(
-    build/
-    | dist/
-    | \S+\.egg-info/
-)'''
-check_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = [
-    "fastjsonschema",
-    "typing_inspect",
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+python-interpreter-path = ".venv/bin/python"
+search-path = ["src", "."]
+project-excludes = [
+    "**/build/",
+    "**/dist/",
+    "**/*.egg-info/",
 ]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disable_error_code = "valid-type"
+preset = "legacy"
+check-unannotated-defs = true
+type-ignore-unknown-tag-behavior = "no-effect"
+infer-return-types = "never"
+ignore-missing-imports = ["fastjsonschema", "typing_inspect"]
+baseline = ".config/pyrefly-baseline.json"
+baseline-matching-mode = "column-ordered"
 
 [tool.pytest.ini_options]
 # do not run integration test by default, but CI will pick it up

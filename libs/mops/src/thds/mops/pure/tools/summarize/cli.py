@@ -94,7 +94,8 @@ def _process_log_file(log_file: Path) -> Dict[str, FunctionSummary]:
         # new metadata stuff below:
         def append_if_exists(key: str) -> None:
             if key in log_entry:
-                summary[key].append(log_entry[key])  # type: ignore
+                # type: ignore[pyrefly:bad-argument-type, pyrefly:bad-typed-dict-key]
+                summary[key].append(log_entry[key])
 
         for key in (
             "invoked_by",
@@ -141,7 +142,7 @@ def _combine_summaries(
             "total_runtime_minutes",
             "remote_runtime_minutes",
         ):
-            acc[function_name][key].extend(data[key])  # type: ignore
+            acc[function_name][key].extend(data[key])  # type: ignore[pyrefly:bad-argument-type]
 
         acc[function_name]["extras"].extend(data["extras"])
 
@@ -220,7 +221,7 @@ def _format_summary(summary: Dict[str, FunctionSummary], sort_by: SortOrder, uri
             )
 
         def describe(fs: FunctionSummary, key: str) -> str:
-            numlist: ty.List[float] = fs[key]  # type: ignore
+            numlist: ty.List[float] = fs[key]  # type: ignore[pyrefly:bad-typed-dict-key]
             if not numlist:
                 return ""
 

@@ -1,0 +1,40 @@
+{
+  "min_severity": "error",
+  "errors": [
+    {
+      "column": 15,
+      "path": "src/thds/adls/cached.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `FunctionType` has no attribute `upload`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "src/thds/adls/download.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Hash | None` is not assignable to parameter `hash` with type `Hash` in function `_FileResult.__new__`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "src/thds/adls/download.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Hash | None` is not assignable to parameter `hash` with type `Hash` in function `_FileResult.__new__`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "src/thds/adls/download.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Hash | None` is not assignable to parameter `hash` with type `Hash` in function `_FileResult.__new__`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "src/thds/adls/file_lock.py",
+      "name": "bad-return",
+      "concise_description": "Returned type `BaseFileLock` is not assignable to declared return type `SoftFileLock`",
+      "severity": "error"
+    }
+  ]
+}

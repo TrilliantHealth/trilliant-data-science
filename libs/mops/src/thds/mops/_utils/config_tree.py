@@ -17,7 +17,7 @@ def _get_first_external_module(ignore_packages: ty.Collection[str] = IGNORED_PAC
     if not frame:
         return ""
 
-    while frame := frame.f_back:  # type: ignore
+    while frame := frame.f_back:
         module_name = frame.f_globals["__name__"]
         is_ignored = False
         for ignore_package in ignore_packages:

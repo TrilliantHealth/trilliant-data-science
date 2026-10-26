@@ -55,7 +55,7 @@ def lookup_token(
 
     Intended for use with functools.partial binding of the leading args.
     """
-    if pd.isna(value):  # type: ignore[arg-type]
+    if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return unknown_value if null_value is None else null_value
     return encoding.get(value, unknown_value)
 
@@ -73,7 +73,7 @@ def lookup_token_normalized(
 
     Intended for use with functools.partial binding of the leading args.
     """
-    if pd.isna(value):  # type: ignore[arg-type]
+    if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return unknown_value if null_value is None else null_value
     if normalizer is not None:
         normalized = normalizer(value)

@@ -62,8 +62,8 @@ def _module_name():
     # this takes ~200 nanoseconds to run. that's fast enough that
     # doing the extra lookup is worth it for being more user-friendly.
     frame = inspect.currentframe()
-    frame = frame.f_back.f_back.f_back  # type: ignore
-    return frame.f_globals["__name__"]  # type: ignore
+    frame = frame.f_back.f_back.f_back  # type: ignore[pyrefly:missing-attribute]
+    return frame.f_globals["__name__"]
 
 
 def _fullname(name: str) -> str:
@@ -90,7 +90,7 @@ def _type_parser(default: T) -> ty.Callable[[ty.Any], T]:
             # non-empty string is truthy, so `bool` is a truthiness test rather than a
             # parser, and `FOO=false` would resolve True. `tobool` reads the word.
             return ty.cast(ty.Callable[[ty.Any], T], tobool)
-        if default == default_type(default):  # type: ignore
+        if default == default_type(default):
             # if this succeeds and doesn't raise, then the type is self-parsing.
             # in other words, type(4)(4) == 4, type('foobar')('foobar') == 'foobar'
             return default_type

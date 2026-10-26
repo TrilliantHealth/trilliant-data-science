@@ -37,7 +37,7 @@ class PickleOnlyAttrs:
 
     def __getstate__(self) -> dict[str, ty.Any]:
         cls = type(self)
-        fields = _field_names(cls)  # type: ignore[arg-type]
+        fields = _field_names(cls)
         return {f: getattr(self, f) for f in fields}
 
     def __setstate__(self, state: ty.Mapping[str, ty.Any]) -> None:

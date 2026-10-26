@@ -62,7 +62,7 @@ def gen_blob_sas_token(
         fqn.sa,
         fqn.container,
         fqn.path,
-        account_key=account_key,  # type: ignore[arg-type]
+        account_key=account_key,  # type: ignore[pyrefly:bad-argument-type]
         # the Azure SDK has too restrictive a type here
         permission=permissions,
         expiry=expiry_datetime,

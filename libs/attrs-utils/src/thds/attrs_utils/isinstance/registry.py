@@ -8,6 +8,4 @@ def true(value: Any) -> bool:
     return True
 
 
-ISINSTANCE_REGISTRY: Registry[Type, Check] = Registry(
-    {Any: true, object: true}  # type: ignore [dict-item]
-)
+ISINSTANCE_REGISTRY: Registry[Type, Check] = Registry({Any: true, object: true})

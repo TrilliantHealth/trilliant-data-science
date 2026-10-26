@@ -7,7 +7,7 @@ import typing as ty
 from functools import partial
 
 # so we can pickle and re-raise exceptions with remote tracebacks
-from tblib import pickling_support  # type: ignore
+from tblib import pickling_support
 
 from thds.core import hashing, inspect, log, source
 
@@ -115,7 +115,8 @@ def make_read_header_and_object(
         if not uri_bytes:
             raise ValueError(f"{uri} exists but is empty - something is very wrong.")
         header, first_pickle = read_partial_pickle(uri_bytes)
-        return (xf_header or (lambda h: h))(header), _unpickle_with_callable(first_pickle)  # type: ignore
+        # type: ignore[pyrefly:bad-return]
+        return (xf_header or (lambda h: h))(header), _unpickle_with_callable(first_pickle)
 
     return read_object
 
@@ -206,7 +207,7 @@ class NestedFunctionWithLogicKeyPickler:
         if not function_logic_key:
             return None
 
-        return UnpickleFunctionWithLogicKey(  # type: ignore
+        return UnpickleFunctionWithLogicKey(
             # we must then wrap the function itself so that this does not cause infinite recursion.
             pickle.dumps(maybe_function_with_logic_key, protocol=_PICKLE_PROTOCOL),
             function_logic_key,

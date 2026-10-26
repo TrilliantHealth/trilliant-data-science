@@ -70,7 +70,7 @@ class PicklableFunction:
         if self.f is None:
             logger.debug(f"Dynamically importing function {str(self)}")
             if self.fmod == "__main__":
-                self.f = get_main_module_function(self.fname)  # type: ignore
+                self.f = get_main_module_function(self.fname)
             else:
                 mod = importlib.import_module(self.fmod)
                 self.f = getattr(mod, self.fname)

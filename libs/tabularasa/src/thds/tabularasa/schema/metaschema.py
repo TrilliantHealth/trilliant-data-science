@@ -250,7 +250,7 @@ class ArrayType(_RawArrayType):
 
     @property
     def python(self) -> Type[List]:
-        return List[self.values.python]  # type: ignore
+        return List[self.values.python]
 
     @property
     def parquet(self) -> pyarrow.DataType:
@@ -281,7 +281,7 @@ class MappingType(_RawMappingType):
 
     @property
     def python(self) -> Type[Dict]:
-        return Dict[self.keys.python, self.values.python]  # type: ignore
+        return Dict[self.keys.python, self.values.python]
 
     @property
     def parquet(self) -> pyarrow.DataType:
@@ -589,7 +589,7 @@ class Column(_RawColumn):
 
     @property
     def python(self) -> Type:
-        return Optional[self.type.python] if self.nullable else self.type.python  # type: ignore
+        return Optional[self.type.python] if self.nullable else self.type.python
 
     def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False) -> str:
         # column type literals are always within the body of a record class def, i.e. not a custom type
@@ -713,7 +713,7 @@ class Table(_RawTable):
     @property
     def pandera_schema(self) -> pa.DataFrameSchema:
         schema = render_pandera_schema(self, as_str=False)
-        return schema  # type: ignore
+        return schema  # type: ignore[pyrefly:bad-return]
 
     @property
     def graph_ref(self) -> ReferenceDataRef:
@@ -755,7 +755,7 @@ class _MultiIndexSchemaProxy(NamedTuple):
 
 class _DataFrameSchemaProxy(NamedTuple):
     columns: Dict[Identifier, _ColumnSchemaProxy]
-    index: Optional[Union[_IndexSchemaProxy, _MultiIndexSchemaProxy]]  # type: ignore
+    index: Optional[Union[_IndexSchemaProxy, _MultiIndexSchemaProxy]]
     checks: List[str]
     coerce: bool
     strict: bool
@@ -787,7 +787,7 @@ def render_pandera_schema(
             extra_kw = dict(name=column.snake_case_name)
         else:
             constructor = _ColumnSchemaProxy if as_str else pa.Column
-            exprlist = column_defs  # type: ignore
+            exprlist = column_defs
             extra_kw = {}
 
         # always enforce that indexes are unique since they derive from primary key declarations

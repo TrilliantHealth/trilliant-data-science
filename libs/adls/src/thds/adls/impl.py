@@ -58,7 +58,7 @@ def async_run(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        return asyncio.run(func(*args, **kwargs))  # type: ignore
+        return asyncio.run(func(*args, **kwargs))  # type: ignore[pyrefly:bad-argument-type]
 
     return wrapper
 
@@ -706,9 +706,9 @@ class ADLSFileSystem:
         """Async batch generator"""
         # TODO - look at type ignores here
         batch_size = size if size is not None else self.default_batch_size
-        async with stream.chunks(it, batch_size).stream() as streamer:  # type: ignore[arg-type,var-annotated]
+        async with stream.chunks(it, batch_size).stream() as streamer:
             async for chunk in streamer:
-                yield chunk  # type: ignore[misc]
+                yield chunk
 
     def fetch_files(self, remote_paths: Union[Iterable[str], Mapping[str, Union[Path, str]]]):
         return self._run(self._fetch_files, remote_paths)

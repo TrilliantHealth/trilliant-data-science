@@ -107,18 +107,19 @@ else:
     def _yaml():
         import ruamel.yaml.representer
 
-        ruamel.yaml.representer.RoundTripRepresenter.ignore_aliases = lambda *args: True  # type: ignore[method-assign]
+        # type: ignore[pyrefly:bad-assignment]
+        ruamel.yaml.representer.RoundTripRepresenter.ignore_aliases = lambda *args: True
 
         yaml = YAML()
-        yaml.preserve_quotes = True  # type: ignore[assignment]
-        yaml.width = 100  # type: ignore[assignment]
+        yaml.preserve_quotes = True
+        yaml.width = 100
         yaml.indent(mapping=2, sequence=4, offset=2)
         return yaml
 
     def load_yaml(stream):
         return _yaml().load(stream)
 
-    def dump_yaml(data, stream):  # type: ignore
+    def dump_yaml(data, stream):
         _yaml().dump(data, stream)
 
 

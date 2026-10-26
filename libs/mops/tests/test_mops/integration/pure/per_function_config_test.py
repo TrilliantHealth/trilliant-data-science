@@ -47,7 +47,7 @@ def test_reuse_memoized_via_config():
     def noop(_, b):
         pass
 
-    args, kwargs = (4,), dict(b=4.2)  # type: ignore
+    args, kwargs = (4,), dict(b=4.2)
     assert (
         16.8
         == invoke_via_shim_or_return_memoized(

@@ -202,14 +202,15 @@ def gen_jsonschema_attrs(
         if all_attributes_required or (at.default is attr.NOTHING and not null_default):
             required.append(at.name)
         else:
-            if isinstance(at.default, attr.Factory):  # type: ignore
-                if at.default.takes_self:  # type: ignore
+            if isinstance(at.default, attr.Factory):  # type: ignore[pyrefly:invalid-argument]
+                if at.default.takes_self:  # type: ignore[pyrefly:missing-attribute]
                     warn(
                         "Can't define a default value for an attrs field with a factory where "
                         f"takes_self=True; occurred for field {at.name!r} on class {type_!r}"
                     )
                 else:
-                    attr_schema[DEFAULT] = serializer(at.default.factory())  # type: ignore
+                    # type: ignore[pyrefly:missing-attribute]
+                    attr_schema[DEFAULT] = serializer(at.default.factory())
             else:
                 default = None if null_default else at.default
                 attr_schema[DEFAULT] = serializer(default)
@@ -288,7 +289,7 @@ def gen_jsonschema_variadic_tuple(
     gen_jsonschema, type_: Type, type_cache: JSONSchemaTypeCache, serializer: ToJSON
 ):
     args = get_args(type_)
-    list_type: Type = List[args[0]]  # type: ignore [valid-type]
+    list_type: Type = List[args[0]]
     gen_jsonschema_collection(gen_jsonschema, list_type, type_cache, serializer)
 
 

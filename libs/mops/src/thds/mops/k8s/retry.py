@@ -34,7 +34,8 @@ def k8s_sdk_retry(
 
     def decorator(f: F) -> F:
         @wraps(f)
-        def wrapper(*args, **kwargs):  # type: ignore
+        # type: ignore[pyrefly:implicit-any-parameter, pyrefly:unannotated-return]
+        def wrapper(*args, **kwargs):
             i = 0
 
             def _raise_if_max(i: int) -> None:

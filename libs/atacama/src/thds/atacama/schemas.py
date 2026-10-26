@@ -1,6 +1,6 @@
 import typing as ty
 
-import marshmallow  # type: ignore
+import marshmallow
 from typing_extensions import Protocol
 
 from ._attrs import Attribute, generate_attrs_post_load, is_attrs_class, yield_attributes
@@ -96,7 +96,7 @@ class SchemaGenerator:
         self._field_transforms = field_transforms
         self._leaf_types = leaf_types
         if cache:
-            self.generate = cache(self.generate)  # type: ignore
+            self.generate = cache(self.generate)
 
     def __call__(
         self,

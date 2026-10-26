@@ -34,8 +34,8 @@ if not _DISABLE_PYSQLITE3:
         # verbose. In production, one of the other two INFO logs is
         # likely to fire, and if not, this case can be inferred from
         # the lack of log.
-        import sqlite3  # type: ignore
+        import sqlite3
 else:
-    import sqlite3  # type: ignore
+    import sqlite3
 
     logger.info("Using sqlite3 module because pysqlite3 was disabled via environment variable")

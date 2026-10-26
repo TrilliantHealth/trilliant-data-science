@@ -47,13 +47,13 @@ class DynamicFeatureSelection(BaseEstimator, skfs.SelectorMixin):
 
         self.min_features = min_features
         self.max_features = 1.0 if max_features is None else max_features
-        self.feature_selector: skfs.SelectorMixin = clone(feature_selector)  # type: ignore
+        self.feature_selector: skfs.SelectorMixin = clone(feature_selector)
         self.feature_score = feature_score
         self.regression = regression
 
     def __sklearn_clone__(self):
         return DynamicFeatureSelection(
-            feature_selector=clone(self.feature_selector),  # type: ignore
+            feature_selector=clone(self.feature_selector),
             feature_score=self.feature_score,
             regression=self.regression,
             min_features=self.min_features,

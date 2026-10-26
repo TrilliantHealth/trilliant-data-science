@@ -172,7 +172,7 @@ def _prepare_for_sqlite(df: pd.DataFrame, table: Table) -> pd.DataFrame:
             # we're using `detect_types=sqlite3.PARSE_DECLTYPES`
             df[name] = df[name].dt.date
         else:
-            preproc = sqlite_preprocessor_for_type(pytype)  # type: ignore
+            preproc = sqlite_preprocessor_for_type(pytype)
             if preproc is not None:
                 preproc_ = pandas_maybe(preproc) if column.nullable else preproc
                 df[name] = df[name].apply(preproc_)

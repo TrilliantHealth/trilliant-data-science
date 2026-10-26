@@ -22,13 +22,13 @@ def _get_attrs_field_default(
     # copyright Desert contributors - see LICENSE_desert.md
     if field.default == attrs.NOTHING:
         return marshmallow.missing
-    if isinstance(field.default, attrs.Factory):  # type: ignore[arg-type]
+    if isinstance(field.default, attrs.Factory):  # type: ignore[pyrefly:invalid-argument]
         # attrs specifically doesn't support this so as to support the
         # primary use case.
         # https://github.com/python-attrs/attrs/blob/38580632ceac1cd6e477db71e1d190a4130beed4/src/attr/__init__.pyi#L63-L65
-        if field.default.takes_self:  # type: ignore[attr-defined]
+        if field.default.takes_self:  # type: ignore[pyrefly:missing-attribute]
             return attrs.NOTHING
-        return field.default.factory  # type: ignore[attr-defined]
+        return field.default.factory  # type: ignore[pyrefly:missing-attribute]
     return field.default
 
 

@@ -4,8 +4,8 @@ import logging
 import typing as ty
 from functools import partial
 
-import marshmallow  # type: ignore
-import typing_inspect  # type: ignore
+import marshmallow
+import typing_inspect
 
 from . import custom_fields
 from ._generic_dispatch import generic_types_dispatch
@@ -15,7 +15,8 @@ from .leaf import LeafTypeMapping
 class VariadicTuple(marshmallow.fields.List):
     """Homogenous tuple with variable number of entries."""
 
-    def _deserialize(self, *args: object, **kwargs: object) -> ty.Tuple[object, ...]:  # type: ignore[override]
+    # type: ignore[pyrefly:bad-override]
+    def _deserialize(self, *args: object, **kwargs: object) -> ty.Tuple[object, ...]:
         return tuple(super()._deserialize(*args, **kwargs))
 
 
@@ -62,14 +63,14 @@ def generate_field(
 
     def tuple_handler(types: ty.Type, variadic: bool):
         if not variadic:
-            return marshmallow.fields.Tuple(  # type: ignore[no-untyped-call]
+            return marshmallow.fields.Tuple(
                 tuple(gen_field(typ) for typ in types),
                 **field_kwargs,
             )
         return VariadicTuple(gen_field(types[0]), **field_kwargs)
 
     def union_handler(types, **field_kwargs):
-        import marshmallow_union  # type: ignore
+        import marshmallow_union
 
         return marshmallow_union.Union([gen_field(subtyp) for subtyp in types], **field_kwargs)
 
@@ -84,7 +85,7 @@ def generate_field(
 
     def fallthrough_handler(typ: ty.Type):
         if type(typ) is enum.EnumMeta:
-            import marshmallow_enum  # type: ignore
+            import marshmallow_enum
 
             return marshmallow_enum.EnumField(typ, **field_kwargs)
 
@@ -104,7 +105,7 @@ def generate_field(
         try:
             nested_schema = schema_generator(typ)
         except RecursionError:
-            nested_schema = lambda: schema_generator(typ)  # type: ignore # noqa: E731
+            nested_schema = lambda: schema_generator(typ)  # noqa: E731
         except Exception:
             logger.exception(f"Failed to generate schema for {debug_name}={typ}")
             raise

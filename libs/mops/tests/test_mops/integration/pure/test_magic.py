@@ -12,9 +12,9 @@ from ...config import TEST_TMP_URI
 
 @pytest.fixture
 def clear_magic():
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
     yield
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
 
 
 @pure.magic(blob_root=TEST_TMP_URI, pipeline_id=f"test/pure-magic/{datetime.utcnow().isoformat()}")
@@ -48,7 +48,7 @@ def test_load_magic_config(clear_magic):
     print()
     assert func_test_config._get_blob_root() == "adls://magicians/gob"
     assert func_test_config._pipeline_id == "final-countdown"
-    assert subprocess_shim is func_test_config._shimbuilder(func_test_config, tuple(), dict())  # type: ignore
+    assert subprocess_shim is func_test_config._shimbuilder(func_test_config, tuple(), dict())
 
 
 def test_pure_magic_with_futures(clear_magic):

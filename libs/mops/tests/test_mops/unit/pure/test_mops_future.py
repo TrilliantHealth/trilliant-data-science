@@ -24,7 +24,7 @@ def test_delegates_and_carries_memo_uri():
 def test_set_result_metadata_then_readable():
     f = MopsFuture(futures.resolved("v"), memo_uri="m")
     assert f.result_metadata is None
-    f.set_result_metadata("METADATA_SENTINEL")  # type: ignore[arg-type]
+    f.set_result_metadata("METADATA_SENTINEL")  # type: ignore[pyrefly:bad-argument-type]
     assert f.result_metadata == "METADATA_SENTINEL"
 
 
@@ -33,7 +33,7 @@ def test_picklable_before_and_after_metadata():
     back = pickle.loads(pickle.dumps(f))
     assert back.memo_uri == "m"
     assert back.result() == 7
-    f.set_result_metadata("MD")  # type: ignore[arg-type]
+    f.set_result_metadata("MD")  # type: ignore[pyrefly:bad-argument-type]
     back2 = pickle.loads(pickle.dumps(f))
     assert back2.result_metadata == "MD"
     assert back2.memo_uri == "m"
@@ -64,7 +64,8 @@ def test_from_tuple_future_splits_value_and_metadata():
     """from_tuple_future splits (value, metadata) on .result() and stores metadata."""
     sentinel_md = object()  # stand-in for Optional[ResultMetadata]
     tuple_future = futures.resolved((99, sentinel_md))
-    mf: MopsFuture[int] = MopsFuture.from_tuple_future(tuple_future, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(tuple_future, memo_uri="m")
     assert mf.result_metadata is None  # not yet resolved
     assert mf.result() == 99
     assert mf.result_metadata is sentinel_md
@@ -75,11 +76,12 @@ def test_add_done_callback_does_not_block_on_pending_tuple_future():
     future to resolve. The regression made add_done_callback resolve the inner
     LazyFuture eagerly, blocking the caller for the full underlying computation."""
     pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
-    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")
 
     seen: list[MopsFuture[int]] = []
     # this call must return promptly; it must NOT block on pending.result().
-    mf.add_done_callback(seen.append)  # type: ignore[arg-type]
+    mf.add_done_callback(seen.append)  # type: ignore[pyrefly:bad-argument-type]
 
     assert mf.done() is False  # underlying future still pending
     assert seen == []  # callback has not fired yet
@@ -98,8 +100,9 @@ def test_result_metadata_populated_via_done_callback():
     """result_metadata is populated when resolution is reached through the
     done-callback path (not just through .result())."""
     pending: "concurrent.futures.Future[tuple[str, str]]" = concurrent.futures.Future()
-    mf: MopsFuture[str] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
-    mf.add_done_callback(lambda _f: None)  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[str] = MopsFuture.from_tuple_future(pending, memo_uri="m")
+    mf.add_done_callback(lambda _f: None)
     assert mf.result_metadata is None
 
     pending.set_result(("v", "MD"))
@@ -115,10 +118,11 @@ def test_done_callback_fires_when_the_invocation_failed():
     add_done_callback (rather than a blocking .result()) then waited forever for a
     query that had already failed."""
     pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
-    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")
 
     seen: list[MopsFuture[int]] = []
-    mf.add_done_callback(seen.append)  # type: ignore[arg-type]
+    mf.add_done_callback(seen.append)  # type: ignore[pyrefly:bad-argument-type]
 
     pending.set_exception(ValueError("the pod OOMed"))
 
@@ -133,10 +137,11 @@ def test_done_callback_fires_when_the_invocation_was_cancelled():
     """Same contract for a CANCELLED tuple-future, which raises CancelledError rather
     than the invocation's own exception when its result is read."""
     pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
-    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")
 
     seen: list[MopsFuture[int]] = []
-    mf.add_done_callback(seen.append)  # type: ignore[arg-type]
+    mf.add_done_callback(seen.append)  # type: ignore[pyrefly:bad-argument-type]
 
     assert pending.cancel()
 
@@ -150,7 +155,8 @@ def test_failed_invocation_settles_a_reified_future():
     add_done_callback, so a dropped callback left the reified future PENDING forever.
     A failed invocation must settle it (with the exception), never hang it."""
     pending: "concurrent.futures.Future[tuple[int, object]]" = concurrent.futures.Future()
-    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[int] = MopsFuture.from_tuple_future(pending, memo_uri="m")
     reified = futures.reify_future(mf)
 
     pending.set_exception(ValueError("evicted"))
@@ -164,7 +170,8 @@ def test_from_tuple_future_picklable():
     """MopsFuture built via from_tuple_future remains picklable (LazyFuture inner)."""
     sentinel_md = "METADATA_SENTINEL"
     tuple_future = futures.resolved(("hello", sentinel_md))
-    mf: MopsFuture[str] = MopsFuture.from_tuple_future(tuple_future, memo_uri="m")  # type: ignore[arg-type]
+    # type: ignore[pyrefly:bad-argument-type]
+    mf: MopsFuture[str] = MopsFuture.from_tuple_future(tuple_future, memo_uri="m")
     # pickle before resolving
     mf2: MopsFuture[str] = pickle.loads(pickle.dumps(mf))
     assert mf2.memo_uri == "m"

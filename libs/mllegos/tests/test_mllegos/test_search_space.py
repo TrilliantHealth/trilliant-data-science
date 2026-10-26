@@ -43,7 +43,8 @@ def test_build_skopt_space_rejects_unknown_range_types() -> None:
     search run."""
     pytest.importorskip("skopt.space")
     with pytest.raises(TypeError, match="unsupported search-space dimension type: tuple"):
-        search_space.build_skopt_space({"n_estimators": (150, 600)})  # type: ignore[dict-item]
+        # type: ignore[pyrefly:bad-assignment]
+        search_space.build_skopt_space({"n_estimators": (150, 600)})
 
 
 def test_build_skopt_space_without_skopt_names_the_extra(

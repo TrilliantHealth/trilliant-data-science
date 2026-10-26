@@ -53,7 +53,7 @@ class IteratorWithLen(ty.Generic[R]):
 
 def try_len(iterable: ty.Iterable[R]) -> ty.Optional[int]:
     try:
-        return len(iterable)  # type: ignore
+        return len(iterable)  # type: ignore[pyrefly:bad-argument-type]
     except TypeError:
         return None
 
@@ -172,7 +172,7 @@ def create_keys(iterable: ty.Iterable[R]) -> ty.Iterator[ty.Tuple[str, R]]:
     """
     with_keys: ty.Iterable[ty.Tuple[str, R]] = ((uuid4().hex, item) for item in iterable)
     try:
-        return IteratorWithLen(len(iterable), with_keys)  # type: ignore[arg-type]
+        return IteratorWithLen(len(iterable), with_keys)  # type: ignore[pyrefly:bad-argument-type]
     except TypeError:
         return iter(with_keys)
 
@@ -250,4 +250,4 @@ def summarize_exceptions(
                 most_common_type = _type
 
         ERROR_LOGGER.info("Raising one of the most common exception type.")
-        raise by_type[most_common_type][0]  # type: ignore
+        raise by_type[most_common_type][0]  # type: ignore[pyrefly:bad-index]

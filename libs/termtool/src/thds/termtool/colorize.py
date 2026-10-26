@@ -85,9 +85,7 @@ def _all_colors() -> ty.List[str]:
     return _preferred_randgreen_start() + [
         name
         for name, rgb in all_colors
-        if rgb not in used_colors
-        and not used_colors.add(rgb)  # type: ignore
-        and rgb not in forbidden_colors
+        if rgb not in used_colors and not used_colors.add(rgb) and rgb not in forbidden_colors
     ]
 
 

@@ -45,7 +45,7 @@ F = ty.TypeVar("F", bound=ty.Callable)
 Decorator = ty.Callable[[F], F]
 
 try:
-    import psutil  # type: ignore
+    import psutil  # type: ignore[pyrefly:missing-import]
 except ImportError:
     psutil = None
 
@@ -126,8 +126,8 @@ def _open_csv_writer():
 def _write_record(*row: str) -> None:
     if _IS_ENABLED:
         _open_csv_writer()
-        _CSV_WRITER.writerow(row)  # type: ignore
-        _CSV_OUT.flush()  # type: ignore
+        _CSV_WRITER.writerow(row)
+        _CSV_OUT.flush()
 
 
 def _dt(dt: float) -> str:
@@ -243,7 +243,7 @@ class ProfilingLoggerAdapter(logging.LoggerAdapter):
             return msg, kwargs
         extra = kwargs.get("extra") or dict()
         th_kw = extra.get(corelog()._TH_REC_CTXT) or dict()
-        return _TH_PROFILER()(msg, **th_kw), kwargs  # type: ignore
+        return _TH_PROFILER()(msg, **th_kw), kwargs
 
 
 def wrap_logger(logger: logging.Logger) -> ProfilingLoggerAdapter:

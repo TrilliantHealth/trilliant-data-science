@@ -270,7 +270,7 @@ def translate_done(
     _settle(lambda: out_future.set_result(translated))
 
 
-class _ChainedFuture(concurrent.futures.Future, ty.Generic[R1]):  # type: ignore[type-arg]
+class _ChainedFuture(concurrent.futures.Future, ty.Generic[R1]):
     """The outer future returned by `chain_futures`.
 
     It subclasses `concurrent.futures.Future` so it still satisfies the

@@ -227,7 +227,7 @@ def memoized(
         ("original_run_name", run_name),
     ):
         if value:
-            event[field] = value  # type: ignore[literal-required]
+            event[field] = value
 
     return event
 

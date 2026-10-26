@@ -45,7 +45,7 @@ def upload_src_len(upload_src: UploadSrc, default: int = 0) -> int:
     if isinstance(upload_src, Path) and upload_src.exists():
         return upload_src.stat().st_size
     try:
-        return len(upload_src)  # type: ignore
+        return len(upload_src)  # type: ignore[pyrefly:bad-argument-type]
     except TypeError as te:
         logger.debug(f"failed to get length? {repr(te)} for {upload_src!r}")
         return default

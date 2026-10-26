@@ -41,8 +41,6 @@ Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 [dependency-groups]
 dev = [
     "kubernetes>=18.20,!=32.0.0,!=36.0.0",
-    "mypy>=1.16",
-    "mypy-extensions~=1.0",
     "pytest~=7.2",
     "pytest-cov~=4.0",
     "pytest-mock~=3.10",
@@ -81,34 +79,45 @@ source = ["thds.mops"]
 [tool.coverage.report]
 show_missing = true
 
-[tool.mypy]
-mypy_path = "src"
-namespace_packages = true
-explicit_package_bases = true
-exclude = '''(?x)(
-    build/
-    | dist/
-    | \S+\.egg-info/
-)'''
-check_untyped_defs = true
-disallow_untyped_calls = true
-disallow_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = [
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+python-interpreter-path = ".venv/bin/python"
+search-path = ["src", "."]
+project-excludes = [
+    "**/build/",
+    "**/dist/",
+    "**/*.egg-info/",
+]
+preset = "legacy"
+check-unannotated-defs = true
+type-ignore-unknown-tag-behavior = "no-effect"
+infer-return-types = "checked"
+ignore-missing-imports = [
     "azure",
     "colors",
     "google",
     "kubernetes.*",
 ]
-ignore_missing_imports = true
+baseline = ".config/pyrefly-baseline.json"
+baseline-matching-mode = "column-ordered"
 
-[[tool.mypy.overrides]]
-module = ["tests.*", "scripts.*"]
-# we are not as strict about untyped things in tests, though projects should feel free to
-# make these overrides more targeted to keep test readability high.
-disallow_untyped_calls = false
-disallow_untyped_defs = false
+[tool.pyrefly.errors]
+implicit-any-parameter = "error"
+unannotated-return = "error"
+
+[[tool.pyrefly.sub-config]]
+matches = "tests/**"
+
+[tool.pyrefly.sub-config.errors]
+implicit-any-parameter = "ignore"
+unannotated-return = "ignore"
+
+[[tool.pyrefly.sub-config]]
+matches = "scripts/**"
+
+[tool.pyrefly.sub-config.errors]
+implicit-any-parameter = "ignore"
+unannotated-return = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

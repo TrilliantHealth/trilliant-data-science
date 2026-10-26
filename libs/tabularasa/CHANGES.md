@@ -1,3 +1,7 @@
+### 0.14.19
+
+- No code change: type-check suppressions name `pyrefly` error kinds instead of mypy codes.
+
 ### 0.14.18
 
 - Prevented references/aliases (e.g. `&id001`, `*id001`) from being written to the schema YAML file on

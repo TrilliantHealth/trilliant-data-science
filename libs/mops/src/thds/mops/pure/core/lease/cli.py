@@ -27,7 +27,7 @@ def acquire_and_hold_once(
         write_times = lambda x, y: None  # noqa: E731
 
     # we want more verbose logging when using the CLI.
-    _acquire.logger.debug = _acquire.logger.info  # type: ignore
+    _acquire.logger.debug = _acquire.logger.info
 
     _acquire.logger.info(f"Beginning lease acquisition on {lease_uri}")
     lease_owned = _acquire.acquire(lease_uri, block=None)

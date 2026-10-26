@@ -53,7 +53,8 @@ def use_runner(runner: Runner, skip: ty.Callable[[], bool] = lambda: False) -> t
 
     def deco(f: F) -> F:
         @wraps(f)
-        def __use_runner_wrapper(*args, **kwargs):  # type: ignore
+        # type: ignore[pyrefly:implicit-any-parameter, pyrefly:unannotated-return]
+        def __use_runner_wrapper(*args, **kwargs):
             if skip():
                 logger.debug("Calling function %s directly (skip)...", f)
                 return f(*args, **kwargs)

@@ -105,7 +105,7 @@ def unique_across_columns(df: pd.DataFrame, colnames: Sequence[str]) -> pd.Serie
         check_cols = df[cols]
     elif not cols and set(index_cols) == set(df.index.names):
         # optimization - don't duplicate the index if we don't have to
-        check_cols = df.index  # type: ignore
+        check_cols = df.index
     else:
         check_cols = pd.DataFrame(
             {
@@ -117,7 +117,7 @@ def unique_across_columns(df: pd.DataFrame, colnames: Sequence[str]) -> pd.Serie
     duped = check_cols.duplicated(keep=False)
     if isinstance(duped, pd.Series):
         # if check_cols was a frame vs an index
-        duped = duped.values  # type: ignore
+        duped = duped.values
 
     return pd.Series(~duped, index=df.index)
 
@@ -403,7 +403,8 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
                 except TypeError as e:
                     if cast:
                         logger.warning(
-                            f"Type-checking failed at level '{type_check.name}'; "  # type: ignore
+                            # type: ignore[pyrefly:missing-attribute]
+                            f"Type-checking failed at level '{type_check.name}'; "
                             "a type cast will be attempted on read"
                         )
                     else:
@@ -493,7 +494,7 @@ class PandasParquetLoader(_ParquetPackageDataOrFileInterface):
 
             if isinstance(dtype, pd_dtypes.ExtensionDtype):
                 casts[name] = dtype
-            elif isinstance(dtype, pa.dtypes.Int) and (  # type: ignore
+            elif isinstance(dtype, pa.dtypes.Int) and (
                 (not dtype.signed) or dtype.bit_width not in (32, 64)
             ):
                 typename = f"{'' if dtype.signed else 'u'}int{dtype.bit_width}"

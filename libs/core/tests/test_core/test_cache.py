@@ -33,37 +33,37 @@ def add_one(i: int) -> int:
 def test_locking() -> None:
     cached_add_one = cache.locking(add_one)
 
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().hits == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().hits == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[pyrefly:missing-attribute]
 
 
 def test_parametrized_locking() -> None:
     cached_add_one = cache.locking(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)
 
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().hits == 1  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().misses == 1  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().hits == 1  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().misses == 1  # type: ignore[pyrefly:missing-attribute]
 
 
 def test_locking_clear_cache() -> None:
     cached_add_one = cache.locking(add_one)
 
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
-    assert cached_add_one.cache_info().currsize == 1  # type: ignore[attr-defined]
-    cached_add_one.clear_cache()  # type: ignore[attr-defined]
-    assert cached_add_one.cache_info().currsize == 0  # type: ignore[attr-defined]
+    assert cached_add_one.cache_info().currsize == 1  # type: ignore[pyrefly:missing-attribute]
+    cached_add_one.clear_cache()  # type: ignore[pyrefly:missing-attribute]
+    assert cached_add_one.cache_info().currsize == 0  # type: ignore[pyrefly:missing-attribute]
 
 
 def slow_add_one(i: int) -> int:
@@ -81,7 +81,7 @@ def test_locking_calls_same_args_once_diff_args_parallel() -> None:
         exc.map(cached_slow_add_one, lst)
     stop = time.perf_counter()
 
-    assert cached_slow_add_one.cache_info().currsize == 4  # type: ignore[attr-defined]
+    assert cached_slow_add_one.cache_info().currsize == 4  # type: ignore[pyrefly:missing-attribute]
     assert stop - start < 4
     # concurrent runtime is less than serial runtime of the 4 function invocations
 
@@ -127,8 +127,8 @@ def test_locking_accepts_a_bounded_cache() -> None:
         return n * n
 
     assert [square(n) for n in (1, 2, 3)] == [1, 4, 9]
-    assert square.cache_info().currsize == 2  # type: ignore[attr-defined]
-    assert square.cache_info().maxsize == 2  # type: ignore[attr-defined]
+    assert square.cache_info().currsize == 2  # type: ignore[pyrefly:missing-attribute]
+    assert square.cache_info().maxsize == 2  # type: ignore[pyrefly:missing-attribute]
 
     assert square(3) == 9  # still cached
     assert calls == [1, 2, 3]
@@ -144,8 +144,8 @@ def test_locking_defaults_to_unbounded_dict() -> None:
 
     for n in range(50):
         double(n)
-    assert double.cache_info().currsize == 50  # type: ignore[attr-defined]
-    assert double.cache_info().maxsize is None  # type: ignore[attr-defined]
+    assert double.cache_info().currsize == 50  # type: ignore[pyrefly:missing-attribute]
+    assert double.cache_info().maxsize is None  # type: ignore[pyrefly:missing-attribute]
 
 
 def test_locking_bounded_cache_is_still_single_flight() -> None:

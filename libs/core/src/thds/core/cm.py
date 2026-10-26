@@ -19,7 +19,7 @@ class _AlreadyEnteredContext(ty.ContextManager[T]):
         # No-op enter; just return the underlying thing
         return self.entered_context
 
-    def __exit__(self, exc_type, exc_value, traceback):  # type: ignore
+    def __exit__(self, exc_type, exc_value, traceback):
         pass  # No-op exit
 
 

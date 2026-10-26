@@ -95,7 +95,7 @@ def test_source_is_hashable():
 def test_source_is_immutable(temp_file):
     s = from_file(temp_file("car"))
     with pytest.raises(dataclasses.FrozenInstanceError):
-        s.uri = "not allowed"  # type: ignore
+        s.uri = "not allowed"  # type: ignore[pyrefly:read-only]
 
 
 def test_set_cached_path_does_not_error_if_none(temp_file):

@@ -58,7 +58,8 @@ def _base_test_db(_base_test_db_rows) -> sqlite3.Connection:
 def test_db(_base_test_db) -> StructTable[TstItem]:
     return StructTable(
         lambda d: TstItem(**d),
-        lambda _: lambda: TableMeta(_base_test_db, "test", {"id"}, {"id", "name"}),  # type: ignore
+        # type: ignore[pyrefly:bad-argument-type]
+        lambda _: lambda: TableMeta(_base_test_db, "test", {"id"}, {"id", "name"}),
     )
 
 
@@ -82,7 +83,8 @@ def test_bad_primary_key(_base_test_db: sqlite3.Connection):
     bad_db = StructTable(
         lambda d: TstItem(**d),
         # name is not actually the primary key, so this (can) blow up
-        lambda _: lambda: TableMeta(_base_test_db, "test", {"name"}, {"id", "name"}),  # type: ignore
+        # type: ignore[pyrefly:bad-argument-type]
+        lambda _: lambda: TableMeta(_base_test_db, "test", {"name"}, {"id", "name"}),
     )
     assert bad_db.get(name="seven") == TstItem(7, "seven")
 
@@ -126,7 +128,7 @@ def test_partition_read(columns, _base_test_db: sqlite3.Connection, _base_test_d
     _partition = partial(read.partition, n, columns=columns)
     partitions = list(map(_partition, range(n)))
     _read_matching = partial(read.matching, "test", _base_test_db)
-    results = list(map(list, map(_read_matching, partitions)))  # type: ignore
+    results = list(map(list, map(_read_matching, partitions)))
     row_count = len(_base_test_db_rows)
     returned_row_count = sum(len(result) for result in results)
 

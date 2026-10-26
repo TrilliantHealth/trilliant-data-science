@@ -1,7 +1,7 @@
 import typing as ty
 from copy import deepcopy
 
-import marshmallow  # type: ignore
+import marshmallow
 
 FieldTransform = ty.Callable[[marshmallow.fields.Field], marshmallow.fields.Field]
 

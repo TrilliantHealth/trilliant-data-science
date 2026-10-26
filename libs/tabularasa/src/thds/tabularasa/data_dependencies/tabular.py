@@ -100,7 +100,7 @@ class PandasCSVLoader:
         deps = self.table.dependencies
         assert isinstance(deps, TabularFileSource)
         with deps.file_handle as f:
-            df = pd.read_csv(  # type: ignore
+            df = pd.read_csv(
                 f,
                 usecols=self.header,
                 dtype=self.dtypes_for_csv_read,

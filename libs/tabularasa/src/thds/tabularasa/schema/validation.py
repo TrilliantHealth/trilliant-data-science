@@ -549,7 +549,8 @@ def _validate_preprocessor(table: _RawTable, tablename: str) -> List[ErrorMessag
 
 def _validate_dependency_dag(schema: _RawSchema) -> List[ErrorMessage]:
     errors: List[ErrorMessage] = []
-    full_graph = Schema.dependency_dag(schema, lambda table: True)  # type: ignore
+    # type: ignore[pyrefly:bad-argument-type]
+    full_graph = Schema.dependency_dag(schema, lambda table: True)
 
     def to_nodeset(predicate):
         return set(

@@ -62,9 +62,9 @@ class ConditionalImputer(BaseEstimator, TransformerMixin):
         }
         low_freq = groups.transform("count") < self.min_freq
         self.fallback_stats_ = {
-            name: X.loc[
-                low_freq_ixs if low_freq_ixs.sum() >= self.min_freq else slice(None), name  # type: ignore
-            ].agg(agg_stats[name])
+            name: X.loc[low_freq_ixs if low_freq_ixs.sum() >= self.min_freq else slice(None), name].agg(
+                agg_stats[name]
+            )
             for name, low_freq_ixs in low_freq.items()
         }
         return self
@@ -85,6 +85,6 @@ class ConditionalImputer(BaseEstimator, TransformerMixin):
                 new_col.loc[can_impute] = stats.loc[conditional[can_impute]].values
                 fallback_value = self.fallback_stats_.get(colname)
                 new_col.fillna(fallback_value, inplace=True)
-                new[colname] = new_col  # type: ignore
+                new[colname] = new_col
 
         return X.assign(**new) if new else X

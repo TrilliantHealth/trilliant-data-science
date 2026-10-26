@@ -84,7 +84,7 @@ def newtype_base(type_: Type) -> Type:
 def literal_base(type_: Type) -> Type:
     assert is_literal_type(type_)
     types = tuple(map(type, get_args(type_)))
-    return Union[types]  # type: ignore
+    return Union[types]  # type: ignore[pyrefly:not-a-type]
 
 
 def enum_base(type_: Type) -> Type:
@@ -92,13 +92,14 @@ def enum_base(type_: Type) -> Type:
     if issubclass(type_, int):  # IntEnum, IntFlag
         return int
     types = tuple(type(e.value) for e in type_)
-    return Union[types]  # type: ignore
+    return Union[types]  # type: ignore[pyrefly:not-a-type]
 
 
 def unwrap_optional(type_: Type) -> Type:
     if is_optional_type(type_):
         args = get_args(type_)
-        return Union[tuple(a for a in args if a is not type(None))]  # type: ignore[return-value]  # noqa:E721
+        # type: ignore[pyrefly:invalid-annotation]
+        return Union[tuple(a for a in args if a is not type(None))]  # noqa:E721
     else:
         return type_
 
@@ -160,7 +161,7 @@ def is_builtin_type(type_: Type) -> bool:
 
 def concrete_constructor(type_: Type[T]) -> Callable[..., T]:
     if is_namedtuple_type(type_):
-        return type_  # type: ignore[return-value]
+        return type_
     origin = get_origin(type_)
     return ORIGIN_TO_CONSTRUCTOR[type_] if origin is None else ORIGIN_TO_CONSTRUCTOR[origin]
 

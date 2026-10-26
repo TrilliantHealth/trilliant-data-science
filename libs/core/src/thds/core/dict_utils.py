@@ -93,9 +93,10 @@ class DotDict(dict[str, VT], ty.MutableMapping[str, VT]):
             if convert_keys_to_identifiers:
                 self._new_to_orig_keys[new_key] = k
             if isinstance(v, dict):
-                self[new_key] = DotDict(v)  # type: ignore
+                self[new_key] = DotDict(v)  # type: ignore[pyrefly:unsupported-operation]
             elif isinstance(v, (list, tuple, set)):
-                self[new_key] = v.__class__([DotDict(iv) if isinstance(iv, dict) else iv for iv in v])  # type: ignore
+                # type: ignore[pyrefly:unsupported-operation]
+                self[new_key] = v.__class__([DotDict(iv) if isinstance(iv, dict) else iv for iv in v])
             else:
                 self[new_key] = v
 
@@ -144,7 +145,7 @@ class DotDict(dict[str, VT], ty.MutableMapping[str, VT]):
         for k, v in self.items():
             if isinstance(v, DotDict):
                 d[(self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k)] = (
-                    v.to_dict(orig_keys)  # type: ignore[assignment]
+                    v.to_dict(orig_keys)  # type: ignore[pyrefly:unsupported-operation]
                 )
             else:
                 d[(self._new_to_orig_keys[k] if orig_keys and convert_keys_to_identifiers else k)] = v
@@ -211,7 +212,8 @@ def merge_dicts(*dicts: dict[ty.Any, ty.Any], default: ty.Any = None) -> dict[ty
     for i, d in enumerate(dicts):
         for k, v in d.items() if isinstance(d, dict) else {}:
             if isinstance(v, dict):
-                merged_dict[k] = merge_dicts(*[a.get(k, {}) for a in dicts])  # type: ignore
+                # type: ignore[pyrefly:unsupported-operation]
+                merged_dict[k] = merge_dicts(*[a.get(k, {}) for a in dicts])
             else:
                 merged_dict[k][i] = v
     return dict(merged_dict)

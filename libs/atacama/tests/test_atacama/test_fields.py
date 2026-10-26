@@ -69,7 +69,8 @@ def test_generate_dict_value_type_from_simple():
 
     foos = neo(Foo)
 
-    assert type(foos().fields["dd"].value_field) == ma.fields.Float  # type: ignore
+    # type: ignore[pyrefly:missing-attribute]
+    assert type(foos().fields["dd"].value_field) == ma.fields.Float
 
 
 def test_generate_number_field_from_float_int_union():
@@ -79,7 +80,8 @@ def test_generate_number_field_from_float_int_union():
 
     foos = neo(Foo)
 
-    assert type(foos().fields["dd"].value_field) == ma.fields.Number  # type: ignore
+    # type: ignore[pyrefly:missing-attribute]
+    assert type(foos().fields["dd"].value_field) == ma.fields.Number
 
 
 def test_union_types_are_hash_equal():

@@ -58,7 +58,7 @@ def to_lazy_uri(resolvable: UriResolvable) -> Callable[[], str]:
     if isinstance(resolvable, (str, AdlsRoot, AdlsFqn)):
         return lambda: str(resolvable)
     if callable(resolvable):
-        return lambda: str(resolvable())  # type: ignore
+        return lambda: str(resolvable())
     raise TypeError(type(resolvable))
 
 

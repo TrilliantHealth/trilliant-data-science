@@ -77,7 +77,8 @@ PANDAS_LOADER_TEMPLATE = constructor_template(
 
 def render_pandera_table_schema(table: metaschema.Table, coerce_run_time_tables: bool) -> str:
     proxy_schema: metaschema._DataFrameSchemaProxy
-    proxy_schema = metaschema.render_pandera_schema(table, as_str=True)  # type: ignore
+    # type: ignore[pyrefly:bad-assignment]
+    proxy_schema = metaschema.render_pandera_schema(table, as_str=True)
 
     def render_check_exprs(check_exprs: Optional[List[str]]) -> str:
         if check_exprs:

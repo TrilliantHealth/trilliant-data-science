@@ -25,7 +25,7 @@ def _get_job(target: K8sTarget, job_name: str) -> ty.Optional[client.models.V1Jo
 
 _JOB_SOURCE = WatchingObjectSource(
     lambda target, _: _batch_api(target).list_namespaced_job,
-    lambda job: job.metadata.name,  # type: ignore
+    lambda job: job.metadata.name,
     _get_job,
     typename="Job",
 )

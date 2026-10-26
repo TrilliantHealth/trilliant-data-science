@@ -75,8 +75,8 @@ def load_config() -> None:
 
 def cache_clear() -> None:
     """Manually clearing the cache is hacky, but we found a bug that necessitated it."""
-    load_config.cache_clear()  # type: ignore[attr-defined]
-    api_client.cache_clear()  # type: ignore[attr-defined]
+    load_config.cache_clear()  # type: ignore[pyrefly:missing-attribute]
+    api_client.cache_clear()  # type: ignore[pyrefly:missing-attribute]
 
 
 @scope.bound

@@ -46,7 +46,7 @@ def hash_readable_chunks(bytes_readable: ty.IO[bytes], hasher: H) -> H:
     hash_readable_chunks(open(Path('foo/bar'), 'rb'), hashlib.sha256()).hexdigest()
     """
     for chunk in iter(lambda: bytes_readable.read(_CHUNK_SIZE), b""):
-        hasher.update(chunk)  # type: ignore
+        hasher.update(chunk)
     return hasher
 
 
@@ -55,14 +55,14 @@ def attempt_readable(thing: SomehowReadable) -> ty.Iterator[ty.IO[bytes]]:
     """Best effort: make this object a bytes-readable."""
     if hasattr(thing, "read") and hasattr(thing, "seek"):
         try:
-            yield thing  # type: ignore
+            yield thing  # type: ignore[pyrefly:invalid-yield]
             return
         finally:
-            thing.seek(0)  # type: ignore
+            thing.seek(0)
     elif isinstance(thing, bytes):
         yield io.BytesIO(thing)
         return
-    with open(thing, "rb") as readable:  # type: ignore
+    with open(thing, "rb") as readable:  # type: ignore[pyrefly:no-matching-overload]
         yield readable
 
 

@@ -82,7 +82,7 @@ def constructor_template(
     name = type_.__name__
     if sig is None:
         if isinstance(type_, type):
-            sig = signature(type_.__init__)  # type: ignore
+            sig = signature(type_.__init__)
             is_method = True
         else:
             sig = signature(type_)

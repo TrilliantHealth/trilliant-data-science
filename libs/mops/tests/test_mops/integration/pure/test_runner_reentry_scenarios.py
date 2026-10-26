@@ -58,9 +58,9 @@ def _count_memo_uris(memo_dir: Path) -> int:
 
 @pytest.fixture
 def clear_magic():
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
     yield
-    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()  # type: ignore
+    pure._magic.api._MAGIC_CONFIG = pure._magic.sauce.new_config()
 
 
 # ---------------------------------------------------------------------------

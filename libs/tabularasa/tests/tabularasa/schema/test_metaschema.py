@@ -56,7 +56,7 @@ def test_dtype_nullable_numpy_type(dtype: schema.dtypes.DType, np_type: np.dtype
 
 match_constraint = schema.constraints.MatchesRegex(matches=re.compile("foobar"))
 
-len_constraint = schema.constraints.LenLessThan(len_lt=5)  # type: ignore[call-arg]
+len_constraint = schema.constraints.LenLessThan(len_lt=5)
 # I can't figure out this type issue - the pydantic plugin is enabled.
 
 int_enum_constraint = schema.constraints.EnumConstraint(enum=[1, 2], ordered=True)
@@ -278,7 +278,7 @@ expected_validation_errors = [
 
 @pytest.fixture()
 def schema_validation_errors() -> List[schema.validation.ErrorMessage]:
-    raw_schema = metaschema._RawSchema(**bad_schema)  # type: ignore[arg-type]
+    raw_schema = metaschema._RawSchema(**bad_schema)
     errors, external_schemas = schema.validation.validation_errors(
         raw_schema,
         require_data_resources=True,

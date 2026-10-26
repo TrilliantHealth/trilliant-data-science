@@ -103,7 +103,7 @@ class DiscreteFeatureSplit(BaseEstimator, TransformerMixin):
             feature_col.isin(low_cardinality_values) if low_cardinality_values else None
         )
         subset_msg = (
-            f"{value_counts[self.low_cardinality_values_.index].sum()} rows encompassing {len(low_cardinality_values)} "  # type: ignore
+            f"{value_counts[self.low_cardinality_values_.index].sum()} rows encompassing {len(low_cardinality_values)} "
             f"distinct values of {self.feature_name}"
             if low_cardinality_values
             else f"10% of the entire dataset of {X.shape[0]} rows"
@@ -136,7 +136,7 @@ class DiscreteFeatureSplit(BaseEstimator, TransformerMixin):
         }
         _example_output = next(iter(outputs.values()))
         output_shape = X.shape[0] if _example_output.ndim == 1 else (X.shape[0], len(self.classes_))
-        output = np.empty(output_shape, dtype=_example_output.dtype)  # type: ignore
+        output = np.empty(output_shape, dtype=_example_output.dtype)
         if method_name == "predict":
             for v, subset in subsets.items():
                 output[subset] = outputs[v]

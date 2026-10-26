@@ -67,6 +67,6 @@ def test_lazy_is_friendlier_now():
         AttributeError,
         match=r"did you mean to instantiate the object before access, i.e. `\(\)\.bar`\?",
     ):
-        assert lazy_foo.bar  # type: ignore
+        assert lazy_foo.bar  # type: ignore[pyrefly:missing-attribute]
 
     assert "baz" == lazy_foo().bar

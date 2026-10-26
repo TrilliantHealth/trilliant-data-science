@@ -100,7 +100,7 @@ class LeasefileWriter:
     def write(self) -> None:
         lease_contents = self.generate_lease(self.first_acquired_at)
         if self.writer_name:
-            lease_contents["writer_name"] = self.writer_name  # type: ignore
+            lease_contents["writer_name"] = self.writer_name  # type: ignore[pyrefly:bad-typed-dict-key]
         assert "/" not in lease_contents["writer_id"], lease_contents
         assert self.writer_id == lease_contents["writer_id"], (self.writer_id, lease_contents)
         lease_bytes = _funcs.json_dumpb(lease_contents)

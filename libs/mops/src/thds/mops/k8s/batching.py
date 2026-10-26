@@ -32,7 +32,8 @@ F = ty.TypeVar("F", bound=ty.Callable)
 
 def _clear_config_cache(f: F) -> F:
     @wraps(f)
-    def _wrapped(*args, **kwargs):  # type: ignore
+    # type: ignore[pyrefly:implicit-any-parameter, pyrefly:unannotated-return]
+    def _wrapped(*args, **kwargs):
         auth.cache_clear()
         return f(*args, **kwargs)
 

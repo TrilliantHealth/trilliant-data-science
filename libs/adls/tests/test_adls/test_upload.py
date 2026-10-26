@@ -22,7 +22,7 @@ def test_basic_upload_without_cache(caplog):
     with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
         # synchronous file not found
         assert upload_decision_and_metadata(
-            get_global_fs_client(  # type: ignore[arg-type]
+            get_global_fs_client(
                 # TODO - look at above type ignore
                 fs.account_name,
                 fs.file_system,
@@ -52,7 +52,7 @@ def test_basic_upload_without_cache(caplog):
         with caplog.at_level(logging.DEBUG, logger="thds.adls._upload"):
             # synchronous bytes don't match
             assert upload_decision_and_metadata(
-                get_global_fs_client(fs.account_name, fs.file_system)  # type: ignore[arg-type]
+                get_global_fs_client(fs.account_name, fs.file_system)
                 # TODO - look at above type ignore
                 .get_file_client(remote_path)
                 .get_file_properties,

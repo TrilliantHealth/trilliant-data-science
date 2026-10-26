@@ -26,7 +26,7 @@ def list_map(f: ty.Callable[[T], T]) -> ty.Callable[[ty.Iterable[T]], ty.List[T]
 
 
 def _list_map_filter_null(f: ty.Callable[[T], ty.Optional[T]], values: ty.Iterable[T]) -> ty.List[T]:
-    return list(filter(not_null, map(f, values)))  # type: ignore[arg-type]
+    return list(filter(not_null, map(f, values)))
 
 
 def list_map_filter_null(
@@ -47,7 +47,7 @@ def pipe(f1: ty.Callable[[A], B], f2: ty.Callable[[B], T]) -> ty.Callable[[A], T
 
 
 def _allow_na(f: ty.Callable[[A], B], value: ty.Optional[A]) -> ty.Optional[B]:
-    if pd.isna(value):  # type: ignore[arg-type]
+    if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return None
     return f(value)
 

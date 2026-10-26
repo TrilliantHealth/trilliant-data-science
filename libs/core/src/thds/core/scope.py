@@ -57,7 +57,7 @@ V = ty.TypeVar("V")
 
 class _keydefaultdict(defaultdict[K, V]):
     def __init__(self, default_factory: ty.Callable[[K], V], *args, **kwargs):
-        super().__init__(default_factory, *args, **kwargs)  # type: ignore
+        super().__init__(default_factory, *args, **kwargs)  # type: ignore[pyrefly:no-matching-overload]
         self.key_default_factory = default_factory
 
     def __missing__(self, key: K) -> V:

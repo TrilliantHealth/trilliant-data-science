@@ -1,0 +1,173 @@
+{
+  "min_severity": "error",
+  "errors": [
+    {
+      "column": 49,
+      "path": "src/thds/mops/k8s/_launch.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[@_, @_] | ResourceDefinition` is not assignable to `ResourceDefinition`",
+      "severity": "error"
+    },
+    {
+      "column": 47,
+      "path": "src/thds/mops/k8s/_launch.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[@_, @_] | ResourceDefinition` is not assignable to `ResourceDefinition`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "src/thds/mops/k8s/batching.py",
+      "name": "missing-attribute",
+      "concise_description": "No attribute `LAUNCH_COUNT` in module `thds.mops.k8s.counts`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "src/thds/mops/k8s/batching.py",
+      "name": "missing-attribute",
+      "concise_description": "No attribute `FINISH_COUNT` in module `thds.mops.k8s.counts`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "src/thds/mops/k8s/orchestrator/cli.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `package` with type `ModuleType | str` in function `importlib.resources.path`",
+      "severity": "error"
+    },
+    {
+      "column": 5,
+      "path": "src/thds/mops/k8s/orchestrator/cli.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `package` with type `ModuleType | str` in function `importlib.resources.path`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "src/thds/mops/k8s/tools/krsync.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `package` with type `ModuleType | str` in function `importlib.resources.path`",
+      "severity": "error"
+    },
+    {
+      "column": 43,
+      "path": "src/thds/mops/k8s/watch.py",
+      "name": "bad-function-definition",
+      "concise_description": "Default `(T) -> str` is not assignable to parameter `get_name` with type `(object) -> str`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "src/thds/mops/pure/adls/blob_store.py",
+      "name": "bad-override",
+      "concise_description": "Class member `AdlsBlobStore.readbytesinto` overrides parent class `BlobStore` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "src/thds/mops/pure/adls/blob_store.py",
+      "name": "bad-override",
+      "concise_description": "Class member `AdlsBlobStore.putbytes` overrides parent class `BlobStore` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "src/thds/mops/pure/core/file_blob_store.py",
+      "name": "bad-override",
+      "concise_description": "Class member `FileBlobStore.readbytesinto` overrides parent class `BlobStore` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "src/thds/mops/pure/core/file_blob_store.py",
+      "name": "bad-override",
+      "concise_description": "Class member `FileBlobStore.putbytes` overrides parent class `BlobStore` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "src/thds/mops/pure/core/memo/keyfunc.py",
+      "name": "bad-function-definition",
+      "concise_description": "Positional-only parameter `__args` cannot appear after keyword parameters",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "src/thds/mops/pure/core/memo/keyfunc.py",
+      "name": "bad-function-definition",
+      "concise_description": "Positional-only parameter `__kwargs` cannot appear after keyword parameters",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_mops/unit/k8s/test_uncertain_future.py",
+      "name": "bad-override",
+      "concise_description": "Class member `SignalingODict.values` overrides parent class `OrderedDict` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "tests/test_mops/unit/pure/test_adls_listing.py",
+      "name": "unsupported-operation",
+      "concise_description": "`<` is not supported between `None` and `datetime`",
+      "severity": "error"
+    },
+    {
+      "column": 46,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[dict[str, str | Unknown]]` is not assignable to parameter `events_batch` with type `Sequence[Event]` in function `thds.mops.pure.tools.console.upload.add_to`",
+      "severity": "error"
+    },
+    {
+      "column": 39,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[dict[str, str | Unknown]]` is not assignable to parameter `events_batch` with type `Sequence[Event]` in function `thds.mops.pure.tools.console.upload.add_to`",
+      "severity": "error"
+    },
+    {
+      "column": 50,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[dict[str, str | Unknown]]` is not assignable to parameter `events_batch` with type `Sequence[Event]` in function `thds.mops.pure.tools.console.upload.add_to`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-unpacking",
+      "concise_description": "Unpacked `dict[str, str | Unknown]` is not assignable to `Event`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-unpacking",
+      "concise_description": "Unpacked `dict[str, str | Unknown]` is not assignable to `Event`",
+      "severity": "error"
+    },
+    {
+      "column": 10,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-unpacking",
+      "concise_description": "Unpacked `dict[str, str | Unknown]` is not assignable to `Event`",
+      "severity": "error"
+    },
+    {
+      "column": 10,
+      "path": "tests/test_mops/unit/pure/test_console_upload.py",
+      "name": "bad-unpacking",
+      "concise_description": "Unpacked `dict[str, str | Unknown]` is not assignable to `Event`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_mops/unit/pure/test_mops_future.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `(type_hint: Unknown, uri: Unknown) -> tuple[object, Literal['THE_VALUE']]` is not assignable to parameter `get_meta_and_result` with type `(str, str) -> tuple[ResultMetadata | None, Any]` in function `thds.mops.pure.runner.get_results.unwrap_value_or_error`",
+      "severity": "error"
+    }
+  ]
+}

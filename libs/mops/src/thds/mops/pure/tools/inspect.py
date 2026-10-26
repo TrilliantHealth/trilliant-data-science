@@ -157,7 +157,7 @@ def _pprint(obj: object, file: ty.Any = None, uri: str = "") -> None:
 
     try:
         # Attempt to use rich for pretty-printing into the buffer
-        from rich import console, pretty  # type: ignore[import-not-found]
+        from rich import console, pretty  # type: ignore[pyrefly:missing-import]
 
         console.Console(file=output_buffer, color_system=None).print(pretty.Pretty(obj), crop=False)
     except ModuleNotFoundError:
@@ -344,7 +344,8 @@ def _diff_uris(uri: str, other_uris: ty.Collection[str]) -> ty.List[str]:
         executor_cm=concurrent.futures.ThreadPoolExecutor(max_workers=8),
     ):
         with tmp.temppath_same_fs() as path_for_other_uri:
-            _write_ire_to_path(control_file, path_for_other_uri, other_uri)  # type: ignore
+            # type: ignore[pyrefly:bad-argument-type]
+            _write_ire_to_path(control_file, path_for_other_uri, other_uri)
             if not _MATCHES.matches(path_for_other_uri.read_text()):
                 continue
 

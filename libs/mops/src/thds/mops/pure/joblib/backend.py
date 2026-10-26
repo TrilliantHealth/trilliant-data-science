@@ -10,7 +10,8 @@ Joblib is installed, or you will get an ImportError.
 
 import typing as ty
 
-from joblib._parallel_backends import LokyBackend, SequentialBackend, ThreadingBackend  # type: ignore
+# type: ignore[pyrefly:missing-import]
+from joblib._parallel_backends import LokyBackend, SequentialBackend, ThreadingBackend
 
 from thds.core import files, log
 

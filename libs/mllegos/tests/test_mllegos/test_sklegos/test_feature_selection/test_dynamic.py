@@ -101,7 +101,7 @@ def test_dynamic_fs_low_variance(array_type: ArrayType):
     n = 100
     X, y = make_dataset(array_type, n, 2, n_const_features=10, n_random_features=1)
     # first column is the random feature
-    the_feature = array_compat.slice_2d(X, None, 0)  # type: ignore[arg-type]
+    the_feature = array_compat.slice_2d(X, None, 0)  # type: ignore[pyrefly:bad-argument-type]
     fs = dynamic.DynamicFeatureSelection(
         feature_selector=univariate.construct_univariate_fs("FDR", "chi2", 0.05),
         feature_score="MI",

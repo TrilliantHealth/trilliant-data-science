@@ -32,7 +32,7 @@ class _MagicConfig:
         # based on the fully-qualified path to the callable, e.g. foo.bar.baz.my_func
         self.shim_bld = config_tree.ConfigTree[ty.Optional[ShimBuilder]](
             "mops.pure.magic.shim",
-            parse=to_shim_builder,  # type: ignore
+            parse=to_shim_builder,
         )
         self.blob_root = config_tree.ConfigTree[ty.Callable[[], str]](
             "mops.pure.magic.blob_root", parse=core.uris.to_lazy_uri
@@ -120,7 +120,8 @@ class Magic(ty.Generic[P, R]):
     def _is_off(self) -> bool:
         return self._shim_builder_or_off is None
 
-    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shim:  # type: ignore[valid-type]
+    # type: ignore[pyrefly:invalid-annotation]
+    def _shimbuilder(self, f: ty.Callable[P, R], args: P.args, kwargs: P.kwargs) -> Shim:
         # this can be set using a stack-local context, or set globally as specifically
         # or generally as the user needs. We prefer stack local over everything else.
         sb = self._shim_builder_or_off

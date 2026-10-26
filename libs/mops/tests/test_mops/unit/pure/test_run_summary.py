@@ -24,7 +24,7 @@ def run_directory() -> Generator[Path, None, None]:
     yield run_dir
 
     shutil.rmtree(run_dir, ignore_errors=True)
-    run_summary._ensure_run_directory.clear_cache()  # type: ignore[attr-defined]
+    run_summary._ensure_run_directory.clear_cache()  # type: ignore[pyrefly:missing-attribute]
 
 
 def test_memoizing_pickling_runner_init() -> None:

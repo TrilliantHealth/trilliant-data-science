@@ -228,7 +228,7 @@ def make_remote_lease_writer(lease_dir_uri: str, expected_writer_id: str = "") -
     )
     leasefile_writer.first_acquired_at = datetime.fromisoformat(first_acquired_at_s)
     # disable releasing from remote
-    leasefile_writer.release = lambda: None  # type: ignore # noqa: E731
+    leasefile_writer.release = lambda: None  # noqa: E731
     return leasefile_writer
 
 

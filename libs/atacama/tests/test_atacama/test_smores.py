@@ -137,7 +137,7 @@ def test_load_and_dump_smore():
     with pytest.raises(ma.ValidationError):
         SmoreFromApiSchema().load(almost)
 
-    almost["chocolate"]["cacao_pct"] = 100  # type: ignore
+    almost["chocolate"]["cacao_pct"] = 100
     SmoreFromApiSchema().load(almost)
 
 

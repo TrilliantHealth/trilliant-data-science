@@ -63,12 +63,12 @@ def _put_bytes_to_file_uri(remote_uri: str, data: AnyStrSrc) -> None:
             f.write(data)
     elif isinstance(data, str):
         with atomic_writable(remote_uri, "w") as f:
-            f.write(data)  # type: ignore
+            f.write(data)  # type: ignore[pyrefly:no-matching-overload]
     else:
         # if this fallback case fails, we may need to admit defeat for now,
         # and follow up by analyzing the failure and adding support for the input data type.
         with atomic_writable(remote_uri, "wb") as f:
-            for block in data:  # type: ignore
+            for block in data:  # type: ignore[pyrefly:not-iterable]
                 f.write(block)
 
 
@@ -80,7 +80,7 @@ class FileBlobStore(BlobStore):
 
     def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
         with path_from_uri(remote_uri).open("rb") as f:
-            shutil.copyfileobj(f, stream)  # type: ignore
+            shutil.copyfileobj(f, stream)
 
     def getfile(self, remote_uri: str) -> Path:
         p = path_from_uri(remote_uri)

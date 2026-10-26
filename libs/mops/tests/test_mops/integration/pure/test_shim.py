@@ -98,7 +98,7 @@ def test_shim_builder(caplog):
 
         return _just_raise
 
-    a2 = use_runner(MemoizingPicklingRunner(build_shim, TEST_TMP_URI))(add2)  # type: ignore
+    a2 = use_runner(MemoizingPicklingRunner(build_shim, TEST_TMP_URI))(add2)
 
     with pytest.raises(ValueError):
         assert a2(0) == 2

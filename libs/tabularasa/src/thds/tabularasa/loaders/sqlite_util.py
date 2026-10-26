@@ -60,10 +60,11 @@ if not PARAMETERIZABLE_BUILTINS:
 
     def get_generic_origin(t) -> ty.Optional[ty.Type]:
         org = get_origin(t)
-        return None if org is None else _builtin_to_typing.get(org, org)  # type: ignore
+        # type: ignore[pyrefly:bad-return]
+        return None if org is None else _builtin_to_typing.get(org, org)
 
 else:
-    get_generic_origin = get_origin  # type: ignore[assignment]
+    get_generic_origin = get_origin
 
 
 LITERAL_SQLITE_TYPES = {int, float, bool, str, type(None), datetime.date, datetime.datetime}
@@ -167,7 +168,7 @@ def nonnull_type_of(t: Type) -> Type:
     if type(None) not in types:
         return t
     nonnull_types = tuple(t_ for t_ in types if t_ is not type(None))  # noqa
-    return ty.Union[nonnull_types]  # type: ignore
+    return ty.Union[nonnull_types]  # type: ignore[pyrefly:not-a-type]
 
 
 def to_local_path(path: StrOrPath, package: Optional[str] = None) -> Path:
@@ -286,7 +287,7 @@ class AttrsSQLiteDatabase:
         mmap_size: int = DEFAULT_MMAP_BYTES,
     ):
         if cache_size is not None:
-            self.sqlite_index_query = lru_cache(cache_size)(self.sqlite_index_query)  # type: ignore
+            self.sqlite_index_query = lru_cache(cache_size)(self.sqlite_index_query)
 
         self._sqlite_con = sqlite_connection(
             db_path,
