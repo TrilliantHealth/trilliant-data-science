@@ -130,8 +130,8 @@ def _attempt_cache_hit(
                 if local_hash != hash_path_if_exists(cache_path):
                     # only copy if the cache is out of date
                     from_local_path_to_cache(local_path, cache_path, cache.link)
-            return _FileResult(local_hash, hit=cache_path)
-        return _FileResult(local_hash, hit=Path(local_path))
+            return _FileResult(local_hash, hit=cache_path)  # type: ignore[pyrefly:bad-argument-type]  # legacy
+        return _FileResult(local_hash, hit=Path(local_path))  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     if local_hash:
         logger.debug(
@@ -144,7 +144,7 @@ def _attempt_cache_hit(
         cache_hash = hash_path_if_exists(cache_path)
         if cache_hash == expected_hash:  # file in cache matches!
             from_cache_path_to_local(cache_path, local_path, cache.link)
-            return _FileResult(cache_hash, hit=cache_path)
+            return _FileResult(cache_hash, hit=cache_path)  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
         if cache_hash:
             logger.debug(

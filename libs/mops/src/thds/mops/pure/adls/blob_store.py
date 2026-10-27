@@ -96,7 +96,7 @@ class AdlsBlobStore(BlobStore):
 
     @_azure_creds_retry
     @scope.bound
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:  # type: ignore[pyrefly:bad-override]  # legacy
         fqn = adls.fqn.parse(remote_uri)
         scope.enter(log.logger_context(download=fqn))
         logger.debug(f"<----- downloading {type_hint}")
@@ -114,7 +114,7 @@ class AdlsBlobStore(BlobStore):
     @_azure_creds_retry
     @_refusal_as_permission_error
     @scope.bound
-    def putbytes(
+    def putbytes(  # type: ignore[pyrefly:bad-override]  # legacy
         self, remote_uri: str, data: AnyStrSrc, type_hint: str = "application/octet-stream"
     ) -> None:
         """Upload data to a remote path."""

@@ -167,4 +167,4 @@ class ConstructorFactory(TypeRecursion[Params, Constructor]):
     """
 
     def __call__(self, type_: Type[T], *args: Params.args, **kwargs: Params.kwargs) -> Constructor[T]:
-        return super().__call__(type_)
+        return super().__call__(type_)  # type: ignore[pyrefly:invalid-param-spec]  # legacy

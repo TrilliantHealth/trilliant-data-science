@@ -49,7 +49,7 @@ def test_unwrap_returns_value_and_metadata(monkeypatch):
     success = memo.results.Success(value_uri="adls://x/value")
     result_and_itype = get_results.ResultAndInvocationType(success, "memoized")
     value, md = get_results.unwrap_value_or_error(
-        fake_get_meta_and_result,
+        fake_get_meta_and_result,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         None,  # run_directory
         "runner_prefix",  # runner_prefix
         (),  # args_kwargs_uris

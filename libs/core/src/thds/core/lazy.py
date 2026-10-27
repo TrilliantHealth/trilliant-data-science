@@ -1,5 +1,6 @@
 """A thread-safe lazy callable."""
 
+import types
 import typing as ty
 from threading import Lock, local
 
@@ -36,7 +37,7 @@ class Lazy(ty.Generic[R]):
 
     def __init__(self, source: ty.Callable[[], R], storage=None):
         self._source = source
-        self._storage = storage if storage is not None else lambda: 0
+        self._storage = storage if storage is not None else types.SimpleNamespace()
         self._storage.lock = Lock()
         # we store the Lock on the storage, because in some cases the storage may be
         # thread-local, and we need a separate lock per thread. However, we also create

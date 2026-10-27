@@ -62,9 +62,9 @@ def stratified_sample_ixs(
     if (remaining := total_sample_size - sample_sizes.sum()) > 0:
         # distribute remaining samples to labels with largest fractional parts
         increment_ixs = np.argpartition(-frac_parts, remaining)[:remaining]
-        sample_sizes.iloc[increment_ixs] += 1
+        sample_sizes.iloc[increment_ixs] += 1  # type: ignore[pyrefly:missing-attribute]  # legacy
 
-    per_label_sample_sizes = sample_sizes.to_dict()
+    per_label_sample_sizes = sample_sizes.to_dict()  # type: ignore[pyrefly:missing-attribute]  # legacy
 
     def sample(group: pd.Series) -> pd.Series:
         return group.sample(

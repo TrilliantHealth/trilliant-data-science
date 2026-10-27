@@ -122,7 +122,7 @@ def get_worktree_root_or_exit() -> Path:
         else:
             # In a git repo but not a recognized structure
             error_exit("Not in a worktree directory (no .bare directory found)")
-    return root
+    return root  # type: ignore[pyrefly:bad-return]  # legacy
 
 
 def get_current_worktree_branch() -> str | None:

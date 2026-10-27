@@ -16,8 +16,8 @@ class Thunk(ty.Generic[R]):
     """Result-typed callable with arguments partially applied beforehand."""
 
     func: ty.Callable
-    args: P.args
-    kwargs: P.kwargs
+    args: P.args  # type: ignore[pyrefly:not-a-type]  # legacy
+    kwargs: P.kwargs  # type: ignore[pyrefly:not-a-type]  # legacy
 
     def __init__(self, func: ty.Callable[P, R], /, *args: P.args, **kwargs: P.kwargs):
         self.func = func

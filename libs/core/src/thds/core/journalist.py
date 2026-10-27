@@ -23,10 +23,13 @@ from thds.core import log
 
 _logger = log.getLogger(__name__)
 
-try:
+if ty.TYPE_CHECKING:
     import psutil  # type: ignore[pyrefly:missing-import]
-except ImportError:
-    psutil = None
+else:
+    try:
+        import psutil
+    except ImportError:
+        psutil = None
 
 
 _SAMPLER_THREAD_NAME = "thds-core-journalist-sampler"

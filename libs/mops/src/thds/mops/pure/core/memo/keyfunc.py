@@ -24,7 +24,10 @@ class Keyfunc(ty.Protocol):
     """
 
     def __call__(
-        self, c: ty.Callable, __args: Args, __kwargs: Kwargs
+        self,
+        c: ty.Callable,
+        __args: Args,  # type: ignore[pyrefly:bad-function-definition]  # legacy
+        __kwargs: Kwargs,  # type: ignore[pyrefly:bad-function-definition]  # legacy
     ) -> ty.Tuple[ty.Callable, Args, Kwargs]: ...  # pragma: nocover
 
 

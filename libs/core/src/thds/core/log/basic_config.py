@@ -109,7 +109,7 @@ def _parse_thds_loglevels_file(filepath: str) -> Iterator[Tuple[str, int]]:
                 )  # AttributeError means invalid level
                 continue
             logger_name = line
-            yield logger_name, current_level
+            yield logger_name, current_level  # type: ignore[pyrefly:invalid-yield]  # legacy
 
 
 class DuplicateFilter:
@@ -147,10 +147,10 @@ if not logging.getLogger().hasHandlers():
             log_path.parent.mkdir(parents=True, exist_ok=True)
             # ^ I hate doing IO in module scope, but we've waited until the last possible moment...
             live_config["handlers"]["file"] = {  # type: ignore[pyrefly:unsupported-operation]
-                "class": "logging.FileHandler",
-                "formatter": "default",
-                "filename": _LOG_FILEPATH,
-                "delay": True,  # no need to have empty logfiles sitting around
+                "class": "logging.FileHandler",  # type: ignore[pyrefly:bad-assignment]  # legacy
+                "formatter": "default",  # type: ignore[pyrefly:bad-assignment]  # legacy
+                "filename": _LOG_FILEPATH,  # type: ignore[pyrefly:bad-assignment]  # legacy
+                "delay": True,  # type: ignore[pyrefly:bad-assignment]  # legacy  # no need to have empty logfiles sitting around
             }
             # type: ignore[pyrefly:bad-index, pyrefly:missing-attribute]
             live_config["root"]["handlers"].append("file")

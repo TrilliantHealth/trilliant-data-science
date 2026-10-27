@@ -98,10 +98,9 @@ ignore-missing-imports = [
     "google",
     "kubernetes.*",
 ]
-baseline = ".config/pyrefly-baseline.json"
-baseline-matching-mode = "column-ordered"
 
 [tool.pyrefly.errors]
+unused-type-ignore = "error"
 implicit-any-parameter = "error"
 unannotated-return = "error"
 

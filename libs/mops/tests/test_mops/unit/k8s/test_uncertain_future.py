@@ -19,7 +19,7 @@ class SignalingODict(collections.OrderedDict):
         super().update(initial)
         self.snapshot_ready = snapshot_ready
 
-    def values(self):
+    def values(self):  # type: ignore[pyrefly:bad-override]  # legacy
         # Signal after we've yielded at least one item, so we're actively iterating
         for i, val in enumerate(super().values()):
             if i == 1:  # Signal after the second item

@@ -128,7 +128,7 @@ class TabularFileSource(DocumentedMixin, LocalFileSourceMixin):
                 csv.register_dialect(dialect_name, dialect_cls)
                 dialect = dialect_cls()
 
-            return dialect
+            return dialect  # type: ignore[pyrefly:bad-return]  # legacy
 
     @property
     def csv_reader_kwargs(self) -> Dict[str, Union[str, int, bool]]:

@@ -65,8 +65,9 @@ check-unannotated-defs = true
 type-ignore-unknown-tag-behavior = "no-effect"
 infer-return-types = "never"
 ignore-missing-imports = ["fastjsonschema", "typing_inspect"]
-baseline = ".config/pyrefly-baseline.json"
-baseline-matching-mode = "column-ordered"
+
+[tool.pyrefly.errors]
+unused-type-ignore = "error"
 
 [tool.pytest.ini_options]
 # do not run integration test by default, but CI will pick it up

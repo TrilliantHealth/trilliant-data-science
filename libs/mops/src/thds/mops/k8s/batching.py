@@ -191,8 +191,8 @@ def make_counting_process_pool_executor(
     # even though i want to assign this to a global, I also want to prevent
     # any possible race condition where i somehow use a different thread's LAUNCH_COUNT
     # when i create the ProcessPoolExecutor a few lines below.
-    counts.LAUNCH_COUNT = launch_count
-    counts.FINISH_COUNT = mp_context.Value("i", 0)  # we don't use this here; we just reset it to zero.
+    counts.LAUNCH_COUNT = launch_count  # type: ignore[pyrefly:missing-attribute]  # legacy
+    counts.FINISH_COUNT = mp_context.Value("i", 0)  # type: ignore[pyrefly:missing-attribute]  # legacy  # we don't use this here; we just reset it to zero.
     # SPOOKY - reset the global finish counter and make it be the same 'type'
     return concurrent.futures.ProcessPoolExecutor(
         max_workers=max_workers or cpus.available_cpu_count(),

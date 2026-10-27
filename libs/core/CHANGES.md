@@ -1,3 +1,8 @@
+### 1.58.20261026
+
+- `Lazy` keeps its lock and cached value on a `types.SimpleNamespace` when no storage is given, instead
+  of on a function object.
+
 ### 1.58.20260924
 
 - Fixed: a config item with a boolean default now reads the word in its environment variable. `bool` is

@@ -5,12 +5,12 @@ from thds import core
 from thds.core.source.tree import SourceTree
 from thds.core.thunks import thunking
 
-from . import upload
 from .download import download_or_use_verified
 from .fqn import AdlsFqn
 from .global_client import get_global_fs_client
 from .impl import ADLSFileSystem
 from .ro_cache import global_cache
+from .upload import upload
 from .uri import UriIsh, parse_any
 
 
@@ -45,7 +45,7 @@ def upload_through_cache(dest: UriIsh, src_path: Path) -> core.source.Source:
     Uses global client, which is pretty much always what you want.
     """
     assert src_path.is_file(), "src_path must be a file."
-    new_src = upload.upload(dest, src_path, write_through_cache=global_cache())
+    new_src = upload(dest, src_path, write_through_cache=global_cache())
     assert new_src.hash, "hash should always be calculable for a local path."
     return new_src
 

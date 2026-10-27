@@ -546,12 +546,12 @@ def test_tree_structured_labels_classifier_calibrated():
             return self
 
         def predict_proba(self, X):
-            return np.tile(self.probs_.values, len(X)).reshape(len(X), len(self.probs_))
+            return np.tile(self.probs_.values, len(X)).reshape(len(X), len(self.probs_))  # type: ignore[pyrefly:no-matching-overload]  # legacy
 
     class_tree = [1, 2, [3, [4, 5], 6], [7, [8, [9, 10]]], [11, 12], 13, [14, 15, 16]]
-    n_classes = sum(1 for _ in tsl._leaves(class_tree))
+    n_classes = sum(1 for _ in tsl._leaves(class_tree))  # type: ignore[pyrefly:bad-argument-type]  # legacy
     clf = tsl.TreeStructuredLabelsClassifier(
-        class_tree,
+        class_tree,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         MarginalClassDistClassifier(),
     )
     X = np.zeros((n_classes, 1))  # dummy features; model ignores

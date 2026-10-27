@@ -65,7 +65,7 @@ def file_lock(lock_unique_str: str, locktype: str = "download") -> FileLock:
     lock_type_dir = FILELOCKS_DIR() / locktype
     lock_type_dir.mkdir(parents=True, exist_ok=True)
     _occasionally_clean_file_locks()
-    return FileLock(
+    return FileLock(  # type: ignore[pyrefly:bad-return]  # legacy
         lock_type_dir / (lock_unique_str.split("/")[-1][:50] + hex_md5_str(lock_unique_str)),
         # is_singleton=True,
         # critical for keeping this reentrant without passing the lock around.

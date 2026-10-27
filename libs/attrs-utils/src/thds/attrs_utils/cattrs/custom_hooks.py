@@ -84,7 +84,7 @@ def structure_hook_with_defaults(
     if badly_typed := {
         name: default
         for name, default in defaults.items()
-        if not isinstance_(default, type(None) if (t := field_types[name]) is None else t)
+        if not isinstance_(default, type(None) if (t := field_types[name]) is None else t)  # type: ignore[pyrefly:bad-argument-type]  # legacy
     }:
         badly_typed_msg = ", ".join(
             f"{name} (expected {field_types[name]}, got {default!r})"

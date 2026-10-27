@@ -49,7 +49,7 @@ def pipe(f1: ty.Callable[[A], B], f2: ty.Callable[[B], T]) -> ty.Callable[[A], T
 def _allow_na(f: ty.Callable[[A], B], value: ty.Optional[A]) -> ty.Optional[B]:
     if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return None
-    return f(value)
+    return f(value)  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
 
 def allow_na(f: ty.Callable[[A], T]) -> ty.Callable[[ty.Optional[A]], ty.Optional[T]]:

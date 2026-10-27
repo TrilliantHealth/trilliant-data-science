@@ -66,10 +66,9 @@ check-unannotated-defs = true
 type-ignore-unknown-tag-behavior = "no-effect"
 infer-return-types = "checked"
 ignore-missing-imports = ["azure", "google", "ruamel.*"]
-baseline = ".config/pyrefly-baseline.json"
-baseline-matching-mode = "column-ordered"
 
 [tool.pyrefly.errors]
+unused-type-ignore = "error"
 unannotated-return = "error"
 implicit-any-parameter = "error"
 

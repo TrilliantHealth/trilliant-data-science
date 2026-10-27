@@ -163,7 +163,7 @@ def concrete_constructor(type_: Type[T]) -> Callable[..., T]:
     if is_namedtuple_type(type_):
         return type_
     origin = get_origin(type_)
-    return ORIGIN_TO_CONSTRUCTOR[type_] if origin is None else ORIGIN_TO_CONSTRUCTOR[origin]
+    return ORIGIN_TO_CONSTRUCTOR[type_] if origin is None else ORIGIN_TO_CONSTRUCTOR[origin]  # type: ignore[pyrefly:bad-return]  # legacy
 
 
 def bases(type_: Type, predicate: Optional[Callable[[Type], bool]] = None) -> List[Type]:

@@ -26,7 +26,7 @@ def gen_literal(random_gen, type_: Type[T]) -> Gen[T]:
 
 def gen_enum(random_gen, type_: Type[T]) -> Gen[T]:
     assert issubclass(type_, enum.Enum)
-    return choice_gen(list(type_))
+    return choice_gen(list(type_))  # type: ignore[pyrefly:bad-return]  # legacy
 
 
 def gen_attrs(random_gen, type_: Type[attr.AttrsInstance]) -> Gen[attr.AttrsInstance]:
@@ -75,7 +75,7 @@ def gen_variadic_tuple(random_gen, type_: Type[T]) -> Gen[T]:
     args = get_args(type_)
     cons = type_utils.concrete_constructor(type_)
     v_gen = random_gen(args[0])
-    return cast(Gen[T], collection.random_collection_gen(cons, repeat_gen(v_gen)))
+    return cast(Gen[T], collection.random_collection_gen(cons, repeat_gen(v_gen)))  # type: ignore[pyrefly:bad-specialization]  # legacy
 
 
 def gen_optional(random_gen, type_: Type[T]) -> Gen[T]:

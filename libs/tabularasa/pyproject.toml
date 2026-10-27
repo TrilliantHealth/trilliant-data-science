@@ -1,6 +1,6 @@
 [project]
 name = "thds.tabularasa"
-version = "0.14.19"
+version = "0.14.20"
 description = "Trilliant Health reference data build system."
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
@@ -123,8 +123,9 @@ ignore-missing-imports = [
     "ruamel.*",
     "typing_inspect",
 ]
-baseline = ".config/pyrefly-baseline.json"
-baseline-matching-mode = "column-ordered"
+
+[tool.pyrefly.errors]
+unused-type-ignore = "error"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

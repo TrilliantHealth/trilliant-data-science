@@ -128,6 +128,6 @@ class OptimizedPrefixEncoding(BaseEstimator, TransformerMixin):
         check_is_fitted(self)
         X_ = pd.Series(X, copy=False)
         if self.array_valued:
-            return X_.map(functional.list_map_filter_null(self.encoder_), na_action="ignore")
+            return X_.map(functional.list_map_filter_null(self.encoder_), na_action="ignore")  # type: ignore[pyrefly:no-matching-overload]  # legacy
         else:
             return X_.apply(self.encoder_)

@@ -78,7 +78,7 @@ class FileBlobStore(BlobStore):
         local_root.mkdir(exist_ok=True)
         return to_uri(local_root)
 
-    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:
+    def readbytesinto(self, remote_uri: str, stream: ty.IO[bytes], type_hint: str = "bytes") -> None:  # type: ignore[pyrefly:bad-override]  # legacy
         with path_from_uri(remote_uri).open("rb") as f:
             shutil.copyfileobj(f, stream)
 
@@ -93,7 +93,7 @@ class FileBlobStore(BlobStore):
             raise FileNotFoundError(f"{remote_uri} does not exist")
         return p
 
-    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> None:
+    def putbytes(self, remote_uri: str, data: AnyStrSrc, type_hint: str = "bytes") -> None:  # type: ignore[pyrefly:bad-override]  # legacy
         """Upload data to a remote path."""
         logger.debug(f"Writing {type_hint} to {remote_uri}")
         _put_bytes_to_file_uri(remote_uri, data)

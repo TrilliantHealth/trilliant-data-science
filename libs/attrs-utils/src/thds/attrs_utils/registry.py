@@ -25,7 +25,7 @@ class Registry(Dict[T, U]):
 
             return decorator
         else:
-            self[key] = value
+            self[key] = value  # type: ignore[pyrefly:unsupported-operation]  # legacy
             return value
 
     def cache(self, func: Callable[[T], U]) -> Callable[[T], U]:

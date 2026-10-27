@@ -44,7 +44,7 @@ def test_locking() -> None:
 
 
 def test_parametrized_locking() -> None:
-    cached_add_one = cache.locking(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)
+    cached_add_one = cache.locking(cache_lock=RLock(), make_func_lock=lambda key: RLock())(add_one)  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     assert cached_add_one.cache_info().currsize == 0  # type: ignore[pyrefly:missing-attribute]
     cached_add_one(1)
@@ -102,7 +102,7 @@ def deadlocker(deco) -> int:
 
 
 def test_locking_supports_recursive_calls_w_rlock() -> None:
-    assert deadlocker(cache.locking(make_func_lock=lambda _key: RLock()))
+    assert deadlocker(cache.locking(make_func_lock=lambda _key: RLock()))  # type: ignore[pyrefly:no-matching-overload]  # legacy
 
 
 class _Bounded(dict):

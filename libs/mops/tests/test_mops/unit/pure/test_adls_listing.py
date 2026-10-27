@@ -35,7 +35,7 @@ def test_listing_timestamps_are_aware_utc(monkeypatch):
     )
     (entry,) = blob_store.AdlsBlobStore().list("adls://thdsscratch/tmp/q/manifest")
     assert entry.modified_at == naive.replace(tzinfo=dt.timezone.utc)
-    assert entry.modified_at < dt.datetime.now(dt.timezone.utc)  # comparable, which is the point
+    assert entry.modified_at < dt.datetime.now(dt.timezone.utc)  # type: ignore[pyrefly:unsupported-operation]  # legacy  # comparable, which is the point
 
 
 def test_other_listing_errors_still_raise(monkeypatch):

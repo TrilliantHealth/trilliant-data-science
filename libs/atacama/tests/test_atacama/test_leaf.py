@@ -28,7 +28,7 @@ def test_handles_literals():
         s_or_p.deserialize("g")
 
     assert isinstance(dm[Literal[1, 2]](), marshmallow.fields.Integer)
-    assert isinstance(dm[Literal[1.1, 2.0]](), marshmallow.fields.Float)
+    assert isinstance(dm[Literal[1.1, 2.0]](), marshmallow.fields.Float)  # type: ignore[pyrefly:invalid-literal]  # legacy
     assert isinstance(dm[Literal[True, False]](), marshmallow.fields.Boolean)
     assert isinstance(dm[Literal[-1, False]](), marshmallow.fields.Raw)
 

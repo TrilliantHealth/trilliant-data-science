@@ -471,7 +471,7 @@ class WatchingObjectSource(ty.Generic[T]):
     def __init__(
         self,
         get_list_method: GetListMethod[T],
-        get_name: ty.Callable[[T], str] = ty.cast(  # noqa: B008
+        get_name: ty.Callable[[T], str] = ty.cast(  # type: ignore[pyrefly:bad-function-definition]  # legacy  # noqa: B008
             ty.Callable[[T], str], _default_get_name
         ),
         backup_fetch: ty.Optional[ty.Callable[[K8sTarget, str], ty.Optional[T]]] = None,

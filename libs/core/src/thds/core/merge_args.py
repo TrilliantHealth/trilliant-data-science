@@ -132,7 +132,7 @@ def _merge(source, dest):  # noqa: C901
             dest.__code__.co_firstlineno,
             dest.__code__.co_lnotab,
         ]
-        passer_code = types.CodeType(*passer_args)
+        passer_code = types.CodeType(*passer_args)  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     passer = types.FunctionType(passer_code, globals())
     dest.__wrapped__ = passer

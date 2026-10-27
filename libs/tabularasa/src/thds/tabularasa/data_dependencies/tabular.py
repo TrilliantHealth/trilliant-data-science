@@ -73,7 +73,7 @@ class PandasCSVLoader:
                 assert converter is not None  # converter for a structured type will not be None
                 self.converters[column.header_name] = cast(
                     Callable[[str], Any],
-                    parse_optional(converter, na_values_for_col) if na_values_for_col else converter,
+                    parse_optional(converter, na_values_for_col) if na_values_for_col else converter,  # type: ignore[pyrefly:bad-specialization]  # legacy
                 )
             elif column.header_name not in self.parse_date_cols:
                 # read_csv requires passing `parse_dates` for determining date-typed columns

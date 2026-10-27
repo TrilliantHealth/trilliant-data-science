@@ -42,7 +42,7 @@ def _add_to_only_root(events):
 
 def test_nothing_is_published_before_a_run_is_named(tmp_path):
     """A run with the console off mints no name, and must not write to the blob store."""
-    upload.add_to("file:///run-not-started", [_event("a")])
+    upload.add_to("file:///run-not-started", [_event("a")])  # type: ignore[pyrefly:bad-argument-type]  # legacy
     upload.flush()
 
     assert not list(tmp_path.rglob("*.json"))
@@ -83,7 +83,7 @@ def test_flushing_twice_does_not_republish(tmp_path):
 def test_an_unwritable_destination_does_not_raise(tmp_path):
     """Publishing is diagnostic. Failing it must never interrupt the run it describes."""
     upload.start("not-a-uri-at-all", "mr.Run.abc")
-    upload.add_to("not-a-uri-at-all", [_event("a")])
+    upload.add_to("not-a-uri-at-all", [_event("a")])  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     upload.flush()  # must not raise
 
@@ -101,7 +101,7 @@ def test_starting_twice_on_the_same_root_keeps_the_first(tmp_path):
 def test_publishing_can_be_turned_off(tmp_path):
     with upload.CONSOLE_UPLOAD_EVENTS.set_local(False):
         upload.start(f"file://{tmp_path}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
-        upload.add_to("file:///upload-disabled", [_event("a")])
+        upload.add_to("file:///upload-disabled", [_event("a")])  # type: ignore[pyrefly:bad-argument-type]  # legacy
         upload.flush()
 
     assert not list(tmp_path.rglob("*.json"))
@@ -117,8 +117,8 @@ def test_two_roots_get_separate_uploaders(tmp_path):
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
 
     roots = sorted(upload.roots())
-    upload.add_to(roots[0], [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])
-    upload.add_to(roots[1], [{**_event("y"), "memo_uri": f"file://{root_b}/{_MEMO_URI_SUFFIX}"}])
+    upload.add_to(roots[0], [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}])  # type: ignore[pyrefly:bad-unpacking]  # legacy
+    upload.add_to(roots[1], [{**_event("y"), "memo_uri": f"file://{root_b}/{_MEMO_URI_SUFFIX}"}])  # type: ignore[pyrefly:bad-unpacking]  # legacy
     upload.flush()
 
     a_events = list((root_a / "mops/console/mr.Run.abc/events").iterdir())
@@ -143,7 +143,7 @@ def test_a_manifest_is_published_with_all_roots(tmp_path):
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
     upload.add_to(
         sorted(upload.roots())[0],
-        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],
+        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],  # type: ignore[pyrefly:bad-unpacking]  # legacy
     )
     upload.flush()
 
@@ -165,7 +165,7 @@ def test_a_failed_manifest_write_is_retried(tmp_path):
     upload.start(f"file://{root_b}/{_MEMO_URI_SUFFIX}", "mr.Run.abc")
     upload.add_to(
         sorted(upload.roots())[0],
-        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],
+        [{**_event("x"), "memo_uri": f"file://{root_a}/{_MEMO_URI_SUFFIX}"}],  # type: ignore[pyrefly:bad-unpacking]  # legacy
     )
 
     roots_a = root_a / "mops/console/mr.Run.abc/roots"

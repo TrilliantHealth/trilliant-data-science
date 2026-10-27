@@ -103,7 +103,7 @@ def to_jsonschema(
     elif not isinstance(modules, Mapping):
         named_modules = {module.__name__: module for module in modules}
     else:
-        named_modules = modules
+        named_modules = modules  # type: ignore[pyrefly:bad-assignment]  # legacy
 
     type_cache = JSONSchemaTypeCache(**named_modules)
     ref = gen_jsonschema(type_, type_cache, to_json)

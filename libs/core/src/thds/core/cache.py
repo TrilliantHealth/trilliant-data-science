@@ -204,8 +204,8 @@ def locking(
         return threading.Lock()
 
     decorator = _locking_factory(
-        cache_lock or threading.Lock(),
-        make_func_lock or default_make_func_lock,
+        cache_lock or threading.Lock(),  # type: ignore[pyrefly:bad-argument-type]  # legacy
+        make_func_lock or default_make_func_lock,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         make_cache or dict,
     )
 

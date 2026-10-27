@@ -59,7 +59,7 @@ def parameterize(
         return params.get(type_, type_)
     elif tparams := ti.get_parameters(type_):
         new_args = tuple(params.get(t, t) for t in tparams)
-        return type_[new_args]
+        return type_[new_args]  # type: ignore[pyrefly:unsupported-operation]  # legacy
     else:
         return type_
 

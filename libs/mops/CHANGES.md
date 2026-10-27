@@ -1,3 +1,8 @@
+### 3.34.20261026
+
+- Type checkers now see `thds.mops.image.default_config` as `docker_tools`' version, so its `file_ref` no
+  longer reads as missing. The fallback used without `docker_tools` is unchanged at runtime.
+
 ### 3.34.20261019
 
 - Fixed: a remote exception that cannot be pickled now reaches the caller as an

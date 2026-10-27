@@ -146,7 +146,7 @@ def resolve_newtypes(t: Type) -> Type:
         if not args:
             return t
         args_resolved = tuple(resolve_newtypes(a) for a in args)
-        return origin[args_resolved]
+        return origin[args_resolved]  # type: ignore[pyrefly:unsupported-operation]  # legacy
     return resolve_newtypes(supertype)
 
 

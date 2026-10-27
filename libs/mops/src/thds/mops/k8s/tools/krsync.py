@@ -24,7 +24,7 @@ import os
 import subprocess
 import sys
 
-with importlib.resources.path(__package__, "krsync.sh") as p:
+with importlib.resources.path(__package__, "krsync.sh") as p:  # type: ignore[pyrefly:bad-argument-type]  # legacy
     krsync = str(p.resolve())
 
 

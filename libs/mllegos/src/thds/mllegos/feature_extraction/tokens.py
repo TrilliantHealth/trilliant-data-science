@@ -57,7 +57,7 @@ def lookup_token(
     """
     if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return unknown_value if null_value is None else null_value
-    return encoding.get(value, unknown_value)
+    return encoding.get(value, unknown_value)  # type: ignore[pyrefly:no-matching-overload]  # legacy
 
 
 def lookup_token_normalized(
@@ -76,9 +76,9 @@ def lookup_token_normalized(
     if pd.isna(value):  # type: ignore[pyrefly:no-matching-overload]
         return unknown_value if null_value is None else null_value
     if normalizer is not None:
-        normalized = normalizer(value)
+        normalized = normalizer(value)  # type: ignore[pyrefly:bad-argument-type]  # legacy
         if normalized is None:
             # don't know what to do with this value
             return unknown_value
         return encoding.get(normalized, unknown_value)
-    return encoding.get(value, unknown_value)
+    return encoding.get(value, unknown_value)  # type: ignore[pyrefly:no-matching-overload]  # legacy

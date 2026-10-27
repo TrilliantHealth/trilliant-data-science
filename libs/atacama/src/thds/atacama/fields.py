@@ -67,7 +67,7 @@ def generate_field(
                 tuple(gen_field(typ) for typ in types),
                 **field_kwargs,
             )
-        return VariadicTuple(gen_field(types[0]), **field_kwargs)
+        return VariadicTuple(gen_field(types[0]), **field_kwargs)  # type: ignore[pyrefly:unsupported-operation]  # legacy
 
     def union_handler(types, **field_kwargs):
         import marshmallow_union

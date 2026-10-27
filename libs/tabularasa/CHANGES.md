@@ -1,3 +1,7 @@
+### 0.14.20
+
+- No code change: inline `# type: ignore[pyrefly:<kind>]` comments replace the `pyrefly` baseline file.
+
 ### 0.14.19
 
 - No code change: type-check suppressions name `pyrefly` error kinds instead of mypy codes.

@@ -62,7 +62,7 @@ class ConditionalImputer(BaseEstimator, TransformerMixin):
         }
         low_freq = groups.transform("count") < self.min_freq
         self.fallback_stats_ = {
-            name: X.loc[low_freq_ixs if low_freq_ixs.sum() >= self.min_freq else slice(None), name].agg(
+            name: X.loc[low_freq_ixs if low_freq_ixs.sum() >= self.min_freq else slice(None), name].agg(  # type: ignore[pyrefly:bad-index]  # legacy
                 agg_stats[name]
             )
             for name, low_freq_ixs in low_freq.items()

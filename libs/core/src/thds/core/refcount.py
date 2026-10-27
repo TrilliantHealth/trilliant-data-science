@@ -73,7 +73,7 @@ class _RefCountResource(ty.Generic[R]):
                     # this is one of those context managers that returns itself
                     # since we manage this resource, we need to prevent others from trying to enter or exit it.
                     resource = _ContextProxy(resource)
-                self._resource = resource
+                self._resource = resource  # type: ignore[pyrefly:bad-assignment]  # legacy
             self._ref_count += 1
             assert self._resource is not None, "Resource should not be None after incrementing ref count"
             resource = self._resource

@@ -195,8 +195,8 @@ def launch(  # noqa: C901
         )
 
         assert node_narrowing is not None
-        resource_requests: ResourceDefinition = node_narrowing.get("resource_requests", dict())
-        resource_limits: ResourceDefinition = node_narrowing.get("resource_limits", dict())
+        resource_requests: ResourceDefinition = node_narrowing.get("resource_requests", dict())  # type: ignore[pyrefly:bad-assignment]  # legacy
+        resource_limits: ResourceDefinition = node_narrowing.get("resource_limits", dict())  # type: ignore[pyrefly:bad-assignment]  # legacy
         if resource_requests or resource_limits:
             v1_container_args["resources"] = client.V1ResourceRequirements(
                 requests=resource_requests,

@@ -177,7 +177,7 @@ def demote_heading_levels(markup_text: str, table_name: str, levels: int = 1) ->
             new_level = min(new_level, MAX_HEADING_LEVEL)
             output.append(HEADING_UNDERLINE_CHARS[new_level - 1] * len(line))
         else:
-            output.append(line)
+            output.append(line)  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     if exceeded_limit:
         warn(f"Demoting heading levels for table {table_name} will exceed max heading level.")

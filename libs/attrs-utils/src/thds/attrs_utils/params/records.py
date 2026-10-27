@@ -48,14 +48,14 @@ def _parameterize_attrs_or_dataclass_field(
     if (parameterized_origin := field_origins.get(field.name)) is not None:
         field_type = type(None) if field.type is None else field.type
         # shouldn't happen in pracice after type resolution, but we keep it here to make mypy happy
-        concrete_type = parameterize(field_type, parameterized_origin)
+        concrete_type = parameterize(field_type, parameterized_origin)  # type: ignore[pyrefly:no-matching-overload]  # legacy
         if concrete_type == field.type:
             return field
         elif isinstance(field, attrs.Attribute):
-            return field.evolve(type=concrete_type)
+            return field.evolve(type=concrete_type)  # type: ignore[pyrefly:bad-return]  # legacy
         else:
             # dataclasses.Field
-            return _replace_dataclass_field_type(field, concrete_type)
+            return _replace_dataclass_field_type(field, concrete_type)  # type: ignore[pyrefly:bad-return]  # legacy
     else:
         return field
 

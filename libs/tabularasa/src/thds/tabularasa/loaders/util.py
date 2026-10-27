@@ -119,7 +119,7 @@ def unique_across_columns(df: pd.DataFrame, colnames: Sequence[str]) -> pd.Serie
         # if check_cols was a frame vs an index
         duped = duped.values
 
-    return pd.Series(~duped, index=df.index)
+    return pd.Series(~duped, index=df.index)  # type: ignore[pyrefly:unsupported-operation]  # legacy
 
 
 def _register_unique_across_columns() -> None:

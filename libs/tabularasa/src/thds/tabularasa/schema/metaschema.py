@@ -65,7 +65,7 @@ class AnonCustomType(DocumentedMixin):
     def python(self) -> Type:
         enum = self.enum
         if enum is not None:
-            return cast(Type, typing_extensions.Literal[tuple(enum.enum)])
+            return cast(Type, typing_extensions.Literal[tuple(enum.enum)])  # type: ignore[pyrefly:invalid-literal]  # legacy
         return self.type.python
 
     def python_type_literal(self, build_options: "BuildOptions", builtin: bool = False) -> str:
@@ -801,13 +801,13 @@ def render_pandera_schema(
         else:
             pandas_type = column.pandas(index=column.name in index_names)
         expr = constructor(
-            dtype=pandas_type,
-            checks=check_exprs,
+            dtype=pandas_type,  # type: ignore[pyrefly:bad-argument-type]  # legacy
+            checks=check_exprs,  # type: ignore[pyrefly:bad-argument-type]  # legacy
             nullable=column.nullable,
             unique=unique,
-            **extra_kw,
+            **extra_kw,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         )
-        exprlist.append((column.snake_case_name, expr))
+        exprlist.append((column.snake_case_name, expr))  # type: ignore[pyrefly:bad-argument-type]  # legacy
 
     index_def: Optional[Union[_IndexSchemaProxy, _MultiIndexSchemaProxy, pa.Index, pa.MultiIndex]]
     if index_defs:
@@ -816,7 +816,7 @@ def render_pandera_schema(
         else:
             constructor = _MultiIndexSchemaProxy if as_str else pa.MultiIndex
             index_def = constructor(
-                indexes=[expr for _name, expr in index_defs],
+                indexes=[expr for _name, expr in index_defs],  # type: ignore[pyrefly:bad-argument-type]  # legacy
                 strict=True,
             )
     else:
@@ -845,11 +845,11 @@ def render_pandera_schema(
 
     schema_cls = _DataFrameSchemaProxy if as_str else pa.DataFrameSchema
     return schema_cls(
-        columns=dict(column_defs),
-        index=index_def,
-        checks=df_check_exprs,
+        columns=dict(column_defs),  # type: ignore[pyrefly:bad-argument-type]  # legacy
+        index=index_def,  # type: ignore[pyrefly:bad-argument-type]  # legacy
+        checks=df_check_exprs,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         coerce=False,
-        strict="filter" if table.transient else True,
+        strict="filter" if table.transient else True,  # type: ignore[pyrefly:bad-argument-type]  # legacy
         ordered=False,
     )
 
