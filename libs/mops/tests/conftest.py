@@ -2,6 +2,8 @@ import pytest
 
 from .test_mops import config as internal_config
 
+pytest_plugins = ["pytester"]
+
 
 def pytest_collection_modifyitems(items):
     for item in items:

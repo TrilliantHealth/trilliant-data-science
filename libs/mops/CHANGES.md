@@ -1,3 +1,9 @@
+### 3.34.20261028
+
+- Fixed: the pytest plugin requires memoized results in CI during conftest loading and collection, not
+  only while tests run.
+- New: `docs/testing.adoc` describes the plugin and how to narrow or switch it off.
+
 ### 3.34.20261026
 
 - Type checkers now see `thds.mops.image.default_config` as `docker_tools`' version, so its `file_ref` no

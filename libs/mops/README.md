@@ -122,6 +122,7 @@ It has some [limitations](docs/limitations.adoc).
 - [CLI tools](docs/tools.adoc) for inspecting and summarizing mops invocations
 - [Debugging guide](docs/debugging.adoc) - storage structure, metadata files, run IDs, and diagnosing
   race conditions
+- [Testing](docs/testing.adoc) - the pytest plugin that requires memoized results in CI
 
 ## Development
 

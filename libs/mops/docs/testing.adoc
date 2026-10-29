@@ -1,0 +1,22 @@
+link:../README.md[↑]
+
+= Testing with `mops`
+
+`thds.mops` ships a pytest plugin, `pytest-mops`, that pytest loads for every project with `mops`
+installed. When the `CI` environment variable is set, the plugin requires every memoized result for the
+whole pytest run: the initial conftest imports, collection (test-module and later conftest imports), and
+the tests themselves. A call whose result is missing raises `RequiredResultNotFound`, naming the memo
+URI, instead of invoking the function. Outside CI the plugin does nothing.
+
+This keeps a CI runner from computing results it was never meant to compute: a test that reaches a
+memoized function at import time fails the same way as one that reaches it in its body.
+
+To narrow or switch off the requirement:
+
+* `-p no:pytest-mops` (on the command line or in `addopts`) disables the plugin for a project.
+* Define a session-scoped autouse fixture named `_mops_require_all_in_ci` in a `conftest.py` to lift the
+  requirement for the tests below it. Only the tests are affected; collection is still guarded.
+* `thds.mops.testing.results.require_all_in_ci(message)` is the same guard as a context manager, for a
+  test that wants its own error message.
+* `pure.results.require_all(message, unless_env=...)` requires results everywhere, with an environment
+  variable that skips the check.
