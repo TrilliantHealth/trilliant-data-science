@@ -1,3 +1,11 @@
+### 3.34.20261103
+
+- Fixed: Kubernetes API calls retry a 429, 500, 502, 503 or 504 response up to five times, backing off
+  from 1 to 16 seconds. `mops.k8s.transient_api_error.max_retries` sets the limit. A single gateway error
+  while creating a Job used to fail the call at once.
+- Fixed: a Job create that is retried and then answered with 409 AlreadyExists uses the existing Job,
+  since the earlier attempt may have created it.
+
 ### 3.34.20261028
 
 - Fixed: the pytest plugin requires memoized results in CI during conftest loading and collection, not

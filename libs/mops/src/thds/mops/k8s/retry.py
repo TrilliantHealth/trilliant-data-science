@@ -23,6 +23,13 @@ _URLLIB_COMMON = (
     urllib3.exceptions.ProtocolError,
     urllib3.exceptions.MaxRetryError,
 )
+_TRANSIENT_API_STATUSES = frozenset({429, 500, 502, 503, 504})
+# A gateway or overloaded API server answers with these; they usually clear within seconds,
+# so they get a short exponential backoff rather than the full retry budget.
+
+
+def _is_transient_api_error(ex: Exception) -> bool:
+    return isinstance(ex, client.exceptions.ApiException) and ex.status in _TRANSIENT_API_STATUSES
 
 
 def k8s_sdk_retry(
@@ -37,6 +44,7 @@ def k8s_sdk_retry(
         # type: ignore[pyrefly:implicit-any-parameter, pyrefly:unannotated-return]
         def wrapper(*args, **kwargs):
             i = 0
+            transient_api_retries = 0
 
             def _raise_if_max(i: int) -> None:
                 if i >= max_retries:
@@ -49,6 +57,7 @@ def k8s_sdk_retry(
                 except Exception as ex:
                     # some shared behavior for all exceptions means we want a single except block
                     _raise_if_max(i)
+                    delay = config.k8s_monitor_delay()
                     if isinstance(ex, _URLLIB_COMMON):
                         # these are extremely common and should always be retried
                         logger.debug(
@@ -66,12 +75,18 @@ def k8s_sdk_retry(
                         # clearing forces fresh credentials on the next attempt. (Bare-client code
                         # that calls auth.load_config() per attempt self-heals the same way - the
                         # clear makes its next load_config() a real reload instead of a cached no-op.)
+                    elif _is_transient_api_error(ex):
+                        if transient_api_retries >= config.k8s_transient_api_error_max_retries():
+                            raise
+
+                        delay = 2**transient_api_retries
+                        transient_api_retries += 1
                     elif not should_retry(ex):
                         raise
 
                     i += 1
                     logger.info(f"Will retry after K8S error {str(ex)}; attempt {i}")
-                time.sleep(config.k8s_monitor_delay())
+                    time.sleep(delay)
                 if get_retry_args_kwargs:
                     args, kwargs = get_retry_args_kwargs(i)
 

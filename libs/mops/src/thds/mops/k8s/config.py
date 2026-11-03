@@ -46,6 +46,11 @@ k8s_logs_watch_read_timeout_seconds = config.item(
 
 k8s_monitor_delay = config.item("mops.k8s.monitor.delay_seconds", 5, parse=int)
 k8s_monitor_max_attempts = config.item("mops.k8s.monitor.max_attempts", 100, parse=int)
+k8s_transient_api_error_max_retries = config.item(
+    "mops.k8s.transient_api_error.max_retries", 5, parse=int
+)
+# retries of a 429 or 5xx API response, which back off 1, 2, 4, 8, 16s... rather than
+# waiting the monitor delay.
 
 # In the East, we use the newer pod managed identity by default,
 # which provides access to a metadata endpoint that Azure clients know

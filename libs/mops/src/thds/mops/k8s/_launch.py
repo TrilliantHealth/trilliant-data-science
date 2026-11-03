@@ -81,6 +81,22 @@ _SIMULTANEOUS_LAUNCHES = threading.BoundedSemaphore(20)
 JOB_NAME = core.stack_context.StackContext("job_name", "")
 
 
+def _create_job(
+    target: K8sTarget, body: client.models.V1Job, retried: bool = False
+) -> client.models.V1Job:
+    """`retried` means an earlier create was sent, and may have created the Job before it failed."""
+    with _SIMULTANEOUS_LAUNCHES:
+        batch_api = client.BatchV1Api(api_client=api_client(target.kubeconfig_context))
+        try:
+            return batch_api.create_namespaced_job(namespace=target.namespace, body=body)
+        except client.exceptions.ApiException as ex:
+            if not (retried and ex.status == 409):
+                raise
+
+            logger.info(f"Job {body.metadata.name} already exists after a retried create")
+            return batch_api.read_namespaced_job(name=body.metadata.name, namespace=target.namespace)
+
+
 @core.scope.bound
 def launch(  # noqa: C901
     container_image: str,
@@ -262,16 +278,15 @@ def launch(  # noqa: C901
     cost.ensure_started(target)
 
     @k8s_sdk_retry()
-    def launch_job() -> client.models.V1Job:
+    def prepare_job() -> client.models.V1Job:
         with _SIMULTANEOUS_LAUNCHES:
             upsert_namespace(target.namespace, target.kubeconfig_context)
             # we do the job transform after actually upserting the namespace so that
             # the transform can use the namespace if necessary.
-            return client.BatchV1Api(
-                api_client=api_client(target.kubeconfig_context)
-            ).create_namespaced_job(namespace=target.namespace, body=job_with_all_transforms())
+            return job_with_all_transforms()
 
-    job = launch_job()
+    body = prepare_job()
+    job = k8s_sdk_retry(lambda _: ((target, body), dict(retried=True)))(_create_job)(target, body)
     logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
     return core.futures.make_lazy(_launch_logs_and_create_future)(  # see below for implementation
         job.metadata.name,
