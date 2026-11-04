@@ -1,3 +1,7 @@
+### 3.34.202611031811
+
+- Added `console.publish_queue_root` and `console.read_queue_roots` for run monitoring.
+
 ### 3.34.20261103
 
 - Fixed: Kubernetes API calls retry a 429, 500, 502, 503 or 504 response up to five times, backing off

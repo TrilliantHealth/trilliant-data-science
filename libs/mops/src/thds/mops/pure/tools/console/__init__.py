@@ -14,4 +14,6 @@ from .events import (  # noqa: F401
     invocation_key_of,
     started,
 )
+from .queue_roots import publish as publish_queue_root  # noqa: F401
+from .queue_roots import read as read_queue_roots  # noqa: F401
 from .writer import CONSOLE_EVENTS_DIR, emit, events_dir  # noqa: F401
