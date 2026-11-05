@@ -12,7 +12,7 @@ This works because a completed memo chain outlives its data: once every
 downstream memo exists, a rerun traverses memo-hits end to end and never
 touches the intermediate bytes at all. The data is scaffolding; the memo
 chain is the durable structure. The rules below exist to make sure a chain
-can never *half*-survive - serving stale metadata where real bytes are
+can never be partly expired - serving stale metadata where real bytes are
 required.
 
 == The tiers
@@ -105,6 +105,6 @@ communicates its output:
 * *Stale namespace resumed*: producers fast-forward as memo-hits, the run
   looks healthy until the first consumer actually needs bytes.
 
-Each of these is a chain that half-survived. The rules above make the two
+Each of these is a partly expired chain. The rules above make the two
 legitimate states - fully replayable, or fully recomputed - the only
 reachable ones.

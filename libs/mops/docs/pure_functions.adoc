@@ -15,8 +15,8 @@ return value is deterministic from the caller's point of view, and any side
 effect that produces a result other code depends on (writing a file, updating
 a database row) is _idempotent_ — repeated calls with the same arguments
 produce the same content at the same location. Diagnostic side effects (logging,
-metrics) aren't idempotent in the strict sense and don't need to be; they're
-not load-bearing for the result.
+metrics) aren't idempotent in the strict sense and don't need to be; they
+don't affect the result.
 
 ## A concrete example
 
