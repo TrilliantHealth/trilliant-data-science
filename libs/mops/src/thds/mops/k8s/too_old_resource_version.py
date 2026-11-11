@@ -23,7 +23,7 @@ def parse_too_old_resource_version(
 ) -> ty.Optional[TooOldResourceVersion]:
     if not isinstance(exc, client.exceptions.ApiException):
         return None
-    m = _TOO_OLD_RESOURCE_VERSION.match(exc.reason)
+    m = _TOO_OLD_RESOURCE_VERSION.match(exc.reason or "")
     if m:
         # this is a completely bonkers thing to have to do
         # ourselves, but here we are.  I can't find any

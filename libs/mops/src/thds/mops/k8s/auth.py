@@ -8,6 +8,7 @@ from kubernetes import client, config
 from thds.core import fretry, log, scope
 
 from .._utils.locked_cache import locked_cached
+from . import narrow
 from .config import kubeconfig_context
 
 logger = log.getLogger(__name__)
@@ -92,7 +93,7 @@ def upsert_namespace(
     logger.debug("Creating namespace if not exists: %s" % namespace)
     kubeapi = client.CoreV1Api(api_client=api_client(kubeconfig_context))
     ns_obj = client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace))
-    namespaces = set([item.metadata.name for item in kubeapi.list_namespace().items])
+    namespaces = set([narrow.name_of(item) for item in kubeapi.list_namespace().items])
     if namespace not in namespaces:
         logger.info(f"Creating namespace {namespace}")
         kubeapi.create_namespace(ns_obj)

@@ -47,7 +47,7 @@ from thds.core import futures, scope
 from thds.core.log import getLogger, logger_context
 from thds.termtool.colorize import colorized
 
-from . import config
+from . import config, narrow
 from .target import K8sTarget, resolve_target
 from .too_old_resource_version import parse_too_old_resource_version
 from .uncertain_future import FutureInterpreter, UncertainFuturesTracker
@@ -60,10 +60,11 @@ R = ty.TypeVar("R")
 
 
 class V1List(ty.Protocol[T]):
-    api_version: str
-    items: ty.List[T]
-    kind: str
-    metadata: client.models.V1ListMeta
+    @property
+    def items(self) -> ty.List[T]: ...
+
+    @property
+    def metadata(self) -> ty.Optional[client.models.V1ListMeta]: ...
 
 
 class K8sList(ty.Protocol[T]):
@@ -174,9 +175,10 @@ def yield_objects_from_list(
                 return
 
             initial_list = list_method(namespace=target.namespace)
+            list_meta = narrow.required(initial_list.metadata, "list metadata")
             logger.debug(
                 f"Watch loop #{loop_count}: Listed {len(initial_list.items)} {object_type_hint} "
-                f"in {target} (resource_version={initial_list.metadata.resource_version})"
+                f"in {target} (resource_version={list_meta.resource_version})"
             )
 
             # Create watch with watchdog monitoring BEFORE FETCH phase
@@ -192,7 +194,7 @@ def yield_objects_from_list(
                     events_yielded += 1
                     yield target, object, "FETCH"
 
-                if initial_list.metadata._continue:
+                if list_meta._continue:
                     logger.warning(
                         f"We did not fetch the whole list of {object_type_hint} the first time..."
                     )
@@ -200,16 +202,17 @@ def yield_objects_from_list(
                 for evt in watch.stream(
                     list_method,
                     namespace=target.namespace,
-                    resource_version=initial_list.metadata.resource_version,
+                    resource_version=list_meta.resource_version,
                     **kwargs,
                     timeout_seconds=server_timeout,
                     _request_timeout=(connection_timeout, read_timeout),
                 ):
                     last_event_time[0] = _watch_timer()  # update for watchdog
-                    object = evt.get("object")
+                    event = ty.cast(ty.Mapping[str, ty.Any], evt)
+                    object = event.get("object")
                     if object:
                         events_yielded += 1
-                        yield target, object, evt["type"]
+                        yield target, object, event["type"]
                     # once we've received events, let the resource version
                     # be managed automatically if possible.
             finally:

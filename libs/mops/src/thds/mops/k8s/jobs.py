@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from kubernetes import client
 
-from . import auth
+from . import auth, narrow
 from ._shared import logger
 from .retry import k8s_sdk_retry
 from .target import K8sTarget, resolve_target
@@ -25,7 +25,7 @@ def _get_job(target: K8sTarget, job_name: str) -> ty.Optional[client.models.V1Jo
 
 _JOB_SOURCE = WatchingObjectSource(
     lambda target, _: _batch_api(target).list_namespaced_job,
-    lambda job: job.metadata.name,
+    narrow.name_of,
     _get_job,
     typename="Job",
 )
@@ -88,7 +88,7 @@ def job_completion_time(job: client.models.V1Job) -> ty.Optional[datetime]:
     if job.status.completion_time:
         return job.status.completion_time
 
-    for condition in job.status.conditions or tuple():
+    for condition in narrow.required(job.status, "status").conditions or tuple():
         if condition.type == "Complete" and condition.status == "True":
             return (
                 condition.last_transition_time
@@ -107,7 +107,7 @@ def is_job_failed(job: client.models.V1Job) -> bool:
     if not job.status:
         return False
 
-    for condition in job.status.conditions or tuple():
+    for condition in narrow.required(job.status, "status").conditions or tuple():
         if condition.type == "Failed" and condition.status == "True":
             return True
 
@@ -122,7 +122,7 @@ def is_mops_exception_failure(job: client.models.V1Job) -> bool:
     The serialized exception is already in blob storage — the caller should retrieve
     it via the normal result-reading path rather than raising K8sJobFailedError.
     """
-    for condition in job.status.conditions or tuple():
+    for condition in narrow.required(job.status, "status").conditions or tuple():
         if condition.reason == "PodFailurePolicy" and condition.status == "True":
             return True
 
@@ -151,7 +151,9 @@ def watch_jobs_cli() -> None:
 
     for job, event_type in watch_jobs(args.namespace, timeout=args.timeout):
         completion_time = job_completion_time(job)
-        creation_time = job.metadata.creation_timestamp
+        creation_time = narrow.required(
+            narrow.required(job.metadata, "metadata").creation_timestamp, "creation_timestamp"
+        )
 
         status = ""
         if is_job_failed(job):
@@ -165,8 +167,8 @@ def watch_jobs_cli() -> None:
         print(
             datetime.now().isoformat(),
             f"{event_type:<10}",
-            f"{job.metadata.name:<64}",
-            job.metadata.creation_timestamp,
+            f"{narrow.name_of(job):<64}",
+            creation_time,
             status,
         )
 

@@ -17,7 +17,7 @@ from thds.core.log import logger_context
 from thds.termtool.colorize import colorized, make_colorized_out, next_color
 
 from .._utils.locked_cache import locked_cached
-from . import auth, config
+from . import auth, config, narrow
 from ._shared import logger
 from .jobs import get_job
 from .retry import k8s_sdk_retry
@@ -39,9 +39,8 @@ class _PodLogWatch(watch.Watch):
     docstring for the literal `:param bool follow:` (`get_watch_argument_name`).
     kubernetes-client 36.x reformatted that to `:param follow:` + `:type follow: bool`, so
     the stock heuristic misses it and injects `watch`, which `read_namespaced_pod_log`
-    rejects (`ApiTypeError`). Scan for either modern form so a `follow`-supporting method
-    (i.e. pod logs) is detected across client versions; the legacy form still matches via
-    the base class.
+    rejects (`ApiTypeError`). Scan for the legacy and the modern forms so a
+    `follow`-supporting method (i.e. pod logs) is detected across client versions.
 
     GH issue: https://github.com/kubernetes-client/python/issues/2615
 
@@ -49,9 +48,9 @@ class _PodLogWatch(watch.Watch):
     `get_watch_argument_name` to match its own reformatted docstrings - it's an upstream
     regression, not ours."""
 
-    def get_watch_argument_name(self, func: ty.Any) -> str:
+    def get_watch_argument_name(self, func: ty.Any) -> ty.Literal["follow", "watch"]:
         doc = pydoc.getdoc(func)
-        if ":param follow:" in doc or ":type follow:" in doc:
+        if any(marker in doc for marker in (":param bool follow:", ":param follow:", ":type follow:")):
             return "follow"
         return super().get_watch_argument_name(func)
 
@@ -116,7 +115,7 @@ class JobLogWatcher:
             self.job_name,
             self.num_pods_expected if not self.pods_being_scraped else 1,
         ):
-            pod_name = pod.metadata.name
+            pod_name = narrow.name_of(pod)
             if pod_name not in self.pods_being_scraped:
                 # don't start new threads for pods we've already previously discovered - they have their own thread.
                 self.pods_being_scraped.add(pod_name)
@@ -164,7 +163,7 @@ def _yield_running_pods_for_job(
     logger.debug("Polling for pods created by job: %s", job_name)
     while attempt < config.k8s_monitor_max_attempts():
         for pod in _list_pods(target):
-            owner_refs = pod.metadata.owner_references
+            owner_refs = narrow.required(pod.metadata, "metadata").owner_references
             if not owner_refs:
                 # this is a rare and undocumented case where a pod
                 # will have owner_references=None if it was manually created.
@@ -175,11 +174,11 @@ def _yield_running_pods_for_job(
                 logger.warning("Found multiple owner references for a pod. Taking first one...")
             owner_ref = owner_refs[0]
             if owner_ref.name == job_name:
-                if pod.status.phase in {
+                if narrow.phase_of(pod) in {
                     K8sPodStatus.RUNNING.value,
                     K8sPodStatus.UNKNOWN.value,
                 }:
-                    logger.debug(f"Found a pod {pod.metadata.name} in phase {pod.status.phase}")
+                    logger.debug(f"Found a pod {narrow.name_of(pod)} in phase {narrow.phase_of(pod)}")
                     yielded += 1
                     yield pod
         if yielded >= expected_number_of_pods:
@@ -194,9 +193,8 @@ def _yield_running_pods_for_job(
 
 
 def _get_pod_phase(target: K8sTarget, pod_name: str) -> str:
-    return (
-        _core_api(target)
-        .read_namespaced_pod(
+    return narrow.phase_of(
+        _core_api(target).read_namespaced_pod(
             namespace=target.namespace,
             name=pod_name,
             _request_timeout=(
@@ -204,7 +202,6 @@ def _get_pod_phase(target: K8sTarget, pod_name: str) -> str:
                 config.k8s_watch_read_timeout_seconds(),
             ),
         )
-        .status.phase
     )
 
 
@@ -263,7 +260,8 @@ def _scrape_pod_logs(
                 _core_api(target).read_namespaced_pod_log,
                 **kwargs,
             ):
-                out(e)
+                if e is not None:
+                    out(e)
                 last_scraped_at = default_timer()
             time.sleep(config.k8s_monitor_delay())
             pod_phase = _get_pod_phase(target, pod_name)

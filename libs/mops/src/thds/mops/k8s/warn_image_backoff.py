@@ -19,7 +19,7 @@ YIKES = colorized(fg="black", bg="yellow")
 
 
 def _emit_basic(event: client.CoreV1Event) -> None:
-    logger.error(YIKES(event.message))
+    logger.error(YIKES(event.message or ""))
 
 
 def _warn_image_pull_backoff(target: K8sTarget, on_backoff: OnCoreEvent = _emit_basic) -> None:
@@ -40,7 +40,7 @@ def _warn_image_pull_backoff(target: K8sTarget, on_backoff: OnCoreEvent = _emit_
         object_type_hint="backoff-warnings",
         field_selector="reason=BackOff",
     ):
-        if None is obj.last_timestamp or obj.last_timestamp > start_dt:
+        if obj.last_timestamp is None or obj.last_timestamp > start_dt:
             on_backoff(obj)
 
 

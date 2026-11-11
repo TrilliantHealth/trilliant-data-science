@@ -1,3 +1,8 @@
+### 3.34.20261111
+
+- Type checkers accept the `k8s` modules with `kubernetes` 37, whose models declare `metadata`, `spec`
+  and `status` as optional. An object missing one now raises a `ValueError` naming the field.
+
 ### 3.34.202611031811
 
 - Added `console.publish_queue_root` and `console.read_queue_roots` for run monitoring.

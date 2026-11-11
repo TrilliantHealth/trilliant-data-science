@@ -6,6 +6,8 @@ import os
 
 from kubernetes import client
 
+from .. import narrow
+
 RUN_LABEL = "mops.trillianthealth.com/console-run"
 RUN_ANNOTATION = "mops.trillianthealth.com/console-run-name"
 
@@ -21,7 +23,7 @@ def with_run(job: client.V1Job, console_run: str) -> client.V1Job:
         return job
 
     labelled = copy.deepcopy(job)
-    metadata = labelled.spec.template.metadata
+    metadata = narrow.required(narrow.pod_template(labelled).metadata, "spec.template.metadata")
     metadata.labels = {**(metadata.labels or {}), RUN_LABEL: value(console_run)}
     metadata.annotations = {
         **(metadata.annotations or {}),

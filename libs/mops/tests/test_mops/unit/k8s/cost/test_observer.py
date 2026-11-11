@@ -1,9 +1,11 @@
 import datetime as dt
 import time
+import typing as ty
 from types import SimpleNamespace
 
 from kubernetes import client
 
+from thds.mops.k8s import narrow
 from thds.mops.k8s.cost import azure, labels, model, observer
 from thds.mops.k8s.target import K8sTarget
 
@@ -36,16 +38,16 @@ def test_job_label_preserves_transform_inputs(monkeypatch):
 
     labelled = labels.add_to(job)
 
-    assert labelled.spec.template.metadata.labels == {
+    assert narrow.required(narrow.pod_template(labelled).metadata, "metadata").labels == {
         "existing": "yes",
         labels.RUN_LABEL: labels.value("2026-09-19/mr.Example"),
     }
-    assert labelled.spec.template.metadata.annotations == {
+    assert narrow.required(narrow.pod_template(labelled).metadata, "metadata").annotations == {
         "a": "b",
         labels.RUN_ANNOTATION: "2026-09-19/mr.Example",
     }
-    assert job.spec.template.metadata.labels == {"existing": "yes"}
-    assert job.spec.template.metadata.annotations == {"a": "b"}
+    assert narrow.required(narrow.pod_template(job).metadata, "metadata").labels == {"existing": "yes"}
+    assert narrow.required(narrow.pod_template(job).metadata, "metadata").annotations == {"a": "b"}
 
 
 def test_sample_learns_a_pool_and_charges_all_of_its_nodes():
@@ -57,7 +59,7 @@ def test_sample_learns_a_pool_and_charges_all_of_its_nodes():
     )
 
     observed, groups = observer._sample(
-        api,
+        ty.cast(client.CoreV1Api, api),
         (azure.PROVIDER,),
         "namespace",
         "run",
@@ -176,7 +178,9 @@ def test_sample_bounds_both_of_its_kubernetes_calls():
 
     api = SimpleNamespace(list_namespaced_pod=_record("pods"), list_node=_record("nodes"))
 
-    observer._sample(api, (azure.PROVIDER,), "namespace", "run", frozenset(), (5.0, 20.0))
+    observer._sample(
+        ty.cast(client.CoreV1Api, api), (azure.PROVIDER,), "namespace", "run", frozenset(), (5.0, 20.0)
+    )
 
     assert seen == {"pods": (5.0, 20.0), "nodes": (5.0, 20.0)}
 

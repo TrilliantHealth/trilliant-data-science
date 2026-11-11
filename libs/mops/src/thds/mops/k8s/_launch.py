@@ -15,7 +15,7 @@ from thds.mops.pure.core.metadata import EXTRA_METADATA_GENERATOR
 from thds.mops.pure.runner.simple_shims import samethread_shim
 from thds.termtool.colorize import colorized
 
-from . import config, cost, counts, job_future, logging, runtime_context
+from . import config, cost, counts, job_future, logging, narrow, runtime_context
 from ._shared import logger
 from .auth import api_client, upsert_namespace
 from .node_selection import NodeNarrowing, ResourceDefinition
@@ -93,8 +93,9 @@ def _create_job(
             if not (retried and ex.status == 409):
                 raise
 
-            logger.info(f"Job {body.metadata.name} already exists after a retried create")
-            return batch_api.read_namespaced_job(name=body.metadata.name, namespace=target.namespace)
+            job_name = narrow.name_of(body)
+            logger.info(f"Job {job_name} already exists after a retried create")
+            return batch_api.read_namespaced_job(name=job_name, namespace=target.namespace)
 
 
 @core.scope.bound
@@ -201,7 +202,7 @@ def launch(  # noqa: C901
 
         logger.debug("Creating container definition ...")
         logger.debug("Setting container CPU/RAM requirements ...")
-        v1_container_args = dict(
+        v1_container_args: dict[str, ty.Any] = dict(
             args=args,
             name=container_name,
             image=container_image,
@@ -215,8 +216,8 @@ def launch(  # noqa: C901
         resource_limits: ResourceDefinition = node_narrowing.get("resource_limits", dict())  # type: ignore[pyrefly:bad-assignment]  # legacy
         if resource_requests or resource_limits:
             v1_container_args["resources"] = client.V1ResourceRequirements(
-                requests=resource_requests,
-                limits=resource_limits,
+                requests={k: str(v) for k, v in resource_requests.items()},
+                limits={k: str(v) for k, v in resource_limits.items()},
             )
             if resource_requests:
                 if cpu_request := resource_requests.get("cpu"):
@@ -289,8 +290,8 @@ def launch(  # noqa: C901
     job = k8s_sdk_retry(lambda _: ((target, body), dict(retried=True)))(_create_job)(target, body)
     logger.info(LAUNCHED(f"Job {name} launched!") + f" on {container_image}")
     return core.futures.make_lazy(_launch_logs_and_create_future)(  # see below for implementation
-        job.metadata.name,
-        num_pods_expected=len(job.spec.template.spec.containers),
+        narrow.name_of(job),
+        num_pods_expected=len(narrow.pod_spec(job).containers),
         namespace=target.namespace,
         kubeconfig_context=target.kubeconfig_context,
         # ^ the resolved target rides along as args (captured now, eagerly) because this

@@ -5,6 +5,8 @@ import typing as ty
 
 from kubernetes import client
 
+from .. import narrow
+
 
 class Node(ty.NamedTuple):
     name: str
@@ -38,16 +40,17 @@ ProviderFactory = ty.Callable[[], Provider]
 
 def identity(raw: client.V1Node) -> tuple[str, str, dt.datetime]:
     """The provider-independent identity shared by every Kubernetes node."""
-    name = raw.metadata.name or ""
-    created = raw.metadata.creation_timestamp or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+    metadata = narrow.required(raw.metadata, "metadata")
+    name = metadata.name or ""
+    created = metadata.creation_timestamp or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
     if created.tzinfo is None:
         created = created.replace(tzinfo=dt.timezone.utc)
-    return name, raw.metadata.uid or name, created
+    return name, metadata.uid or name, created
 
 
 def unclassified(raw: client.V1Node) -> Node:
     name, uid, created = identity(raw)
-    labels = raw.metadata.labels or {}
+    labels = narrow.required(raw.metadata, "metadata").labels or {}
     return Node(
         name=name,
         uid=uid,

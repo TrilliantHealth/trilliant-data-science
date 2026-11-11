@@ -25,7 +25,7 @@ def test_modern_docstring_format_picks_follow() -> None:
 
 
 def test_legacy_docstring_format_picks_follow() -> None:
-    # kubernetes-client <=35.x style, handled by the base class via super().
+    # kubernetes-client <=35.x style; client 37's base class no longer recognizes it.
     f = _func_with_doc(":param bool follow: Follow the log stream. Defaults to false.")
     assert _PodLogWatch().get_watch_argument_name(f) == "follow"
 

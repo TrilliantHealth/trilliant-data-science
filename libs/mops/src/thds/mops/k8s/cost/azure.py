@@ -7,6 +7,7 @@ import urllib.request
 
 from kubernetes import client
 
+from .. import narrow
 from . import model
 
 _POOL_LABEL = "kubernetes.azure.com/agentpool"
@@ -64,7 +65,7 @@ def retail_hourly(region: str, sku: str, spot: bool = False) -> Price:
 
 def node(raw: client.V1Node) -> None | model.Node:
     """Classify an AKS node from its Kubernetes metadata."""
-    labels = raw.metadata.labels or {}
+    labels = narrow.required(raw.metadata, "metadata").labels or {}
     provider_id = getattr(raw.spec, "provider_id", "") or ""
     if _POOL_LABEL not in labels and not provider_id.lower().startswith("azure://"):
         return None
