@@ -26,13 +26,24 @@ empty_config_retry = fretry.retry_sleep(_retry_config, fretry.expo(retries=3, de
 _AUTH_RLOCK = RLock()
 
 
+def _with_env_no_proxy(
+    configuration: client.Configuration, environ: ty.Mapping[str, str]
+) -> client.Configuration:
+    """The kubernetes client reads HTTPS_PROXY from the environment but discards NO_PROXY, so in a
+    pod with a forward proxy every API server call would go through it. Restore NO_PROXY."""
+    configuration.no_proxy = environ.get("no_proxy") or environ.get("NO_PROXY") or None
+    return configuration
+
+
 def _new_api_client(kubeconfig_context: str) -> client.ApiClient:
     if "KUBERNETES_SERVICE_HOST" in os.environ:
         # in-pod there is exactly one cluster; the context is irrelevant. (Skipping the
         # kube-config probe also avoids the kubernetes library's root-logger WARNING about
         # falling back to inCluster config, which otherwise recurs on every token refresh.)
         config.load_incluster_config()
-        return client.ApiClient()
+        return client.ApiClient(
+            configuration=_with_env_no_proxy(client.Configuration.get_default_copy(), os.environ)
+        )
 
     if not kubeconfig_context:
         return config.new_client_from_config()

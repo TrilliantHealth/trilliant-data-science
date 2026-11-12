@@ -1,3 +1,9 @@
+### 3.34.202611111900
+
+- Fixed: in a pod, the Kubernetes API client now honors `NO_PROXY`. The kubernetes client library reads
+  `HTTPS_PROXY` from the environment but drops `NO_PROXY`, so a pod behind a forward proxy sent every API
+  server call through the proxy, even when `NO_PROXY` listed the API server.
+
 ### 3.34.20261111
 
 - Type checkers accept the `k8s` modules with `kubernetes` 37, whose models declare `metadata`, `spec`
