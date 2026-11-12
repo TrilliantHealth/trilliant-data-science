@@ -128,7 +128,11 @@ def upload(
         if "metadata" in upload_data_kwargs:
             decision.metadata.update(upload_data_kwargs.pop("metadata"))
 
-        if azcopy.upload.should_use_azcopy(n_bytes) and isinstance(src, Path):
+        if (
+            azcopy.upload.should_use_azcopy(n_bytes)
+            and isinstance(src, Path)
+            and azcopy.system_resources.acquire_process_slot()
+        ):
             logger.info("Using azcopy to upload %s to %s", src, dest_)
             try:
                 azcopy.upload.run(
@@ -148,6 +152,8 @@ def upload(
                     exc,
                     output,
                 )
+            finally:
+                azcopy.system_resources.release_process_slot()
 
         upload_content_settings = ContentSettings()
         if content_type:

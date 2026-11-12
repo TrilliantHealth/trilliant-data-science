@@ -1,3 +1,10 @@
+### 4.5.20261111
+
+- `THDS_ADLS_AZCOPY_SYSTEM_RESOURCES_MAX_PROCESSES` limits how many `azcopy` processes run at once in one
+  Python process. Transfers over the limit use the Python SDK. By default there is no limit.
+- A transfer that fails or is cancelled while `azcopy` runs now stops its `azcopy` process. A cancelled
+  async download used to leave it running.
+
 ### 4.5.20261016
 
 - Add the `demand-forecast` named root.

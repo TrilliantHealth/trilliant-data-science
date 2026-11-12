@@ -85,14 +85,18 @@ def run(
         text=True,
         env=system_resources.restrict_usage(),
     )
-    assert process.stdout
-    output_lines = list()
-    with progress.azcopy_tracker("up", uri.to_blob_windows_url(dest), size_bytes) as track:
-        for line in process.stdout:
-            track(line)
-            output_lines.append(line.strip())
+    try:
+        assert process.stdout
+        output_lines = list()
+        with progress.azcopy_tracker("up", uri.to_blob_windows_url(dest), size_bytes) as track:
+            for line in process.stdout:
+                track(line)
+                output_lines.append(line.strip())
 
-    process.wait()
+        process.wait()
+    finally:
+        system_resources.stop_process(process)  # the caller frees the slot after this returns
+
     if process.returncode != 0:
         raise subprocess.CalledProcessError(
             process.returncode,

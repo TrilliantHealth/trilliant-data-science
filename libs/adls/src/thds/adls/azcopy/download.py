@@ -61,8 +61,9 @@ def sync_fastpath(
     dl_file_client: DataLakeFileClient,
     download_request: DownloadRequest,
 ) -> None:
-    if not isinstance(download_request, SdkDownloadRequest):
+    if not isinstance(download_request, SdkDownloadRequest) and system_resources.acquire_process_slot():
         logger.debug("Downloading %s using azcopy", dl_file_client.url)
+        process: subprocess.Popen | None = None
         try:
             # Run the copy
             process = subprocess.Popen(
@@ -94,6 +95,8 @@ def sync_fastpath(
 
         except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
+        finally:
+            system_resources.release_process_slot(process)
 
     logger.debug("Downloading %s using Python SDK", dl_file_client.url)
     if hasattr(download_request, "writer"):
@@ -115,8 +118,9 @@ async def async_fastpath(
     # but it involves a lot of boilerplate, _and_ we have no nice way to cache
     # the value, which is going to be computed one per process and never again.
     # So we'll just block the async loop for a couple of seconds one time...
-    if not isinstance(download_request, SdkDownloadRequest):
+    if not isinstance(download_request, SdkDownloadRequest) and system_resources.acquire_process_slot():
         logger.debug("Downloading %s using azcopy", dl_file_client.url)
+        copy_proc: asyncio.subprocess.Process | None = None
         try:
             # Run the copy
             copy_proc = await asyncio.create_subprocess_exec(
@@ -151,6 +155,8 @@ async def async_fastpath(
 
         except (subprocess.SubprocessError, FileNotFoundError):
             logger.warning("Falling back to Python SDK for download")
+        finally:
+            await system_resources.release_process_slot_async(copy_proc)
 
     logger.debug("Downloading %s using Async Python SDK", dl_file_client.url)
     if hasattr(download_request, "writer"):
