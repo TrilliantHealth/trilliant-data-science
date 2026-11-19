@@ -1,9 +1,9 @@
 import os
+import tomllib
 import typing as ty
 from pathlib import Path
 
 from thds.core import config, log
-from thds.mops._compat import tomllib
 
 logger = log.getLogger(__name__)
 

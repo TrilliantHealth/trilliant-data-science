@@ -1,3 +1,7 @@
+## 1.10
+
+- Require Python 3.11 or newer.
+
 ## 1.9
 
 - Adds new `pickling` submodule with utilities for controlling `pickle` behavior for `attrs` and

@@ -1,3 +1,7 @@
+## 1.8
+
+- Require Python 3.11 or newer.
+
 ### 1.7.20261004
 
 - `wt status` and `wt prune` no longer count a branch as unmerged when its changes are already on the

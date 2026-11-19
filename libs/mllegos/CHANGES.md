@@ -1,5 +1,9 @@
 # Changes
 
+## 1.5
+
+- Require Python 3.11 or newer.
+
 ## 1.4
 
 - Add `shaplegos`: `explain_tree` runs `shap.TreeExplainer` over a named pandas feature frame and returns

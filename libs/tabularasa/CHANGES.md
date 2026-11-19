@@ -1,3 +1,7 @@
+## 0.15.0
+
+- Require Python 3.11 or newer.
+
 ### 0.14.20
 
 - No code change: inline `# type: ignore[pyrefly:<kind>]` comments replace the `pyrefly` baseline file.

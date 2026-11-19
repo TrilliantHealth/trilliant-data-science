@@ -96,7 +96,7 @@ scratch bytes expire.
 
 ## Requirements
 
-- Python >= 3.10
+- Python >= 3.11
 - `thds.mops` installed in both the [local/orchestrator](docs/orchestrator.adoc) environment and the
   [remote](docs/remote.adoc) execution context.
 - Your code is structured as ['pure' functions](docs/pure_functions.adoc).

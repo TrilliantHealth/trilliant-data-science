@@ -1,11 +1,11 @@
 [project]
 name = "thds.gent"
-version = "1.7"
+version = "1.8"
 # Patch version is a datetime determined upon release.
 description = "Git worktree management utilities - tree shepherds for your working trees"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "argh>=0.31.0",
     "rich>=13.0.0",

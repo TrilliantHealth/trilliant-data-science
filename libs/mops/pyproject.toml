@@ -1,11 +1,11 @@
 [project]
 name = "thds.mops"
-version = "3.34"
+version = "3.35"
 # Patch version is a datetime determined upon release
 description = "ML Ops tools for Trilliant Health"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "azure-core",
     "azure-identity",
@@ -16,7 +16,6 @@ dependencies = [
     "thds-core",
     "thds-humenc",
     "thds-termtool",
-    "tomli",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +39,7 @@ Repository = "https://github.com/TrilliantHealth/trilliant-data-science"
 
 [dependency-groups]
 dev = [
+    "tomli",
     "kubernetes>=18.20,!=32.0.0,!=36.0.0",
     "pytest~=7.2",
     "pytest-cov~=4.0",

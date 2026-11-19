@@ -1,6 +1,6 @@
 version = 1
-revision = 3
-requires-python = ">=3.10"
+revision = 5
+requires-python = ">=3.11"
 
 [options]
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
@@ -30,16 +30,6 @@ version = "7.9.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e7/e0/98670a80884f64578f0c22cd70c5e81a6e07b08167721c7487b4d70a7ca0/coverage-7.9.1.tar.gz", hash = "sha256:6cf43c78c4282708a28e466316935ec7489a9c487518a77fa68f716c67909cec", size = 813650, upload-time = "2025-06-13T13:02:28.627Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/78/1c1c5ec58f16817c09cbacb39783c3655d54a221b6552f47ff5ac9297603/coverage-7.9.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:cc94d7c5e8423920787c33d811c0be67b7be83c705f001f7180c7b186dcf10ca", size = 212028, upload-time = "2025-06-13T13:00:29.293Z" },
-    { url = "https://files.pythonhosted.org/packages/98/db/e91b9076f3a888e3b4ad7972ea3842297a52cc52e73fd1e529856e473510/coverage-7.9.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:16aa0830d0c08a2c40c264cef801db8bc4fc0e1892782e45bcacbd5889270509", size = 212420, upload-time = "2025-06-13T13:00:34.027Z" },
-    { url = "https://files.pythonhosted.org/packages/0e/d0/2b3733412954576b0aea0a16c3b6b8fbe95eb975d8bfa10b07359ead4252/coverage-7.9.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cf95981b126f23db63e9dbe4cf65bd71f9a6305696fa5e2262693bc4e2183f5b", size = 241529, upload-time = "2025-06-13T13:00:35.786Z" },
-    { url = "https://files.pythonhosted.org/packages/b3/00/5e2e5ae2e750a872226a68e984d4d3f3563cb01d1afb449a17aa819bc2c4/coverage-7.9.1-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:f05031cf21699785cd47cb7485f67df619e7bcdae38e0fde40d23d3d0210d3c3", size = 239403, upload-time = "2025-06-13T13:00:37.399Z" },
-    { url = "https://files.pythonhosted.org/packages/37/3b/a2c27736035156b0a7c20683afe7df498480c0dfdf503b8c878a21b6d7fb/coverage-7.9.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bb4fbcab8764dc072cb651a4bcda4d11fb5658a1d8d68842a862a6610bd8cfa3", size = 240548, upload-time = "2025-06-13T13:00:39.647Z" },
-    { url = "https://files.pythonhosted.org/packages/98/f5/13d5fc074c3c0e0dc80422d9535814abf190f1254d7c3451590dc4f8b18c/coverage-7.9.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:0f16649a7330ec307942ed27d06ee7e7a38417144620bb3d6e9a18ded8a2d3e5", size = 240459, upload-time = "2025-06-13T13:00:40.934Z" },
-    { url = "https://files.pythonhosted.org/packages/36/24/24b9676ea06102df824c4a56ffd13dc9da7904478db519efa877d16527d5/coverage-7.9.1-cp310-cp310-musllinux_1_2_i686.whl", hash = "sha256:cea0a27a89e6432705fffc178064503508e3c0184b4f061700e771a09de58187", size = 239128, upload-time = "2025-06-13T13:00:42.343Z" },
-    { url = "https://files.pythonhosted.org/packages/be/05/242b7a7d491b369ac5fee7908a6e5ba42b3030450f3ad62c645b40c23e0e/coverage-7.9.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:e980b53a959fa53b6f05343afbd1e6f44a23ed6c23c4b4c56c6662bbb40c82ce", size = 239402, upload-time = "2025-06-13T13:00:43.634Z" },
-    { url = "https://files.pythonhosted.org/packages/73/e0/4de7f87192fa65c9c8fbaeb75507e124f82396b71de1797da5602898be32/coverage-7.9.1-cp310-cp310-win32.whl", hash = "sha256:70760b4c5560be6ca70d11f8988ee6542b003f982b32f83d5ac0b72476607b70", size = 214518, upload-time = "2025-06-13T13:00:45.622Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/ab/5e4e2fe458907d2a65fab62c773671cfc5ac704f1e7a9ddd91996f66e3c2/coverage-7.9.1-cp310-cp310-win_amd64.whl", hash = "sha256:a66e8f628b71f78c0e0342003d53b53101ba4e00ea8dabb799d9dba0abbbcebe", size = 215436, upload-time = "2025-06-13T13:00:47.245Z" },
     { url = "https://files.pythonhosted.org/packages/60/34/fa69372a07d0903a78ac103422ad34db72281c9fc625eba94ac1185da66f/coverage-7.9.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:95c765060e65c692da2d2f51a9499c5e9f5cf5453aeaf1420e3fc847cc060582", size = 212146, upload-time = "2025-06-13T13:00:48.496Z" },
     { url = "https://files.pythonhosted.org/packages/27/f0/da1894915d2767f093f081c42afeba18e760f12fdd7a2f4acbe00564d767/coverage-7.9.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ba383dc6afd5ec5b7a0d0c23d38895db0e15bcba7fb0fa8901f245267ac30d86", size = 212536, upload-time = "2025-06-13T13:00:51.535Z" },
     { url = "https://files.pythonhosted.org/packages/10/d5/3fc33b06e41e390f88eef111226a24e4504d216ab8e5d1a7089aa5a3c87a/coverage-7.9.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:37ae0383f13cbdcf1e5e7014489b0d71cc0106458878ccde52e8a12ced4298ed", size = 245092, upload-time = "2025-06-13T13:00:52.883Z" },
@@ -94,18 +84,6 @@ toml = [
 ]
 
 [[package]]
-name = "exceptiongroup"
-version = "1.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/f4/c6e662dade71f56cd2f3735141b265c3c79293c109549c1e6933b0651ffc/exceptiongroup-1.3.0-py3-none-any.whl", hash = "sha256:4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10", size = 16674, upload-time = "2025-05-10T17:42:49.33Z" },
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -147,12 +125,10 @@ version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fb/aa/405082ce2749be5398045152251ac69c0f3578c7077efc53431303af97ce/pytest-8.4.0.tar.gz", hash = "sha256:14d920b48472ea0dbf68e45b96cd1ffda4705f33307dcc86c676c1b5104838a6", size = 1515232, upload-time = "2025-06-02T17:36:30.03Z" }
 wheels = [
@@ -195,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "thds-core"
-version = "1.58"
+version = "1.59"
 source = { editable = "../core" }
 dependencies = [
     { name = "setuptools" },
@@ -218,7 +194,7 @@ dev = [
 
 [[package]]
 name = "thds-termtool"
-version = "1.0"
+version = "1.1"
 source = { editable = "." }
 dependencies = [
     { name = "ansicolors" },

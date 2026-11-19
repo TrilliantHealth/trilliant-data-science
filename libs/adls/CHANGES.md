@@ -1,3 +1,7 @@
+## 4.6
+
+- Require Python 3.11 or newer.
+
 ### 4.5.20261111
 
 - `THDS_ADLS_AZCOPY_SYSTEM_RESOURCES_MAX_PROCESSES` limits how many `azcopy` processes run at once in one

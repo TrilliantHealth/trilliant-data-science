@@ -1,3 +1,7 @@
+## 3.35
+
+- Require Python 3.11 or newer.
+
 ### 3.34.202611111900
 
 - Fixed: in a pod, the Kubernetes API client now honors `NO_PROXY`. The kubernetes client library reads

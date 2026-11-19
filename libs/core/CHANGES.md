@@ -1,3 +1,7 @@
+## 1.59
+
+- Require Python 3.11 or newer.
+
 ### 1.58.20261026
 
 - `Lazy` keeps its lock and cached value on a `types.SimpleNamespace` when no storage is given, instead

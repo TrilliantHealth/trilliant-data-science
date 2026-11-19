@@ -1,11 +1,11 @@
 [project]
 name = "thds.mllegos"
 # Patch version is a datetime determined upon release
-version = "1.4"
+version = "1.5"
 description = "Composable components for basic ML tasks"
 readme = "README.md"
 authors = [{name = "Trilliant Health", email = "info@trillianthealth.com"}]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "pandas",

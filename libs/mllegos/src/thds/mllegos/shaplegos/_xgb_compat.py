@@ -1,15 +1,15 @@
 """Let shap < 0.50 read models written by xgboost >= 3.1.
 
 xgboost 3.1 started serializing `learner_model_param.base_score` as a vector literal (`"[5E-1]"`)
-instead of a scalar. shap 0.50 parses either form, but shap 0.50 also dropped Python 3.10, so on
-3.10 we are held at 0.49, whose XGBoost loader does `float("[5E-1]")` and raises.
+instead of a scalar. shap 0.50 parses either form, but the older XGBoost loader does
+`float("[5E-1]")` and raises.
 
 The loader decodes the model's UBJSON dump through one module-level function; we wrap that function
 to rewrite a vector `base_score` back to the scalar string the old parser expects. A binary or
 regression model writes a one-element vector. A multiclass model writes one element per class, and
 shap 0.50 keeps only the first, so this shim does the same and the two versions explain a given
-model identically. The patch is a no-op on shap >= 0.50. Delete this module once every consumer runs
-Python >= 3.11.
+model identically. The patch is a no-op on shap >= 0.50. Delete this module once the minimum
+supported shap version is 0.50.
 """
 
 import ast

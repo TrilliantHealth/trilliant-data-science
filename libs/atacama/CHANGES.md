@@ -1,3 +1,7 @@
+## 1.3
+
+- Require Python 3.11 or newer.
+
 ### 1.2.20260225
 
 - Drop Python 3.9 support (`requires-python>=3.10`).
