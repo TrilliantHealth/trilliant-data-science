@@ -94,3 +94,31 @@ def test_non_bool_types_still_parse_themselves(monkeypatch):
     _set_env_for(monkeypatch, "test.str.self", "seven")
     assert config.item("test.int.self", default=1)() == 7
     assert config.item("test.str.self", default="one")() == "seven"
+
+
+def test_an_item_is_registered_only_once_it_is_fully_built():
+    class _ReadsOnRegister(config.ConfigRegistry):
+        def setdefault(self, name, item):
+            assert item() == 5  # what another thread would do on finding the item
+            return super().setdefault(name, item)
+
+    config.item("complete", default=5, registry=_ReadsOnRegister("probe"), name_transform=lambda s: s)
+
+
+def test_an_item_that_loses_a_registration_race_is_refused():
+    registry = config.ConfigRegistry("probe")
+    winner = []
+
+    def _parse_while_a_competitor_registers(raw):
+        winner.append(config.item("dup", default=1, registry=registry, name_transform=lambda s: s))
+        return raw
+
+    with pytest.raises(config.ConfigNameCollisionError):
+        config.item(
+            "dup",
+            default=2,
+            parse=_parse_while_a_competitor_registers,
+            registry=registry,
+            name_transform=lambda s: s,
+        )
+    assert registry["dup"] is winner[0]

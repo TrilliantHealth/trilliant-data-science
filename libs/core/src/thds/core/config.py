@@ -129,7 +129,6 @@ class ConfigItem(ty.Generic[T]):
             raise ConfigNameCollisionError(
                 f"Config item {name} has already been registered in {registry.name}!"
             )
-        registry[name] = self
         self.name = name
         if parse is bool:
             # `parse=bool` can only have meant "this is a boolean"; taken literally it is a
@@ -149,6 +148,10 @@ class ConfigItem(ty.Generic[T]):
         self._stack_context: StackContext[T] = StackContext(
             "config_" + name, ty.cast(T, _NOT_CONFIGURED)
         )
+        if registry.setdefault(name, self) is not self:  # last, so no thread finds a half-built item
+            raise ConfigNameCollisionError(
+                f"Config item {name} has already been registered in {registry.name}!"
+            )
 
     def set_global(self, value: T):
         """Global to the current process.

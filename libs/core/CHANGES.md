@@ -1,3 +1,9 @@
+### 1.59.20261120
+
+- Fixed: a `ConfigItem` is added to its registry only after it is fully built, so a thread reading the
+  registry while another thread creates an item no longer finds one without its `_stack_context`. Two
+  threads creating the same name still get a `ConfigNameCollisionError` in one of them.
+
 ## 1.59
 
 - Require Python 3.11 or newer.
