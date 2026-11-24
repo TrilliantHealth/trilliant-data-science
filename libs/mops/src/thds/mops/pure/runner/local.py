@@ -197,14 +197,14 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
                         ),
                     )
                     # lazy yields (value, metadata) since PostShimResultGetter now returns a tuple.
-                    mops_future = MopsFuture.from_tuple_future(lazy, memo_uri)
+                    mops_future = MopsFuture.from_tuple_future(lazy, memo_uri, "computed")
                     same_process_in_flight.register(memo_uri, mops_future)  # replaces the placeholder
                     return mops_future
 
                 else:  # it's a synchronous shim - just process the result directly.
                     future_result_getter.release_lease = release_lease_in_current_process
                     value, md = future_result_getter(future_or_shim_result)
-                    f = MopsFuture(futures.resolved(value), memo_uri)
+                    f = MopsFuture(futures.resolved(value), memo_uri, "computed")
                     f.set_result_metadata(md)
                     return f
 
@@ -240,7 +240,7 @@ def invoke_via_shim_or_return_memoized(  # noqa: C901
             result = check_result_exists("memoized")
             if result:
                 value, md = p_unwrap_value_or_error(memo_uri, result)
-                f: MopsFuture[T] = MopsFuture(futures.resolved(value), memo_uri)
+                f: MopsFuture[T] = MopsFuture(futures.resolved(value), memo_uri, "memo_hit")
                 f.set_result_metadata(md)
                 return f
 

@@ -1,3 +1,7 @@
+## 3.36
+
+- `MopsFuture.execution_kind` reports computed, memo-hit, or shared work, including lease takeovers.
+
 ## 3.35
 
 - Require Python 3.11 or newer.

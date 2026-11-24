@@ -13,6 +13,7 @@ from .core.metadata import ResultMetadata
 logger = log.getLogger(__name__)
 
 R = ty.TypeVar("R")
+ExecutionKind = ty.Literal["computed", "memo_hit", "shared", "unknown"]
 
 
 @dataclass
@@ -60,17 +61,29 @@ class MopsFuture(ty.Generic[R]):
       than blocking on the underlying (possibly multi-minute) computation.
     """
 
-    def __init__(self, inner: futures.PFuture[R], memo_uri: str) -> None:
+    def __init__(
+        self, inner: futures.PFuture[R], memo_uri: str, execution_kind: ExecutionKind = "unknown"
+    ) -> None:
         self._inner = inner
         self._yields_tuple = False
         self.memo_uri = memo_uri
         self.result_metadata: ty.Optional[ResultMetadata] = None
+        self._execution_kind = execution_kind
+
+    @property
+    def execution_kind(self) -> ExecutionKind:
+        """This caller's work; a shared invocation can become computed after lease takeover."""
+        return ty.cast(
+            ExecutionKind,
+            getattr(self._inner, "execution_kind", getattr(self, "_execution_kind", "unknown")),
+        )
 
     @classmethod
     def from_tuple_future(
         cls,
         tuple_future: futures.PFuture[tuple[R, ty.Optional[ResultMetadata]]],
         memo_uri: str,
+        execution_kind: ExecutionKind = "unknown",
     ) -> "MopsFuture[R]":
         """Construct a MopsFuture from a future that yields (value, metadata).
 
@@ -79,7 +92,7 @@ class MopsFuture(ty.Generic[R]):
         inner tuple-future without resolving it, so it returns promptly even
         when the underlying computation has not finished.
         """
-        mf: MopsFuture[R] = cls(ty.cast("futures.PFuture[R]", tuple_future), memo_uri)
+        mf: MopsFuture[R] = cls(ty.cast("futures.PFuture[R]", tuple_future), memo_uri, execution_kind)
         mf._yields_tuple = True
         return mf
 

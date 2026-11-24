@@ -201,6 +201,9 @@ def test_submit_returns_mops_future_with_memo_uri_and_metadata(tmp_path):
     assert fut2.result() == 7
     assert fut2.memo_uri == fut1.memo_uri
     assert fut2.result_metadata is not None
+    assert fut1.execution_kind == "computed"
+    assert fut2.execution_kind == "memo_hit"
+    assert pickle.loads(pickle.dumps(fut2)).execution_kind == "memo_hit"
 
 
 @pytest.mark.parametrize(

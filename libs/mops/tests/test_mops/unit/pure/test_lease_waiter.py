@@ -72,6 +72,7 @@ def test_resolves_when_someone_elses_result_appears():
     assert not fut.done()  # registration never blocks on the wait
     assert fut.result(timeout=10) == ("result", None)
     assert len(checks) >= 3
+    assert MopsFuture.from_tuple_future(fut, "memo://unit/other-result").execution_kind == "shared"
 
 
 def test_memoized_exception_is_raised_by_the_future():
@@ -108,6 +109,7 @@ def test_takeover_dispatches_off_the_waiter_thread_and_bridges_the_result():
     )
     assert fut.result(timeout=10) == (42, None)
     assert invoked_on_threads == ["mops-lease-takeover"]
+    assert MopsFuture.from_tuple_future(fut, "memo://unit/takeover").execution_kind == "computed"
 
 
 def test_takeover_invocation_error_fails_the_future():
@@ -248,6 +250,10 @@ def test_pickling_after_takeover_delegates_to_the_invocation_future():
     reconstruct, args = fut.__reduce__()
     assert reconstruct is lease_waiter._unpickled
     assert args == (inner,)
+    assert (
+        MopsFuture.from_tuple_future(reconstruct(*args), "memo://unit/takeover-pickle").execution_kind
+        == "computed"
+    )
 
     inner.set_result((99, None))
     assert fut.result(timeout=10) == (99, None)

@@ -392,3 +392,16 @@ result = local_func(args)
 with my_magic_func.shim("subprocess"):
     result = my_magic_func(args)
 ----
+
+== Asynchronous execution identity
+
+`wand.submit(...)` returns a `MopsFuture` with `memo_uri`, `result_metadata`, and
+`execution_kind`. The kind is `computed` when this caller invokes the function,
+`memo_hit` when it returns an existing result, or `shared` when it waits for another
+caller's invocation. A shared call that takes over an expired lease becomes `computed`;
+read the kind after completion for accounting. Manually constructed futures and older
+pickles without this information report `unknown`.
+
+The result metadata describes the original execution even on reuse. Use the caller's
+execution kind to distinguish new work from reuse; neither elapsed request time nor the
+presence of result metadata proves a new execution.

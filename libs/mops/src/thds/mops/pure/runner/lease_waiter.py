@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from thds.core import cache, futures, log
 from thds.termtool.colorize import colorized, make_colorized_out
 
-from .._futures import MopsFuture
+from .._futures import ExecutionKind, MopsFuture
 from ..core import lease, metadata
 from . import same_process_in_flight
 
@@ -44,14 +44,13 @@ ValueAndMetadata = tuple[R, metadata.ResultMetadata | None]
 
 def _resolved_tuple_future(
     value_and_metadata: "ValueAndMetadata[R]",
-) -> "concurrent.futures.Future[ValueAndMetadata[R]]":
-    fut: "concurrent.futures.Future[ValueAndMetadata[R]]" = concurrent.futures.Future()
-    fut.set_result(value_and_metadata)
-    return fut
+    execution_kind: ExecutionKind = "shared",
+) -> "MopsFuture[ValueAndMetadata[R]]":
+    return MopsFuture(futures.resolved(value_and_metadata), "", execution_kind)
 
 
 def _unpickled(future: "futures.PFuture[ValueAndMetadata[R]]") -> "futures.PFuture[ValueAndMetadata[R]]":
-    return future
+    return MopsFuture(future, "", "computed")
 
 
 class _AwaitedFuture(concurrent.futures.Future, ty.Generic[R]):
@@ -73,6 +72,7 @@ class _AwaitedFuture(concurrent.futures.Future, ty.Generic[R]):
     def __init__(self, memo_uri: str) -> None:
         super().__init__()
         self.memo_uri = memo_uri
+        self.execution_kind: ExecutionKind = "shared"
         self._takeover_future: MopsFuture[R] | None = None
 
     def __reduce__(self) -> tuple:
@@ -85,7 +85,7 @@ class _AwaitedFuture(concurrent.futures.Future, ty.Generic[R]):
                 "Pickling a pending awaited-lease future for %s - blocking until it resolves.",
                 self.memo_uri,
             )
-        return _resolved_tuple_future, (self.result(),)
+        return _resolved_tuple_future, (self.result(), self.execution_kind)
 
 
 @dataclass
@@ -182,6 +182,7 @@ def _poll(item: _AwaitedLease) -> float | None:
 
     lease_owned = item.acquire_lease()
     if lease_owned is not None:
+        item.outer.execution_kind = "computed"
         logger.info(f"Took over expired lease for {item.memo_uri} - invoking ourselves.")
         threading.Thread(target=_take_over, args=(item, lease_owned), name="mops-lease-takeover").start()
         return None
